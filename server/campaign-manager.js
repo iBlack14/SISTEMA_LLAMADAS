@@ -206,14 +206,24 @@ export function ensureCampaign(session) {
 export function syncCampaignContacts(session, contacts = [], options = {}) {
   const campaign = ensureCampaign(session);
   const seenIds = new Set();
+  const seenPhones = new Set();
+  const previousContacts = new Map(campaign.contacts.map((contact) => [contact.phone, contact]));
   campaign.contacts = contacts.map((contact) => normalizeContact(contact)).filter((contact) => {
-    if (!contact || seenIds.has(contact.id)) return false;
+    if (!contact || seenIds.has(contact.id) || seenPhones.has(contact.phone)) return false;
     seenIds.add(contact.id);
+    seenPhones.add(contact.phone);
     return true;
+  }).map((contact) => {
+    const previous = previousContacts.get(contact.phone);
+    // A new campaign is an explicit new attempt; keep earlier attempts intact.
+    return { ...contact, status: "pending", result: "", technicalResult: "",
+      attempts: 0, currentAttemptId: "", assignedWorkerId: null, assignedWorkerName: "",
+      answeredAt: null, completedAt: null,
+      attemptHistory: previous?.attemptHistory || contact.attemptHistory };
   });
   campaign.assignments = {};
   campaign.pausedWorkerIds = [];
-  campaign.history = [];
+  // Keep completed attempts available in the report across campaign restarts.
   campaign.listName = String(options.listName || "").trim();
   campaign.maxAttempts = Math.min(5, Math.max(1, Number(options.maxAttempts || 2)));
   campaign.completedAt = null;
@@ -374,14 +384,16 @@ export function pickNextContact(session, workerId = "") {
   const campaign = ensureCampaign(session);
   const normalizedWorkerId = String(workerId || "").trim();
   const targetedMode = campaign.contacts.some((contact) => Boolean(contact.targetWorkerId));
-  const eligible = (contact) => !normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId;
+  const busyPhones = new Set(getActiveContacts(session).map((contact) => contact.phone));
+  const eligible = (contact) => !busyPhones.has(contact.phone)
+    && (!normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId);
   // Complete the first round before retrying unanswered contacts.
   let next = campaign.contacts.find((contact) => eligible(contact) && contact.status === "pending")
     || campaign.contacts.find((contact) => eligible(contact) && contact.status === "retry_pending")
     || null;
   if (!next && normalizedWorkerId && targetedMode) {
     const unclaimed = campaign.contacts.find((contact) =>
-      !contact.targetWorkerId && ["pending", "retry_pending"].includes(contact.status)
+      !contact.targetWorkerId && !busyPhones.has(contact.phone) && ["pending", "retry_pending"].includes(contact.status)
     );
     if (unclaimed) {
       const nextList = unclaimed.list;
@@ -400,7 +412,7 @@ export function assignNextContact(session, worker = {}) {
   const campaign = ensureCampaign(session);
   const workerId = String(worker.id || "").trim();
   if (!workerId || campaign.status !== "running" || isWorkerPaused(session, workerId)) return null;
-  if (campaign.assignments[workerId]) return getContactByWorker(session, workerId);
+  if (campaign.assignments[workerId] || ACTIVE_STATES.has(worker.callState)) return null;
 
   const next = pickNextContact(session, workerId);
   if (!next) {
@@ -415,7 +427,7 @@ export function assignNextContact(session, worker = {}) {
 
   const startedAt = nowIso();
   const attempt = normalizeAttempt({
-    number: next.attempts + 1,
+    number: next.attemptHistory.reduce((max, item) => Math.max(max, item.number), 0) + 1,
     workerId,
     workerName: worker.name || workerId,
     startedAt
@@ -450,15 +462,15 @@ export function assignSpecificContact(session, worker = {}, contactId = "") {
   const campaign = ensureCampaign(session);
   const workerId = String(worker.id || "").trim();
   const requestedId = String(contactId || "").trim();
-  if (!workerId || !requestedId || campaign.assignments[workerId]) return null;
+  if (!workerId || !requestedId || campaign.assignments[workerId] || ACTIVE_STATES.has(worker.callState)) return null;
   const contact = campaign.contacts.find((item) => item.id === requestedId);
   if (!contact || (contact.targetWorkerId && contact.targetWorkerId !== workerId)) return null;
-  const assignedElsewhere = Object.values(campaign.assignments).some((assignment) => assignment.contactId === requestedId);
+  const assignedElsewhere = getActiveContacts(session).some((item) => item.phone === contact.phone);
   if (assignedElsewhere) return null;
 
   const startedAt = nowIso();
   const attempt = normalizeAttempt({
-    number: contact.attempts + 1,
+    number: contact.attemptHistory.reduce((max, item) => Math.max(max, item.number), 0) + 1,
     workerId,
     workerName: worker.name || workerId,
     startedAt
@@ -483,7 +495,8 @@ export function assignSpecificContact(session, worker = {}, contactId = "") {
     attemptId: attempt.id,
     assignedAt: startedAt
   };
-  campaign.status = "running";
+  // A chosen redial must not resume the rest of a paused/completed campaign.
+  if (campaign.status !== "running") campaign.status = "paused";
   campaign.completedAt = null;
   campaign.updatedAt = Date.now();
   syncLegacyActiveFields(campaign);
@@ -495,11 +508,12 @@ export function ensureCampaignContact(session, input = {}) {
   const requestedId = String(input.id || "").trim();
   let contact = requestedId ? campaign.contacts.find((item) => item.id === requestedId) : null;
   if (contact) {
-    if (input.targetWorkerId) contact.targetWorkerId = String(input.targetWorkerId).trim();
     return contact;
   }
   contact = normalizeContact(input);
   if (!contact) return null;
+  const samePhone = campaign.contacts.find((item) => item.phone === contact.phone);
+  if (samePhone) return samePhone;
   campaign.contacts.push(contact);
   campaign.updatedAt = Date.now();
   return contact;
@@ -582,6 +596,9 @@ export function updateActiveCallState(session, state, worker = {}, extras = {}) 
   if (reportedAttemptId && attempt?.id && reportedAttemptId !== attempt.id) return null;
 
   if (normalizedState === "dialing" || normalizedState === "ringing" || normalizedState === "in_call") {
+    // Late ringing/dialing events must never undo a confirmed answer.
+    const rank = { dialing: 1, ringing: 2, in_call: 3 };
+    if (rank[normalizedState] < (rank[contact.status] || 0)) return null;
     contact.status = normalizedState;
     if (attempt && normalizedState === "ringing" && !attempt.ringingAt) attempt.ringingAt = nowIso();
     if (attempt && normalizedState === "in_call" && !attempt.answeredAt) {

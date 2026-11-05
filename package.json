@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test",
     "start": "node server/server.js",
+    "start:local": "node --env-file=local-test.env server/server.js",
     "dev": "node --watch server/server.js",
     "start:web": "node server/server.js",
     "dev:web": "node --watch server/server.js",

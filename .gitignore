@@ -1,0 +1,7 @@
+.idea/
+.local-test/
+local-test.env
+
+**/build/
+**/.gradle/
+android-app/local.properties

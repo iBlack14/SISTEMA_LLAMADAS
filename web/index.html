@@ -226,6 +226,21 @@
         </div>
       </section>
 
+      <section aria-label="Reporte de llamadas">
+        <h3>Reporte de llamadas</h3>
+        <p class="muted">Cada intento conserva su resultado. Puedes volver a llamar cuando el equipo esté disponible.</p>
+        <label for="campaignReportFilter">Buscar por número, contacto, lista o resultado</label>
+        <input id="campaignReportFilter" type="search" placeholder="Buscar en el reporte..." />
+        <p id="campaignReportCount" aria-live="polite">0 registros</p>
+        <p id="campaignReportEmpty">Todavía no hay llamadas registradas.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lista</th><th>Contacto</th><th>Número</th><th>Equipo</th><th>Intento</th><th>Inicio (Lima)</th><th>Contestó (Lima)</th><th>Fin (Lima)</th><th>Duración</th><th>Resultado técnico</th><th>Resultado comercial</th><th>Acción</th></tr></thead>
+            <tbody id="campaignReportBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
         <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
       </section>
@@ -491,7 +506,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20260812-operator-isolation");
+        import("/dashboard.js?v=20261105-call-stability-report");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);

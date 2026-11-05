@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/vc_bg"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_main_card"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <ImageView
+            android:id="@+id/companyImage"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="@drawable/bg_company_image"
+            android:padding="18dp"
+            android:scaleType="centerInside"
+            android:src="@android:drawable/sym_call_incoming" />
+
+        <TextView
+            android:id="@+id/companyNameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="Contacto"
+            android:textColor="@color/vc_text_primary"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/phoneNumberText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="-"
+            android:textColor="@color/vc_text_secondary"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/callStateText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_state_chip"
+            android:paddingLeft="14dp"
+            android:paddingTop="8dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="8dp"
+            android:text="LLAMANDO"
+            android:textColor="@color/vc_text_secondary"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/callTimerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="00:00"
+            android:textColor="@color/vc_text_primary"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/micButton"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Micrófono"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_primary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/speakerButton"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Altavoz"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/answerButton"
+                android:layout_width="0dp"
+                android:layout_height="58dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_success_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Contestar"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_inverse"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/hangupButton"
+                android:layout_width="0dp"
+                android:layout_height="58dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_danger_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Colgar"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_inverse" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

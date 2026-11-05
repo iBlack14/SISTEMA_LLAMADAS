@@ -1,0 +1,36 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.VoipVcBridge" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/vc_bg</item>
+        <item name="android:navigationBarColor">@color/vc_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">@color/vc_accent</item>
+        <item name="colorPrimaryVariant">@color/vc_accent_dark</item>
+        <item name="colorSecondary">@color/vc_success</item>
+        <item name="colorSurface">@color/vc_surface</item>
+        <item name="android:colorBackground">@color/vc_bg</item>
+        <item name="colorOnPrimary">@color/vc_text_inverse</item>
+        <item name="colorOnSecondary">@color/vc_text_inverse</item>
+        <item name="colorOnSurface">@color/vc_text_primary</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+    </style>
+
+    <style name="Theme.VoipVcBridge.Scanner" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:statusBarColor">#09090B</item>
+        <item name="android:navigationBarColor">#09090B</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">@color/vc_accent</item>
+        <item name="colorPrimaryVariant">@color/vc_accent_dark</item>
+        <item name="colorSecondary">@color/vc_success</item>
+        <item name="colorSurface">#18181B</item>
+        <item name="android:colorBackground">#09090B</item>
+        <item name="colorOnPrimary">@color/vc_text_inverse</item>
+        <item name="colorOnSecondary">@color/vc_text_inverse</item>
+        <item name="colorOnSurface">@color/vc_text_inverse</item>
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+    </style>
+</resources>

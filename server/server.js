@@ -907,11 +907,24 @@ io.on("connection", (socket) => {
       const worker = workerId
         ? getConnectedPhoneWorkers(session).find((item) => item.id === workerId)
         : getActivePhoneWorker(session);
-      if (contactId) {
-        const campaign = ensureCampaign(session);
-        campaign.activeContactId = contactId;
-        if (worker) campaign.activeWorkerSocketId = worker.socketId;
+      if (!worker) return;
+      const campaign = ensureCampaign(session);
+      if (campaign.assignments[worker.id] || ["dialing", "ringing", "in_call"].includes(worker.callState)) {
+        socket.emit("phone:command_ack", { commandId, action, ok: false, message: "El equipo ya tiene una llamada en curso" });
+        return;
       }
+      const requested = ensureCampaignContact(session, { id: contactId, phone: phoneNumber, name: contactName || companyName });
+      const assigned = requested && assignSpecificContact(session, worker, requested.id);
+      if (!assigned) {
+        socket.emit("phone:command_ack", { commandId, action, ok: false, message: "Número inválido, ocupado o asignado a otro equipo" });
+        return;
+      }
+      contactId = assigned.id;
+      phoneNumber = assigned.phone;
+      worker.callState = "dialing";
+      worker.activeContactId = assigned.id;
+      worker.lastNumber = assigned.phone;
+      worker.lastCompanyName = assigned.name;
       session.updatedAt = Date.now();
       saveSoon();
       
@@ -970,7 +983,7 @@ io.on("connection", (socket) => {
     emitCampaignState(code);
   });
 
-  socket.on("phone:status", ({ callState, phoneNumber, contactName, companyName, contactId, callId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed }) => {
+  socket.on("phone:status", ({ callState, phoneNumber, contactName, companyName, contactId, callId, commandId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed }) => {
     const code = socket.data.code;
     const role = socket.data.role;
     if (!code || role !== "phone") return;
@@ -980,6 +993,13 @@ io.on("connection", (socket) => {
 
     const worker = getPhoneWorkerBySocketId(session, socket.id);
     const isExternalIncoming = Boolean(externalIncoming);
+    // Reject obsolete events before changing worker availability or campaign state.
+    const activeAssignment = worker && ensureCampaign(session).assignments[worker.id];
+    if (!isExternalIncoming && activeAssignment
+        && ((callId && activeAssignment.attemptId !== String(callId))
+          || (contactId && activeAssignment.contactId !== String(contactId)))) return;
+    if (!isExternalIncoming && activeAssignment && callState === "idle" && !terminalConfirmed) return;
+    if (!isExternalIncoming && worker?.callState === "in_call" && ["dialing", "ringing"].includes(callState)) return;
     if (worker) {
       worker.callState = callState || worker.callState || "idle";
       worker.speakerOn = Boolean(speakerOn);
@@ -1024,7 +1044,14 @@ io.on("connection", (socket) => {
     emitCampaignState(code);
 
     const campaign = ensureCampaign(session);
-    if (["ended", "failed"].includes(String(callState || "")) && campaign.status === "running") {
+    const terminal = ["ended", "failed"].includes(String(callState || "")) || (callState === "idle" && terminalConfirmed);
+    // Let the recovered Android client clear its persisted command only after
+    // the matching attempt has been recorded, including terminal replays.
+    if (!isExternalIncoming && terminal && callId && commandId
+        && campaign.history.some((item) => item.attemptId === callId && item.contactId === contactId && item.workerId === worker?.id)) {
+      socket.emit("phone:status_ack", { accepted: true, terminal: true, commandId, contactId });
+    }
+    if (terminal && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
     }
   });
@@ -1512,18 +1539,17 @@ app.post("/api/session/:code/workers/:workerId/call-contact", (req, res) => {
   const worker = (session.phoneWorkers || []).find((item) => item.id === workerId && item.connected && item.socketId);
   if (!worker) return res.status(404).json({ ok: false, error: "El equipo asignado no esta conectado" });
   const campaign = ensureCampaign(session);
+  if (campaign.assignments[workerId] || ["dialing", "ringing", "in_call"].includes(worker.callState)) {
+    return res.status(409).json({ ok: false, error: "Espera a que termine la llamada actual del equipo" });
+  }
   const requested = ensureCampaignContact(session, { ...(req.body?.contact || {}), id: contactId, targetWorkerId: workerId });
   if (!requested) return res.status(400).json({ ok: false, error: "El contacto o su numero no son validos" });
   if (requested.targetWorkerId && requested.targetWorkerId !== workerId) {
     return res.status(409).json({ ok: false, error: "El contacto pertenece a otro equipo" });
   }
 
-  const held = holdActiveContact(session, workerId);
-  if (held) {
-    io.to(worker.socketId).emit("call:action", { action: "hangup", from: "dashboard", contactId: held.id, commandId: nanoid() });
-  }
   setWorkerPaused(session, workerId, false);
-  const contact = assignSpecificContact(session, worker, contactId);
+  const contact = assignSpecificContact(session, worker, requested.id);
   if (!contact) return res.status(409).json({ ok: false, error: "No se pudo asignar el contacto al equipo" });
 
   worker.callState = "dialing";

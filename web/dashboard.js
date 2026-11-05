@@ -1270,6 +1270,7 @@ function mapCampaignReportRow(item, fallbackList = "") {
   const workerName = String(item.workerName || item.worker || workerId || "").trim();
   return {
     attemptId: item.attemptId || "",
+    contactId: item.contactId || "",
     list: item.list || fallbackList || "",
     name: item.name || "",
     phone: item.phone || "",
@@ -1295,8 +1296,15 @@ function reportWorkerLabel(row) {
 }
 
 function getCampaignReportRows() {
-  const history = Array.isArray(campaignState?.history) ? campaignState.history : [];
-  return history.map((item) => mapCampaignReportRow(item, campaignState?.listName || ""));
+  const sources = [campaignState?.turn?.currentReport, campaignState?.history];
+  const rows = new Map();
+  for (const source of sources) {
+    for (const item of Array.isArray(source) ? source : []) {
+      const key = item.attemptId || [item.contactId, item.workerId, item.attemptNumber, item.startedAt].join("|");
+      rows.set(key, mapCampaignReportRow(item, campaignState?.listName || ""));
+    }
+  }
+  return [...rows.values()].sort((a, b) => (Date.parse(a.startedAt) || 0) - (Date.parse(b.startedAt) || 0));
 }
 
 async function getAllCampaignReportRows() {
@@ -1372,7 +1380,10 @@ function reportResultClass(value) {
 
 function renderCampaignReport() {
   if (!refs.campaignReportBodyEl) return;
-  const rows = getCampaignReportRows();
+  const query = String(refs.campaignReportFilterEl?.value || "").trim().toLocaleLowerCase("es");
+  const rows = getCampaignReportRows().filter((item) => !query ||
+    [item.name, item.phone, item.list, item.worker, reportResultLabel(item.technicalResult), reportResultLabel(item.disposition)]
+      .some((value) => String(value || "").toLocaleLowerCase("es").includes(query)));
   if (refs.campaignReportCountEl) {
     refs.campaignReportCountEl.textContent = `${rows.length} ${rows.length === 1 ? "registro" : "registros"}`;
   }
@@ -1390,6 +1401,7 @@ function renderCampaignReport() {
       <td>${escHtml(formatCallDuration(item.durationSeconds))}</td>
       <td><span class="campaign-report-result technical ${reportResultClass(item.technicalResult)}">${escHtml(reportResultLabel(item.technicalResult))}</span></td>
       <td><span class="campaign-report-result commercial ${reportResultClass(item.disposition)}">${escHtml(reportResultLabel(item.disposition))}</span></td>
+      <td><button type="button" class="secondary" data-report-attempt="${escHtml(item.attemptId)}">Volver a llamar</button></td>
     </tr>
   `).join("");
 }
@@ -1647,6 +1659,26 @@ function requestAutomaticSession() {
 
 // ── EVENT BINDING ────────────────────────────────────────────────────
 function bindEvents() {
+  if (refs.campaignReportFilterEl) refs.campaignReportFilterEl.oninput = renderCampaignReport;
+  if (refs.campaignReportBodyEl) refs.campaignReportBodyEl.onclick = async (event) => {
+    const button = event.target.closest("button[data-report-attempt]");
+    if (!button || button.disabled) return;
+    const row = getCampaignReportRows().find((item) => item.attemptId === button.dataset.reportAttempt);
+    if (!row) return;
+    const slot = getPairingListAssignmentByName(row.list)?.slot;
+    const workerId = slot?.deviceId || row.workerId;
+    if (!workerId) return setStatus("Vincula un equipo a esta lista para volver a llamar.", true);
+    button.disabled = true;
+    try {
+      const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/call-contact`, {
+        contactId: row.contactId,
+        contact: { id: row.contactId, name: row.name, phone: row.phone, list: row.list }
+      });
+      if (data) setStatus("Rellamada enviada. El intento anterior permanece en el reporte.", true);
+    } finally {
+      button.disabled = false;
+    }
+  };
   if (refs.createBtn) refs.createBtn.onclick = () => socket.emit("session:create", { dashboardClientId });
   if (refs.joinBtn) refs.joinBtn.onclick = () => {
     const code = refs.sessionCodeIn.value.trim().toUpperCase();
