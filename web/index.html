@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/styles.css?v=20260811-pdf-speaker-logout" />
+ <link rel="stylesheet" href="/styles.css?v=20261105-calendario-cuadrado-v3" />
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -70,11 +70,25 @@
           <small id="currentShiftSchedule">Horario de Lima</small>
         </div>
         <div class="shift-management-actions">
+          <button id="reportNavBtn" class="secondary" type="button">📅 CALENDARIO</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">REINICIAR SESIÓN</button>
         </div>
       </section>
       <section id="shiftHistoryPanel" class="shift-history-panel" aria-live="polite"></section>
+
+<!-- NAVEGACIÓN DEL MÓDULO DE REPORTES -->
+<div class="report-nav">
+  <button id="reportBackBtn" class="secondary" type="button" hidden>
+    ← VOLVER A LLAMADAS
+  </button>
+</div>
+
+<!-- CONTENEDOR DEL CALENDARIO ANUAL -->
+<section id="annualReport" class="annual-report" hidden></section>
+
+<!-- CONTENIDO ORIGINAL DE LLAMADAS -->
+<div id="callsContent">
 
       <!-- QR BLOCK -->
       <div class="qr-block" id="qrBlock">
@@ -244,7 +258,8 @@
       <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
         <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
       </section>
-
+</div>
+<!-- FIN DEL CONTENIDO ORIGINAL DE LLAMADAS -->
     </section>
   </main>
 
@@ -477,7 +492,7 @@
       </div>
     </div>
   </div>
-
+<script src="/modules/reports.js?v=1" defer></script>
   <script>
     (function bootstrapDashboard() {
       const params = new URLSearchParams(window.location.search);

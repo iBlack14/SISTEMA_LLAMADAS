@@ -5056,3 +5056,258 @@ button,
     padding-right: 4px;
   }
 }
+
+/*MÓDULO DE REPORTES - CALENDARIO ANUAL*/
+
+[hidden] {
+  display: none !important;
+}
+
+.report-nav {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.annual-report {
+  padding: 20px 0;
+}
+
+.report-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.report-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* CUADRÍCULA DE LOS 12 MESES */
+
+.months-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(245px, 1fr));
+  gap: 16px;
+}
+
+.report-month {
+  border: 1px solid var(--border);
+  background: rgba(124, 58, 237, 0.08);
+  padding: 15px;
+  border-radius: 16px;
+}
+
+.report-month h3 {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.report-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  text-align: center;
+}
+
+.report-days b {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-days button {
+  min-height: 32px;
+  padding: 0;
+  font-size: 12px;
+  background: transparent;
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+
+.report-days button.has-report {
+  background: transparent;
+  border-color: #ff00ff;
+  font-weight: bold;
+}
+
+.report-days button:hover {
+  border-color: #a78bfa;
+}
+
+/* BUSCADOR */
+
+.report-search {
+  margin: 15px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.report-search input {
+  margin-left: 10px;
+}
+
+.report-search span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* SELECTOR DE RUBROS */
+
+.report-rubros,
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.report-rubros button {
+  background: rgba(124, 58, 237, 0.14);
+  border: 1px solid var(--border);
+}
+
+.report-rubros button.chosen {
+  background: #6d28d9;
+}
+
+/* TARJETAS DE ESTADÍSTICAS */
+
+.report-metrics {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.report-metrics article {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  background: rgba(124, 58, 237, 0.08);
+  display: grid;
+  gap: 7px;
+}
+
+.report-metrics span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-metrics strong {
+  font-size: 20px;
+}
+
+/* TABLA DE CONTACTOS */
+
+.report-table-wrap {
+  overflow-x: auto;
+}
+
+.report-table-wrap table {
+  width: 100%;
+}
+
+.report-error {
+  color: #fda4af;
+}
+
+@media (max-width: 600px) {
+  .months-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-heading {
+    align-items: flex-start;
+  }
+
+  .report-search input {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+/* =========================================
+   CALENDARIO DE REPORTES
+   MAGENTA + VERDE
+========================================= */
+
+/* TODOS LOS NÚMEROS: BORDE MAGENTA */
+#annualReport .report-days button,
+#annualReport .report-days button.has-report {
+  background: transparent !important;
+  background-image: none !important;
+
+  border: 2px solid #ff00ff !important;
+  border-radius: 8px !important;
+
+  color: #ffffff !important;
+  box-shadow: none !important;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+
+/* FECHA SELECCIONADA: VERDE */
+#annualReport .report-days button.selected-date,
+#annualReport .report-days button.has-report.selected-date {
+  background: #16a34a !important;
+  background-image: none !important;
+
+  border: 2px solid #16a34a !important;
+  color: #ffffff !important;
+
+  font-weight: 700 !important;
+
+  box-shadow:
+    0 0 10px rgba(22, 163, 74, 0.5) !important;
+}
+
+/* EFECTO HOVER: MAGENTA */
+#annualReport .report-days button:not(.selected-date):hover {
+  background: rgba(255, 0, 255, 0.12) !important;
+  border-color: #ff00ff !important;
+}
+
+/* NO CAMBIAR EL VERDE AL PASAR EL CURSOR */
+#annualReport .report-days button.selected-date:hover {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+}
+
+/* DÍAS NORMALES: SOLO BORDE MAGENTA */
+#annualReport .report-month .report-days button,
+#annualReport .report-month .report-days button.has-report {
+  background: rgba(0, 0, 0, 0.12) !important;
+  background-image: none !important;
+  border: 2px solid #ff00ff !important;
+  border-radius: 50% !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* DÍA SELECCIONADO: VERDE */
+#annualReport .report-month .report-days button.selected-date,
+#annualReport .report-month .report-days button.has-report.selected-date {
+  background: #16a34a !important;
+  background-image: none !important;
+  border: 2px solid #16a34a !important;
+  color: white !important;
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.5) !important;
+}
+
+/* EFECTO AL PASAR EL CURSOR */
+#annualReport .report-month .report-days button:not(.selected-date):hover {
+  background: rgba(255, 0, 255, 0.15) !important;
+  border-color: #ff00ff !important;
+}
