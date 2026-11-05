@@ -1,0 +1,27 @@
+{
+  "name": "voip-vc-call-bridge-skeleton",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "start:web": "node server/server.js",
+    "dev:web": "node --watch server/server.js",
+    "start:calls": "node server/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mysql2": "^3.12.0",
+    "nanoid": "^5.1.5",
+    "node-fetch": "^3.3.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  }
+}

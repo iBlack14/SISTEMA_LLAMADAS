@@ -1,0 +1,2832 @@
+import { socket, API_BASE } from './modules/socket.js?v=2';
+import { refs, setStatus, setBadge, setAckBadge } from './modules/dom.js?v=2';
+import * as Contacts from './modules/contacts.js?v=2';
+import * as AudioBridge from './modules/audio-bridge.js?v=2';
+import * as WhatsApp from './modules/whatsapp.js?v=2';
+import * as Quotation from './modules/quotation.js?v=2';
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let sessionCode = "";
+let dashboardToken = "";
+let pairQrObjectUrls = [];
+let pairingStateSignature = "";
+let pairingSlotsSnapshot = [];
+let callCtx = null;
+let callTimerId = null;
+let callStartedAt = null;
+let lastCallDuration = 0;
+let currentState = "idle";
+let micEnabled = false;
+let speakerEnabled = false;
+let importPreviewData = [];
+let currentPage = 1;
+let currentCallingContactId = null;
+let currentPhoneLinked = false;
+let latestSessionState = {};
+let campaignState = null;
+const pendingCommandTimeouts = new Map();
+const PAGE_SIZE = 20;
+const DASHBOARD_SESSION_KEY = "voip vc.dashboardSessionCode";
+const DASHBOARD_TOKEN_PREFIX = "voip vc.dashboardToken.";
+const TURN_PENDING_PREFIX = "voip vc.turnPending.";
+const HIDDEN_ASSIGNED_RECORDS_PREFIX = "voip vc.hiddenAssignedRecords.";
+let restoreAttempted = false;
+let autoSessionRequested = false;
+
+function getHiddenAssignedRecords() {
+  if (!sessionCode) return new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${HIDDEN_ASSIGNED_RECORDS_PREFIX}${sessionCode}`) || "[]");
+    return new Set(Array.isArray(saved) ? saved.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function hideAssignedRecord(listName) {
+  if (!sessionCode || !listName) return;
+  const hidden = getHiddenAssignedRecords();
+  hidden.add(String(listName));
+  localStorage.setItem(`${HIDDEN_ASSIGNED_RECORDS_PREFIX}${sessionCode}`, JSON.stringify([...hidden]));
+}
+
+// ── INITIALIZATION ──────────────────────────────────────────────────
+async function init() {
+  console.log("Dashboard init starting...");
+  Contacts.loadContacts();
+  Contacts.loadCalledCounts();
+  Contacts.loadContactRowStatus();
+  Contacts.loadCallDurations();
+  Contacts.loadDismissedReminders();
+  WhatsApp.loadWhatsAppPresetMessages();
+  
+  renderContacts();
+  loadApkInfo().catch(e => console.error("Error loading APK info:", e));
+  bindEvents();
+  syncAudioButtons();
+  renderCampaignPanel();
+  restoreSavedSession();
+  
+  setStatus("Listo.");
+  console.log("Dashboard init complete.");
+}
+
+// ── UI RENDERING ──────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+}
+
+function makeId() {
+  return (typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function normalizePhone(input) {
+  return String(input || "").replace(/[^\d+]/g, "").trim();
+}
+
+function normalizeImportedPhone(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  // Preserve malformed source values so they can be audited, but never dialed.
+  if (/\p{L}/u.test(raw)) return raw;
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return raw.startsWith("+") ? `+${digits}` : digits;
+}
+
+function normalizeValidPeruPhone(input) {
+  const raw = String(input || "").trim();
+  if (!raw || /\p{L}/u.test(raw)) return "";
+  let digits = raw.replace(/\D/g, "");
+  if ((raw.startsWith("+51") || (digits.length === 11 && digits.startsWith("51"))) && digits.startsWith("51")) {
+    digits = digits.slice(2);
+  }
+  return /^\d{9}$/.test(digits) ? digits : "";
+}
+
+function whatsappActionIcon() {
+  return `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16.01 3C8.84 3 3 8.75 3 15.82c0 2.25.6 4.45 1.73 6.38L3 29l7.02-1.82a13.15 13.15 0 0 0 5.99 1.45H16c7.17 0 13-5.75 13-12.82S23.18 3 16.01 3Zm7.65 18.1c-.32.9-1.88 1.72-2.6 1.82-.67.1-1.52.15-2.45-.14-.57-.18-1.3-.42-2.24-.82-3.94-1.68-6.52-5.59-6.72-5.85-.19-.26-1.6-2.1-1.6-4.01 0-1.92 1.02-2.86 1.38-3.25.36-.39.79-.49 1.05-.49h.76c.24 0 .57-.09.89.67.32.77 1.1 2.68 1.2 2.87.1.19.16.42.03.68-.13.26-.2.42-.39.65-.2.23-.41.5-.59.67-.2.19-.4.4-.17.79.23.39 1.03 1.67 2.21 2.71 1.52 1.34 2.8 1.76 3.2 1.95.39.2.62.16.85-.1.23-.26.98-1.13 1.24-1.52.26-.39.53-.32.89-.19.36.13 2.3 1.07 2.69 1.26.39.19.66.29.75.45.1.16.1.94-.22 1.85Z"/></svg>`;
+}
+
+function mobileCallActionIcon() {
+  return `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M7.15 3.15 11.7 2c.88-.22 1.8.23 2.14 1.07l2.08 5.13c.3.74.08 1.6-.55 2.09l-2.66 2.12a19.05 19.05 0 0 0 6.88 6.88l2.12-2.66a1.82 1.82 0 0 1 2.09-.55l5.13 2.08c.84.34 1.29 1.26 1.07 2.14l-1.15 4.55a3.13 3.13 0 0 1-3.03 2.38C14.21 27.23 4.77 17.79 4.77 6.18a3.13 3.13 0 0 1 2.38-3.03Z" fill="currentColor"/></svg>`;
+}
+
+function contactActionButtons(contact, scope = "contacts") {
+  return `<div class="contact-action-buttons">
+    <button type="button" class="wa-action-btn" data-action="whatsapp-direct" data-id="${escHtml(contact.id || "")}" data-list-contact-scope="${scope}" aria-label="Contactar por WhatsApp" title="Contactar por WhatsApp">${whatsappActionIcon()}<span>WHATSAPP</span></button>
+    <button type="button" class="call-action-btn" data-action="call-direct" data-id="${escHtml(contact.id || "")}" data-list="${escHtml(contact.list || "Principal")}" data-list-contact-scope="${scope}" aria-label="Llamar a este contacto" title="Llamar desde el equipo asignado">${mobileCallActionIcon()}<span>LLAMAR</span></button>
+  </div>`;
+}
+
+function turnPendingKey(contact = {}) {
+  return `${String(contact.list || "Principal").trim().toLowerCase()}|${normalizeValidPeruPhone(contact.phone)}`;
+}
+
+function loadTurnPendingContacts() {
+  if (!sessionCode) return [];
+  const serverPending = campaignState?.turn?.pendingContacts
+    ?? latestSessionState?.shiftManagement?.pendingContacts;
+  if (Array.isArray(serverPending)) {
+    return serverPending.filter((item) => normalizeValidPeruPhone(item.phone));
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${TURN_PENDING_PREFIX}${sessionCode}`) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => normalizeValidPeruPhone(item.phone)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTurnPendingContacts(contacts) {
+  if (!sessionCode) return;
+  localStorage.setItem(`${TURN_PENDING_PREFIX}${sessionCode}`, JSON.stringify(contacts));
+}
+
+function syncTurnPendingContacts() {
+  if (!sessionCode) return;
+  const serverPending = campaignState?.turn?.pendingContacts
+    ?? latestSessionState?.shiftManagement?.pendingContacts;
+  if (Array.isArray(serverPending)) saveTurnPendingContacts(serverPending);
+}
+
+function renderTurnPendingContacts() {
+  const pending = loadTurnPendingContacts();
+  if (refs.pendingTurnCountEl) refs.pendingTurnCountEl.textContent = `${pending.length} pendiente${pending.length === 1 ? "" : "s"}`;
+  if (refs.pendingTurnBodyEl) {
+    refs.pendingTurnBodyEl.innerHTML = pending.length
+      ? pending.map((contact) => {
+          const sourceContact = Contacts.contacts.find((item) =>
+            (item.list || "Principal") === (contact.list || "Principal")
+            && normalizeValidPeruPhone(item.phone) === normalizeValidPeruPhone(contact.phone)
+          ) || contact;
+          return `<tr>
+          <td>${escHtml(contact.list || "Principal")}</td>
+          <td>${escHtml(contact.name || "Sin nombre")}</td>
+          <td>${escHtml(contact.phone || "-")}</td>
+          <td>${contactActionButtons(sourceContact, "turn-pending")}</td>
+        </tr>`;
+        }).join("")
+      : `<tr><td colspan="4" class="pending-turn-empty">No hay números pendientes del turno.</td></tr>`;
+  }
+}
+
+function currentShiftSnapshot() {
+  return campaignState?.turn || latestSessionState?.shiftManagement || null;
+}
+
+function renderShiftManagement() {
+  const snapshot = currentShiftSnapshot();
+  const current = snapshot?.current;
+  const detected = snapshot?.detected;
+  if (refs.currentShiftLabelEl) {
+    refs.currentShiftLabelEl.textContent = current?.label || detected?.label || "SIN TURNO ACTIVO";
+  }
+  if (refs.currentShiftScheduleEl) {
+    const date = current?.date || detected?.date || "";
+    refs.currentShiftScheduleEl.textContent = `${current?.schedule || detected?.schedule || "Horario de Lima"}${date ? ` · ${date}` : ""}`;
+  }
+  if (refs.finalizeTurnBtn) refs.finalizeTurnBtn.disabled = !current;
+  if (refs.finalizeSessionBtn) refs.finalizeSessionBtn.disabled = !sessionCode;
+
+  if (refs.shiftHistoryPanelEl) {
+    const history = Array.isArray(snapshot?.history) ? snapshot.history.slice(0, 4) : [];
+    refs.shiftHistoryPanelEl.innerHTML = history.length
+      ? `<div class="shift-history-head"><strong>TURNOS FINALIZADOS</strong><span>${history.length} recientes</span></div>
+        <div class="shift-history-list">${history.map((turn) => `
+          <article>
+            <div><strong>${escHtml(turn.label || "Turno")}</strong><small>${escHtml(turn.date || "")}</small></div>
+            <span>${Number(turn.summary?.total || 0)} llamadas</span>
+            <span>${Number(turn.summary?.answered || 0)} contestadas</span>
+            <span>${Number(turn.summary?.failed || 0)} pendientes</span>
+          </article>`).join("")}</div>`
+      : "";
+  }
+}
+
+function normalizeHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function mapRowByHeaders(row, headers) {
+  const out = {};
+  headers.forEach((header, index) => {
+    out[header] = row[index];
+  });
+  return out;
+}
+
+function buildContactFromStructuredRow(row, fallbackIndex) {
+  const entries = Object.entries(row || {});
+  const normalized = Object.fromEntries(entries.map(([key, value]) => [normalizeHeader(key), String(value || "").trim()]));
+
+  const rawName =
+    normalized.name ||
+    normalized.nombre ||
+    normalized.company ||
+    normalized.empresa ||
+    normalized.businessname ||
+    "";
+
+  const rawPhone =
+    normalized.mobilenumber ||
+    normalized.mobile ||
+    normalized.phone ||
+    normalized.telefono ||
+    normalized.telefono1 ||
+    normalized.celular ||
+    normalized.whatsapp ||
+    normalized.tel ||
+    "";
+
+  const rawWebsite =
+    normalized.website ||
+    normalized.web ||
+    normalized.url ||
+    normalized.sitio ||
+    "";
+
+  const fallbackValues = entries.map(([, value]) => String(value || "").trim()).filter(Boolean);
+  const detectedPhone = rawPhone || fallbackValues.find(v => /\+?\d[\d\s().-]{5,}/.test(v)) || "";
+  if (!detectedPhone) return null;
+
+  const detectedName =
+    rawName ||
+    fallbackValues.find(v => !/\+?\d[\d\s().-]{5,}/.test(v) && /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(v) && !/^https?:\/\//i.test(v) && !/^tel:/i.test(v)) ||
+    `Contacto ${fallbackIndex + 1}`;
+
+  const noteParts = [];
+  if (rawWebsite) noteParts.push(rawWebsite);
+  for (const value of fallbackValues) {
+    if (value === detectedName || value === detectedPhone || value === rawWebsite) continue;
+    if (!noteParts.includes(value)) noteParts.push(value);
+  }
+
+  return {
+    id: makeId(),
+    name: detectedName,
+    phone: normalizeImportedPhone(detectedPhone),
+    note: noteParts.join(" ").trim()
+  };
+}
+
+function buildContactFromTableArrayRow(row, fallbackIndex) {
+  const values = (row || []).map((value) => String(value || "").trim());
+  if (!values.length) return null;
+
+  const first = values[0] || "";
+  const second = values[1] || "";
+  const third = values[2] || "";
+  const fourth = values[3] || "";
+
+  const firstIsPhone = /\+?\d[\d\s().-]{5,}/.test(first);
+  const secondIsPhone = /\+?\d[\d\s().-]{5,}/.test(second);
+
+  const detectedName = !firstIsPhone && /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(first)
+    ? first
+    : (!secondIsPhone && /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(second) ? second : `Contacto ${fallbackIndex + 1}`);
+
+  const detectedPhone = secondIsPhone
+    ? second
+    : (firstIsPhone ? first : "");
+
+  if (!detectedPhone) return null;
+
+  const noteParts = [third, fourth]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return {
+    id: makeId(),
+    name: detectedName,
+    phone: normalizeImportedPhone(detectedPhone),
+    note: noteParts.join(" ").trim()
+  };
+}
+
+function extractContactsFromHtmlTable(doc) {
+  const tables = [...doc.querySelectorAll("table")];
+  for (const table of tables) {
+    const rows = [...table.querySelectorAll("tr")];
+    if (rows.length < 2) continue;
+
+    const headerCells = [...rows[0].querySelectorAll("th,td")].map((cell) => normalizeHeader(cell.textContent || ""));
+    const nameIdx = headerCells.findIndex((header) => ["name", "nombre", "company", "empresa", "businessname"].includes(header));
+    const phoneIdx = headerCells.findIndex((header) => ["mobilenumber", "mobile", "phone", "telefono", "celular", "tel", "whatsapp"].includes(header));
+    const websiteIdx = headerCells.findIndex((header) => ["website", "web", "url", "sitio"].includes(header));
+
+    if (nameIdx === -1 && phoneIdx === -1) continue;
+
+    const contacts = [];
+    for (const row of rows.slice(1)) {
+      const cols = [...row.querySelectorAll("th,td")].map((cell) => String(cell.textContent || "").trim());
+      if (!cols.some(Boolean)) continue;
+
+      const name = String(cols[nameIdx] || "").trim();
+      const phone = normalizeImportedPhone(cols[phoneIdx] || "");
+      const website = websiteIdx >= 0 ? String(cols[websiteIdx] || "").trim() : "";
+
+      if (!phone) continue;
+      contacts.push({
+        id: makeId(),
+        name: name || `Contacto ${contacts.length + 1}`,
+        phone,
+        note: website
+      });
+    }
+
+    if (contacts.length) return contacts;
+  }
+
+  return [];
+}
+
+function extractContactsFromRows(rows) {
+  const out = [];
+  const list = rows || [];
+  if (!list.length) return out;
+
+  const firstRow = list[0];
+  const headerCandidates = Array.isArray(firstRow) ? firstRow.map(normalizeHeader) : Object.keys(firstRow || {}).map(normalizeHeader);
+  const hasStructuredHeaders = headerCandidates.some((header) =>
+    ["name", "nombre", "mobilenumber", "mobile", "phone", "telefono", "celular", "website", "web", "url"].includes(header)
+  );
+
+  const structuredRows = hasStructuredHeaders
+    ? list.slice(1).map((row) => Array.isArray(row) ? mapRowByHeaders(row, firstRow) : row)
+    : list;
+
+  for (const row of structuredRows) {
+    if (Array.isArray(row)) {
+      const tableContact = buildContactFromTableArrayRow(row, out.length);
+      if (tableContact?.phone) {
+        out.push(tableContact);
+        continue;
+      }
+    }
+    const contact = buildContactFromStructuredRow(row, out.length);
+    if (!contact?.phone) continue;
+    out.push(contact);
+  }
+  return out;
+}
+
+function parseDelimitedText(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const rows = lines.map((line) => {
+    if (line.includes("\t")) return line.split("\t");
+    if (line.includes(";")) return line.split(";");
+    return line.split(",");
+  });
+  return extractContactsFromRows(rows);
+}
+
+function showImportPreview(items) {
+  importPreviewData = items.slice(0, 500);
+  refs.previewBody.innerHTML = "";
+  refs.previewCountEl.textContent = String(importPreviewData.length);
+
+  const fragment = document.createDocumentFragment();
+  for (const item of importPreviewData) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escHtml(item.name)}</td>
+      <td style="font-family:monospace;">${escHtml(item.phone)}</td>
+    `;
+    fragment.appendChild(tr);
+  }
+  refs.previewBody.appendChild(fragment);
+
+  refs.importPreview.style.display = importPreviewData.length ? "block" : "none";
+}
+
+function resetImportPreview() {
+  importPreviewData = [];
+  refs.previewBody.innerHTML = "";
+  refs.previewCountEl.textContent = "0";
+  refs.importPreview.style.display = "none";
+}
+
+let currentImportFileName = ""; // Global variable to store the current import file name
+
+function requestListName({ title = "Nueva lista", defaultValue = "", label = "Nombre de la lista", placeholder = "Ej. Avícolas" } = {}) {
+  return new Promise((resolve) => {
+    const modal = refs.listNameModalEl;
+    const input = refs.listNameInputEl;
+    if (!modal || !input) return resolve(null);
+
+    refs.listNameTitleEl.textContent = title;
+    if (refs.listNameLabelEl) refs.listNameLabelEl.textContent = label;
+    refs.listNameErrorEl.textContent = "";
+    input.value = defaultValue;
+    input.placeholder = placeholder;
+    modal.style.display = "flex";
+
+    const finish = (value) => {
+      modal.style.display = "none";
+      refs.listNameSaveBtn.onclick = null;
+      refs.listNameCancelBtn.onclick = null;
+      refs.listNameCloseBtn.onclick = null;
+      input.onkeydown = null;
+      resolve(value);
+    };
+    const save = () => {
+      const value = input.value.trim();
+      if (!value) {
+        refs.listNameErrorEl.textContent = "Escribe un nombre para la lista.";
+        input.focus();
+        return;
+      }
+      finish(value);
+    };
+
+    refs.listNameSaveBtn.onclick = save;
+    refs.listNameCancelBtn.onclick = () => finish(null);
+    refs.listNameCloseBtn.onclick = () => finish(null);
+    input.onkeydown = (event) => {
+      if (event.key === "Enter") save();
+      if (event.key === "Escape") finish(null);
+    };
+    setTimeout(() => input.focus(), 0);
+  });
+}
+
+function requestConfirmation({ title = "Confirmar acción", message = "", confirmLabel = "Aceptar", cancelLabel = "Cancelar", showCancel = true } = {}) {
+  return new Promise((resolve) => {
+    const modal = refs.confirmModalEl;
+    if (!modal) return resolve(false);
+    refs.confirmTitleEl.textContent = title;
+    refs.confirmMessageEl.textContent = message;
+    refs.confirmAcceptBtn.textContent = confirmLabel;
+    refs.confirmCancelBtn.textContent = cancelLabel;
+    refs.confirmCancelBtn.style.display = showCancel ? "" : "none";
+    modal.style.display = "flex";
+
+    const finish = (accepted) => {
+      modal.style.display = "none";
+      refs.confirmAcceptBtn.onclick = null;
+      refs.confirmCancelBtn.onclick = null;
+      refs.confirmCloseBtn.onclick = null;
+      resolve(accepted);
+    };
+    refs.confirmAcceptBtn.onclick = () => finish(true);
+    refs.confirmCancelBtn.onclick = () => finish(false);
+    refs.confirmCloseBtn.onclick = () => finish(false);
+    setTimeout(() => refs.confirmAcceptBtn.focus(), 0);
+  });
+}
+
+window.AppDialogs = {
+  confirm: (message, title = "Confirmar acción") => requestConfirmation({ title, message }),
+  alert: (message, title = "Aviso") => requestConfirmation({ title, message, confirmLabel: "Entendido", showCancel: false })
+};
+
+async function addImportedContacts() {
+  if (!importPreviewData.length) return;
+  
+  const defaultTab = currentImportFileName ? currentImportFileName.split('.')[0] : "Lista Nueva";
+  const listName = await requestListName({ title: "Guardar contactos importados", defaultValue: defaultTab });
+  if (!listName) return;
+  
+  Contacts.addList(listName);
+  Contacts.setActiveList(listName);
+  const addedCount = Contacts.addContacts(importPreviewData, listName);
+  
+  setStatus(`Lista "${listName}" creada con ${addedCount} contacto(s).`, true);
+  resetImportPreview();
+  renderTabs();
+  renderContacts();
+  renderCampaignPanel();
+  if (sessionCode) loadPairingData(sessionCode);
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  refs.importFileNameEl.textContent = file.name;
+  currentImportFileName = file.name; // Store the file name
+
+  const lowerName = file.name.toLowerCase();
+  try {
+    let contacts = [];
+
+    if (lowerName.endsWith(".csv") || lowerName.endsWith(".txt")) {
+      contacts = parseDelimitedText(await file.text());
+    } else if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+      const data = await file.arrayBuffer();
+      const wb = window.XLSX.read(data, { type: "array" });
+      const firstSheet = wb.SheetNames[0];
+      const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1 });
+      contacts = extractContactsFromRows(rows);
+    } else if (lowerName.endsWith(".docx")) {
+      const data = await file.arrayBuffer();
+      const htmlResult = await window.mammoth.convertToHtml({ arrayBuffer: data });
+      const doc = new DOMParser().parseFromString(htmlResult.value || "", "text/html");
+      contacts = extractContactsFromHtmlTable(doc);
+      if (!contacts.length) {
+        const textResult = await window.mammoth.extractRawText({ arrayBuffer: data });
+        contacts = parseDelimitedText(textResult.value);
+      }
+    } else {
+      setStatus("Formato no soportado. Usa .docx, .xlsx, .xls, .csv o .txt", true);
+      return;
+    }
+
+    showImportPreview(contacts);
+    setStatus(contacts.length ? `Se detectaron ${contacts.length} contactos.` : "No se detectaron contactos en el archivo.", true);
+  } catch (error) {
+    console.error("Import file error:", error);
+    setStatus("No se pudo leer el archivo importado.", true);
+  }
+}
+
+async function handleImportUrl() {
+  const url = String(refs.importUrlEl.value || "").trim();
+  if (!url) {
+    setStatus("Pega una URL para importar.", true);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/fetch-url?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (!res.ok || !data.ok || !data.html) {
+      setStatus(data.error || "No se pudo leer la URL.", true);
+      return;
+    }
+
+    const doc = new DOMParser().parseFromString(data.html, "text/html");
+    const directTableContacts = extractContactsFromHtmlTable(doc);
+    if (directTableContacts.length) {
+      showImportPreview(directTableContacts);
+      setStatus(`Se detectaron ${directTableContacts.length} contactos desde la URL.`, true);
+      return;
+    }
+
+    const rows = [];
+    doc.querySelectorAll("table tr").forEach((tr) => {
+      const cols = [...tr.querySelectorAll("th,td")].map((el) => el.textContent?.trim() || "");
+      if (cols.some(Boolean)) rows.push(cols);
+    });
+    if (!rows.length) {
+      doc.querySelectorAll("li, p").forEach((el) => {
+        const text = el.textContent?.trim() || "";
+        if (text) rows.push([text]);
+      });
+    }
+
+    const contacts = extractContactsFromRows(rows);
+    showImportPreview(contacts);
+    setStatus(contacts.length ? `Se detectaron ${contacts.length} contactos desde la URL.` : "No se detectaron contactos en la URL.", true);
+  } catch (error) {
+    console.error("Import URL error:", error);
+    setStatus("No se pudo importar desde la URL.", true);
+  }
+}
+
+function addManualContact() {
+  const name = String(refs.cNameIn?.value || "").trim();
+  const phone = normalizeImportedPhone(refs.cPhoneIn?.value || "");
+  const note = String(refs.cNoteIn?.value || "").trim();
+
+  if (!name || !phone) {
+    setStatus("Completa nombre y teléfono.", true);
+    return;
+  }
+
+  const added = Contacts.addContact({ id: makeId(), name, phone, note }, Contacts.activeList);
+  if (!added) {
+    setStatus("El telefono no es valido o ya existe en esta lista.", true);
+    return;
+  }
+  refs.cNameIn.value = "";
+  refs.cPhoneIn.value = "";
+  refs.cNoteIn.value = "";
+  renderContacts();
+  setStatus("Contacto agregado.", true);
+}
+
+function openAddContactModal() {
+  if (!refs.addContactModalEl) return;
+  refs.addNameInput.value = "";
+  refs.addPhoneInput.value = "";
+  refs.addNoteInput.value = "";
+  refs.addContactModalEl.style.display = "flex";
+  refs.addNameInput.focus();
+}
+
+function saveModalContact() {
+  const name = String(refs.addNameInput?.value || "").trim();
+  const phone = normalizeImportedPhone(refs.addPhoneInput?.value || "");
+  const note = String(refs.addNoteInput?.value || "").trim();
+  if (!name || !phone) {
+    setStatus("Completa nombre y telefono.", true);
+    return;
+  }
+  const added = Contacts.addContact({ id: makeId(), name, phone, note }, Contacts.activeList);
+  if (!added) {
+    setStatus("El telefono no es valido o ya existe en esta lista.", true);
+    return;
+  }
+  refs.addContactModalEl.style.display = "none";
+  currentPage = 1;
+  renderContacts();
+  setStatus("Contacto agregado.", true);
+}
+
+function renderContacts() {
+  updateCalledContactsCounter();
+  const cBodyEl = refs.cBodyEl;
+  cBodyEl.innerHTML = "";
+  
+  // Filter by active list
+  const allContacts = Contacts.contacts;
+  const contacts = allContacts.filter(c => c.list === Contacts.activeList);
+  
+  const totalPages = Math.max(1, Math.ceil(contacts.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  if (!contacts.length) {
+    cBodyEl.innerHTML = `<tr><td colspan="3" class="muted" style="text-align:center;padding:18px;">Sin contactos. Importa un archivo para crear la primera lista.</td></tr>`;
+    refs.contactsPaginationEl.style.display = "none";
+    renderReminderFloat();
+    return;
+  }
+
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = contacts.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const fragment = document.createDocumentFragment();
+  for (const c of pageRows) {
+    const tr = document.createElement("tr");
+    const callCount = Number(Contacts.calledCounts[c.id] || 0);
+    const rowStatus = String(Contacts.contactRowStatus[c.id] || "").toLowerCase();
+    const duration = Number(Contacts.callDurations[c.id] || 0);
+    const campaignContact = getCampaignContactMap().get(c.id);
+    
+    const isThisActiveCall = (currentState === "in_call" || currentState === "ringing" || currentState === "dialing") && normalizePhone(callCtx?.phone) === normalizePhone(c.phone);
+
+    if (callCount > 0) tr.classList.add("contact-row-called");
+    if (duration > 0) tr.classList.add("contact-row-answered");
+    if (["r", "lc", "sc"].includes(rowStatus)) tr.classList.add(`contact-row-status-${rowStatus}`);
+    
+    const isCampaignActive = Object.values(campaignState?.assignments || {}).some((assignment) => assignment.contactId === c.id);
+    if (isCampaignActive || isThisActiveCall) {
+        tr.classList.add(currentState === "in_call" ? "contact-row-active-in-call" : "contact-row-active-call");
+    }
+    
+    tr.innerHTML = `
+      <td>${escHtml(c.name)}</td>
+      <td style="font-family:monospace;font-size:13px;">${escHtml(c.phone)}</td>
+      <td class="actions-cell contact-direct-cell">${contactActionButtons(c)}</td>`;
+    fragment.appendChild(tr);
+  }
+  cBodyEl.appendChild(fragment);
+
+  refs.contactsPaginationEl.style.display = totalPages > 1 ? "flex" : "none";
+  refs.pageInfoEl.textContent = `Página ${currentPage} de ${totalPages}`;
+  refs.prevPageBtn.disabled = currentPage <= 1;
+  refs.nextPageBtn.disabled = currentPage >= totalPages;
+  renderReminderFloat();
+}
+
+function updateCalledContactsCounter() {
+  if (!refs.calledContactsValueEl) return;
+  const count = Contacts.contacts.reduce((acc, c) => acc + (Number(Contacts.calledCounts[c.id] || 0) > 0 ? 1 : 0), 0);
+  refs.calledContactsValueEl.textContent = String(count);
+}
+
+function renderReminderFloat() {
+    if (!refs.reminderFloatContainer) return;
+    refs.reminderFloatContainer.innerHTML = "";
+    
+    const now = Date.now();
+    const reminders = Contacts.contacts.filter(c => {
+        if (!c.note || Contacts.dismissedReminderIds[c.id]) return false;
+        return c.note.toLowerCase().includes("llamar") || c.note.toLowerCase().includes("callback");
+    });
+    
+    if (!reminders.length) return;
+    
+    reminders.slice(0, 3).forEach(c => {
+        const div = document.createElement("div");
+        div.className = "reminder-float-item";
+        div.innerHTML = `
+            <div class="reminder-content">
+                <strong>Recordatorio: ${escHtml(c.name)}</strong>
+                <p>${escHtml(c.note)}</p>
+            </div>
+            <div class="reminder-actions">
+                <button onclick="dialManual('${escHtml(c.phone)}', '${escHtml(c.name)}')">📞</button>
+                <button onclick="dismissReminder('${escHtml(c.id)}')">✕</button>
+            </div>
+        `;
+        refs.reminderFloatContainer.appendChild(div);
+    });
+}
+
+window.dismissReminder = (id) => {
+    Contacts.dismissedReminderIds[id] = true;
+    Contacts.saveDismissedReminders();
+    renderReminderFloat();
+};
+
+function syncAudioButtons() {
+  if (refs.muteBtnEl) {
+    refs.muteBtnEl.textContent = micEnabled ? "🎙️ Micrófono" : "🔇 Micrófono";
+    refs.muteBtnEl.classList.toggle("btn-audio-active", micEnabled);
+  }
+  if (refs.speakerBtnEl) {
+    refs.speakerBtnEl.textContent = speakerEnabled ? "🔊 Altavoz activo" : "🔈 Altavoz";
+    refs.speakerBtnEl.classList.toggle("btn-audio-active", speakerEnabled);
+  }
+  if (refs.micBadgeEl) {
+    refs.micBadgeEl.textContent = micEnabled ? "🎙️ Mic activo" : "🔇 Mic apagado";
+    refs.micBadgeEl.classList.toggle("is-active", micEnabled);
+    refs.micBadgeEl.classList.toggle("muted", !micEnabled);
+  }
+}
+
+function saveSessionCode(code, token = dashboardToken) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return;
+  localStorage.setItem(DASHBOARD_SESSION_KEY, normalized);
+  if (token) localStorage.setItem(`${DASHBOARD_TOKEN_PREFIX}${normalized}`, String(token));
+}
+
+function getSavedSessionCode() {
+  return String(localStorage.getItem(DASHBOARD_SESSION_KEY) || "").trim().toUpperCase();
+}
+
+function getSavedDashboardToken(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  return normalized ? String(localStorage.getItem(`${DASHBOARD_TOKEN_PREFIX}${normalized}`) || "").trim() : "";
+}
+
+function getCampaignContactMap() {
+  return new Map((campaignState?.contacts || []).map((contact) => [contact.id, contact]));
+}
+
+function getActiveCampaignContact() {
+  if (!campaignState?.activeContactId) return null;
+  return getCampaignContactMap().get(campaignState.activeContactId) || null;
+}
+
+function campaignCounter(label, value, tone = "") {
+  return `<div class="campaign-counter ${tone}"><span>${escHtml(label)}</span><strong>${value}</strong></div>`;
+}
+
+function renderWorkersPanelLegacy() {
+  const workers = Array.isArray(latestSessionState?.phoneWorkers) ? latestSessionState.phoneWorkers : [];
+  const connected = workers.filter((worker) => worker?.connected);
+  if (refs.workersSummaryEl) refs.workersSummaryEl.textContent = `${connected.length} conectados`;
+  if (!refs.workersListEl) return;
+
+  if (!connected.length) {
+    refs.workersListEl.innerHTML = `<div class="campaign-list-empty">Sin workers conectados.</div>`;
+    return;
+  }
+
+  refs.workersListEl.innerHTML = connected.map((worker) => `
+    <div class="worker-chip ${worker.active ? "is-active" : ""}">
+      <strong>${escHtml(worker.name || "Android")}</strong>
+      <span>${escHtml(worker.id || "worker")}</span>
+      <small>${escHtml(worker.callState || "idle")}</small>
+    </div>
+  `).join("");
+}
+
+function workerStateLabel(worker) {
+  if (!worker.connected) return "Desconectado";
+  if (worker.paused) return "Pausado";
+  const labels = {
+    idle: "Disponible",
+    ended: "Disponible",
+    failed: "Error",
+    dialing: "Llamando",
+    ringing: "Sonando",
+    in_call: "En llamada"
+  };
+  return labels[worker.callState] || worker.callState || "Disponible";
+}
+
+function formatSeconds(value) {
+  const total = Math.max(0, Number(value || 0));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderWorkersPanel() {
+  const workers = Array.isArray(latestSessionState?.phoneWorkers) ? latestSessionState.phoneWorkers : [];
+  const connected = workers.filter((worker) => worker?.connected);
+  if (refs.workersSummaryEl) refs.workersSummaryEl.textContent = `${connected.length} conectados`;
+  if (!refs.workersListEl) return;
+  if (!workers.length) {
+    refs.workersListEl.innerHTML = `<div class="campaign-list-empty">Sin teléfonos vinculados.</div>`;
+    return;
+  }
+
+  refs.workersListEl.innerHTML = workers.map((worker) => {
+    const busy = ["dialing", "ringing", "in_call"].includes(worker.callState);
+    const stateClass = worker.paused ? "is-paused" : busy ? "is-busy" : worker.connected ? "is-ready" : "is-offline";
+    return `
+      <article class="worker-card ${stateClass}" data-worker-id="${escHtml(worker.id)}">
+        <div class="worker-card-head">
+          <div><strong>${escHtml(worker.name || "Android")}</strong><small>${escHtml(worker.lineLabel || worker.id || "Teléfono")}</small></div>
+          <span class="worker-state">${escHtml(workerStateLabel(worker))}</span>
+        </div>
+        ${busy ? `
+          <div class="worker-contact"><strong>${escHtml(worker.companyName || "Contacto")}</strong><span>${escHtml(worker.phoneNumber || "-")}</span></div>
+          <div class="worker-duration">${formatSeconds(worker.answeredAt ? Math.floor((Date.now() - Date.parse(worker.answeredAt)) / 1000) : (worker.durationSeconds || 0))}</div>
+        ` : `<div class="worker-empty">${worker.paused ? "No recibirá nuevas llamadas" : "Esperando asignación"}</div>`}
+        <div class="worker-actions">
+          <button class="secondary" data-worker-action="pause" data-worker-id="${escHtml(worker.id)}">${worker.paused ? "Reanudar" : "Pausar"}</button>
+          <button class="danger-soft" data-worker-action="hangup" data-worker-id="${escHtml(worker.id)}" ${busy ? "" : "disabled"}>Colgar</button>
+          <button class="worker-disconnect-btn" data-worker-action="disconnect" data-worker-id="${escHtml(worker.id)}">Cerrar sesión</button>
+        </div>
+      </article>`;
+  }).join("");
+
+  refs.workersListEl.querySelectorAll("[data-worker-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const workerId = button.dataset.workerId;
+      const worker = workers.find((item) => item.id === workerId);
+      if (button.dataset.workerAction === "pause") await setWorkerPause(workerId, !worker?.paused);
+      if (button.dataset.workerAction === "hangup") await hangupWorker(workerId);
+      if (button.dataset.workerAction === "disconnect") await disconnectWorker(workerId, worker?.name);
+    });
+  });
+}
+
+function renderCampaignPanel() {
+  syncTurnPendingContacts();
+  renderTurnPendingContacts();
+  renderShiftManagement();
+  renderWorkersPanel();
+  renderCampaignReport();
+  renderAssignedListsPanel();
+  const campaignStatus = String(campaignState?.status || "idle");
+  const assignmentsCount = Object.keys(campaignState?.assignments || {}).length;
+  const availableLists = Contacts.lists.filter((name) =>
+    Contacts.contacts.some((contact) => (contact.list || "Principal") === name && normalizeValidPeruPhone(contact.phone))
+  );
+  const availableWorkers = (latestSessionState?.phoneWorkers || []).filter((worker) => worker.connected && !worker.paused).length;
+  if (refs.campaignStartBtn) {
+    const campaignBusy = campaignStatus === "running" || assignmentsCount > 0;
+    refs.campaignStartBtn.disabled = campaignBusy || !availableLists.length || !availableWorkers;
+    refs.campaignStartBtn.title = !availableLists.length
+      ? "Importa una lista de contactos primero."
+      : !availableWorkers ? "Vincula al menos un telefono." : campaignBusy ? "Deten o completa la campana actual antes de iniciar otra." : "";
+  }
+  if (refs.campaignStartBtn) refs.campaignStartBtn.textContent = "▶ Iniciar llamada general";
+  if (refs.pendingTurnCallBtn) {
+    const pendingCount = loadTurnPendingContacts().length;
+    const campaignBusy = campaignStatus === "running" || assignmentsCount > 0;
+    refs.pendingTurnCallBtn.disabled = !pendingCount || campaignBusy || !availableWorkers;
+    refs.pendingTurnCallBtn.title = !pendingCount
+      ? "No hay números que hayan agotado sus intentos."
+      : !availableWorkers ? "No hay equipos disponibles." : campaignBusy ? "Espera a que termine la campaña actual." : "";
+  }
+  const counts = campaignState?.counts || {};
+  const active = getActiveCampaignContact();
+  const callbacks = campaignState?.callbacks || [];
+  const pendingCallbacks = callbacks.filter(c => c.status === "pending").length;
+
+  if (refs.callbacksSummaryEl) {
+    refs.callbacksSummaryEl.textContent = `${pendingCallbacks} pendientes`;
+  }
+
+  if (refs.campaignStatusLineEl) {
+    const status = String(campaignState?.status || "idle");
+    const labelMap = {
+      idle: "Sin campaña activa.",
+      running: "Campaña corriendo.",
+      paused: "Campaña pausada.",
+      completed: "Campaña completada."
+    };
+    refs.campaignStatusLineEl.textContent = labelMap[status] || `Campaña ${status}`;
+  }
+
+  if (refs.campaignCountersEl) {
+    refs.campaignCountersEl.innerHTML = [
+      campaignCounter("Pendientes", counts.pending || 0),
+      campaignCounter("Reintentos", counts.retry_pending || 0, "accent"),
+      campaignCounter("Llamando", (counts.dialing || 0) + (counts.ringing || 0), "warn"),
+      campaignCounter("En llamada", counts.in_call || 0, "ok"),
+      campaignCounter("Callbacks", counts.awaiting_callback || 0, "accent"),
+      campaignCounter("Completados", counts.completed || 0, "ok"),
+      campaignCounter("Fallidos", counts.failed || 0, "danger")
+    ].join("");
+  }
+
+  if (refs.campaignActiveCardEl) {
+    refs.campaignActiveCardEl.innerHTML = active
+      ? `
+        <div class="campaign-active-card">
+          <strong>${escHtml(active.name)}</strong>
+          <span>${escHtml(active.phone)}</span>
+          <small>${escHtml(active.note || "Sin nota")}</small>
+          <small>Intentos: ${active.attempts || 0}${active.assignedWorkerId ? ` · Worker: ${escHtml(active.assignedWorkerId)}` : ""}</small>
+        </div>
+      `
+      : `<div class="campaign-list-empty">Sin contacto activo.</div>`;
+  }
+
+  const disableResult = !active;
+  if (refs.campaignResultAgendaBtn) refs.campaignResultAgendaBtn.disabled = disableResult;
+  if (refs.campaignResultNoBtn) refs.campaignResultNoBtn.disabled = disableResult;
+  if (refs.campaignResultAdvisorBtn) refs.campaignResultAdvisorBtn.disabled = disableResult;
+  if (refs.campaignResultRetryBtn) refs.campaignResultRetryBtn.disabled = disableResult;
+  if (refs.campaignPauseBtn) refs.campaignPauseBtn.disabled = campaignState?.status !== "running";
+  if (refs.campaignResumeBtn) refs.campaignResumeBtn.disabled = !["paused", "idle"].includes(String(campaignState?.status || "idle"));
+  if (refs.campaignSkipBtn) refs.campaignSkipBtn.disabled = disableResult;
+  if (refs.campaignStopBtn) refs.campaignStopBtn.style.display = ["running", "paused"].includes(campaignStatus) || assignmentsCount ? "" : "none";
+  if (refs.campaignPauseBtn) refs.campaignPauseBtn.style.display = campaignStatus === "running" ? "" : "none";
+  if (refs.campaignResumeBtn) refs.campaignResumeBtn.style.display = campaignStatus === "paused" ? "" : "none";
+  if (refs.campaignSkipBtn) refs.campaignSkipBtn.style.display = active ? "" : "none";
+  const archivedReportCount = (campaignState?.turn?.history || []).reduce((total, turn) => total + Number(turn.reportCount || 0), 0);
+  if (refs.campaignReportBtn) refs.campaignReportBtn.style.display = (campaignState?.history || []).length || archivedReportCount ? "" : "none";
+
+  if (refs.callbacksListEl) {
+    refs.callbacksListEl.innerHTML = callbacks.length
+      ? callbacks.map((item) => `
+          <div class="callback-item ${item.status === "completed" ? "is-completed" : ""}">
+            <strong>${escHtml(item.name || "Contacto")}</strong>
+            <span>${escHtml(item.phone || "-")}</span>
+            <small>${escHtml(item.reason || "Sin motivo")}</small>
+            <small>${escHtml(item.advisor ? `Asesor: ${item.advisor}` : "Asesor sin asignar")}</small>
+          </div>
+        `).join("")
+      : `<div class="campaign-list-empty">Sin callbacks pendientes.</div>`;
+  }
+}
+
+async function fetchCampaignState(code = sessionCode) {
+  if (!code) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(code)}/campaign`, {
+      headers: { "X-Dashboard-Token": dashboardToken }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) return;
+    campaignState = data.campaign || null;
+    renderCampaignPanel();
+  } catch (error) {
+    console.error("Campaign state fetch error:", error);
+  }
+}
+
+async function postCampaignAction(path, body = {}) {
+  if (!sessionCode) {
+    setStatus("Crea o restaura una sesión primero.", true);
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionCode)}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardToken },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      setStatus(data.error || "No se pudo ejecutar la acción de campaña.", true);
+      return null;
+    }
+    campaignState = data.campaign || campaignState;
+    renderCampaignPanel();
+    return data;
+  } catch (error) {
+    console.error("Campaign action error:", error);
+    setStatus("No se pudo comunicar la acción de campaña.", true);
+    return null;
+  }
+}
+
+async function setWorkerPause(workerId, paused) {
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/pause`, { paused });
+  if (data) setStatus(paused ? "Teléfono pausado; no recibirá nuevas llamadas." : "Teléfono reanudado.", true);
+}
+
+async function hangupWorker(workerId) {
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/hangup`);
+  if (data) setStatus("Orden de colgar enviada al teléfono.", true);
+}
+
+async function startIndependentWorker(workerId) {
+  if (!workerId) return;
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/start-independent`);
+  if (data) setStatus(data.dispatched ? "Llamada independiente iniciada." : "Este teléfono no tiene contactos pendientes.", true);
+}
+
+async function stopIndependentWorker(workerId) {
+  if (!workerId) return;
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/stop-independent`);
+  if (data) setStatus(`Llamada detenida${data.heldContact?.phone ? `: ${data.heldContact.phone}` : ""}. No consumió un intento.`, true);
+}
+
+async function callContactFromAssignedList(contactId, listName) {
+  const assignedLists = Contacts.lists.filter((name) =>
+    Contacts.contacts.some((contact) => (contact.list || "Principal") === name)
+  );
+  const listIndex = assignedLists.indexOf(listName || "Principal");
+  const slot = listIndex >= 0 ? pairingSlotsSnapshot[listIndex] : null;
+  if (!slot?.deviceId) {
+    setStatus(`La lista "${listName || "Principal"}" no tiene un equipo vinculado.`, true);
+    return;
+  }
+  const contact = Contacts.contacts.find((item) => item.id === contactId);
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(slot.deviceId)}/call-contact`, {
+    contactId,
+    contact: contact ? {
+      id: contact.id,
+      name: contact.name,
+      phone: normalizeValidPeruPhone(contact.phone),
+      note: contact.note || "",
+      list: contact.list || "Principal",
+      targetWorkerId: slot.deviceId
+    } : null
+  });
+  if (data) setStatus("Llamada manual enviada al equipo asignado.", true);
+}
+
+async function hangupWorkerWithResult(workerId) {
+  if (!workerId) return;
+  const answered = await requestConfirmation({
+    title: "Resultado de la llamada",
+    message: "¿Contestó una persona? Pulsa Cancelar si no contestó o fue buzón de voz.",
+    confirmLabel: "Sí contestó",
+    cancelLabel: "No contestó / buzón"
+  });
+  const worker = (latestSessionState?.phoneWorkers || []).find((item) => item.id === workerId);
+  if (worker?.activeContactId) {
+    await postCampaignAction("/campaign/result", { contactId: worker.activeContactId, result: answered ? "contesto" : "sin_respuesta" });
+  }
+  await hangupWorker(workerId);
+}
+
+async function disconnectWorker(workerId, workerName = "este teléfono") {
+  const accepted = window.confirm(`¿Cerrar la sesión de ${workerName || "este teléfono"}?`);
+  if (!accepted) return;
+  const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/disconnect`);
+  if (data) setStatus("Teléfono desvinculado correctamente.", true);
+}
+
+async function stopCampaignRun() {
+  const data = await postCampaignAction("/campaign/stop");
+  if (data) setStatus("Campaña detenida. El historial se conservó.", true);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+async function downloadCampaignReport() {
+  const reportRows = await getAllCampaignReportRows();
+  if (!reportRows.length) {
+    setStatus("Aún no hay intentos para exportar.", true);
+    return;
+  }
+  const pdfRows = reportRows.map((item) => ({
+    ...item,
+    name: `${item.list || "Sin lista"} - ${item.name || "Sin nombre"}`
+  }));
+  const pdf = buildAssignedListPdf("Todas las llamadas", pdfRows);
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `reporte_todas_las_llamadas_${new Date().toISOString().slice(0, 10)}.pdf`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus(`Reporte PDF generado con ${reportRows.length} llamada${reportRows.length === 1 ? "" : "s"}.`, true);
+}
+
+function mapCampaignReportRow(item, fallbackList = "") {
+  return {
+    attemptId: item.attemptId || "",
+    list: item.list || fallbackList || "",
+    name: item.name || "",
+    phone: item.phone || "",
+    worker: item.workerName || item.workerId || "",
+    attemptNumber: Number(item.attemptNumber || 0),
+    startedAt: item.startedAt || "",
+    answeredAt: item.answeredAt || "",
+    endedAt: item.endedAt || "",
+    durationSeconds: Number(item.durationSeconds || 0),
+    technicalResult: item.technicalResult || "",
+    disposition: item.disposition || ""
+  };
+}
+
+function getCampaignReportRows() {
+  const history = Array.isArray(campaignState?.history) ? campaignState.history : [];
+  return history.map((item) => mapCampaignReportRow(item, campaignState?.listName || ""));
+}
+
+async function getAllCampaignReportRows() {
+  const rows = getCampaignReportRows();
+  const archivedTurns = campaignState?.turn?.history || latestSessionState?.shiftManagement?.history || [];
+  for (const archivedTurn of archivedTurns) {
+    if (!archivedTurn?.id || !Number(archivedTurn.reportCount || 0)) continue;
+    try {
+      const response = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionCode)}/turns/${encodeURIComponent(archivedTurn.id)}/report`, {
+        headers: { "X-Dashboard-Token": dashboardToken }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) continue;
+      for (const item of data.turn?.report || []) rows.push(mapCampaignReportRow(item));
+    } catch (error) {
+      console.error("Archived report fetch error:", error);
+    }
+  }
+  const unique = new Map();
+  rows.forEach((row, index) => {
+    const key = row.attemptId || [row.list, row.phone, row.worker, row.attemptNumber, row.startedAt, row.endedAt, index].join("|");
+    unique.set(key, row);
+  });
+  return [...unique.values()].sort((left, right) => {
+    const leftTime = new Date(left.startedAt || 0).getTime() || 0;
+    const rightTime = new Date(right.startedAt || 0).getTime() || 0;
+    return leftTime - rightTime;
+  });
+}
+
+function formatReportDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function reportResultLabel(value) {
+  const labels = {
+    contesto: "Contestó",
+    sin_respuesta: "Sin respuesta",
+    no_contactado: "No contactado",
+    reintentar: "Reintentar",
+    no_interesado: "Sin interés",
+    interesado: "Interesado",
+    agendado: "Agendado",
+    requiere_asesor: "Requiere asesor",
+    numero_incorrecto: "Número incorrecto"
+  };
+  return labels[value] || String(value || "—").replaceAll("_", " ");
+}
+
+function reportResultClass(value) {
+  const normalized = String(value || "empty").toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  return `result-${normalized}`;
+}
+
+function renderCampaignReport() {
+  if (!refs.campaignReportBodyEl) return;
+  const rows = getCampaignReportRows();
+  if (refs.campaignReportCountEl) {
+    refs.campaignReportCountEl.textContent = `${rows.length} ${rows.length === 1 ? "registro" : "registros"}`;
+  }
+  if (refs.campaignReportEmptyEl) refs.campaignReportEmptyEl.style.display = rows.length ? "none" : "block";
+  refs.campaignReportBodyEl.innerHTML = [...rows].reverse().map((item) => `
+    <tr class="campaign-report-row ${reportResultClass(item.disposition || item.technicalResult)}">
+      <td>${escHtml(item.list || "—")}</td>
+      <td><strong>${escHtml(item.name || "—")}</strong></td>
+      <td class="campaign-report-phone">${escHtml(item.phone || "—")}</td>
+      <td>${escHtml(item.worker || "—")}</td>
+      <td>${item.attemptNumber || "—"}</td>
+      <td>${escHtml(formatReportDate(item.startedAt))}</td>
+      <td>${escHtml(formatReportDate(item.answeredAt))}</td>
+      <td>${escHtml(formatReportDate(item.endedAt))}</td>
+      <td>${escHtml(formatCallDuration(item.durationSeconds))}</td>
+      <td><span class="campaign-report-result technical ${reportResultClass(item.technicalResult)}">${escHtml(reportResultLabel(item.technicalResult))}</span></td>
+      <td><span class="campaign-report-result commercial ${reportResultClass(item.disposition)}">${escHtml(reportResultLabel(item.disposition))}</span></td>
+    </tr>
+  `).join("");
+}
+
+async function saveVoiceAgentConfig(enabled) {
+  void enabled;
+  setStatus("Agente de voz desactivado por ahora.");
+  return null;
+}
+
+async function startCampaignRunLegacy() {
+  if (!Contacts.contacts.length) {
+    setStatus("Importa o agrega contactos antes de iniciar la campaña.", true);
+    return;
+  }
+  const data = await postCampaignAction("/campaign/start", {
+    contacts: Contacts.contacts.map((contact) => ({
+      id: contact.id,
+      name: contact.name,
+      phone: contact.phone,
+      note: contact.note || ""
+    }))
+  });
+  if (data) setStatus("Campaña iniciada.", true);
+}
+
+async function startCampaignRun() {
+  const eligibleForGeneral = (contact) => !["completed", "failed", "awaiting_callback"].includes(String(contact.campaignStatus || ""))
+    && contact.technicalResult !== "no_contactado";
+  const orderedLists = Contacts.lists.filter((name) => Contacts.contacts.some((contact) =>
+    (contact.list || "Principal") === name && normalizeValidPeruPhone(contact.phone)
+  ));
+  const workerByList = new Map(pairingSlotsSnapshot.map((slot, index) => [orderedLists[index], slot.deviceId || ""]));
+  const selectedContacts = Contacts.contacts.filter((contact) =>
+    orderedLists.includes(contact.list || "Principal") && normalizeValidPeruPhone(contact.phone) && eligibleForGeneral(contact)
+  );
+  const listName = "Asignación automática";
+  if (!selectedContacts.length) {
+    setStatus(`La lista ${listName} no tiene contactos.`, true);
+    return;
+  }
+  const connectedCount = (latestSessionState?.phoneWorkers || []).filter((worker) => worker.connected && !worker.paused).length;
+  if (!connectedCount) {
+    setStatus("Vincula al menos un teléfono disponible antes de iniciar.", true);
+    return;
+  }
+  const data = await postCampaignAction("/campaign/start", {
+    listName,
+    maxAttempts: 2,
+    contacts: selectedContacts.map((contact) => ({
+      id: contact.id,
+      name: contact.name,
+      phone: normalizeValidPeruPhone(contact.phone),
+      note: contact.note || "",
+      list: contact.list || "Principal",
+      targetWorkerId: workerByList.get(contact.list || "Principal") || ""
+    }))
+  });
+  if (data) setStatus(`Llamada general iniciada: ${selectedContacts.length} contactos y ${connectedCount} teléfonos.`, true);
+}
+
+async function startPendingTurnRun() {
+  const pending = loadTurnPendingContacts();
+  if (!pending.length) {
+    setStatus("No hay números pendientes del turno.", true);
+    return;
+  }
+  const workers = Array.isArray(latestSessionState?.phoneWorkers) ? latestSessionState.phoneWorkers : [];
+  const firstAvailableSlot = pairingSlotsSnapshot.find((slot) => {
+    if (!slot.deviceId) return false;
+    const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
+    return worker?.connected && !worker.paused
+      && ["idle", "failed", "available"].includes(String(worker.callState || "idle"));
+  });
+  const fallbackWorker = workers.find((worker) => worker.connected && !worker.paused
+    && ["idle", "failed", "available"].includes(String(worker.callState || "idle")));
+  const workerId = firstAvailableSlot?.deviceId || fallbackWorker?.id || "";
+  if (!workerId) {
+    setStatus("No hay ningún equipo disponible para llamar los pendientes.", true);
+    return;
+  }
+  const data = await postCampaignAction("/campaign/start", {
+    listName: "Pendientes del turno",
+    maxAttempts: 1,
+    contacts: pending.map((contact, index) => ({
+      id: `turn-pending-${Date.now()}-${index}`,
+      name: contact.name,
+      phone: normalizeValidPeruPhone(contact.phone),
+      list: contact.list || "Principal",
+      targetWorkerId: workerId
+    }))
+  });
+  if (data) setStatus(`Llamando ${pending.length} número${pending.length === 1 ? "" : "s"} pendiente${pending.length === 1 ? "" : "s"} desde el primer equipo disponible.`, true);
+}
+
+async function finalizeWorkTurn() {
+  const snapshot = currentShiftSnapshot();
+  if (!snapshot?.current) {
+    setStatus("No hay un turno activo para finalizar.", true);
+    return;
+  }
+  const accepted = await requestConfirmation({
+    title: "Finalizar turno",
+    message: `Se archivará ${snapshot.current.label || "el turno"}, se detendrán las llamadas y se desvincularán todos los equipos. Los pendientes se conservarán para el siguiente turno.`,
+    confirmLabel: "Finalizar turno"
+  });
+  if (!accepted) return;
+  const data = await postCampaignAction("/turn/finalize");
+  if (!data) return;
+  campaignState = data.campaign || campaignState;
+  await loadPairingData(sessionCode);
+  renderCampaignPanel();
+  setStatus("Turno finalizado. Reporte archivado y pendientes conservados.", true);
+}
+
+async function finalizeOperationalSession() {
+  const accepted = await requestConfirmation({
+    title: "Finalizar sesión",
+    message: "Se cerrará la operación actual, se archivará el turno, se desvincularán los teléfonos y se generarán nuevos códigos QR. Los pendientes no se eliminarán.",
+    confirmLabel: "Finalizar sesión"
+  });
+  if (!accepted) return;
+  const data = await postCampaignAction("/session/finalize");
+  if (!data) return;
+  campaignState = data.campaign || campaignState;
+  pairingStateSignature = "";
+  await loadPairingData(sessionCode);
+  renderCampaignPanel();
+  setStatus("Sesión finalizada. El sistema quedó limpio y los pendientes fueron conservados.", true);
+}
+
+async function pauseCampaignRun() {
+  const data = await postCampaignAction("/campaign/pause");
+  if (data) setStatus("Campaña pausada.", true);
+}
+
+async function resumeCampaignRun() {
+  const data = await postCampaignAction("/campaign/resume");
+  if (data) setStatus("Campaña reanudada.", true);
+}
+
+async function skipCampaignContact() {
+  const data = await postCampaignAction("/campaign/skip");
+  if (data) setStatus("Contacto saltado y marcado para reintento.", true);
+}
+
+async function markCampaignResult(result) {
+  const active = getActiveCampaignContact();
+  if (!active) {
+    setStatus("No hay contacto activo en campaña.", true);
+    return;
+  }
+
+  const payload = { contactId: active.id, result };
+  if (result === "requiere_asesor") {
+    const callbackReason = await requestListName({
+      title: "Derivar a un asesor",
+      label: "Motivo de derivación",
+      placeholder: "Ej. Solicita información comercial",
+      defaultValue: active.callbackReason || "Solicitó asesor"
+    });
+    if (!callbackReason) return;
+    const assignedAdvisor = await requestListName({
+      title: "Asignar asesor",
+      label: "Nombre del asesor",
+      placeholder: "Ej. Alonso",
+      defaultValue: active.assignedAdvisor || "Sin asignar"
+    });
+    if (assignedAdvisor === null) return;
+    payload.callbackReason = callbackReason;
+    payload.assignedAdvisor = assignedAdvisor === "Sin asignar" ? "" : assignedAdvisor;
+  }
+
+  const data = await postCampaignAction("/campaign/result", payload);
+  if (!data) return;
+
+  const labels = {
+    agendado: "Contacto marcado como agendado.",
+    no_interesado: "Contacto marcado como no interesado.",
+    requiere_asesor: "Contacto derivado a callback.",
+    reintentar: "Contacto marcado para reintento."
+  };
+  setStatus(labels[result] || "Resultado de campaña actualizado.", true);
+}
+
+async function markContactDisposition(contactId, result) {
+  const data = await postCampaignAction("/campaign/result", { contactId, result });
+  if (data) setStatus("Resultado comercial actualizado.", true);
+}
+
+function restoreSavedSession() {
+  if (restoreAttempted) return;
+  const savedCode = getSavedSessionCode();
+  restoreAttempted = true;
+  if (!savedCode) {
+    requestAutomaticSession();
+    return;
+  }
+  sessionCode = savedCode;
+  dashboardToken = getSavedDashboardToken(savedCode);
+  refs.sessionCodeIn.value = savedCode;
+  if (!dashboardToken) {
+    setStatus("Preparando una sesión nueva...");
+    sessionCode = "";
+    requestAutomaticSession();
+    return;
+  }
+  setStatus(`Restaurando sesión ${savedCode}...`);
+  socket.emit("session:join", { code: savedCode, role: "dashboard", token: dashboardToken });
+  loadPairingData(savedCode);
+}
+
+function requestAutomaticSession() {
+  if (sessionCode || autoSessionRequested || !socket.connected) return;
+  autoSessionRequested = true;
+  setStatus("Creando sesión automática...");
+  socket.emit("session:create");
+}
+
+// ── EVENT BINDING ────────────────────────────────────────────────────
+function bindEvents() {
+  if (refs.createBtn) refs.createBtn.onclick = () => socket.emit("session:create");
+  if (refs.joinBtn) refs.joinBtn.onclick = () => {
+    const code = refs.sessionCodeIn.value.trim().toUpperCase();
+    if (code) {
+      dashboardToken = getSavedDashboardToken(code);
+      if (!dashboardToken) {
+        setStatus("No existe una credencial privada guardada para esa sesión en este navegador.", true);
+        return;
+      }
+      socket.emit("session:join", { code, role: "dashboard", token: dashboardToken });
+      loadPairingData(code);
+    }
+  };
+  
+  refs.cBodyEl.onclick = async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    const contact = Contacts.contacts.find(c => c.id === id);
+    if (!contact) return;
+    
+    if (action === "dial") startDialForContact(contact);
+    if (action === "result-interested") markContactDisposition(id, "interesado");
+    if (action === "result-no-interest") markContactDisposition(id, "no_interesado");
+    if (action === "result-callback") markContactDisposition(id, "reintentar");
+    if (action === "whatsapp") WhatsApp.openWhatsAppModal(contact);
+    if (action === "whatsapp-direct") {
+      const phone = normalizeValidPeruPhone(contact.phone);
+      if (!phone) {
+        setStatus("Este contacto no tiene un número peruano válido para WhatsApp.", true);
+      } else {
+        window.open(`https://wa.me/51${phone}`, "_blank", "noopener,noreferrer");
+      }
+    }
+    if (action === "call-direct") await callContactFromAssignedList(contact.id, contact.list || "Principal");
+    if (action === "edit") {
+       openEditModal(contact);
+    }
+    if (action === "delete") {
+      if (await requestConfirmation({ title: "Eliminar contacto", message: `¿Eliminar a ${contact.name}?`, confirmLabel: "Eliminar" })) {
+        Contacts.deleteContact(id);
+        renderContacts();
+      }
+    }
+  };
+
+  refs.hangupBtnEl.onclick = () => {
+    emitCallActionWithAck("hangup");
+    applyState("ended", callCtx?.phone || "");
+  };
+
+  refs.muteBtnEl.onclick = toggleMute;
+  refs.speakerBtnEl.onclick = toggleSpeaker;
+  if (refs.addContactBtn) refs.addContactBtn.onclick = addManualContact;
+  if (refs.openAddContactBtn) refs.openAddContactBtn.onclick = openAddContactModal;
+  if (refs.floatingAddContactBtn) refs.floatingAddContactBtn.onclick = openAddContactModal;
+  if (refs.addCloseBtn) refs.addCloseBtn.onclick = () => { refs.addContactModalEl.style.display = "none"; };
+  if (refs.addSaveBtn) refs.addSaveBtn.onclick = saveModalContact;
+  if (refs.addPhoneInput) refs.addPhoneInput.onkeydown = (event) => { if (event.key === "Enter") saveModalContact(); };
+  if (refs.importFileEl) refs.importFileEl.onchange = (e) => handleImportFile(e.target.files?.[0] || null);
+  if (refs.importUrlBtn) refs.importUrlBtn.onclick = handleImportUrl;
+  if (refs.importConfirm) refs.importConfirm.onclick = addImportedContacts;
+  if (refs.importCancel) refs.importCancel.onclick = resetImportPreview;
+  if (refs.tabWord) refs.tabWord.onclick = () => {
+    refs.tabWord.classList.add("active");
+    refs.tabUrl.classList.remove("active");
+    refs.panelWord.style.display = "block";
+    refs.panelUrl.style.display = "none";
+  };
+  if (refs.tabUrl) refs.tabUrl.onclick = () => {
+    refs.tabUrl.classList.add("active");
+    refs.tabWord.classList.remove("active");
+    refs.panelUrl.style.display = "block";
+    refs.panelWord.style.display = "none";
+  };
+  if (refs.prevPageBtn) refs.prevPageBtn.onclick = () => {
+    currentPage = Math.max(1, currentPage - 1);
+    renderContacts();
+  };
+  if (refs.nextPageBtn) refs.nextPageBtn.onclick = () => {
+    currentPage += 1;
+    renderContacts();
+  };
+  if (refs.campaignStartBtn) refs.campaignStartBtn.onclick = startCampaignRun;
+  if (refs.pendingTurnCallBtn) refs.pendingTurnCallBtn.onclick = startPendingTurnRun;
+  if (refs.pendingTurnBodyEl) refs.pendingTurnBodyEl.onclick = async (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const contact = Contacts.contacts.find((item) => item.id === button.dataset.id);
+    if (!contact) return;
+    if (button.dataset.action === "call-direct") {
+      await callContactFromAssignedList(contact.id, contact.list || "Principal");
+    } else if (button.dataset.action === "whatsapp-direct") {
+      const phone = normalizeValidPeruPhone(contact.phone);
+      if (phone) window.open(`https://wa.me/51${phone}`, "_blank", "noopener,noreferrer");
+      else setStatus("Este contacto no tiene un número peruano válido para WhatsApp.", true);
+    }
+  };
+  if (refs.finalizeTurnBtn) refs.finalizeTurnBtn.onclick = finalizeWorkTurn;
+  if (refs.finalizeSessionBtn) refs.finalizeSessionBtn.onclick = finalizeOperationalSession;
+  if (refs.addPairingQrBtn) refs.addPairingQrBtn.onclick = createPairingQr;
+  if (refs.assignedListsPanelEl) refs.assignedListsPanelEl.onclick = async (event) => {
+    const contactButton = event.target.closest("button[data-action]");
+    if (contactButton) {
+      const contact = Contacts.contacts.find((item) => item.id === contactButton.dataset.id);
+      if (!contact) return;
+      if (contactButton.dataset.action === "call-direct") {
+        await callContactFromAssignedList(contact.id, contact.list || "Principal");
+      } else if (contactButton.dataset.action === "whatsapp-direct") {
+        const phone = normalizeValidPeruPhone(contact.phone);
+        if (phone) window.open(`https://wa.me/51${phone}`, "_blank", "noopener,noreferrer");
+        else setStatus("Este contacto no tiene un número peruano válido para WhatsApp.", true);
+      }
+      return;
+    }
+    const downloadButton = event.target.closest("button[data-download-assigned-list]");
+    if (downloadButton) {
+      downloadAssignedListReport(downloadButton.dataset.downloadAssignedList);
+      return;
+    }
+    const deleteButton = event.target.closest("button[data-delete-assigned-list]");
+    if (!deleteButton) return;
+    const listName = deleteButton.dataset.deleteAssignedList;
+    const accepted = await requestConfirmation({
+      title: "Eliminar registro terminado",
+      message: `¿Quitar el registro terminado de "${listName}"? La lista original y todos sus contactos se conservarán.`,
+      confirmLabel: "Eliminar registro"
+    });
+    if (!accepted) return;
+    hideAssignedRecord(listName);
+    renderAssignedListsPanel();
+    setStatus(`Registro terminado de "${listName}" eliminado. La base original se conserva.`, true);
+  };
+  if (refs.pairingSlotsEl) refs.pairingSlotsEl.onclick = async (event) => {
+    const independentButton = event.target.closest("button[data-independent-pairing-slot]");
+    if (independentButton) {
+      await startIndependentWorker(independentButton.dataset.workerId);
+      return;
+    }
+    const stopButton = event.target.closest("button[data-stop-pairing-slot]");
+    if (stopButton) {
+      await stopIndependentWorker(stopButton.dataset.workerId);
+      return;
+    }
+    const hangupButton = event.target.closest("button[data-hangup-pairing-slot]");
+    if (hangupButton) {
+      await hangupWorkerWithResult(hangupButton.dataset.workerId);
+      return;
+    }
+    const speakerButton = event.target.closest("button[data-speaker-pairing-slot]");
+    if (speakerButton) {
+      const enabled = speakerButton.dataset.speakerOn === "true";
+      emitCallActionWithAck(enabled ? "speaker_off" : "speaker_on", { workerId: speakerButton.dataset.workerId });
+      setStatus(enabled ? "Desactivando altavoz del equipo." : "Activando altavoz del equipo.", true);
+      return;
+    }
+    const disconnectButton = event.target.closest("button[data-disconnect-pairing-slot]");
+    if (disconnectButton) {
+      await disconnectWorker(disconnectButton.dataset.workerId, disconnectButton.dataset.workerName || "este teléfono");
+      return;
+    }
+    const button = event.target.closest("button[data-delete-pairing-slot]");
+    if (!button) return;
+    const confirmed = await requestConfirmation({
+      title: "Eliminar código QR",
+      message: `¿Eliminar ${button.dataset.slotLabel || "este QR"}?`,
+      confirmLabel: "Eliminar"
+    });
+    if (confirmed) await deletePairingQr(button.dataset.deletePairingSlot);
+  };
+  if (refs.campaignPauseBtn) refs.campaignPauseBtn.onclick = pauseCampaignRun;
+  if (refs.campaignResumeBtn) refs.campaignResumeBtn.onclick = resumeCampaignRun;
+  if (refs.campaignStopBtn) refs.campaignStopBtn.onclick = stopCampaignRun;
+  if (refs.campaignReportBtn) refs.campaignReportBtn.onclick = downloadCampaignReport;
+  if (refs.campaignSkipBtn) refs.campaignSkipBtn.onclick = skipCampaignContact;
+  if (refs.campaignResultAgendaBtn) refs.campaignResultAgendaBtn.onclick = () => markCampaignResult("agendado");
+  if (refs.campaignResultNoBtn) refs.campaignResultNoBtn.onclick = () => markCampaignResult("no_interesado");
+  if (refs.campaignResultAdvisorBtn) refs.campaignResultAdvisorBtn.onclick = () => markCampaignResult("requiere_asesor");
+  if (refs.campaignResultRetryBtn) refs.campaignResultRetryBtn.onclick = () => markCampaignResult("reintentar");
+  if (refs.agentDisableBtn) {
+    refs.agentDisableBtn.onclick = () => saveVoiceAgentConfig(false);
+    refs.agentDisableBtn.disabled = true;
+    refs.agentDisableBtn.title = "Agente de voz desactivado temporalmente";
+  }
+  
+  if (refs.testBotAudioBtn) refs.testBotAudioBtn.onclick = () => socket.emit("test:bot_audio");
+
+
+
+  // History
+  if (refs.openHistoryBtn) refs.openHistoryBtn.onclick = openHistory;
+  if (refs.historyCloseBtn) refs.historyCloseBtn.onclick = () => { refs.historyModalEl.style.display = "none"; };
+  if (refs.clearHistoryBtn) refs.clearHistoryBtn.onclick = clearHistory;
+
+  // Tabs
+  renderTabs();
+
+  loadHistory();
+  
+  // Visual feedback for bot audio activity
+  AudioBridge.setOnAudioActivity((active) => {
+    if (refs.testBotAudioBtn) {
+      refs.testBotAudioBtn.style.boxShadow = active ? "0 0 15px var(--accent)" : "none";
+      refs.testBotAudioBtn.style.transform = active ? "scale(1.05)" : "scale(1)";
+    }
+  });
+  
+  
+  // Missing button handlers
+  if (refs.exportWordBtn) refs.exportWordBtn.onclick = exportContactsToWord;
+  if (refs.openQuotationBtn) refs.openQuotationBtn.onclick = openQuotationModal;
+  if (refs.deleteAllContactsBtn) {
+    refs.deleteAllContactsBtn.onclick = async () => {
+      if (!await requestConfirmation({ title: "Eliminar todos los contactos", message: "Se eliminarán todos los contactos y todas las listas. Esta acción no se puede deshacer.", confirmLabel: "Eliminar todo" })) return;
+      Contacts.clearAllContacts();
+      Contacts.lists.length = 0;
+      Contacts.lists.push("Principal");
+      Contacts.setActiveList("Principal");
+      Contacts.saveLists();
+      renderTabs();
+      renderContacts();
+      setStatus("Todos los contactos y listas han sido eliminados.");
+    };
+  }
+  if (refs.connectWhatsAppBtn) refs.connectWhatsAppBtn.onclick = WhatsApp.openWhatsAppConnectModal;
+  
+  // Quotation modal handlers
+  if (refs.quotationCloseBtn) refs.quotationCloseBtn.onclick = () => {
+    if (refs.quotationModalEl) refs.quotationModalEl.style.display = "none";
+  };
+  if (refs.quotationPreviewBtn) refs.quotationPreviewBtn.onclick = Quotation.previewQuotationHtml;
+  if (refs.quotationDownloadBtn) refs.quotationDownloadBtn.onclick = Quotation.downloadQuotationPdf;
+  if (refs.quotationPreviewCloseBtn) refs.quotationPreviewCloseBtn.onclick = () => {
+    if (refs.quotationPreviewModalEl) refs.quotationPreviewModalEl.style.display = "none";
+  };
+  if (refs.quotationPreviewDownloadBtn) refs.quotationPreviewDownloadBtn.onclick = Quotation.downloadQuotationPdf;
+  
+  // WhatsApp modal handlers
+  if (refs.whatsappCloseBtn) refs.whatsappCloseBtn.onclick = WhatsApp.closeWhatsAppModal;
+  if (refs.whatsappSendBtn) refs.whatsappSendBtn.onclick = WhatsApp.sendWhatsAppMessage;
+  if (refs.whatsappLogoutBtn) refs.whatsappLogoutBtn.onclick = WhatsApp.logoutWhatsAppAccount;
+  if (refs.whatsappTemplateSaveBtn) refs.whatsappTemplateSaveBtn.onclick = WhatsApp.saveNewWhatsAppPresetMessage;
+  
+  // Quotation form handlers
+  if (refs.quotationAddItemBtn) refs.quotationAddItemBtn.onclick = () => {
+    Quotation.quotationItems.push({ 
+      id: makeId(), 
+      service: "", 
+      customMode: false, 
+      quantity: 1, 
+      price: 0, 
+      image: "" 
+    });
+    Quotation.renderQuotationItems();
+  };
+  
+  // Quotation item change handlers
+  if (refs.quotationItemsBodyEl) {
+    refs.quotationItemsBodyEl.onclick = (e) => {
+      const target = e.target;
+      const field = target.dataset.qField;
+      const id = target.dataset.qId;
+      const action = target.dataset.qAction;
+      
+      if (!id) return;
+      
+      const item = Quotation.quotationItems.find(item => item.id === id);
+      if (!item) return;
+      
+      if (action === "remove") {
+        Quotation.quotationItems = Quotation.quotationItems.filter(i => i.id !== id);
+        Quotation.renderQuotationItems();
+        Quotation.recalcQuotationTotals();
+        return;
+      }
+      
+      if (field === "service_select") {
+        item.service = target.value;
+        item.customMode = target.value === "__other__";
+        Quotation.renderQuotationItems();
+      } else if (field === "service_custom") {
+        item.service = target.value;
+      } else if (field === "quantity") {
+        item.quantity = Number(target.value) || 1;
+      } else if (field === "price") {
+        item.price = Number(target.value) || 0;
+      } else if (field === "image") {
+        item.image = target.value;
+      }
+      
+      Quotation.recalcQuotationTotals();
+    };
+    
+    refs.quotationItemsBodyEl.onchange = refs.quotationItemsBodyEl.onclick;
+  }
+  
+  // IGV checkbox handler
+  if (refs.quotationApplyIgvEl) {
+    refs.quotationApplyIgvEl.onchange = () => Quotation.recalcQuotationTotals();
+  }
+  
+  // Initialize quotation events
+  Quotation.bindQuotationEvents();
+  
+  // WhatsApp file drop zone handlers
+  if (refs.whatsappDropZone) {
+    refs.whatsappDropZone.onclick = () => refs.whatsappFileInput?.click();
+    
+    refs.whatsappDropZone.ondragover = (e) => {
+      e.preventDefault();
+      refs.whatsappDropZone.classList.add("drag-over");
+    };
+    
+    refs.whatsappDropZone.ondragleave = () => {
+      refs.whatsappDropZone.classList.remove("drag-over");
+    };
+    
+    refs.whatsappDropZone.ondrop = (e) => {
+      e.preventDefault();
+      refs.whatsappDropZone.classList.remove("drag-over");
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        refs.whatsappFileInput.files = files;
+        WhatsApp.updateWhatsAppFileLabel();
+      }
+    };
+    
+    if (refs.whatsappFileInput) {
+      refs.whatsappFileInput.onchange = WhatsApp.updateWhatsAppFileLabel;
+    }
+  }
+}
+
+// ── MISSING BUTTON FUNCTIONS ─────────────────────────────────────────────
+async function exportContactsToWord() {
+  if (!Contacts.contacts.length) {
+    setStatus("No hay contactos para exportar.", true);
+    return;
+  }
+
+  try {
+    setStatus("Generando documento Word...", true);
+    
+    // Create HTML content that can be converted to Word
+    let htmlContent = `
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Lista de Contactos</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; }
+          table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .call-count { background-color: #e8f5e8; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <h1>Lista de Contactos - ${new Date().toLocaleDateString()}</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Teléfono</th>
+              <th>Nota</th>
+              <th>Llamadas</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    Contacts.contacts.forEach(contact => {
+      const callCount = Number(Contacts.calledCounts[contact.id] || 0);
+      htmlContent += `
+        <tr>
+          <td>${escHtml(contact.name)}</td>
+          <td>${escHtml(contact.phone)}</td>
+          <td>${escHtml(contact.note || "")}</td>
+          <td>${callCount > 0 ? `<span class="call-count">${callCount}</span>` : "0"}</td>
+        </tr>
+      `;
+    });
+
+    htmlContent += `
+          </tbody>
+        </table>
+        <p style="margin-top: 20px; font-size: 12px; color: #666;">
+          Total de contactos: ${Contacts.contacts.length} | 
+          Contactos llamados: ${Contacts.contacts.reduce((acc, c) => acc + (Number(Contacts.calledCounts[c.id] || 0) > 0 ? 1 : 0), 0)}
+        </p>
+      </body>
+      </html>
+    `;
+
+    // Create a Blob with the HTML content
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contactos_${new Date().toISOString().split('T')[0]}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setStatus("Documento Word descargado.", true);
+  } catch (error) {
+    console.error("Error exporting to Word:", error);
+    setStatus("Error al exportar a Word.", true);
+  }
+}
+
+function openQuotationModal() {
+  Quotation.resetQuotationForm();
+  if (refs.quotationModalEl) {
+    refs.quotationModalEl.style.display = "grid";
+    setStatus("Modal de cotización abierto.", true);
+  }
+}
+
+// ── CALL LOGIC ────────────────────────────────────────────────────────
+function startDialForContact(c) {
+  if (["dialing", "ringing", "in_call"].includes(currentState)) return;
+  currentCallingContactId = c.id;
+  Contacts.calledCounts[c.id] = (Contacts.calledCounts[c.id] || 0) + 1;
+  Contacts.saveCalledCounts();
+  renderContacts();
+  openCallWindow(c.phone, { contactName: c.name, note: c.note });
+  emitCallActionWithAck("dial", { phoneNumber: c.phone, contactName: c.name, contactId: c.id });
+}
+
+function openCallWindow(phone, opts = {}) {
+  callCtx = {
+    phone: phone || "",
+    contactName: opts.contactName || "Sin contacto",
+    note: opts.note || "",
+    answered: false
+  };
+  if (callTimerId) {
+    clearInterval(callTimerId);
+    callTimerId = null;
+  }
+  callStartedAt = null;
+  if (refs.callKickerEl) refs.callKickerEl.textContent = "Enviando orden...";
+  if (refs.callNameEl) refs.callNameEl.textContent = callCtx.contactName || "Sin contacto";
+  if (refs.callNumberEl) refs.callNumberEl.textContent = callCtx.phone || "-";
+  if (refs.callNoteEl) refs.callNoteEl.textContent = callCtx.note || "-";
+  if (refs.callDurEl) refs.callDurEl.textContent = "00:00";
+  refs.callModalEl.style.display = "grid";
+  setBadge("idle", refs.callBadgeEl);
+  if (refs.callHintEl) {
+    refs.callHintEl.textContent = "Enviando orden al celular...";
+  }
+}
+
+function formatCallDuration(totalSeconds) {
+  const safeSeconds = Math.max(0, Number(totalSeconds || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  const hours = Math.floor(minutes / 60);
+  if (hours > 0) {
+    const remMinutes = minutes % 60;
+    return [hours, remMinutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+  }
+  return [minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function stopCallTimer(clearStart = true) {
+  if (callTimerId) {
+    clearInterval(callTimerId);
+    callTimerId = null;
+  }
+  if (clearStart) callStartedAt = null;
+}
+
+function startCallTimer() {
+  stopCallTimer();
+  if (!callStartedAt) callStartedAt = Date.now();
+  if (refs.callDurEl) {
+    refs.callDurEl.textContent = formatCallDuration(Math.floor((Date.now() - callStartedAt) / 1000));
+  }
+    callTimerId = setInterval(() => {
+        if (!callStartedAt || !refs.callDurEl) return;
+        const dur = Math.floor((Date.now() - callStartedAt) / 1000);
+        refs.callDurEl.textContent = formatCallDuration(dur);
+        lastCallDuration = dur; // Store the last duration
+    }, 1000);
+}
+
+async function toggleMute() {
+  micEnabled = !micEnabled;
+
+  if (micEnabled) {
+    await AudioBridge.startMic();
+    if (currentState === "in_call") {
+      await AudioBridge.startWebMicStreaming();
+    }
+    emitCallActionWithAck("unmute");
+  } else {
+    AudioBridge.stopMic();
+    emitCallActionWithAck("mute");
+  }
+
+  syncAudioButtons();
+}
+
+function toggleSpeaker() {
+  speakerEnabled = !speakerEnabled;
+  AudioBridge.setPhoneAudioEnabled(speakerEnabled && currentState === "in_call");
+  
+  // Enviar comando al APK para el altavoz físico
+  emitCallActionWithAck(speakerEnabled ? "speaker_on" : "speaker_off");
+  
+  syncAudioButtons();
+}
+
+function applyState(state, lastNum, opts = {}) {
+  const previousState = currentState;
+  currentState = state;
+  
+  if (opts.micMuted !== undefined) {
+    const newMicEnabled = !opts.micMuted;
+    if (newMicEnabled !== micEnabled) {
+      micEnabled = newMicEnabled;
+      if (!micEnabled) {
+        AudioBridge.stopMic();
+      }
+    }
+  }
+  if (opts.isSpeakerOn !== undefined) {
+    const newSpeakerEnabled = opts.isSpeakerOn;
+    if (newSpeakerEnabled !== speakerEnabled) {
+      speakerEnabled = newSpeakerEnabled;
+      AudioBridge.setPhoneAudioEnabled(speakerEnabled && state === "in_call");
+    }
+  }
+  
+  syncAudioButtons();
+
+  setBadge(state, refs.callBadgeEl);
+  if (refs.callNumberEl && lastNum) refs.callNumberEl.textContent = lastNum;
+  if (refs.callNameEl && opts.contactName) refs.callNameEl.textContent = opts.contactName;
+  if (refs.callKickerEl) {
+    refs.callKickerEl.className = `call-kicker state-${state}`;
+    const kickerMap = {
+      idle: "Listo",
+      dialing: "Llamando...",
+      ringing: "Sonando...",
+      in_call: "Contestada",
+      ended: callStartedAt ? "Llamada finalizada" : "No contestó",
+      failed: "No se pudo llamar"
+    };
+    refs.callKickerEl.textContent = kickerMap[state] || "Estado";
+  }
+  if (refs.callHintEl) {
+    const hints = {
+      idle: "Esperando acción del celular.",
+      dialing: "El celular inició el marcado.",
+      ringing: "La llamada está sonando.",
+      in_call: "Llamada contestada y en curso.",
+      ended: callStartedAt ? `Duración: ${refs.callDurEl?.textContent || "00:00"}` : "La llamada no fue contestada.",
+      failed: "No se pudo iniciar la llamada."
+    };
+    refs.callHintEl.textContent = hints[state] || "";
+  }
+
+  // New state handling logic
+    if (state === "in_call") {
+        if (!callStartedAt) { 
+            callStartedAt = Date.now();
+            startCallTimer();
+        }
+        refs.callModalEl.classList.add("is-active-call");
+        refs.callModalEl.classList.remove("is-ringing");
+        refs.callRingEl.classList.add("is-in-call");
+    } else if (state === "idle" || state === "ended" || state === "failed") {
+        stopCallTimer(false); // Stop but don't clear Last Duration yet
+        refs.callModalEl.classList.remove("is-active-call");
+        refs.callModalEl.classList.remove("is-ringing");
+        refs.callRingEl.classList.remove("is-in-call");
+        
+        if (state === "ended" && lastCallDuration > 0) {
+            if (currentCallingContactId) {
+                Contacts.callDurations[currentCallingContactId] = (Contacts.callDurations[currentCallingContactId] || 0) + lastCallDuration;
+                Contacts.saveCallDurations();
+            }
+            
+            // Add to history
+            addHistoryEntry(lastNum || callCtx?.phone, lastCallDuration);
+
+            refs.callHintEl.textContent = `Llamada finalizada. Duración: ${formatCallDuration(lastCallDuration)}`;
+            // Keep duration visible in the badge for a moment
+            if (refs.callDurEl) refs.callDurEl.textContent = formatCallDuration(lastCallDuration);
+            lastCallDuration = 0;
+            renderContacts();
+        }
+
+        if (state === "idle" || state === "ended" || state === "failed") {
+            if (state === "idle") {
+              callStartedAt = null;
+              if (refs.callDurEl) refs.callDurEl.textContent = "00:00";
+            }
+            AudioBridge.stopPhoneAudio();
+            AudioBridge.stopMic();
+            micEnabled = false;
+            syncAudioButtons();
+            
+            // Close modal faster (2s instead of 4s) to keep campaign moving
+            setTimeout(() => { 
+                if (currentState === "idle" || currentState === "ended" || currentState === "failed") {
+                    refs.callModalEl.style.display = "none"; 
+                }
+            }, 2000);
+        }
+    } else {
+        refs.callModalEl.classList.remove("is-active-call");
+        if (state === "ringing" || state === "dialing") {
+          refs.callModalEl.classList.add("is-ringing");
+        } else {
+          refs.callModalEl.classList.remove("is-ringing");
+        }
+        refs.callRingEl.classList.remove("is-in-call");
+    }
+
+    if (state === "ringing" || state === "dialing") {
+        refs.callRingEl.classList.add("is-calling");
+    } else {
+        refs.callRingEl.classList.remove("is-calling");
+    }
+    syncAudioButtons();
+}
+
+function emitCallActionWithAck(action, payload = {}) {
+  const commandId = (typeof crypto.randomUUID === 'function') 
+    ? crypto.randomUUID() 
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const existing = pendingCommandTimeouts.get(commandId);
+  if (existing) clearTimeout(existing);
+  socket.emit("call:action", { action, commandId, ...payload });
+  setAckBadge(refs.apkAckBadgeEl, "pending", `APK · ${action}...`);
+  const timeoutId = setTimeout(() => {
+    pendingCommandTimeouts.delete(commandId);
+    setAckBadge(refs.apkAckBadgeEl, "warn", `APK · sin respuesta`);
+    if (refs.callHintEl && action === "dial" && ["idle", "failed", "ended"].includes(currentState)) {
+      refs.callHintEl.textContent = "El celular no confirmó la orden. Revisa permisos, marcador predeterminado o conexión del APK.";
+    }
+  }, 8000);
+  pendingCommandTimeouts.set(commandId, timeoutId);
+  return commandId;
+}
+
+function updatePairingHint(link) {
+  if (!refs.qrHintEl) return;
+  if (currentPhoneLinked) return;
+
+  try {
+    const parsed = new URL(link);
+    const apiBase = String(parsed.searchParams.get("apiBase") || "").trim();
+    if (!apiBase) {
+      refs.qrHintEl.textContent = "QR generado, pero no incluye apiBase.";
+      return;
+    }
+
+    const apiUrl = new URL(apiBase);
+    const host = apiUrl.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+      refs.qrHintEl.textContent = `Advertencia: el QR apunta a ${apiBase}. Ese host no sirve para el celular; usa IP LAN o dominio público.`;
+      return;
+    }
+
+    refs.qrHintEl.textContent = `QR listo. La APK se conectará a ${apiBase}`;
+  } catch {
+    refs.qrHintEl.textContent = "QR listo. Verifica que la URL del servidor sea accesible desde el celular.";
+  }
+}
+
+function updateSessionUi(st = {}) {
+  latestSessionState = st || {};
+  const dashboardConnected = Boolean(st?.connected?.dashboard ?? sessionCode);
+
+  const phoneConnected = Boolean(st?.connected?.phone);
+  const phoneLinking   = Boolean(st?.connected?.linking);
+  const phoneCount = Number(st?.connected?.phoneCount || 0);
+  const phoneDeviceName = String(st?.phoneDevice?.name || "").trim();
+  currentPhoneLinked = phoneConnected;
+
+  if (refs.qrHintEl && phoneLinking) {
+    refs.qrHintEl.innerHTML = `<strong>¡Celular detectado!</strong> Sincronizando datos...`;
+    refs.qrHintEl.style.color = "var(--success)";
+  }
+
+  if (refs.qrBlockEl) {
+    refs.qrBlockEl.classList.toggle("is-linked", phoneConnected);
+  }
+
+  if (refs.linkedBanner) {
+    refs.linkedBanner.style.display = phoneConnected ? "flex" : "none";
+  }
+  if (refs.linkedDevice) {
+    if (phoneConnected) {
+      const deviceLabel = phoneDeviceName || (phoneCount > 1 ? `${phoneCount} dispositivos conectados` : "Dispositivo conectado");
+      refs.linkedDevice.textContent = `${deviceLabel} · Sesión ${sessionCode || "activa"}`;
+    } else {
+      refs.linkedDevice.textContent = "Dispositivo conectado";
+    }
+  }
+  if (refs.contactsSec) {
+    refs.contactsSec.style.display = dashboardConnected ? "block" : "none";
+  }
+  if (refs.qrBlockEl) {
+    // Keep the QR visible so more phones can join the same session.
+    refs.qrBlockEl.style.display = dashboardConnected ? "flex" : "none";
+  }
+
+  if (dashboardConnected) {
+    setStatus(phoneConnected ? `${phoneCount} teléfono(s) vinculado(s). Cada dispositivo utiliza su propio QR.` : "Sesión creada. Escanea un QR diferente en cada teléfono.", true);
+    renderCampaignPanel();
+  } else {
+    setStatus("Sin vincular. Crea o une a una sesión.");
+  }
+}
+
+// ── APK & PAIRING ────────────────────────────────────────────────────
+async function loadPairingData(code) {
+  try {
+    const res = await fetch(`${API_BASE}/api/pairing/${code}`, {
+      headers: { "X-Dashboard-Token": dashboardToken }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo generar la vinculación.");
+    const slots = Array.isArray(data.pairingSlots) ? data.pairingSlots : [];
+    pairingSlotsSnapshot = slots;
+    pairQrObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    pairQrObjectUrls = [];
+
+    const assignedLists = Contacts.lists.filter((name) =>
+      Contacts.contacts.some((contact) => (contact.list || "Principal") === name)
+    );
+    const workers = Array.isArray(latestSessionState?.phoneWorkers) ? latestSessionState.phoneWorkers : [];
+    const renderedSlots = await Promise.all(slots.map(async (slot, index) => {
+      const slotDisplayLabel = `EQUIPO ${index + 1}`;
+      let qrUrl = "";
+      try {
+        const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${code}.svg?slot=${encodeURIComponent(slot.id)}`, {
+          headers: { "X-Dashboard-Token": dashboardToken }
+        });
+        if (!qrResponse.ok) throw new Error(`HTTP ${qrResponse.status}`);
+        qrUrl = URL.createObjectURL(await qrResponse.blob());
+        pairQrObjectUrls.push(qrUrl);
+      } catch {
+        qrUrl = "";
+      }
+      const assigned = Boolean(slot.deviceId);
+      const activeWorkerList = slot.deviceId
+        ? (campaignState?.contacts || []).find((contact) =>
+            contact.targetWorkerId === slot.deviceId && !["completed", "failed", "awaiting_callback"].includes(contact.status)
+          )?.list
+        : "";
+      const assignedList = activeWorkerList || assignedLists[index] || "";
+      const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
+      const callState = String(worker?.callState || "idle");
+      const calling = Boolean(worker && ["dialing", "ringing", "in_call"].includes(callState));
+      const ringing = ["dialing", "ringing"].includes(callState);
+      const answered = callState === "in_call";
+      const ended = Boolean(worker && ["ended", "failed"].includes(callState));
+      const heldContact = (campaignState?.contacts || []).find((contact) =>
+        contact.targetWorkerId === slot.deviceId && contact.status === "held"
+      );
+      const statusIcon = ringing
+        ? { src: "./assets/call-status/timbrando.png", label: "Timbrando", effect: "is-vibrating" }
+        : answered
+          ? { src: "./assets/call-status/contesto.png", label: "Llamada contestada", effect: "is-pulsing" }
+          : ended || heldContact
+            ? { src: "./assets/call-status/rechazado.png", label: "Llamada rechazada o finalizada", effect: "is-rejected" }
+            : null;
+      return `
+        <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}">
+          <div class="pairing-slot-top">
+            <strong>${slotDisplayLabel}</strong>
+            <span class="pairing-slot-state">${assigned ? (slot.connected ? "Conectado" : "Vinculado") : "Disponible"}</span>
+          </div>
+          ${qrUrl
+            ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
+            : `<div class="pairing-slot-qr-error">No se pudo cargar este QR. Actualiza la página.</div>`}
+          <div class="pairing-slot-details">
+            <span>Teléfono</span>
+            <strong>${assigned ? escHtml(slot.deviceName || "Teléfono vinculado") : "Sin vincular"}</strong>
+            <span>Lista asignada</span>
+            <strong>${assignedList ? escHtml(assignedList) : "Sin lista asignada"}</strong>
+          </div>
+          <div class="pairing-slot-current-call ${ringing ? "is-ringing" : answered ? "is-answered" : ended || heldContact ? "is-ended" : ""}">
+            <span>${ringing ? "Teléfono timbrando" : answered ? "Llamada contestada" : heldContact ? "Llamada detenida" : ended ? "Llamada finalizada" : "Estado de llamada"}</span>
+            <div class="pairing-call-number-row">
+              <strong class="pairing-call-number">${calling || ended ? escHtml(worker.phoneNumber || "Sin número") : heldContact ? escHtml(heldContact.phone || "") : "Esperando llamada"}</strong>
+              ${statusIcon ? `<img class="pairing-call-status-icon ${statusIcon.effect}" src="${statusIcon.src}" alt="${statusIcon.label}" />` : ""}
+            </div>
+            <small class="pairing-call-company">${calling || ended ? escHtml(worker.companyName || "Empresa") : heldContact ? escHtml(heldContact.name || "Empresa") : ""}</small>
+          </div>
+          <div class="pairing-slot-call-actions">
+            <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${assigned && assignedList && !calling ? "" : "disabled"}>▶ Iniciar</button>
+            <button type="button" class="pairing-slot-stop" data-stop-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>■ Detener</button>
+            <button type="button" class="pairing-slot-hangup" data-hangup-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>☎ Colgar</button>
+          </div>
+          ${assigned ? `<button type="button" class="pairing-slot-speaker ${worker?.speakerOn ? "is-on" : ""}" data-speaker-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" data-speaker-on="${worker?.speakerOn ? "true" : "false"}">${worker?.speakerOn ? "ALTAVOZ ACTIVADO" : "ACTIVAR ALTAVOZ"}</button>` : ""}
+          ${assigned ? `<button type="button" class="pairing-slot-disconnect" data-disconnect-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" data-worker-name="${escHtml(slot.deviceName || "Teléfono vinculado")}">Desvincular teléfono</button>` : ""}
+          ${assigned ? "" : `<button type="button" class="pairing-slot-delete" data-delete-pairing-slot="${escHtml(slot.id)}" data-slot-label="${slotDisplayLabel}">Eliminar QR</button>`}
+        </article>`;
+    }));
+
+    if (refs.pairingSlotsEl) {
+      refs.pairingSlotsEl.innerHTML = renderedSlots.length
+        ? renderedSlots.join("")
+        : `<div class="campaign-list-empty">No hay códigos QR disponibles.</div>`;
+    }
+    renderAssignedListsPanel();
+  } catch (error) {
+    if (refs.pairingSlotsEl) refs.pairingSlotsEl.innerHTML = `<div class="campaign-list-empty">${escHtml(error.message || "No se pudieron cargar los códigos QR.")}</div>`;
+  }
+}
+
+function renderAssignedListsPanel() {
+  const container = refs.assignedListsPanelEl;
+  if (!container) return;
+
+  const hiddenRecords = getHiddenAssignedRecords();
+  const orderedLists = Contacts.lists.filter((name) =>
+    Contacts.contacts.some((contact) => (contact.list || "Principal") === name)
+  ).slice(0, pairingSlotsSnapshot.length).filter((name) => !hiddenRecords.has(String(name)));
+
+  if (!orderedLists.length) {
+    container.innerHTML = `<div class="assigned-lists-empty">Todavía no hay listas asignadas.</div>`;
+    return;
+  }
+
+  const history = Array.isArray(campaignState?.history) ? campaignState.history : [];
+  const latestHistoryByContact = new Map();
+  for (const entry of history) {
+    const key = String(entry.contactId || "");
+    if (!key) continue;
+    const previous = latestHistoryByContact.get(key);
+    if (!previous || Date.parse(entry.startedAt || 0) >= Date.parse(previous.startedAt || 0)) {
+      latestHistoryByContact.set(key, entry);
+    }
+  }
+
+  container.innerHTML = orderedLists.map((listName, listIndex) => {
+    const contacts = Contacts.contacts.filter((contact) =>
+      (contact.list || "Principal") === listName && normalizeValidPeruPhone(contact.phone)
+    );
+    const called = contacts.filter((contact) => Number(contact.attempts || 0) > 0 || latestHistoryByContact.has(String(contact.id)));
+    const campaignContactById = new Map((campaignState?.contacts || []).map((contact) => [String(contact.id), contact]));
+    const pending = contacts.filter((contact) => {
+      const status = campaignContactById.get(String(contact.id))?.status || contact.campaignStatus || "";
+      return !called.includes(contact) || ["pending", "retry_pending", "held"].includes(status);
+    });
+    const finished = contacts.length > 0 && pending.length === 0;
+    const slot = pairingSlotsSnapshot[listIndex];
+
+    const pendingRows = pending.map((contact) => `
+      <tr>
+        <td>${contacts.indexOf(contact) + 1}</td>
+        <td>${escHtml(contact.name || "Sin nombre")}</td>
+        <td><span class="pending-contact-phone"><span>${escHtml(contact.phone || "-")}</span><img src="./assets/call-status/contacto-pendiente.png" alt="Contacto pendiente" /></span></td>
+        <td>${contactActionButtons(contact, "assigned-pending")}</td>
+      </tr>`).join("");
+
+    const calledRows = called.map((contact) => {
+      const attempt = latestHistoryByContact.get(String(contact.id)) || {};
+      const answered = Boolean(attempt.answeredAt || attempt.technicalResult === "contesto" || contact.technicalResult === "contesto");
+      const duration = Number(attempt.durationSeconds ?? contact.callDurationSeconds ?? 0);
+      return `
+        <tr>
+          <td>${contacts.indexOf(contact) + 1}</td>
+          <td>${escHtml(contact.name || attempt.name || "Sin nombre")}</td>
+          <td>${escHtml(contact.phone || attempt.phone || "-")}</td>
+          <td><span class="answered-badge ${answered ? "yes" : "no"}">${answered ? "Sí" : "No"}</span></td>
+          <td>${escHtml(formatCallDuration(duration))}</td>
+          <td>${contactActionButtons(contact, "assigned")}</td>
+        </tr>`;
+    }).join("");
+
+    return `
+      <article class="assigned-list-card">
+        <div class="assigned-list-head">
+          <div>
+            <span>ASIGNACIÓN ${listIndex + 1} · EQUIPO ${listIndex + 1}</span>
+            <h3>${escHtml(listName)}</h3>
+          </div>
+          <div class="assigned-list-head-actions">
+            <strong class="assigned-list-status ${finished ? "finished" : ""}">${finished ? "Lista terminada" : `${contacts.length} contactos`}</strong>
+            <button type="button" class="assigned-list-download" data-download-assigned-list="${escHtml(listName)}">⬇ Descargar reporte</button>
+            ${finished && listName !== "Principal" ? `<button type="button" class="assigned-list-delete" data-delete-assigned-list="${escHtml(listName)}">Eliminar registro</button>` : ""}
+          </div>
+        </div>
+        <div class="assigned-list-group">
+          <h4>Pendientes por llamar <span>${pending.length}</span></h4>
+          <div class="assigned-list-table-wrap">
+            <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contacto</th></tr></thead>
+            <tbody>${pendingRows || `<tr><td colspan="4" class="assigned-list-none">No quedan contactos pendientes.</td></tr>`}</tbody></table>
+          </div>
+        </div>
+        <div class="assigned-list-group called">
+          <h4>Contactos llamados <span>${called.length}</span></h4>
+          <div class="assigned-list-table-wrap">
+            <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contestó</th><th>Duración</th><th>Contacto</th></tr></thead>
+            <tbody>${calledRows || `<tr><td colspan="6" class="assigned-list-none">Todavía no se realizaron llamadas.</td></tr>`}</tbody></table>
+          </div>
+        </div>
+      </article>`;
+  }).join("");
+}
+
+function downloadAssignedListReport(listName) {
+  const rows = getCampaignReportRows().filter((item) => (item.list || "") === listName);
+  const pdf = buildAssignedListPdf(listName, rows);
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `reporte_${String(listName || "lista").replace(/[^a-z0-9_-]+/gi, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function pdfSafeText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function pdfClipText(value, maxLength) {
+  const text = pdfSafeText(value).replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 3))}...` : text;
+}
+
+function buildAssignedListPdf(listName, rows) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 38;
+  const pages = [];
+  let commands = [];
+  let y = 0;
+  let pageNumber = 0;
+
+  const text = (value, x, baseline, size = 9, bold = false, color = "0.12 0.03 0.18") => {
+    commands.push(`${color} rg BT /${bold ? "F2" : "F1"} ${size} Tf 1 0 0 1 ${x} ${baseline} Tm (${pdfSafeText(value)}) Tj ET`);
+  };
+  const rect = (x, bottom, width, height, fill, stroke = null) => {
+    commands.push(`${fill} rg${stroke ? ` ${stroke} RG` : ""} ${x} ${bottom} ${width} ${height} re ${stroke ? "B" : "f"}`);
+  };
+  const line = (x1, y1, x2, y2, color = "0.88 0.76 0.90") => {
+    commands.push(`${color} RG 0.5 w ${x1} ${y1} m ${x2} ${y2} l S`);
+  };
+  const startPage = () => {
+    if (commands.length) pages.push(commands.join("\n"));
+    commands = [];
+    pageNumber += 1;
+    rect(0, 0, pageWidth, pageHeight, "0.985 0.975 0.992");
+    rect(0, pageHeight - 15, pageWidth, 15, "0.91 0.00 0.67");
+    text("VIAVOX VC - GESTION DE LLAMADAS", margin, pageHeight - 42, 9, true, "0.43 0.03 0.55");
+    text(`Pagina ${pageNumber}`, pageWidth - 82, 24, 8, false, "0.42 0.33 0.46");
+    y = pageHeight - 70;
+  };
+  const tableHeader = () => {
+    const headers = ["N.", "EMPRESA", "TELEFONO", "EQUIPO", "INT.", "CONTESTO", "DURACION"];
+    const widths = [28, 132, 78, 103, 42, 67, 66];
+    let x = margin;
+    rect(margin, y - 22, 516, 25, "0.38 0.02 0.46");
+    headers.forEach((header, index) => {
+      text(header, x + 5, y - 14, 7.5, true, "1 1 1");
+      x += widths[index];
+    });
+    y -= 25;
+  };
+
+  const answeredRows = rows.filter((row) => Boolean(row.answeredAt || row.technicalResult === "contesto"));
+  const totalSeconds = rows.reduce((total, row) => total + Number(row.durationSeconds || 0), 0);
+  const equipmentCounts = new Map();
+  rows.forEach((row) => {
+    const equipment = String(row.worker || "Sin equipo").trim() || "Sin equipo";
+    equipmentCounts.set(equipment, (equipmentCounts.get(equipment) || 0) + 1);
+  });
+
+  startPage();
+  text("REPORTE DE LLAMADAS", margin, y, 22, true, "0.24 0.01 0.31");
+  y -= 26;
+  text(`Lista: ${listName || "Sin nombre"}`, margin, y, 13, true, "0.72 0.00 0.59");
+  text(`Generado: ${new Date().toLocaleString("es-PE")}`, 345, y, 8, false, "0.42 0.33 0.46");
+  y -= 44;
+
+  const summary = [
+    ["LLAMADAS", rows.length],
+    ["CONTESTADAS", answeredRows.length],
+    ["NO CONTESTADAS", Math.max(0, rows.length - answeredRows.length)],
+    ["DURACION TOTAL", formatCallDuration(totalSeconds)]
+  ];
+  summary.forEach(([label, value], index) => {
+    const x = margin + index * 130;
+    rect(x, y - 38, 119, 46, "0.95 0.91 0.97", "0.88 0.20 0.72");
+    text(label, x + 8, y - 7, 7, true, "0.45 0.05 0.50");
+    text(value, x + 8, y - 28, 15, true, "0.18 0.02 0.25");
+  });
+  y -= 68;
+
+  text("CANTIDAD DE LLAMADAS POR EQUIPO", margin, y, 11, true, "0.35 0.02 0.43");
+  y -= 20;
+  if (!equipmentCounts.size) {
+    text("Todavia no hay llamadas registradas.", margin, y, 9, false, "0.42 0.33 0.46");
+    y -= 22;
+  } else {
+    [...equipmentCounts.entries()].forEach(([equipment, count], index) => {
+      if (y < 135) startPage();
+      rect(margin, y - 14, 516, 22, index % 2 ? "0.98 0.96 0.99" : "0.94 0.90 0.96");
+      text(pdfClipText(equipment, 66), margin + 8, y - 7, 8.5, true);
+      text(`${count} llamada${count === 1 ? "" : "s"}`, pageWidth - 119, y - 7, 8.5, true, "0.72 0.00 0.59");
+      y -= 22;
+    });
+  }
+  y -= 22;
+  text("DETALLE DEL REGISTRO", margin, y, 11, true, "0.35 0.02 0.43");
+  y -= 18;
+  tableHeader();
+
+  if (!rows.length) {
+    text("No hay llamadas registradas para esta lista.", margin + 8, y - 18, 9, false, "0.42 0.33 0.46");
+  } else {
+    rows.forEach((row, index) => {
+      if (y < 66) {
+        startPage();
+        text(`REPORTE: ${pdfClipText(listName, 55)}`, margin, y, 12, true, "0.35 0.02 0.43");
+        y -= 24;
+        tableHeader();
+      }
+      const answered = Boolean(row.answeredAt || row.technicalResult === "contesto");
+      const values = [
+        index + 1,
+        pdfClipText(row.name || "Sin nombre", 25),
+        pdfClipText(row.phone || "-", 14),
+        pdfClipText(row.worker || "Sin equipo", 19),
+        row.attemptNumber || 1,
+        answered ? "SI" : "NO",
+        formatCallDuration(Number(row.durationSeconds || 0))
+      ];
+      const widths = [28, 132, 78, 103, 42, 67, 66];
+      let x = margin;
+      if (index % 2) rect(margin, y - 20, 516, 24, "0.975 0.955 0.982");
+      values.forEach((value, valueIndex) => {
+        const color = valueIndex === 5 ? (answered ? "0.00 0.48 0.35" : "0.78 0.05 0.36") : "0.12 0.03 0.18";
+        text(value, x + 5, y - 13, 7.8, valueIndex === 0 || valueIndex === 5, color);
+        x += widths[valueIndex];
+      });
+      line(margin, y - 20, margin + 516, y - 20);
+      y -= 24;
+    });
+  }
+  pages.push(commands.join("\n"));
+
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"
+  ];
+  const kids = [];
+  pages.forEach((content, index) => {
+    const pageObject = 5 + index * 2;
+    const contentObject = pageObject + 1;
+    kids.push(`${pageObject} 0 R`);
+    objects[pageObject - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObject} 0 R >>`;
+    objects[contentObject - 1] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+  });
+  objects[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`;
+
+  let documentText = "%PDF-1.4\n%PDFREPORT\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = documentText.length;
+    documentText += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = documentText.length;
+  documentText += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let index = 1; index <= objects.length; index += 1) {
+    documentText += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+  }
+  documentText += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new TextEncoder().encode(documentText);
+}
+
+async function createPairingQr() {
+  if (!sessionCode || !dashboardToken) return;
+  if (refs.addPairingQrBtn) refs.addPairingQrBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionCode)}/pairing-slots`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardToken },
+      body: "{}"
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo crear el QR.");
+    await loadPairingData(sessionCode);
+    setStatus("Nuevo código QR creado.", true);
+  } catch (error) {
+    setStatus(error.message || "No se pudo crear el QR.", true);
+  } finally {
+    if (refs.addPairingQrBtn) refs.addPairingQrBtn.disabled = false;
+  }
+}
+
+async function deletePairingQr(slotId) {
+  if (!sessionCode || !dashboardToken || !slotId) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionCode)}/pairing-slots/${encodeURIComponent(slotId)}`, {
+      method: "DELETE",
+      headers: { "X-Dashboard-Token": dashboardToken }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo eliminar el QR.");
+    await loadPairingData(sessionCode);
+    setStatus("Código QR eliminado.", true);
+  } catch (error) {
+    setStatus(error.message || "No se pudo eliminar el QR.", true);
+  }
+}
+
+async function loadApkInfo() {
+  try {
+    const res = await fetch(`${API_BASE}/api/apk/info`);
+    const info = await res.json();
+    if (info.ok) {
+      refs.apkNameEl.textContent = info.name;
+      const sizeMb = Number(info.size || 0) / (1024 * 1024);
+      refs.apkMetaEl.textContent = `${info.version || info.type || "APK"} · ${sizeMb.toFixed(1)} MB`;
+      refs.apkDlBtn.href = `${API_BASE}/api/apk/download`;
+      return;
+    }
+    refs.apkMetaEl.textContent = "APK no disponible";
+  } catch {
+    refs.apkMetaEl.textContent = "No se pudo cargar la información del APK";
+  }
+}
+
+// ── SOCKET HANDLERS ──────────────────────────────────────────────────
+socket.on("state:changed", st => {
+  updateSessionUi(st);
+  renderShiftManagement();
+  applyState(st.callState, st.lastNumber, st);
+  renderContacts();
+  const nextPairingSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
+    worker.id,
+    Boolean(worker.connected),
+    worker.callState || "idle",
+    worker.companyName || "",
+    worker.phoneNumber || "",
+    Boolean(worker.speakerOn)
+  ]));
+  if (nextPairingSignature !== pairingStateSignature) {
+    pairingStateSignature = nextPairingSignature;
+    if (sessionCode) loadPairingData(sessionCode);
+  }
+});
+
+function syncCampaignResultsToContacts() {
+  const campaignContacts = Array.isArray(campaignState?.contacts) ? campaignState.contacts : [];
+  let changed = false;
+  for (const result of campaignContacts) {
+    const local = Contacts.contacts.find((contact) => contact.id === result.id);
+    if (!local) continue;
+    local.campaignStatus = result.status || "";
+    local.campaignResult = result.result || "";
+    local.technicalResult = result.technicalResult || "";
+    local.attempts = Number(result.attempts || 0);
+    local.lastAttemptAt = result.lastAttemptAt || null;
+    local.callDurationSeconds = Number(result.durationSeconds || 0);
+    local.lastWorkerName = result.assignedWorkerName || local.lastWorkerName || "";
+    changed = true;
+  }
+  if (changed) Contacts.saveContacts();
+}
+
+socket.on("campaign:state", st => {
+  campaignState = st;
+  syncCampaignResultsToContacts();
+  syncTurnPendingContacts();
+  renderCampaignPanel();
+  renderContacts();
+});
+
+setInterval(() => {
+  if ((latestSessionState?.phoneWorkers || []).some((worker) => worker.callState === "in_call")) renderWorkersPanel();
+}, 1000);
+
+socket.on("session:created", ({ code, dashboardToken: createdToken }) => {
+  autoSessionRequested = false;
+  sessionCode = code;
+  dashboardToken = String(createdToken || "");
+  refs.sessionCodeIn.value = code;
+  saveSessionCode(code, dashboardToken);
+  updateSessionUi({ connected: { dashboard: true, phone: false } });
+  loadPairingData(code);
+  fetchCampaignState(code);
+});
+
+socket.on("session:joined", ({ code, role }) => {
+  if (role === "dashboard") {
+    sessionCode = code;
+    refs.sessionCodeIn.value = code;
+    saveSessionCode(code);
+    updateSessionUi({ connected: { dashboard: true, phone: currentPhoneLinked } });
+    loadPairingData(code);
+    fetchCampaignState(code);
+  }
+});
+
+socket.on("session:error", ({ message }) => {
+  if (sessionCode && !autoSessionRequested) {
+    sessionCode = "";
+    dashboardToken = "";
+    requestAutomaticSession();
+    return;
+  }
+  autoSessionRequested = false;
+  setStatus(message || "No se pudo abrir la sesión.", true);
+});
+
+socket.on("connect", () => {
+  if (sessionCode && dashboardToken) {
+    socket.emit("session:join", { code: sessionCode, role: "dashboard", token: dashboardToken });
+    fetchCampaignState(sessionCode);
+  } else {
+    restoreSavedSession();
+    requestAutomaticSession();
+  }
+});
+
+socket.on("phone:command_ack", ({ commandId, action, ok, message }) => {
+  const timeoutId = pendingCommandTimeouts.get(commandId);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    pendingCommandTimeouts.delete(commandId);
+  }
+  setAckBadge(
+    refs.apkAckBadgeEl,
+    ok ? "ok" : "error",
+    ok ? `APK · ${action} ok` : `APK · ${action} error`
+  );
+  if (refs.callHintEl) {
+    refs.callHintEl.textContent = message || (ok ? "Orden recibida por el celular." : "El celular rechazó la orden.");
+  }
+  if (!ok && action === "dial") {
+    applyState("failed", callCtx?.phone || "");
+  }
+});
+
+// START
+
+/* ── HISTORY LOGIC ────────────────────────────────────── */
+let callHistory = [];
+function loadHistory() {
+  try { callHistory = JSON.parse(localStorage.getItem("voip.callHistory") || "[]"); }
+  catch { callHistory = []; }
+}
+
+function saveHistory() {
+  localStorage.setItem("voip.callHistory", JSON.stringify(callHistory));
+}
+
+function addHistoryEntry(phone, duration) {
+  if (!phone) return;
+  callHistory.unshift({
+    phone,
+    duration,
+    timestamp: Date.now()
+  });
+  if (callHistory.length > 50) callHistory.pop();
+  saveHistory();
+}
+
+function openHistory() {
+  renderHistory();
+  refs.historyModalEl.style.display = "flex";
+}
+
+async function clearHistory() {
+  if (!await requestConfirmation({ title: "Limpiar historial", message: "¿Deseas eliminar todo el historial reciente?", confirmLabel: "Limpiar" })) return;
+  callHistory = [];
+  saveHistory();
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = refs.historyListEl;
+  if (!list) return;
+  if (callHistory.length === 0) {
+    list.innerHTML = `<div class="muted" style="text-align:center;padding:40px;">Sin llamadas recientes.</div>`;
+    return;
+  }
+  list.innerHTML = callHistory.map(h => `
+    <div class="history-item">
+      <div class="history-info">
+        <div class="history-phone">${escHtml(h.phone)}</div>
+        <div class="history-meta">
+          <span>📅 ${new Date(h.timestamp).toLocaleString()}</span>
+          <span>⏱️ ${formatCallDuration(h.duration)}</span>
+        </div>
+      </div>
+      <div class="history-actions">
+        <button class="history-call-btn" onclick="dialFromHistory('${escHtml(h.phone)}')">📞 Llamar</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+window.dialFromHistory = (phone) => {
+  refs.historyModalEl.style.display = "none";
+  dialManual(phone, "Historial");
+};
+
+/* ── TABS LOGIC ────────────────────────────────────────── */
+function renderTabs() {
+  const container = refs.contactsTabsEl;
+  if (!container) return;
+  
+  const lists = (Contacts.lists || []).filter((list) =>
+    Contacts.contacts.some((contact) => (contact.list || "Principal") === list)
+  );
+  container.innerHTML = lists.map(list => `
+    <div class="tab-item ${Contacts.activeList === list ? "active" : ""}" data-name="${escHtml(list)}">
+      <span>${escHtml(list)}</span>
+      ${list !== "Principal" ? `<button class="delete-tab-btn" data-list="${escHtml(list)}">×</button>` : ""}
+    </div>
+  `).join("");
+  
+  container.onclick = async (e) => {
+    const tab = e.target.closest(".tab-item");
+    const del = e.target.closest(".delete-tab-btn");
+    
+    if (del) {
+      e.stopPropagation();
+      const name = del.dataset.list;
+      if (await requestConfirmation({ title: "Eliminar lista", message: `¿Eliminar la lista "${name}" y todos sus contactos?`, confirmLabel: "Eliminar" })) {
+        Contacts.deleteList(name);
+        renderTabs();
+        renderContacts();
+        renderCampaignPanel();
+        if (sessionCode) loadPairingData(sessionCode);
+      }
+      return;
+    }
+    
+    if (tab) {
+      const name = tab.dataset.name;
+      Contacts.setActiveList(name);
+      renderTabs();
+      renderContacts();
+      renderCampaignPanel();
+    }
+  };
+}
+
+function dialManual(phone, name) {
+  if (["dialing", "ringing", "in_call"].includes(currentState)) return;
+  currentCallingContactId = null; 
+  openCallWindow(phone, { contactName: name });
+  emitCallActionWithAck("dial", { phoneNumber: phone, contactName: name });
+}
+
+function openEditModal(contact) {
+    if (!refs.editModalEl) return;
+    refs.editNameInput.value = contact.name || "";
+    refs.editPhoneInput.value = contact.phone || "";
+    refs.editNoteInput.value = contact.note || "";
+    
+    refs.editSaveBtn.onclick = () => {
+        const newData = {
+            name: refs.editNameInput.value.trim(),
+            phone: refs.editPhoneInput.value.trim(),
+            note: refs.editNoteInput.value.trim()
+        };
+        if (Contacts.updateContact(contact.id, newData)) {
+            refs.editModalEl.style.display = "none";
+            renderContacts();
+            setStatus("Contacto actualizado.", true);
+        }
+    };
+    
+    refs.editCloseBtn.onclick = () => {
+        refs.editModalEl.style.display = "none";
+    };
+    
+    refs.editModalEl.style.display = "grid";
+}
+
+init();
