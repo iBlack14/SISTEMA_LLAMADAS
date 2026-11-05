@@ -3534,7 +3534,10 @@ init();
     "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
 
-  let year = new Date().getFullYear();
+  const pageParams = new URLSearchParams(window.location.search);
+  const demoMode = pageParams.get("demoReports") === "1";
+  let dateToOpenOnLoad = demoMode ? pageParams.get("demoDate") || "" : "";
+  let year = demoMode ? 2024 : new Date().getFullYear();
   let selectedDate = "";
   let reports = [];
   let selectedReport = "";
@@ -3567,6 +3570,16 @@ init();
   }
 
   async function fetchReports(date = "") {
+    if (demoMode) {
+      if (!Array.isArray(window.VOIP_VC_DEMO_REPORTS)) {
+        throw Error("No se pudieron cargar los datos demo del calendario.");
+      }
+
+      return window.VOIP_VC_DEMO_REPORTS.filter(
+        report => !date || report.date === date
+      );
+    }
+
     if (!sessionCode()) {
       throw Error("Inicia una sesión para consultar reportes.");
     }
@@ -3600,9 +3613,15 @@ init();
   async function showCalendar() {
     try {
       reports = await fetchReports();
-      selectedDate = "";
       selectedReport = "";
       renderCalendar();
+      if (dateToOpenOnLoad) {
+        const date = dateToOpenOnLoad;
+        dateToOpenOnLoad = "";
+        if (reports.some(report => report.date === date)) {
+          await showDay(date);
+        }
+      }
     } catch (error) {
       showError(error);
     }
@@ -3630,7 +3649,10 @@ init();
           return `
             <button
               data-date="${date}"
-              class="${dates.has(date) ? "has-report" : ""}"
+              class="${[
+                dates.has(date) ? "has-report" : "",
+                selectedDate === date ? "selected-date" : ""
+              ].filter(Boolean).join(" ")}"
             >
               ${index + 1}
             </button>
@@ -3655,13 +3677,27 @@ init();
       <div class="report-heading">
         <h2>CALENDARIO ANUAL · REPORTES</h2>
         <div>
+          <button id="toggleDemoReports" class="secondary" type="button">
+            ${demoMode ? "SALIR DE DEMO" : "PROBAR DEMO"}
+          </button>
           <button id="prevYear" class="secondary">‹</button>
           <strong>${year}</strong>
           <button id="nextYear" class="secondary">›</button>
         </div>
       </div>
+      ${demoMode ? '<p class="muted">MODO DEMO · datos ficticios 2024–2026</p>' : ""}
       <div class="months-grid">${monthCards}</div>
     `;
+
+    $("toggleDemoReports").onclick = () => {
+      const url = new URL(window.location.href);
+      if (demoMode) {
+        url.searchParams.delete("demoReports");
+      } else {
+        url.searchParams.set("demoReports", "1");
+      }
+      window.location.assign(url.href);
+    };
 
     $("prevYear").onclick = () => {
       year--;
@@ -3699,7 +3735,11 @@ init();
           <button id="backCalendar" class="secondary">
             ← CALENDARIO
           </button>
+          <button id="toggleDemoReports" class="secondary" type="button">
+            ${demoMode ? "SALIR DE DEMO" : "VER DATOS DEMO"}
+          </button>
           <h2>REPORTE DEL ${esc(selectedDate)}</h2>
+          ${demoMode ? '<p class="muted">MODO DEMO · datos ficticios</p>' : ""}
         </div>
       </div>
 
@@ -3735,6 +3775,16 @@ init();
     `;
 
     $("backCalendar").onclick = showCalendar;
+    $("toggleDemoReports").onclick = () => {
+      const url = new URL(window.location.href);
+      if (demoMode) {
+        url.searchParams.delete("demoReports");
+      } else {
+        url.searchParams.set("demoReports", "1");
+      }
+      url.searchParams.set("demoDate", selectedDate);
+      window.location.assign(url.href);
+    };
 
     $("reportSearch").oninput = renderDetails;
 
@@ -3797,9 +3847,9 @@ init();
         </button>
         <button
           id="reportContinue"
-          ${report.pending ? "" : "disabled"}
+          ${report.pending && !demoMode ? "" : "disabled"}
         >
-          ☎ CONTINUAR LLAMADAS
+          ${demoMode ? "☎ DEMO · llamadas desactivadas" : "☎ CONTINUAR LLAMADAS"}
         </button>
       </div>
 

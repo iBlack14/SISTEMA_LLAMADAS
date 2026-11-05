@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
- <link rel="stylesheet" href="/styles.css?v=20261105-calendario-cuadrado-v3" />
+ <link rel="stylesheet" href="/styles.css?v=20261105-calendario-layout-demo-v3" />
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -492,7 +492,8 @@
       </div>
     </div>
   </div>
-<script src="/modules/reports.js?v=1" defer></script>
+<script src="/demo-reports.js?v=20261105-calendar-demo-all-dates-v2" defer></script>
+<script src="/modules/reports.js?v=demo-reports-2024-2026-detail-fix" defer></script>
   <script>
     (function bootstrapDashboard() {
       const params = new URLSearchParams(window.location.search);
@@ -521,7 +522,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20261105-call-stability-report");
+        import("/dashboard.js?v=20261105-calendar-demo-detail-fix");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);
