@@ -70,26 +70,14 @@
           <small id="currentShiftSchedule">Horario de Lima</small>
         </div>
         <div class="shift-management-actions">
-          <button id="reportNavBtn" class="secondary" type="button">📅 CALENDARIO</button>
+          <button id="reportNavBtn" class="secondary" type="button">CALENDARIO</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">REINICIAR SESIÓN</button>
         </div>
       </section>
       <section id="shiftHistoryPanel" class="shift-history-panel" aria-live="polite"></section>
 
-<!-- NAVEGACIÓN DEL MÓDULO DE REPORTES -->
-<div class="report-nav">
-  <button id="reportBackBtn" class="secondary" type="button" hidden>
-    ← VOLVER A LLAMADAS
-  </button>
-</div>
-
-<!-- CONTENEDOR DEL CALENDARIO ANUAL -->
-<section id="annualReport" class="annual-report" hidden></section>
-
-<!-- CONTENIDO ORIGINAL DE LLAMADAS -->
-<div id="callsContent">
-
+      <div id="callsContent">
       <!-- QR BLOCK -->
       <div class="qr-block" id="qrBlock">
         <div class="pairing-slots-head">
@@ -258,8 +246,15 @@
       <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
         <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
       </section>
-</div>
-<!-- FIN DEL CONTENIDO ORIGINAL DE LLAMADAS -->
+      </div>
+
+      <section id="annualReport" class="annual-report" aria-label="Calendario anual" hidden>
+        <div class="report-nav">
+          <button id="reportBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
+        </div>
+        <div id="calendarUi"></div>
+      </section>
+
     </section>
   </main>
 
@@ -492,8 +487,7 @@
       </div>
     </div>
   </div>
-<script src="/demo-reports.js?v=20261105-calendar-demo-all-dates-v2" defer></script>
-<script src="/modules/reports.js?v=demo-reports-2024-2026-detail-fix" defer></script>
+  <script src="/modules/calendar-ui.js?v=20261106-ui-only"></script>
   <script>
     (function bootstrapDashboard() {
       const params = new URLSearchParams(window.location.search);
