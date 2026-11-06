@@ -5,3 +5,4 @@ local-test.env
 **/build/
 **/.gradle/
 android-app/local.properties
+**/node_modules/

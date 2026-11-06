@@ -70,12 +70,14 @@
           <small id="currentShiftSchedule">Horario de Lima</small>
         </div>
         <div class="shift-management-actions">
+          <button id="reportNavBtn" class="secondary" type="button">CALENDARIO</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">REINICIAR SESIÓN</button>
         </div>
       </section>
       <section id="shiftHistoryPanel" class="shift-history-panel" aria-live="polite"></section>
 
+      <div id="callsContent">
       <!-- QR BLOCK -->
       <div class="qr-block" id="qrBlock">
         <div class="pairing-slots-head">
@@ -243,6 +245,14 @@
 
       <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
         <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
+      </section>
+      </div>
+
+      <section id="annualReport" class="annual-report" aria-label="Calendario anual" hidden>
+        <div class="report-nav">
+          <button id="reportBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
+        </div>
+        <div id="calendarUi"></div>
       </section>
 
     </section>
@@ -478,6 +488,7 @@
     </div>
   </div>
 
+  <script src="/modules/calendar-ui.js?v=20261106-ui-only"></script>
   <script>
     (function bootstrapDashboard() {
       const params = new URLSearchParams(window.location.search);
