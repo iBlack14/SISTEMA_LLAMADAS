@@ -31,6 +31,7 @@ class IncomingCallActivity : AppCompatActivity() {
     private lateinit var answerBtn: MaterialButton
     private lateinit var hangupBtn: MaterialButton
 
+    private var telecomUi = false
     private var imageUrl: String = ""
     private var callStartedAt: Long? = null
     private val timerHandler = Handler(Looper.getMainLooper())
@@ -51,8 +52,11 @@ class IncomingCallActivity : AppCompatActivity() {
                 finish()
                 return
             }
-            if (intent?.action != BridgeService.ACTION_CALL_UI_STATE) return
-            renderFromIntent(intent)
+            if (telecomUi && intent?.action == BridgeService.ACTION_TELECOM_CALL_STATE) {
+                renderFromIntent(intent)
+            } else if (!telecomUi && intent?.action == BridgeService.ACTION_CALL_UI_STATE) {
+                renderFromIntent(intent)
+            }
         }
     }
 
@@ -75,18 +79,38 @@ class IncomingCallActivity : AppCompatActivity() {
         answerBtn = findViewById(R.id.answerButton)
         hangupBtn = findViewById(R.id.hangupButton)
 
-        answerBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_ANSWER) }
-        micBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_TOGGLE_MUTE) }
-        speakerBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_TOGGLE_SPEAKER) }
-        hangupBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_HANGUP) }
+        answerBtn.setOnClickListener {
+            if (VoipVcInCallService.answerRingingCall()) {
+                answerBtn.isEnabled = false
+                callState.text = "Conectando…"
+            } else {
+                callState.text = "No se pudo contestar. Reintenta."
+            }
+        }
+        micBtn.setOnClickListener {
+            if (telecomUi) VoipVcInCallService.toggleMute()?.let { muted ->
+                micBtn.text = if (muted) "Activar micrófono" else "Silenciar"
+            } else sendServiceAction(BridgeService.ACTION_UI_TOGGLE_MUTE)
+        }
+        speakerBtn.setOnClickListener {
+            if (telecomUi) VoipVcInCallService.toggleSpeaker()?.let { speaker ->
+                speakerBtn.text = if (speaker) "Quitar altavoz" else "Altavoz"
+            } else sendServiceAction(BridgeService.ACTION_UI_TOGGLE_SPEAKER)
+        }
+        hangupBtn.setOnClickListener {
+            if (telecomUi) VoipVcInCallService.disconnectCall(phoneNumber.text.toString().let { if (it == "-") "" else it })
+            else sendServiceAction(BridgeService.ACTION_UI_HANGUP)
+        }
 
+        telecomUi = intent.getBooleanExtra("telecom_ui", false)
         renderFromIntent(intent)
-        sendServiceAction(BridgeService.ACTION_UI_SYNC)
+        if (!telecomUi) sendServiceAction(BridgeService.ACTION_UI_SYNC)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        telecomUi = intent.getBooleanExtra("telecom_ui", false)
         renderFromIntent(intent)
     }
 
@@ -94,9 +118,11 @@ class IncomingCallActivity : AppCompatActivity() {
         super.onStart()
         val filter = IntentFilter().apply {
             addAction(BridgeService.ACTION_CALL_UI_STATE)
+            addAction(BridgeService.ACTION_TELECOM_CALL_STATE)
             addAction(BridgeService.ACTION_CLOSE_CALL_UI)
         }
         ContextCompat.registerReceiver(this, uiReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        if (telecomUi) VoipVcInCallService.currentCallIntent()?.let { renderFromIntent(it) }
     }
 
     override fun onStop() {
@@ -140,6 +166,10 @@ class IncomingCallActivity : AppCompatActivity() {
         }
         applyStateChipStyle(state)
         answerBtn.visibility = if (state == "ringing") View.VISIBLE else View.GONE
+        answerBtn.isEnabled = state == "ringing"
+        hangupBtn.text = if (state == "ringing") "Rechazar" else "Colgar"
+        micBtn.isEnabled = state == "in_call"
+        speakerBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
 
         if (state == "in_call") {
             if (callStartedAt == null) callStartedAt = System.currentTimeMillis()
@@ -151,8 +181,8 @@ class IncomingCallActivity : AppCompatActivity() {
             callTimer.text = "00:00"
         }
 
-        micBtn.text = if (micMuted) "🔇 Micrófono OFF" else "🎙️ Micrófono ON"
-        speakerBtn.text = if (speakerOn) "🔊 Altavoz ON" else "🔈 Altavoz OFF"
+        micBtn.text = if (micMuted) "Activar micrófono" else "Silenciar"
+        speakerBtn.text = if (speakerOn) "Quitar altavoz" else "Altavoz"
         applyToggleStyles(micMuted, speakerOn)
 
         if (img.isNotBlank() && img != imageUrl) {

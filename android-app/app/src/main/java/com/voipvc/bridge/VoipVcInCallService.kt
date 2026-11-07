@@ -1,6 +1,10 @@
 package com.voipvc.bridge
 
 import android.content.Intent
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import androidx.core.app.NotificationCompat
 import android.os.Build
 import android.telecom.Call
 import android.telecom.InCallService
@@ -24,6 +28,37 @@ class VoipVcInCallService : InCallService() {
                 Log.w(TAG, "Failed to answer incoming call: ${e.message}")
                 false
             }
+        }
+
+        fun currentCallIntent(): Intent? = activeService?.let { service ->
+            val call = service.calls.firstOrNull { it.state == Call.STATE_RINGING }
+                ?: liveCalls().firstOrNull() ?: return@let null
+            service.presentationIntent(call, service.mapCallState(call.state))
+        }
+
+        fun toggleMute(): Boolean? {
+            val service = activeService ?: return null
+            val muted = !(service.callAudioState?.isMuted ?: false)
+            service.setMuted(muted)
+            return muted
+        }
+
+        fun setSpeaker(enabled: Boolean): Boolean {
+            val service = activeService ?: return false
+            return try {
+                service.setAudioRoute(if (enabled) android.telecom.CallAudioState.ROUTE_SPEAKER
+                    else android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE)
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "Cannot route call audio", e)
+                false
+            }
+        }
+
+        fun toggleSpeaker(): Boolean? {
+            val service = activeService ?: return null
+            val speaker = service.callAudioState?.route != android.telecom.CallAudioState.ROUTE_SPEAKER
+            return if (setSpeaker(speaker)) speaker else null
         }
 
         fun isTrackingCalls(): Boolean = liveCalls().isNotEmpty()
@@ -80,22 +115,38 @@ class VoipVcInCallService : InCallService() {
     private val callbacks = mutableMapOf<Call, Call.Callback>()
     private val callDirections = mutableMapOf<Call, String>()
     private var lastBroadcastSignature = ""
+    private var analyzedCall: Call? = null
 
     override fun onCreate() {
         super.onCreate()
         activeService = this
+        VoicemailDetector.initialize(this)
     }
 
     override fun onDestroy() {
+        VoicemailDetector.stop()
         if (activeService === this) activeService = null
         super.onDestroy()
     }
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        setSpeaker(true)
         val cb = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 val mapped = mapCallState(state)
+                if (state == Call.STATE_ACTIVE || state == Call.STATE_DIALING) {
+                    setSpeaker(true)
+                    // Some networks expose no downlink during dialing. Retry once connected.
+                    if (state == Call.STATE_ACTIVE && analyzedCall === call) {
+                        VoicemailDetector.stop()
+                        analyzedCall = null
+                    }
+                    analyzeOutgoingCall(call)
+                } else if (analyzedCall === call) {
+                    VoicemailDetector.stop()
+                    analyzedCall = null
+                }
                 // Do not let another ringing/active call hide the terminal
                 // event of the campaign call that just disconnected.
                 if (mapped == "ended") broadcastCallState(call, mapped)
@@ -103,19 +154,56 @@ class VoipVcInCallService : InCallService() {
             }
 
             override fun onDetailsChanged(call: Call, details: Call.Details) {
+                analyzeOutgoingCall(call)
                 broadcastAggregateState()
             }
         }
         callbacks[call] = cb
         call.registerCallback(cb)
+        analyzeOutgoingCall(call)
+        broadcastAggregateState()
+    }
+
+    override fun onCallAudioStateChanged(audioState: android.telecom.CallAudioState) {
+        super.onCallAudioStateChanged(audioState)
         broadcastAggregateState()
     }
 
     override fun onCallRemoved(call: Call) {
+        if (analyzedCall === call) { VoicemailDetector.stop(); analyzedCall = null }
         callbacks.remove(call)?.let { call.unregisterCallback(it) }
         broadcastAggregateState()
         callDirections.remove(call)
         super.onCallRemoved(call)
+    }
+
+    private fun analyzeOutgoingCall(call: Call) {
+        if (Build.VERSION.SDK_INT < 31 || call.state !in setOf(Call.STATE_ACTIVE, Call.STATE_DIALING) ||
+            call.details.callDirection != Call.Details.DIRECTION_OUTGOING ||
+            analyzedCall === call || !VoicemailDetector.enabled()) return
+        val live = calls.filter { it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING }
+        if (live.size != 1) return
+        analyzedCall = call
+        VoicemailDetector.start { _, resultCode ->
+            if (analyzedCall !== call || call.state !in setOf(Call.STATE_ACTIVE, Call.STATE_DIALING) ||
+                !calls.contains(call) || calls.count {
+                    it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING
+                } != 1) return@start
+            val number = call.details.handle?.schemeSpecificPart.orEmpty()
+            // This exact Call object is checked again before requesting the cut.
+            sendBroadcast(Intent(BridgeService.ACTION_TELECOM_CALL_STATE).setPackage(packageName)
+                .putExtra(BridgeService.EXTRA_CALL_STATE, mapCallState(call.state))
+                .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+                .putExtra(BridgeService.EXTRA_CALL_DIRECTION, "outgoing")
+                .putExtra("detected_voicemail", resultCode == "buzon_de_voz")
+                .putExtra("detected_announcement", resultCode))
+            try {
+                call.disconnect()
+                Log.i(TAG, "Voicemail phrase matched; disconnect requested for current outgoing call")
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Voicemail detected but Android denied disconnect", e)
+            }
+        }
     }
 
     private fun mapCallState(state: Int): String = when (state) {
@@ -132,16 +220,64 @@ class VoipVcInCallService : InCallService() {
         val dialingCall = calls.firstOrNull { mapCallState(it.state) == "dialing" }
         val endedCall = calls.firstOrNull { mapCallState(it.state) == "ended" }
 
-        val primaryCall = activeCall ?: ringingCall ?: dialingCall ?: endedCall
+        val primaryCall = ringingCall ?: activeCall ?: dialingCall ?: endedCall
         val mapped = when {
-            activeCall != null -> "in_call"
             ringingCall != null -> "ringing"
+            activeCall != null -> "in_call"
             dialingCall != null -> "dialing"
             endedCall != null -> "ended"
             else -> "idle"
         }
 
         broadcastCallState(primaryCall, mapped)
+        updateCallPresentation(primaryCall, mapped)
+    }
+
+    private fun presentationIntent(call: Call, state: String): Intent =
+        Intent(this, IncomingCallActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(BridgeService.EXTRA_PHONE_NUMBER, call.details.handle?.schemeSpecificPart.orEmpty())
+            .putExtra(BridgeService.EXTRA_CONTACT_NAME, call.details.callerDisplayName.orEmpty())
+            .putExtra(BridgeService.EXTRA_CALL_STATE, state)
+            .putExtra(BridgeService.EXTRA_SPEAKER_ON,
+                callAudioState?.route == android.telecom.CallAudioState.ROUTE_SPEAKER)
+            .putExtra("telecom_ui", true)
+
+    private var presentedCall: Call? = null
+
+    private fun updateCallPresentation(call: Call?, state: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (call == null || state in setOf("idle", "ended")) {
+            manager.cancel(2002)
+            presentedCall = null
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(NotificationChannel(
+                "phone_calls", "Llamadas del teléfono", NotificationManager.IMPORTANCE_HIGH
+            ))
+        }
+        val pending = PendingIntent.getActivity(this, 2002, presentationIntent(call, state),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notification = NotificationCompat.Builder(this, "phone_calls")
+            .setSmallIcon(android.R.drawable.sym_call_incoming)
+            .setContentTitle(if (state == "ringing") "Llamada entrante" else "Llamada en curso")
+            .setContentText(call.details.handle?.schemeSpecificPart.orEmpty().ifBlank { "Número privado" })
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setOngoing(true)
+            .setContentIntent(pending)
+            .setFullScreenIntent(pending, state == "ringing")
+            .build()
+        try { manager.notify(2002, notification) } catch (e: SecurityException) {
+            Log.w(TAG, "Call notification unavailable", e)
+        }
+        if (presentedCall !== call) {
+            presentedCall = call
+            try { startActivity(presentationIntent(call, state)) } catch (e: Exception) {
+                Log.w(TAG, "Call screen unavailable", e)
+            }
+        }
     }
 
     private fun callDirection(call: Call?, mapped: String): String {
@@ -167,7 +303,8 @@ class VoipVcInCallService : InCallService() {
         } else ""
         val bestName = contactName.ifBlank { callerName }
         val direction = callDirection(primaryCall, mapped)
-        val signature = listOf(mapped, number, bestName, direction).joinToString("|")
+        val speakerOn = callAudioState?.route == android.telecom.CallAudioState.ROUTE_SPEAKER
+        val signature = listOf(mapped, number, bestName, direction, speakerOn.toString()).joinToString("|")
         if (signature == lastBroadcastSignature) return
         lastBroadcastSignature = signature
 
@@ -178,6 +315,7 @@ class VoipVcInCallService : InCallService() {
                 .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
                 .putExtra(BridgeService.EXTRA_CONTACT_NAME, bestName)
                 .putExtra(BridgeService.EXTRA_CALL_DIRECTION, direction)
+                .putExtra(BridgeService.EXTRA_SPEAKER_ON, speakerOn)
         )
     }
 }

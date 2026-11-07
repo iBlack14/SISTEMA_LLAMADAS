@@ -127,6 +127,9 @@ class BridgeService : Service() {
     private var isSpeakerOn = false
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var dialAttemptToken = 0
+    @Volatile private var currentPairingToken = ""
+    private var detectedVoicemail = false
+    private var detectedAnnouncement = ""
     private var activeCallId = ""
     private var activeCommandId = ""
     private var activeContactId = ""
@@ -150,6 +153,18 @@ class BridgeService : Service() {
             val incomingNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
             val incomingName = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty().trim()
             val direction = intent.getStringExtra(EXTRA_CALL_DIRECTION).orEmpty().ifBlank { "unknown" }
+            if (intent.hasExtra(EXTRA_SPEAKER_ON)) {
+                isSpeakerOn = intent.getBooleanExtra(EXTRA_SPEAKER_ON, false)
+            }
+            val announcement = intent.getStringExtra("detected_announcement").orEmpty()
+                .ifBlank { if (intent.getBooleanExtra("detected_voicemail", false)) "buzon_de_voz" else "" }
+            if (announcement in setOf("buzon_de_voz", "sin_servicio", "no_disponible") &&
+                activeCommandId.isNotBlank() && numbersMatch(campaignPhoneNumber, incomingNumber)) {
+                detectedAnnouncement = announcement
+                detectedVoicemail = announcement == "buzon_de_voz"
+                persistCampaignTracking()
+                setStatus("Locución detectada ($announcement): corte solicitado")
+            }
             lastTelecomEventAt = SystemClock.elapsedRealtime()
             handleObservedCallState(st, incomingNumber, incomingName, direction, "telecom")
         }
@@ -242,6 +257,7 @@ class BridgeService : Service() {
             return
         }
         connectionKey = requestedConnectionKey
+        currentPairingToken = token.trim()
 
         socket?.disconnect()
         socket?.off()
@@ -268,20 +284,22 @@ class BridgeService : Service() {
             val payload = JSONObject()
                 .put("code", code).put("role", "phone")
                 .put("protocolVersion", 2)
-                .put("token", token)
+                .put("token", currentPairingToken)
                 .put("deviceId", devId).put("deviceName", devName)
             client.emit("session:join", payload)
         }
 
-        client.on("session:joined") {
+        client.on("session:joined") { args ->
             if (client !== socket) return@on
+            val rotatedToken = (args.firstOrNull() as? JSONObject)?.optString("token").orEmpty()
             mainHandler.post {
                 if (client !== socket) return@post
+                if (rotatedToken.isNotBlank()) currentPairingToken = rotatedToken
                 setStatus("✅ Activo — esperando llamadas")
                 // Save credentials for reboot auto-start
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
                     .putString(PREF_SOCKET_URL, url) .putString(PREF_CODE, code)
-                    .putString(PREF_TOKEN, token)    .putString(PREF_DEVICE_ID, devId)
+                    .putString(PREF_TOKEN, currentPairingToken)    .putString(PREF_DEVICE_ID, devId)
                     .putString(PREF_DEVICE_NAME, devName).apply()
                 // Re-announce the actual local call after a network micro-cut so
                 // the server can resume the same command during its grace window.
@@ -463,9 +481,9 @@ class BridgeService : Service() {
         dialAttemptToken += 1
         hangupVerificationToken += 1
         val thisAttempt = dialAttemptToken
-        // Every new call must start with speaker OFF by default.
-        isSpeakerOn = false
-        setSpeakerOn(false)
+        // Telecom applies speaker routing when it creates the cellular call.
+        // Do not publish the previous call state before initializing this attempt.
+        isSpeakerOn = true
         currentPhoneNumber = number
         currentContactName = when {
             contactName.isNotBlank() -> contactName
@@ -478,6 +496,8 @@ class BridgeService : Service() {
             else -> number
         }
         currentImageUrl = imageUrl
+        detectedVoicemail = false
+        detectedAnnouncement = ""
         activeCommandId = commandId
         activeCallId = callId
         activeContactId = contactId
@@ -639,6 +659,12 @@ class BridgeService : Service() {
     }
 
     private fun setSpeakerOn(enabled: Boolean): Boolean {
+        if (VoipVcInCallService.isTrackingCalls()) {
+            val ok = VoipVcInCallService.setSpeaker(enabled)
+            if (!ok) setStatus("⚠️ Android no pudo cambiar el altavoz")
+            // Confirmed route arrives through the Telecom audio callback.
+            return ok
+        }
         try {
             val am = getSystemService(AUDIO_SERVICE) as? AudioManager
             if (am == null) {
@@ -898,6 +924,8 @@ class BridgeService : Service() {
     }
 
     private fun clearCampaignTracking() {
+        detectedVoicemail = false
+        detectedAnnouncement = ""
         activeCallId = ""
         activeCommandId = ""
         activeContactId = ""
@@ -905,6 +933,8 @@ class BridgeService : Service() {
         campaignStateObserved = false
         campaignTrackingRestored = false
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .remove("detected_voicemail")
+            .remove("detected_announcement")
             .remove("active_call_id")
             .remove(PREF_ACTIVE_COMMAND_ID)
             .remove(PREF_ACTIVE_CONTACT_ID)
@@ -917,6 +947,8 @@ class BridgeService : Service() {
     private fun persistCampaignTracking(state: String = lastCallState) {
         if (activeCommandId.isBlank()) return
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putBoolean("detected_voicemail", detectedVoicemail)
+            .putString("detected_announcement", detectedAnnouncement)
             .putString("active_call_id", activeCallId)
             .putString(PREF_ACTIVE_COMMAND_ID, activeCommandId)
             .putString(PREF_ACTIVE_CONTACT_ID, activeContactId)
@@ -928,6 +960,8 @@ class BridgeService : Service() {
 
     private fun restoreCampaignTracking() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        detectedVoicemail = prefs.getBoolean("detected_voicemail", false)
+        detectedAnnouncement = prefs.getString("detected_announcement", "").orEmpty()
         activeCallId = prefs.getString("active_call_id", "").orEmpty()
         activeCommandId = prefs.getString(PREF_ACTIVE_COMMAND_ID, "").orEmpty()
         activeContactId = prefs.getString(PREF_ACTIVE_CONTACT_ID, "").orEmpty()
@@ -1226,6 +1260,8 @@ class BridgeService : Service() {
             reportedDirection,
             source,
             campaignStateObserved.toString(),
+            detectedVoicemail.toString(),
+            detectedAnnouncement,
             noLiveCalls.toString(),
             isMicMuted.toString(),
             isSpeakerOn.toString()
@@ -1245,6 +1281,8 @@ class BridgeService : Service() {
                 .put("commandId", commandId)
                 .put("callId", if (correlateCampaign) activeCallId else "")
                 .put("contactId", contactId)
+                .put("detectedVoicemail", correlateCampaign && detectedVoicemail)
+            .put("detectedAnnouncement", if (correlateCampaign) detectedAnnouncement else "")
                 .put("terminalConfirmed", noLiveCalls)
                 .put("externalIncoming", reportedDirection == "incoming")
                 .put("callDirection", reportedDirection)

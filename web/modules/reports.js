@@ -8,10 +8,7 @@
     "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
 
-  const pageParams = new URLSearchParams(window.location.search);
-  const demoMode = pageParams.get("demoReports") === "1";
-  let dateToOpenOnLoad = demoMode ? pageParams.get("demoDate") || "" : "";
-  let year = demoMode ? 2024 : new Date().getFullYear();
+  let year = new Date().getFullYear();
   let selectedDate = "";
   let reports = [];
   let selectedReport = "";
@@ -59,16 +56,6 @@ function dashboardToken() {
 }
 
   async function fetchReports(date = "") {
-    if (demoMode) {
-      if (!Array.isArray(window.VOIP_VC_DEMO_REPORTS)) {
-        throw Error("No se pudieron cargar los datos demo del calendario.");
-      }
-
-      return window.VOIP_VC_DEMO_REPORTS.filter(
-        report => !date || report.date === date
-      );
-    }
-
     if (!sessionCode()) {
       throw Error("Inicia una sesión para consultar reportes.");
     }
@@ -110,14 +97,6 @@ function showError(error) {
     selectedReport = "";
 
     renderCalendar();
-
-    if (dateToOpenOnLoad) {
-      const date = dateToOpenOnLoad;
-      dateToOpenOnLoad = "";
-      if (reports.some(report => report.date === date)) {
-        await showDay(date);
-      }
-    }
   } catch (error) {
     showError(error);
   }
@@ -173,27 +152,13 @@ function showError(error) {
       <div class="report-heading">
         <h2>CALENDARIO ANUAL · REPORTES</h2>
         <div>
-          <button id="toggleDemoReports" class="secondary" type="button">
-            ${demoMode ? "SALIR DE DEMO" : "PROBAR DEMO"}
-          </button>
           <button id="prevYear" class="secondary">‹</button>
           <strong>${year}</strong>
           <button id="nextYear" class="secondary">›</button>
         </div>
       </div>
-      ${demoMode ? '<p class="muted">MODO DEMO · datos ficticios 2024–2026</p>' : ""}
       <div class="months-grid">${monthCards}</div>
     `;
-
-    $("toggleDemoReports").onclick = () => {
-      const url = new URL(window.location.href);
-      if (demoMode) {
-        url.searchParams.delete("demoReports");
-      } else {
-        url.searchParams.set("demoReports", "1");
-      }
-      window.location.assign(url.href);
-    };
 
     $("prevYear").onclick = () => {
       year--;
@@ -239,11 +204,7 @@ function showError(error) {
           <button id="backCalendar" class="secondary">
             ← CALENDARIO
           </button>
-          <button id="toggleDemoReports" class="secondary" type="button">
-            ${demoMode ? "SALIR DE DEMO" : "VER DATOS DEMO"}
-          </button>
           <h2>REPORTE DEL ${esc(selectedDate)}</h2>
-          ${demoMode ? '<p class="muted">MODO DEMO · datos ficticios</p>' : ""}
         </div>
       </div>
 
@@ -279,17 +240,6 @@ function showError(error) {
     `;
 
     $("backCalendar").onclick = showCalendar;
-    $("toggleDemoReports").onclick = () => {
-      const url = new URL(window.location.href);
-      if (demoMode) {
-        url.searchParams.delete("demoReports");
-      } else {
-        url.searchParams.set("demoReports", "1");
-      }
-      url.searchParams.set("demoDate", selectedDate);
-      window.location.assign(url.href);
-    };
-
     $("reportSearch").oninput = renderDetails;
 
     $("annualReport")
@@ -351,9 +301,9 @@ function showError(error) {
         </button>
         <button
           id="reportContinue"
-          ${report.pending && !demoMode ? "" : "disabled"}
+          ${report.pending ? "" : "disabled"}
         >
-          ${demoMode ? "☎ DEMO · llamadas desactivadas" : "☎ CONTINUAR LLAMADAS"}
+          ☎ CONTINUAR LLAMADAS
         </button>
       </div>
 

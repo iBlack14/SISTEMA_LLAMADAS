@@ -7,9 +7,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test",
     "start": "node server/server.js",
-    "start:local": "node --env-file=local-test.env server/server.js",
+    "migrate:history": "node server/migrate-call-history.js",
+    "backup:history": "node server/migrate-call-history.js --backup-only",
+    "restore:history": "node server/migrate-call-history.js --restore",
     "dev": "node --watch server/server.js",
     "start:web": "node server/server.js",
     "dev:web": "node --watch server/server.js",

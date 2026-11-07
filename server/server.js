@@ -21,6 +21,10 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 import { SessionPersistence } from "./persistence.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, annualPhoneBlocks, phoneKey } from "./contact-book.js";
+import { collectReportAttempts } from "./report-attempts.js";
+import { collectCallAttempts } from "./call-history.js";
+import { CallHistoryGate } from "./call-history-gate.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -52,7 +56,7 @@ import {
   markPendingCampaignStarted,
   getShiftSnapshot
 } from "./shift-manager.js";
-const persistence = new SessionPersistence(process.env.SESSIONS_FILE || path.join(__dirname, "sessions.json"));
+const persistence = new SessionPersistence();
 
 const app = express();
 app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
@@ -91,7 +95,7 @@ app.use((req, res, next) => {
 });
 
 
-app.use(express.json({ limit: process.env.MAX_JSON_SIZE || "256kb" }));
+app.use(express.json({ limit: process.env.MAX_JSON_SIZE || "20mb" }));
 app.use((_, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
@@ -129,6 +133,7 @@ server.headersTimeout = Number(process.env.HEADERS_TIMEOUT_MS || 66000);
 server.requestTimeout = Number(process.env.REQUEST_TIMEOUT_MS || 30000);
 
 let sessions = new Map();
+const historyGate = new CallHistoryGate(persistence, () => sessions);
 
 async function bootstrap() {
   sessions = await persistence.load();
@@ -143,8 +148,13 @@ async function bootstrap() {
     }
     session.callState = "idle";
   }
+  // MySQL is the sole session/history store; file backups are optional exports.
   await persistence.save(sessions);
-  console.log(`[PERSISTENCE] Loaded ${sessions.size} sessions.`);
+  persistence.startBackups();
+  setInterval(() => historyGate.retryPending().catch(error => {
+    console.error("[HISTORY] Reintento pendiente:", error.code || "STORAGE_UNAVAILABLE");
+  }), 10000).unref();
+  console.log(`[PERSISTENCE] Loaded ${sessions.size} sessions. Mode: ${persistence.status().mode}`);
 
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || "0.0.0.0";
@@ -154,7 +164,9 @@ async function bootstrap() {
 }
 
 function saveSoon() {
-  persistence.save(sessions);
+  return persistence.save(sessions).catch(error => {
+    console.error("[PERSISTENCE] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
+  });
 }
 
 function createPhoneWorker({ socketId = null, id = "", deviceId = "", name = "", deviceName = "", linkedAt, connected = false, callState = "idle", ...rest } = {}) {
@@ -401,7 +413,7 @@ function disconnectAllSessionPhones(session, reason = "turn_finished") {
 
 function hasPersistentCampaignData(session) {
   const campaign = ensureCampaign(session);
-  return campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
+  return Boolean(session.contactBook || session.hasCallHistory) || campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
 }
 
 function detachSocketFromCurrentSession(socket) {
@@ -447,6 +459,43 @@ function detachSocketFromCurrentSession(socket) {
   socket.data.role = null;
 }
 
+function allCallAttempts() {
+  const rows = [...persistence.records.values()].map(entry => entry.row);
+  for (const session of sessions.values()) rows.push(...collectCallAttempts(session));
+  return rows;
+}
+
+function annualBlock(phone) {
+  return annualPhoneBlocks(allCallAttempts()).get(phoneKey(phone));
+}
+
+function callRestrictions(session) {
+  const blocks = annualPhoneBlocks(allCallAttempts());
+  const contacts = [...(session.contactBook?.contacts || []),...(session.campaign?.contacts || [])];
+  return Object.fromEntries(contacts.flatMap(contact => {
+    const phone = phoneKey(contact.phone);
+    return blocks.has(phone) ? [[phone,blocks.get(phone)]] : [];
+  }));
+}
+
+function blockedCallMessage(block) {
+  return "Número llamado anteriormente. Disponible desde " +
+    new Date(block.nextAllowedAt).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) + ".";
+}
+
+async function sendPersistedDial(code, socketId, payload) {
+  try {
+    await persistence.save(sessions);
+    const session = sessions.get(code);
+    const assignment = Object.values(session?.campaign?.assignments || {})
+      .find(item => item.attemptId === payload.callId);
+    if (!assignment || assignment.workerSocketId !== socketId) return;
+    io.to(socketId).emit("call:action",payload);
+  } catch {
+    io.to(code).emit("call:error",{message:"No se confirmó el guardado en MySQL. No se envió la llamada."});
+  }
+}
+
 function dispatchNextCampaignCallLegacy(code) {
   const session = sessions.get(code);
   if (!session) return null;
@@ -459,6 +508,7 @@ function dispatchNextCampaignCallLegacy(code) {
 
   // Seleccionar worker para saber si vamos directo o por PBX
   const worker = getActivePhoneWorker(session);
+  excludeCalledPending(campaign, allCallAttempts());
   const next = assignNextContact(session, worker || {});
   session.updatedAt = Date.now();
   saveSoon();
@@ -475,7 +525,7 @@ function dispatchNextCampaignCallLegacy(code) {
   
   if (worker) {
     console.log(`[CAMPAIGN] Marcado directo a ${next.phone} vía worker ${worker.name}`);
-    io.to(worker.socketId).emit("call:action", {
+    sendPersistedDial(code, worker.socketId, {
       action: "dial",
       phoneNumber: next.phone,
       contactId: next.id,
@@ -502,10 +552,12 @@ function dispatchNextCampaignCallLegacy(code) {
 }
 
 function dispatchCampaignCalls(code, onlyWorkerId = "") {
+  if (historyGate.blocked(code)) return [];
   const session = sessions.get(code);
   if (!session) return [];
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
+  excludeCalledPending(campaign, allCallAttempts());
 
   const dispatched = [];
   const connectedWorkers = getConnectedPhoneWorkers(session);
@@ -527,6 +579,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   );
 
   for (const worker of workers) {
+    excludeCalledPending(campaign, allCallAttempts());
     const next = assignNextContact(session, worker);
     if (!next) continue;
     worker.callState = "dialing";
@@ -537,7 +590,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
     session.lastNumber = next.phone;
     session.lastContactName = next.name;
     session.lastCompanyName = next.name;
-    io.to(worker.socketId).emit("call:action", {
+    sendPersistedDial(code, worker.socketId, {
       action: "dial",
       phoneNumber: next.phone,
       contactId: next.id,
@@ -610,6 +663,9 @@ function emitState(code) {
   });
 
   io.to(code).emit("state:changed", {
+    localTestMode: false,
+    storage: persistence.status(),
+    callRestrictions: callRestrictions(session),
     connected: {
       dashboard: Boolean(session.dashboardSocketId),
       phone: Boolean(session.phoneSocketId),
@@ -857,6 +913,7 @@ io.on("connection", (socket) => {
       session.dashboardClientId = String(dashboardClientId || "").trim();
       socket.data.dashboardClientId = session.dashboardClientId;
     }
+    let rotatedPairingToken = "";
     if (role === "phone") {
       const worker = upsertPhoneWorker(session, {
         socketId: socket.id,
@@ -870,6 +927,11 @@ io.on("connection", (socket) => {
         });
         worker.pairingSlotId = pairingSlot.id;
         socket.data.pairingSlotId = pairingSlot.id;
+        pairingSlot.token = nanoid(20);
+        rotatedPairingToken = pairingSlot.token;
+      } else if (normalizedToken === session.pairingToken) {
+        session.pairingToken = nanoid(20);
+        rotatedPairingToken = session.pairingToken;
       }
       session.activePhoneSocketId ||= worker.socketId;
       syncSessionPhoneState(session);
@@ -877,7 +939,11 @@ io.on("connection", (socket) => {
     }
 
     session.updatedAt = Date.now();
-    socket.emit("session:joined", { code: normalizedCode, role });
+    socket.emit("session:joined", {
+      code: normalizedCode,
+      role,
+      ...(rotatedPairingToken ? { token: rotatedPairingToken } : {})
+    });
     emitState(normalizedCode);
     emitCampaignState(normalizedCode);
 
@@ -899,6 +965,15 @@ io.on("connection", (socket) => {
     if (!session) return;
 
   if (action === "dial") {
+      if (historyGate.blocked(code)) {
+        socket.emit("session:error", { error: "El historial tiene un guardado pendiente. Espera antes de llamar." });
+        return;
+      }
+      const block = annualBlock(phoneNumber);
+      if (block) {
+        socket.emit("call:error",{message:blockedCallMessage(block)});
+        return;
+      }
       session.lastNumber = phoneNumber || "";
       session.lastCompanyName = companyName || "";
       session.lastContactName = contactName || "";
@@ -907,17 +982,26 @@ io.on("connection", (socket) => {
       const worker = workerId
         ? getConnectedPhoneWorkers(session).find((item) => item.id === workerId)
         : getActivePhoneWorker(session);
-      if (contactId) {
-        const campaign = ensureCampaign(session);
-        campaign.activeContactId = contactId;
-        if (worker) campaign.activeWorkerSocketId = worker.socketId;
+      if (worker) {
+        if (getContactByWorker(session, worker.id)) {
+          socket.emit("session:error", { error: "El equipo tiene una llamada asignada. Espera a que termine." });
+          return;
+        }
+        const tracked = ensureCampaignContact(session, {
+          id: contactId || nanoid(), name: contactName || companyName || "",
+          phone: phoneNumber, list: "Manual", targetWorkerId: worker.id
+        });
+        if (!tracked || !assignSpecificContact(session, worker, tracked.id)) return;
+        contactId = tracked.id;
+        worker.activeContactId = tracked.id;
+        worker.callState = "dialing";
       }
       session.updatedAt = Date.now();
       saveSoon();
       
       if (worker) {
         console.log(`[MANUAL] Marcado directo a ${phoneNumber} vía worker ${worker.name}`);
-        io.to(worker.socketId).emit("call:action", {
+        sendPersistedDial(code, worker.socketId, {
           action: "dial",
           phoneNumber: phoneNumber || "",
           companyName: companyName || "",
@@ -970,11 +1054,12 @@ io.on("connection", (socket) => {
     emitCampaignState(code);
   });
 
-  socket.on("phone:status", ({ callState, phoneNumber, contactName, companyName, contactId, callId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed }) => {
+  socket.on("phone:status", (payload = {}) => {
     const code = socket.data.code;
     const role = socket.data.role;
     if (!code || role !== "phone") return;
-
+    historyGate.serialize(code, async () => {
+    const { callState, phoneNumber, contactName, companyName, contactId, callId, commandId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed, detectedVoicemail, detectedAnnouncement } = payload;
     const session = sessions.get(code);
     if (!session) return;
 
@@ -1011,7 +1096,10 @@ io.on("connection", (socket) => {
       }
     } else {
       const reconciledState = terminalConfirmed && callState === "idle" ? "ended" : callState;
-      updatedContact = updateActiveCallState(session, reconciledState, worker || {}, { lastError, contactId, callId });
+      // An unrelated/late Telecom event must not finish the assigned attempt.
+      if (contactId && callId) {
+        updatedContact = updateActiveCallState(session, reconciledState, worker || {}, { lastError, contactId, callId, detectedVoicemail: detectedVoicemail === true, detectedAnnouncement });
+      }
     }
     if (worker && updatedContact) {
       worker.activeContactId = ["dialing", "ringing", "in_call"].includes(updatedContact.status) ? updatedContact.id : null;
@@ -1019,14 +1107,39 @@ io.on("connection", (socket) => {
       worker.lastNumber = updatedContact.phone || worker.lastNumber || "";
     }
     syncSessionPhoneState(session);
-    saveSoon();
+
+    const terminal = ["ended", "failed"].includes(String(callState || ""))
+      || (terminalConfirmed && callState === "idle");
+    const campaign = ensureCampaign(session);
+    const alreadyFinalized = terminal && contactId && callId
+      && (persistence.hasFinishedAttempt(code, callId, contactId) || campaign.contacts.some((contact) => contact.id === contactId
+        && contact.attemptHistory.some((attempt) => attempt.id === callId && attempt.endedAt)));
+    // No successful receipt or next call until the transaction/outbox is durable.
+    await historyGate.commit(code, [callId, contactId, callState, terminal].join("|"), () => {
     emitState(code);
     emitCampaignState(code);
-
-    const campaign = ensureCampaign(session);
-    if (["ended", "failed"].includes(String(callState || "")) && campaign.status === "running") {
+    socket.emit("phone:status_ack", {
+      persisted: true,
+      accepted: Boolean(updatedContact || alreadyFinalized),
+      terminal: Boolean(terminal && (updatedContact || alreadyFinalized)),
+      commandId: commandId || "",
+      contactId: contactId || "",
+      callId: callId || ""
+    });
+    console.info("[PHONE_STATUS]", { code, workerId: worker?.id, callState, callId,
+      accepted: Boolean(updatedContact || alreadyFinalized), terminal: Boolean(terminal) });
+    if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
     }
+    });
+    }).catch(error => {
+      socket.emit("phone:status_ack", {
+        accepted: false, terminal: false, persisted: false,
+        commandId: payload.commandId || "", contactId: payload.contactId || "", callId: payload.callId || ""
+      });
+      console.error("[PHONE_STATUS] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
+      emitState(code);
+    });
   });
 
   socket.on("phone:command_ack", ({ commandId, action, ok, message }) => {
@@ -1186,6 +1299,48 @@ app.get("/api/pairing/:code", pairingRateLimit, (req, res) => {
 });
 
 app.use("/api/session/:code", requireDashboardAccess);
+app.use("/api/session/:code", (req, res, next) => {
+  const startsCall = req.method === "POST" && /\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(req.path);
+  if (startsCall && historyGate.blocked(String(req.params.code || "").toUpperCase())) {
+    return res.status(503).json({ ok: false, error: "El historial tiene un guardado pendiente; no se iniciarán nuevas llamadas." });
+  }
+  next();
+});
+
+app.get("/api/session/:code/contact-book", async (req, res) => {
+  const code = String(req.params.code).toUpperCase().trim();
+  const session = sessions.get(code);
+  if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
+  try {
+    const attempts = await persistence.getCallAttempts(code);
+    res.json({ok:true,revision:session.contactBookRevision || 0,
+      book:session.contactBook ? withProgress(session.contactBook,attempts,allCallAttempts()) : null});
+  } catch { res.status(503).json({ok:false,error:"No se pudo cargar la base desde MySQL."}); }
+});
+
+app.put("/api/session/:code/contact-book", async (req, res) => {
+  const code = String(req.params.code).toUpperCase().trim();
+  const session = sessions.get(code);
+  if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
+  let book;
+  try { book = normalizeBook(req.body?.book); }
+  catch (error) { return res.status(400).json({ok:false,error:error.message}); }
+  try {
+    const revision = await historyGate.serialize(code, async () => {
+      if (Number(req.body?.revision) !== Number(session.contactBookRevision || 0)) {
+        throw Object.assign(new Error("La base cambió. Recarga antes de editar."),{conflict:true});
+      }
+      session.contactBook = book;
+      session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
+      session.updatedAt = Date.now();
+      await persistence.save(sessions);
+      return session.contactBookRevision;
+    });
+    res.json({ok:true,revision});
+  } catch (error) {
+    res.status(error.conflict ? 409 : 503).json({ok:false,error:error.conflict ? error.message : "No se confirmó el guardado en MySQL. Recarga antes de continuar."});
+  }
+});
 
 app.post("/api/session/:code/pairing-slots", (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
@@ -1278,7 +1433,7 @@ app.get("/api/session/:code/turns/:turnId/report", (req, res) => {
   return res.json({ ok: true, code, turn });
 });
 
-app.post("/api/session/:code/turn/finalize", (req, res) => {
+app.post("/api/session/:code/turn/finalize", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   const session = sessions.get(code);
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
@@ -1289,7 +1444,8 @@ app.post("/api/session/:code/turn/finalize", (req, res) => {
   disconnectAllSessionPhones(session, "turn_finished");
   resetCampaignForShift(session);
   session.updatedAt = Date.now();
-  saveSoon();
+  try { await persistence.save(sessions); }
+  catch { return res.status(503).json({ok:false,error:"No se confirmó el cierre de turno en MySQL."}); }
   emitState(code);
   emitCampaignState(code);
   return res.json({
@@ -1300,7 +1456,7 @@ app.post("/api/session/:code/turn/finalize", (req, res) => {
   });
 });
 
-app.post("/api/session/:code/session/finalize", (req, res) => {
+app.post("/api/session/:code/session/finalize", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   const session = sessions.get(code);
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
@@ -1312,7 +1468,8 @@ app.post("/api/session/:code/session/finalize", (req, res) => {
   session.pairingSlots = Array.from({ length: 3 }, (_, index) => createPairingSlot(index));
   session.pairingToken = nanoid(20);
   session.updatedAt = Date.now();
-  saveSoon();
+  try { await persistence.save(sessions); }
+  catch { return res.status(503).json({ok:false,error:"No se confirmó el cierre de sesión en MySQL."}); }
   emitState(code);
   emitCampaignState(code);
   return res.json({
@@ -1419,6 +1576,25 @@ function reportData(session, date) {
 }
 
 /* CONSULTAR REPORTES */
+
+app.get("/api/session/:code/reports/attempts", async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase().trim();
+  const session = sessions.get(code);
+  if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
+  if (!hasDashboardAccess(req, session)) return res.status(403).json({ ok: false, error: "Acceso no autorizado" });
+  const from = String(req.query.from || ""), to = String(req.query.to || "");
+  const valid = value => !value || (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(value + "T00:00:00Z")) && new Date(value + "T00:00:00Z").toISOString().slice(0,10) === value);
+  if (!valid(from) || !valid(to) || (from && to && from > to)) {
+    return res.status(400).json({ ok: false, error: "Rango de fechas inválido" });
+  }
+  try {
+    const rows = await persistence.getCallAttempts(code, { from, to, phone: String(req.query.phone || "") });
+    return res.json({ ok: true, rows, storage: persistence.status() });
+  } catch (error) {
+    return res.status(503).json({ ok: false, error: "No se pudo consultar el historial guardado. Intenta nuevamente.", storage: persistence.status() });
+  }
+});
 
 app.get("/api/session/:code/reports/daily", (req, res) => {
   const code = String(req.params.code || "")
@@ -1540,9 +1716,9 @@ app.post(
   }
 );
 
-app.post("/api/session/:code/campaign/start", (req, res) => {
+app.post("/api/session/:code/campaign/start", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
-  const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  let contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
   if (!code) return res.status(400).json({ ok: false, error: "Code requerido" });
   if (!contacts.length) return res.status(400).json({ ok: false, error: "contacts requeridos" });
 
@@ -1555,11 +1731,21 @@ app.post("/api/session/:code/campaign/start", (req, res) => {
   if (contacts.length > 10000) {
     return res.status(413).json({ ok: false, error: "La campana admite hasta 10000 contactos." });
   }
+  try {
+    const history = await persistence.getCallAttempts(code);
+    contacts = uncalledContacts(contacts, allCallAttempts());
+  } catch {
+    return res.status(503).json({ok:false,error:"No se pudo comprobar el historial en MySQL."});
+  }
+  if (!contacts.length) return res.status(409).json({ok:false,error:"Número llamado anteriormente: todos los teléfonos de esta selección están bloqueados por 12 meses o duplicados."});
+  if (ensureCampaign(session).status === "running" || Object.keys(ensureCampaign(session).assignments || {}).length) {
+    return res.status(409).json({ok:false,error:"Ya se inició una campaña mientras se consultaba el historial."});
+  }
   archiveCurrentCampaign(session);
   syncPendingContacts(session, currentCampaign);
   startCampaign(session, contacts, {
     listName: req.body?.listName,
-    maxAttempts: Math.min(5, Math.max(1, Number(req.body?.maxAttempts || 2)))
+    maxAttempts: 1
   });
   
 const startedCampaign = ensureCampaign(session);
@@ -1579,7 +1765,8 @@ startedCampaign.reportRubro = String(
     markPendingCampaignStarted(session, contacts);
   }
   session.updatedAt = Date.now();
-  saveSoon();
+  try { await persistence.save(sessions); }
+  catch { return res.status(503).json({ok:false,error:"No se pudo guardar la campaña en MySQL."}); }
   emitCampaignState(code);
   const dispatched = dispatchCampaignCalls(code);
 
@@ -1591,26 +1778,28 @@ startedCampaign.reportRubro = String(
   });
 });
 
-app.post("/api/session/:code/campaign/pause", (req, res) => {
+app.post("/api/session/:code/campaign/pause", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   if (!code) return res.status(400).json({ ok: false, error: "Code requerido" });
   const session = sessions.get(code);
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
 
   pauseCampaign(session);
-  saveSoon();
+  try { await persistence.save(sessions); }
+  catch { emitCampaignState(code); return res.status(503).json({ok:false,error:"Campaña pausada, pero falta confirmar el guardado en MySQL."}); }
   emitCampaignState(code);
   return res.json({ ok: true, code, campaign: getCampaignSnapshot(session) });
 });
 
-app.post("/api/session/:code/campaign/resume", (req, res) => {
+app.post("/api/session/:code/campaign/resume", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   if (!code) return res.status(400).json({ ok: false, error: "Code requerido" });
   const session = sessions.get(code);
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
 
   resumeCampaign(session);
-  saveSoon();
+  try { await persistence.save(sessions); }
+  catch { pauseCampaign(session); return res.status(503).json({ok:false,error:"No se confirmó la continuación en MySQL."}); }
   emitCampaignState(code);
   const dispatched = dispatchCampaignCalls(code);
   return res.json({ ok: true, code, dispatched: dispatched.length, campaign: getCampaignSnapshot(session) });
@@ -1750,6 +1939,8 @@ app.post("/api/session/:code/workers/:workerId/call-contact", (req, res) => {
     return res.status(409).json({ ok: false, error: "El contacto pertenece a otro equipo" });
   }
 
+  const block = annualBlock(requested.phone);
+  if (block) return res.status(409).json({ok:false,error:blockedCallMessage(block),reason:"numero_llamado_anteriormente",nextAllowedAt:block.nextAllowedAt});
   const held = holdActiveContact(session, workerId);
   if (held) {
     io.to(worker.socketId).emit("call:action", { action: "hangup", from: "dashboard", contactId: held.id, commandId: nanoid() });
@@ -1762,7 +1953,7 @@ app.post("/api/session/:code/workers/:workerId/call-contact", (req, res) => {
   worker.activeContactId = contact.id;
   worker.lastCompanyName = contact.name;
   worker.lastNumber = contact.phone;
-  io.to(worker.socketId).emit("call:action", {
+  sendPersistedDial(code, worker.socketId, {
     action: "dial",
     phoneNumber: contact.phone,
     contactId: contact.id,

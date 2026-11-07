@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
- <link rel="stylesheet" href="/styles.css?v=20261105-calendario-layout-demo-v3" />
+ <link rel="stylesheet" href="/styles.css?v=20261106-permanent-history" />
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -45,13 +45,16 @@
         <div class="apk-info">
           <img class="apk-icon-img" src="/logotipo-VCMAS.ico" alt="VC icono" width="22" height="22" />
           <div>
-            <strong id="apkName">Phone-VC Android</strong>
+            <strong id="apkName">VOIP VC Android</strong>
             <small id="apkMeta" class="muted">Cargando info del APK…</small>
           </div>
         </div>
         <div class="apk-actions">
           <a id="apkDownloadBtn" href="/api/apk/download" class="btn-apk-dl" download>
-            ⬇️ Descargar APK
+            Descargar VOIP VC
+          </a>
+          <a id="shizukuDownloadBtn" href="https://github.com/RikkaApps/Shizuku/releases/download/v13.5.4/shizuku-v13.5.4.r1049.0e53409-release.apk" class="btn-apk-dl apk-shizuku-dl" target="_blank" rel="noopener noreferrer">
+            Descargar Shizuku
           </a>
         </div>
       </div>
@@ -62,6 +65,7 @@
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Preparando sesión automática...</span>
       </div>
+      <p id="storageStatus" class="storage-status" role="status" hidden></p>
 
       <section class="shift-management" id="shiftManagement">
         <div class="shift-management-info">
@@ -70,12 +74,11 @@
           <small id="currentShiftSchedule">Horario de Lima</small>
         </div>
         <div class="shift-management-actions">
-          <button id="reportNavBtn" class="secondary" type="button">CALENDARIO</button>
+          <button id="reportNavBtn" class="secondary" type="button">REPORTES</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">REINICIAR SESIÓN</button>
         </div>
       </section>
-      <section id="shiftHistoryPanel" class="shift-history-panel" aria-live="polite"></section>
 
       <div id="callsContent">
       <!-- QR BLOCK -->
@@ -101,7 +104,6 @@
           </div>
           <div class="campaign-actions">
             <button id="campaignStopBtn" class="danger-soft">■ Detener</button>
-            <button id="campaignReportBtn" class="secondary">⬇ Reporte</button>
             <button id="campaignStartBtn">▶ Iniciar llamada general</button>
             <button id="pendingTurnCallBtn" class="secondary">☎ Llamar números pendientes</button>
             <button id="campaignPauseBtn" class="secondary">⏸ Pausar</button>
@@ -228,31 +230,46 @@
         </div>
       </section>
 
-      <section aria-label="Reporte de llamadas">
-        <h3>Reporte de llamadas</h3>
-        <p class="muted">Cada intento conserva su resultado. Puedes volver a llamar cuando el equipo esté disponible.</p>
-        <label for="campaignReportFilter">Buscar por número, contacto, lista o resultado</label>
-        <input id="campaignReportFilter" type="search" placeholder="Buscar en el reporte..." />
-        <p id="campaignReportCount" aria-live="polite">0 registros</p>
-        <p id="campaignReportEmpty">Todavía no hay llamadas registradas.</p>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Lista</th><th>Contacto</th><th>Número</th><th>Equipo</th><th>Intento</th><th>Inicio (Lima)</th><th>Contestó (Lima)</th><th>Fin (Lima)</th><th>Duración</th><th>Resultado técnico</th><th>Resultado comercial</th><th>Acción</th></tr></thead>
-            <tbody id="campaignReportBody"></tbody>
-          </table>
-        </div>
-      </section>
 
       <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
         <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
       </section>
       </div>
 
-      <section id="annualReport" class="annual-report" aria-label="Calendario anual" hidden>
+      <section id="annualReport" class="annual-report" aria-label="Reportes de llamadas" hidden>
         <div class="report-nav">
           <button id="reportBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
         </div>
+        <div class="reports-workspace">
         <div id="calendarUi"></div>
+      <section id="campaignReportPanel" class="campaign-report-panel" aria-labelledby="campaignReportTitle">
+        <div class="campaign-report-heading">
+          <div>
+            <h3 id="campaignReportTitle">Llamadas del período</h3>
+            <p class="muted">Resultados de cada intento y acceso a rellamadas.</p>
+          </div>
+          <div class="report-download-actions"><span id="campaignReportCount" class="campaign-report-count" aria-live="polite">0 registros</span><button id="campaignReportBtn" class="secondary" type="button">Descargar PDF</button></div>
+        </div>
+        <div class="report-filters">
+          <div class="report-shift-filter"><label for="reportShiftFilter">Turno</label><select id="reportShiftFilter"><option value="">Todos los turnos</option></select></div>
+          <div class="report-shift-filter"><label for="reportListFilter">Lista</label><select id="reportListFilter"><option value="">Todas las listas</option></select></div>
+          <div class="report-shift-filter"><label for="reportWorkerFilter">Equipo</label><select id="reportWorkerFilter"><option value="">Todos los equipos</option></select></div>
+          <div class="report-shift-filter"><label for="reportResultFilter">Resultado</label><select id="reportResultFilter"><option value="">Todos los resultados</option></select></div>
+          <div class="campaign-report-search">
+            <label for="campaignReportFilter">Buscar en el reporte</label>
+            <input id="campaignReportFilter" type="search" placeholder="Número, contacto, lista o resultado..." />
+          </div>
+        </div>
+        <p id="reportsLoadStatus" class="muted" role="status"></p>
+        <p id="campaignReportEmpty" class="campaign-report-empty" role="status">Todavía no hay llamadas registradas.</p>
+        <div id="campaignReportTableWrap" class="table-wrap campaign-report-table-wrap" role="region" aria-label="Historial de llamadas, desplaza horizontalmente para ver todas las columnas" tabindex="0" hidden>
+          <table>
+            <thead><tr><th scope="col">Lista</th><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Equipo</th><th scope="col">Intento</th><th scope="col">Inicio (Lima)</th><th scope="col">Conectó (Lima)</th><th scope="col">Fin (Lima)</th><th scope="col">Espera</th><th scope="col">Tiempo conectado</th><th scope="col">Tiempo total</th><th scope="col">Resultado técnico</th><th scope="col">Resultado comercial</th><th scope="col">Acción</th></tr></thead>
+            <tbody id="campaignReportBody"></tbody>
+          </table>
+        </div>
+      </section>
+        </div>
       </section>
 
     </section>
@@ -356,81 +373,6 @@
     </div>
   </div>
 
-  <!-- QUOTATION MODAL -->
-  <div id="quotationModal" class="edit-modal" style="display:none">
-    <div class="edit-card quotation-card">
-      <button id="quotationCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
-      <h3>Nueva Cotización</h3>
-      <p class="muted" style="margin-bottom:10px;">Sin PHP. Se genera y descarga directamente desde el navegador.</p>
-
-      <div class="edit-form quotation-form-grid">
-        <label for="qDate">Fecha</label>
-        <input id="qDate" type="date" />
-
-        <label for="qCompany">Empresa / Razón Social</label>
-        <input id="qCompany" type="text" placeholder="Empresa" />
-
-        <label for="qRuc">RUC</label>
-        <input id="qRuc" type="text" placeholder="RUC" />
-
-        <label for="qPhone">Teléfono</label>
-        <input id="qPhone" type="text" placeholder="+51999999999" />
-
-        <label for="qEmail">Correo</label>
-        <input id="qEmail" type="email" placeholder="correo@dominio.com" />
-
-        <label for="qAddress">Dirección</label>
-        <input id="qAddress" type="text" placeholder="Dirección" />
-      </div>
-
-      <div class="table-wrap quotation-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Servicio / Producto</th>
-              <th>Cantidad</th>
-              <th>Precio</th>
-              <th>Total</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="quotationItemsBody"></tbody>
-        </table>
-      </div>
-
-      <div class="row" style="margin-top:10px;">
-        <button id="quotationAddItemBtn" type="button" class="secondary">＋ Agregar ítem</button>
-      </div>
-
-      <div class="quotation-totals">
-        <label class="quotation-igv-label">
-          <input id="quotationApplyIgv" type="checkbox" />
-          <span>Aplicar IGV (18%)</span>
-        </label>
-        <div class="quotation-total-line"><span>Subtotal:</span><strong id="quotationSubtotal">S/ 0.00</strong></div>
-        <div class="quotation-total-line"><span>IGV:</span><strong id="quotationIgv">S/ 0.00</strong></div>
-        <div class="quotation-total-line grand"><span>Total:</span><strong id="quotationTotal">S/ 0.00</strong></div>
-      </div>
-
-      <div class="row" style="justify-content:flex-end;">
-        <button id="quotationPreviewBtn" type="button" class="secondary">👁️ Vista previa</button>
-        <button id="quotationDownloadBtn" type="button">💾 Descargar PDF</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- QUOTATION PREVIEW MODAL -->
-  <div id="quotationPreviewModal" class="edit-modal quotation-preview-modal" style="display:none">
-    <div class="edit-card quotation-preview-card">
-      <button id="quotationPreviewCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
-      <div class="quotation-preview-actions">
-        <button id="quotationPreviewDownloadBtn" type="button">💾 Descargar PDF</button>
-        <span id="quotationSendFeedback" class="quotation-send-feedback" aria-live="polite"></span>
-      </div>
-      <iframe id="quotationPreviewFrame" class="quotation-preview-frame" title="Vista previa cotización"></iframe>
-    </div>
-  </div>
-
   <datalist id="noteOptions">
     <option value="No contestó"></option>
     <option value="Llamar mañana"></option>
@@ -439,7 +381,6 @@
     <option value="Llamar 25/02/2026"></option>
     <option value="Llamar 2026-02-25 15:30"></option>
   </datalist>
-  <datalist id="quotationServicesDatalist"></datalist>
 
   <!-- CALL MODAL -->
   <div id="callModal" class="call-modal" style="display:none">
@@ -487,7 +428,7 @@
       </div>
     </div>
   </div>
-  <script src="/modules/calendar-ui.js?v=20261106-ui-only"></script>
+  <script type="module" src="/modules/calendar-ui.js?v=20261106-calendar-range"></script>
   <script>
     (function bootstrapDashboard() {
       const params = new URLSearchParams(window.location.search);
@@ -516,7 +457,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20261105-calendar-demo-detail-fix");
+        import("/dashboard.js?v=20261106-annual-call-limit");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);

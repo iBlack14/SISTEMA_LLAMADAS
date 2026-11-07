@@ -99,6 +99,9 @@ class MainActivity : AppCompatActivity() {
     private var isSpeakerOn = false
     private var callStartedAt: Long? = null
     private var autoReconnectAttempted = false
+    private var voicemailReminderChecked = false
+    private var returningFromVoicemailSetup = false
+    private var voicemailReminderDialog: AlertDialog? = null
     private var pendingPairFromConnectedMode: Boolean? = null
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
@@ -225,6 +228,11 @@ class MainActivity : AppCompatActivity() {
         ViewCompat.requestApplyInsets(scroll)
         bindViews()
         bindActions()
+        findViewById<View>(R.id.voicemailSetupBtn).setOnClickListener {
+            openVoicemailSetup(false)
+        }
+        VoicemailDetector.initialize(this)
+        voicemailReminderChecked = savedInstanceState?.getBoolean("voicemail_reminder_checked") == true
         hydrateTechnicalInputs()
         refreshSavedSessionMode()
         refreshReadinessChips()
@@ -239,9 +247,58 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("voicemail_reminder_checked", voicemailReminderChecked)
         outState.putBoolean("manual_setup_expanded", findViewById<View>(R.id.manualSetupSection).visibility == View.VISIBLE)
         pendingPairFromConnectedMode?.let { outState.putBoolean("pending_pair_mode", it) }
         super.onSaveInstanceState(outState)
+    }
+
+    private fun openVoicemailSetup(requestAuthorization: Boolean) {
+        returningFromVoicemailSetup = true
+        voicemailReminderChecked = true
+        startActivity(Intent(this, VoicemailSetupActivity::class.java).apply {
+            putExtra(VoicemailSetupActivity.EXTRA_REQUEST_AUTHORIZATION, requestAuthorization)
+        })
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        if (returningFromVoicemailSetup) {
+            returningFromVoicemailSetup = false
+            voicemailReminderChecked = true
+        }
+        timerHandler.postDelayed({ maybeShowVoicemailReminder() }, 400)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) timerHandler.postDelayed({ maybeShowVoicemailReminder() }, 400)
+    }
+
+    private fun maybeShowVoicemailReminder() {
+        if (isFinishing || isDestroyed || !hasWindowFocus() || voicemailReminderChecked) return
+        if (voicemailReminderDialog?.isShowing == true) {
+            voicemailReminderChecked = true
+            return
+        }
+        // Do not overlap the regular permission flow or interrupt a live call.
+        if (pendingPairFromConnectedMode != null) return
+        if (hasPermission(Manifest.permission.READ_PHONE_STATE)) {
+            try {
+                if (getSystemService(TelecomManager::class.java)?.isInCall == true) return
+            } catch (_: SecurityException) { return }
+        }
+        val issue = VoicemailDetector.authorizationIssue() ?: return
+        voicemailReminderChecked = true
+        voicemailReminderDialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+            .setTitle("Autoriza la detección de buzón")
+            .setMessage(issue + "\n\nPermite el acceso al audio para reconocer las locuciones y solicitar el corte. No se guardan grabaciones.")
+            .setPositiveButton("Configurar y autorizar") { _, _ -> openVoicemailSetup(true) }
+            .setNegativeButton("Ahora no", null)
+            .create().also { dialog ->
+                dialog.setOnDismissListener { voicemailReminderDialog = null }
+                dialog.show()
+            }
     }
 
     private fun setManualSetupExpanded(expanded: Boolean) {
@@ -266,6 +323,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        if (!returningFromVoicemailSetup && !isChangingConfigurations) voicemailReminderChecked = false
         unregisterReceiver(statusReceiver)
         timerHandler.removeCallbacks(timerRunnable)
     }
@@ -655,6 +713,10 @@ class MainActivity : AppCompatActivity() {
         } else if (lastCallState in setOf("idle", "ended", "failed")) {
             callStartedAt = null
             timerHandler.removeCallbacks(timerRunnable)
+            currentPhoneNumber = ""
+            currentContactName = ""
+            currentCompanyName = ""
+            lastCallState = "idle"
         }
 
         renderCallPresentation()
@@ -665,7 +727,7 @@ class MainActivity : AppCompatActivity() {
             currentContactName.isNotBlank() -> currentContactName
             currentCompanyName.isNotBlank() -> currentCompanyName
             currentPhoneNumber.isNotBlank() -> currentPhoneNumber
-            else -> "Bridge listo"
+            else -> "Listo para llamar"
         }
 
         currentCallNameText.text = primaryName
@@ -694,6 +756,11 @@ class MainActivity : AppCompatActivity() {
         callTimerText.text = formatElapsed()
         answerBtn.visibility = if (lastCallState == "ringing") View.VISIBLE else View.GONE
         val liveCall = lastCallState in setOf("dialing", "ringing", "in_call")
+        currentCallNumberText.visibility = if (currentPhoneNumber.isNotBlank()) View.VISIBLE else View.GONE
+        callTimerText.visibility = if (liveCall) View.VISIBLE else View.GONE
+        hangupBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
+        muteBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
+        speakerBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
         hangupBtn.isEnabled = liveCall
         muteBtn.isEnabled = lastCallState == "in_call"
         speakerBtn.isEnabled = liveCall

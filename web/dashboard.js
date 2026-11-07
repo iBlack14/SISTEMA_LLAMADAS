@@ -1,9 +1,9 @@
 import { socket, API_BASE } from './modules/socket.js?v=2';
+import { validateReportPeriod, isInReportPeriod, reportPeriodLabel } from './modules/report-period.js?v=20261106-range';
 import { refs, setStatus, setBadge, setAckBadge } from './modules/dom.js?v=20260810-list-data-order';
-import * as Contacts from './modules/contacts.js?v=2';
+import * as Contacts from './modules/contacts.js?v=20261106-mysql-book';
 import * as AudioBridge from './modules/audio-bridge.js?v=2';
-import * as WhatsApp from './modules/whatsapp.js?v=2';
-import * as Quotation from './modules/quotation.js?v=2';
+import * as WhatsApp from './modules/whatsapp.js?v=20261106-mysql-book';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let sessionCode = "";
@@ -25,6 +25,14 @@ let currentCallingContactId = null;
 let currentPhoneLinked = false;
 let latestSessionState = {};
 let campaignState = null;
+let reportRowsCache = [];
+let reportCacheSession = "";
+let reportRequestSerial = 0;
+let reportPeriod = { from: "", to: "" };
+let reportShiftId = "";
+let reportListFilter = "";
+let reportWorkerFilter = "";
+let reportResultFilter = "";
 const pendingCommandTimeouts = new Map();
 // The contact database is browsed inside a seven-row scroll area. Render the
 // complete selected list so scrolling can reach every record without paging.
@@ -51,7 +59,7 @@ let normalCampaignResumeRequested = false;
 function getHiddenAssignedRecords() {
   if (!sessionCode) return new Set();
   try {
-    const saved = JSON.parse(localStorage.getItem(`${HIDDEN_ASSIGNED_RECORDS_PREFIX}${sessionCode}`) || "[]");
+    const saved = Contacts.getPreference("hiddenAssignedRecords", []);
     return new Set(Array.isArray(saved) ? saved.map(String) : []);
   } catch {
     return new Set();
@@ -62,10 +70,19 @@ function hideAssignedRecord(listName) {
   if (!sessionCode || !listName) return;
   const hidden = getHiddenAssignedRecords();
   hidden.add(String(listName));
-  localStorage.setItem(`${HIDDEN_ASSIGNED_RECORDS_PREFIX}${sessionCode}`, JSON.stringify([...hidden]));
+  Contacts.setPreference("hiddenAssignedRecords", [...hidden]);
 }
 
 // ── INITIALIZATION ──────────────────────────────────────────────────
+window.addEventListener("contact-book:loaded", () => {
+  WhatsApp.loadWhatsAppPresetMessages();
+  WhatsApp.saveWhatsAppPresetMessages();
+  renderTabs(); renderContacts(); renderCampaignPanel();
+});
+window.addEventListener("contact-book:error", event => {
+  setStatus(event.detail + " No cierres esta página; recarga para recuperar la base confirmada.", true);
+});
+
 async function init() {
   console.log("Dashboard init starting...");
   Contacts.loadContacts();
@@ -131,10 +148,18 @@ function mobileCallActionIcon() {
   return `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M7.15 3.15 11.7 2c.88-.22 1.8.23 2.14 1.07l2.08 5.13c.3.74.08 1.6-.55 2.09l-2.66 2.12a19.05 19.05 0 0 0 6.88 6.88l2.12-2.66a1.82 1.82 0 0 1 2.09-.55l5.13 2.08c.84.34 1.29 1.26 1.07 2.14l-1.15 4.55a3.13 3.13 0 0 1-3.03 2.38C14.21 27.23 4.77 17.79 4.77 6.18a3.13 3.13 0 0 1 2.38-3.03Z" fill="currentColor"/></svg>`;
 }
 
+function contactAnnualBlock(contact) {
+  const phone = normalizeValidPeruPhone(contact.phone);
+  const until = latestSessionState?.callRestrictions?.[phone]?.nextAllowedAt || contact.callBlockedUntil;
+  return until && Date.parse(until) > Date.now() ? until : null;
+}
+
 function contactActionButtons(contact, scope = "contacts") {
+  const until = contactAnnualBlock(contact);
+  const reason = until ? "Número llamado anteriormente. Disponible desde " + new Date(until).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) : "";
   return `<div class="contact-action-buttons">
     <button type="button" class="wa-action-btn" data-action="whatsapp-direct" data-id="${escHtml(contact.id || "")}" data-list-contact-scope="${scope}" aria-label="Contactar por WhatsApp" title="Contactar por WhatsApp">${whatsappActionIcon()}<span>WHATSAPP</span></button>
-    <button type="button" class="call-action-btn" data-action="call-direct" data-id="${escHtml(contact.id || "")}" data-list="${escHtml(contact.list || "Principal")}" data-list-contact-scope="${scope}" aria-label="Llamar a este contacto" title="Llamar desde el equipo asignado">${mobileCallActionIcon()}<span>LLAMAR</span></button>
+    <button type="button" class="call-action-btn" data-action="call-direct" data-id="${escHtml(contact.id || "")}" data-list="${escHtml(contact.list || "Principal")}" data-list-contact-scope="${scope}" aria-label="Llamar a este contacto" title="${escHtml(reason || "Llamar desde el equipo asignado")}" ${until ? "disabled" : ""}>${mobileCallActionIcon()}<span>${until ? "YA LLAMADO" : "LLAMAR"}</span></button>
   </div>`;
 }
 
@@ -150,7 +175,7 @@ function loadTurnPendingContacts() {
     return serverPending.filter((item) => normalizeValidPeruPhone(item.phone));
   }
   try {
-    const parsed = JSON.parse(localStorage.getItem(`${TURN_PENDING_PREFIX}${sessionCode}`) || "[]");
+    const parsed = Contacts.getPreference("turnPending", []);
     return Array.isArray(parsed) ? parsed.filter((item) => normalizeValidPeruPhone(item.phone)) : [];
   } catch {
     return [];
@@ -159,7 +184,7 @@ function loadTurnPendingContacts() {
 
 function saveTurnPendingContacts(contacts) {
   if (!sessionCode) return;
-  localStorage.setItem(`${TURN_PENDING_PREFIX}${sessionCode}`, JSON.stringify(contacts));
+  Contacts.setPreference("turnPending", contacts);
 }
 
 function syncTurnPendingContacts() {
@@ -512,6 +537,8 @@ window.AppDialogs = {
 };
 
 async function addImportedContacts() {
+  try { await Contacts.flushDatabase(); }
+  catch (error) { setStatus(error.message, true); return; }
   if (importPreviewBatches.length) {
     let totalAdded = 0;
     let processedLists = 0;
@@ -524,6 +551,8 @@ async function addImportedContacts() {
       processedLists += 1;
     }
     Contacts.setActiveList(importPreviewBatches[0].listName);
+    try { await Contacts.flushDatabase(); }
+    catch (error) { setStatus(error.message, true); return; }
     setStatus(`${processedLists} lista(s) procesada(s): ${totalAdded} contacto(s) agregado(s)${omitted ? ` y ${omitted} duplicado(s) omitido(s)` : ""}.`, true);
     resetImportPreview();
     renderTabs();
@@ -541,7 +570,8 @@ async function addImportedContacts() {
   Contacts.addList(listName);
   Contacts.setActiveList(listName);
   const addedCount = Contacts.addContacts(importPreviewData, listName);
-  
+  try { await Contacts.flushDatabase(); }
+  catch (error) { setStatus(error.message, true); return; }
   setStatus(`Lista "${listName}" creada con ${addedCount} contacto(s).`, true);
   resetImportPreview();
   renderTabs();
@@ -758,7 +788,7 @@ function renderContacts() {
     
     tr.innerHTML = `
       <td>${escHtml(c.name)}</td>
-      <td style="font-family:monospace;font-size:13px;">${escHtml(c.phone)}</td>
+      <td style="font-family:monospace;font-size:13px;">${escHtml(c.phone)}${contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">Número llamado anteriormente</small>' : ""}</td>
       <td class="actions-cell contact-direct-cell">${contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
@@ -1026,8 +1056,6 @@ function renderCampaignPanel() {
   if (refs.campaignPauseBtn) refs.campaignPauseBtn.style.display = campaignStatus === "running" ? "" : "none";
   if (refs.campaignResumeBtn) refs.campaignResumeBtn.style.display = campaignStatus === "paused" ? "" : "none";
   if (refs.campaignSkipBtn) refs.campaignSkipBtn.style.display = active ? "" : "none";
-  const archivedReportCount = (campaignState?.turn?.history || []).reduce((total, turn) => total + Number(turn.reportCount || 0), 0);
-  if (refs.campaignReportBtn) refs.campaignReportBtn.style.display = (campaignState?.history || []).length || archivedReportCount ? "" : "none";
 
   if (refs.callbacksListEl) {
     refs.callbacksListEl.innerHTML = callbacks.length
@@ -1065,6 +1093,7 @@ async function postCampaignAction(path, body = {}) {
   }
 
   try {
+    if (/\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(path)) await Contacts.flushDatabase();
     const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionCode)}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardToken },
@@ -1080,7 +1109,7 @@ async function postCampaignAction(path, body = {}) {
     return data;
   } catch (error) {
     console.error("Campaign action error:", error);
-    setStatus("No se pudo comunicar la acción de campaña.", true);
+    setStatus(error.message || "No se pudo comunicar la acción de campaña.", true);
     return null;
   }
 }
@@ -1097,6 +1126,13 @@ async function hangupWorker(workerId) {
 
 async function startIndependentWorker(workerId) {
   if (!workerId) return;
+  const worker = (latestSessionState?.phoneWorkers || [])
+    .find((item) => String(item.id) === String(workerId));
+  if (!worker?.connected) {
+    setStatus("Este teléfono está desconectado. Vincula el celular actual con el QR de este equipo antes de iniciar.", true);
+    await loadPairingData(sessionCode);
+    return;
+  }
   const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/start-independent`);
   if (data) setStatus(data.dispatched ? "Llamada independiente iniciada." : "Este teléfono no tiene contactos pendientes.", true);
 }
@@ -1130,9 +1166,9 @@ async function skipWorkerList(slotId, workerId, currentList) {
   }
   const storageKey = `${PAIRING_LIST_ASSIGNMENTS_PREFIX}${sessionCode}`;
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { saved = {}; }
+  try { saved = Contacts.getPreference("pairingListAssignments", {}); } catch { saved = {}; }
   saved[slotId] = nextList;
-  localStorage.setItem(storageKey, JSON.stringify(saved));
+  Contacts.setPreference("pairingListAssignments", saved);
   setStatus(`Lista saltada. Ahora el equipo tiene asignada "${nextList}".`, true);
   await loadPairingData(sessionCode);
 }
@@ -1156,7 +1192,7 @@ function getPairingListAssignments() {
   const validLists = new Set(listNames.filter((listName) => !completedLists.has(listName)));
   const storageKey = `${PAIRING_LIST_ASSIGNMENTS_PREFIX}${sessionCode}`;
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { saved = {}; }
+  try { saved = Contacts.getPreference("pairingListAssignments", {}); } catch { saved = {}; }
   if (!saved || typeof saved !== "object" || Array.isArray(saved)) saved = {};
 
   const usedLists = new Set();
@@ -1177,7 +1213,7 @@ function getPairingListAssignments() {
     saved[slot.id] = nextList;
     usedLists.add(nextList);
   }
-  if (sessionCode) localStorage.setItem(storageKey, JSON.stringify(saved));
+  if (sessionCode) Contacts.setPreference("pairingListAssignments", saved);
 
   return listNames.flatMap((listName, assignmentIndex) => {
     const linked = linkedSlots.find(({ slot }) => saved[slot.id] === listName);
@@ -1248,18 +1284,22 @@ function csvCell(value) {
 }
 
 async function downloadCampaignReport() {
-  const reportRows = await getAllCampaignReportRows();
+  if (!await loadUnifiedReportRows()) return;
+  const reportRows = getVisibleReportRows();
   if (!reportRows.length) {
     setStatus("Aún no hay intentos para exportar.", true);
     return;
   }
   const shift = currentShiftSnapshot()?.current || currentShiftSnapshot()?.detected || {};
-  const pdf = await buildCallReportPdf("Todas las llamadas del turno", reportRows, shift);
+  const selectedShift = reportShiftId ? reportRows[0]?.shiftLabel || "Turno seleccionado" : "Todos los turnos";
+  const pdf = await buildCallReportPdf("Historial de llamadas", reportRows, {
+    ...shift, label: selectedShift, date: reportPeriodLabel(reportPeriod), schedule: ""
+  });
   const blob = new Blob([pdf], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `reporte_todas_las_llamadas_${new Date().toISOString().slice(0, 10)}.pdf`;
+  anchor.download = `reporte_llamadas_${reportPeriod.from ? reportPeriod.from + "_a_" + reportPeriod.to : "todo_el_historial"}.pdf`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   setStatus(`Reporte PDF generado con ${reportRows.length} llamada${reportRows.length === 1 ? "" : "s"}.`, true);
@@ -1269,6 +1309,9 @@ function mapCampaignReportRow(item, fallbackList = "") {
   const workerId = String(item.workerId || "").trim();
   const workerName = String(item.workerName || item.worker || workerId || "").trim();
   return {
+    reportDate: item.reportDate || reportDateKey(item.startedAt),
+    shiftId: item.shiftId || ((Date.parse(item.startedAt) || 0) >= (Date.parse(currentShiftSnapshot()?.current?.startedAt) || Infinity) ? currentShiftSnapshot()?.current?.id || "" : ""),
+    shiftLabel: item.shiftLabel || "",
     attemptId: item.attemptId || "",
     contactId: item.contactId || "",
     list: item.list || fallbackList || "",
@@ -1281,6 +1324,10 @@ function mapCampaignReportRow(item, fallbackList = "") {
     startedAt: item.startedAt || "",
     answeredAt: item.answeredAt || "",
     endedAt: item.endedAt || "",
+    waitingSeconds: Number(item.waitingSeconds ?? (item.startedAt && (item.answeredAt || item.endedAt)
+      ? Math.max(0, Math.round((Date.parse(item.answeredAt || item.endedAt) - Date.parse(item.startedAt)) / 1000)) : 0)),
+    totalSeconds: Number(item.totalSeconds ?? (item.startedAt && item.endedAt
+      ? Math.max(0, Math.round((Date.parse(item.endedAt) - Date.parse(item.startedAt)) / 1000)) : 0)),
     durationSeconds: Number(item.durationSeconds || 0),
     technicalResult: item.technicalResult || "",
     disposition: item.disposition || ""
@@ -1293,6 +1340,73 @@ function reportWorkerKey(row) {
 
 function reportWorkerLabel(row) {
   return String(row?.workerName || row?.worker || row?.workerId || "Sin equipo").trim() || "Sin equipo";
+}
+
+
+function reportDateKey(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date(value));
+}
+
+function getUnifiedReportRows() {
+  const rows = new Map();
+  for (const row of [...(reportCacheSession === sessionCode ? reportRowsCache : []), ...getCampaignReportRows()]) {
+    const key = row.attemptId || [row.contactId, row.phone, row.workerId, row.attemptNumber, row.startedAt].join("|");
+    const previous = rows.get(key);
+    rows.set(key, { ...previous, ...row,
+      shiftId: row.shiftId || previous?.shiftId || "",
+      shiftLabel: row.shiftLabel || previous?.shiftLabel || ""
+    });
+  }
+  return [...rows.values()].sort((a, b) => (Date.parse(a.startedAt) || 0) - (Date.parse(b.startedAt) || 0));
+}
+
+function getVisibleReportRows() {
+  const query = String(refs.campaignReportFilterEl?.value || "").trim().toLocaleLowerCase("es");
+  return getUnifiedReportRows().filter(row =>
+    isInReportPeriod(row.reportDate, reportPeriod) &&
+    (!reportShiftId || row.shiftId === reportShiftId) &&
+    (!reportListFilter || String(row.list || "") === reportListFilter) &&
+    (!reportWorkerFilter || reportWorkerKey(row) === reportWorkerFilter) &&
+    (!reportResultFilter || String(row.disposition || row.technicalResult || "") === reportResultFilter) &&
+    (!query || [row.name, row.phone, row.list, row.worker,
+      reportResultLabel(row.technicalResult), reportResultLabel(row.disposition)]
+      .some(value => String(value || "").toLocaleLowerCase("es").includes(query))));
+}
+
+async function loadUnifiedReportRows() {
+  const status = document.getElementById("reportsLoadStatus");
+  if (!sessionCode || !dashboardToken) {
+    if (status) status.textContent = "Conecta una sesión para consultar el historial.";
+    return false;
+  }
+  const code = sessionCode;
+  const request = ++reportRequestSerial;
+  if (reportCacheSession !== code) {
+    reportRowsCache = [];
+    reportCacheSession = code;
+  }
+  if (status) status.textContent = "Cargando historial…";
+  try {
+    const response = await fetch(API_BASE + "/api/session/" + encodeURIComponent(code) + "/reports/attempts", {
+      headers: { "X-Dashboard-Token": dashboardToken }
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo cargar el historial");
+    if (sessionCode !== code || request !== reportRequestSerial) return false;
+    reportRowsCache = (data.rows || []).map(item => mapCampaignReportRow(item));
+    if (status) status.textContent = "";
+    renderCampaignReport();
+    document.dispatchEvent(new CustomEvent("reports:data", { detail: { rows: getUnifiedReportRows() } }));
+    return true;
+  } catch (error) {
+    if (sessionCode === code && request === reportRequestSerial && status) {
+      status.textContent = "No se pudo cargar el historial completo. Vuelve a abrir Reportes para reintentar.";
+    }
+    return false;
+  }
 }
 
 function getCampaignReportRows() {
@@ -1360,7 +1474,11 @@ function formatReportDate(value) {
 
 function reportResultLabel(value) {
   const labels = {
-    contesto: "Contestó",
+    buzon_de_voz: "Buzón de voz",
+    sin_servicio: "Sin servicio",
+    numero_llamado_anteriormente: "Número llamado anteriormente",
+    no_disponible: "No disponible",
+    contesto: "Conectada",
     sin_respuesta: "Sin respuesta",
     no_contactado: "No contactado",
     reintentar: "Reintentar",
@@ -1381,13 +1499,58 @@ function reportResultClass(value) {
 function renderCampaignReport() {
   if (!refs.campaignReportBodyEl) return;
   const query = String(refs.campaignReportFilterEl?.value || "").trim().toLocaleLowerCase("es");
-  const rows = getCampaignReportRows().filter((item) => !query ||
-    [item.name, item.phone, item.list, item.worker, reportResultLabel(item.technicalResult), reportResultLabel(item.disposition)]
-      .some((value) => String(value || "").toLocaleLowerCase("es").includes(query)));
+  const shiftSelect = document.getElementById("reportShiftFilter");
+  const periodRows = getUnifiedReportRows().filter(row => isInReportPeriod(row.reportDate, reportPeriod));
+  const shifts = new Map(periodRows
+    .filter(row => row.shiftId)
+    .map(row => [row.shiftId, row.shiftLabel || "Turno"]));
+  if (reportShiftId && !shifts.has(reportShiftId)) reportShiftId = "";
+  if (shiftSelect) {
+    const options = '<option value="">Todos los turnos</option>' + [...shifts].map(([id, label]) =>
+      '<option value="' + escHtml(id) + '">' + escHtml(label) + '</option>').join("");
+    if (shiftSelect.innerHTML !== options) shiftSelect.innerHTML = options;
+    shiftSelect.value = reportShiftId;
+  }
+  const fillSelect = (id, allLabel, values, current) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const options = '<option value="">' + allLabel + '</option>' + [...values].sort((a, b) => a.localeCompare(b, "es")).map(value =>
+      '<option value="' + escHtml(value) + '">' + escHtml(value) + '</option>').join("");
+    if (select.innerHTML !== options) select.innerHTML = options;
+    select.value = current;
+  };
+  const lists = new Set(periodRows.map(row => String(row.list || "").trim()).filter(Boolean));
+  if (reportListFilter && !lists.has(reportListFilter)) reportListFilter = "";
+  fillSelect("reportListFilter", "Todas las listas", lists, reportListFilter);
+  const workers = new Set(periodRows.map(row => reportWorkerKey(row)).filter(key => key !== "Sin equipo"));
+  if (reportWorkerFilter && !workers.has(reportWorkerFilter)) reportWorkerFilter = "";
+  fillSelect("reportWorkerFilter", "Todos los equipos", workers, reportWorkerFilter);
+  const results = new Map();
+  for (const row of periodRows) {
+    const value = String(row.disposition || row.technicalResult || "").trim();
+    if (value) results.set(value, reportResultLabel(value));
+  }
+  if (reportResultFilter && !results.has(reportResultFilter)) reportResultFilter = "";
+  const resultSelect = document.getElementById("reportResultFilter");
+  if (resultSelect) {
+    const options = '<option value="">Todos los resultados</option>' + [...results].map(([value, label]) =>
+      '<option value="' + escHtml(value) + '">' + escHtml(label) + '</option>').join("");
+    if (resultSelect.innerHTML !== options) resultSelect.innerHTML = options;
+    resultSelect.value = reportResultFilter;
+  }
+  const rows = getVisibleReportRows();
+  if (refs.campaignReportBtn) refs.campaignReportBtn.disabled = !rows.length;
   if (refs.campaignReportCountEl) {
     refs.campaignReportCountEl.textContent = `${rows.length} ${rows.length === 1 ? "registro" : "registros"}`;
   }
-  if (refs.campaignReportEmptyEl) refs.campaignReportEmptyEl.style.display = rows.length ? "none" : "block";
+  if (refs.campaignReportEmptyEl) {
+    refs.campaignReportEmptyEl.style.display = rows.length ? "none" : "block";
+    refs.campaignReportEmptyEl.textContent = query
+      ? "No hay llamadas que coincidan con tu búsqueda."
+      : reportPeriod.from || reportShiftId || reportListFilter || reportWorkerFilter || reportResultFilter ? "No hay llamadas con estos filtros. Prueba otras fechas, turnos o listas." : "Todavía no hay llamadas registradas.";
+  }
+  const reportTable = document.getElementById("campaignReportTableWrap");
+  if (reportTable) reportTable.hidden = !rows.length;
   refs.campaignReportBodyEl.innerHTML = [...rows].reverse().map((item) => `
     <tr class="campaign-report-row ${reportResultClass(item.disposition || item.technicalResult)}">
       <td>${escHtml(item.list || "—")}</td>
@@ -1398,7 +1561,9 @@ function renderCampaignReport() {
       <td>${escHtml(formatReportDate(item.startedAt))}</td>
       <td>${escHtml(formatReportDate(item.answeredAt))}</td>
       <td>${escHtml(formatReportDate(item.endedAt))}</td>
+      <td>${escHtml(formatCallDuration(item.waitingSeconds))}</td>
       <td>${escHtml(formatCallDuration(item.durationSeconds))}</td>
+      <td>${escHtml(formatCallDuration(item.totalSeconds))}</td>
       <td><span class="campaign-report-result technical ${reportResultClass(item.technicalResult)}">${escHtml(reportResultLabel(item.technicalResult))}</span></td>
       <td><span class="campaign-report-result commercial ${reportResultClass(item.disposition)}">${escHtml(reportResultLabel(item.disposition))}</span></td>
       <td><button type="button" class="secondary" data-report-attempt="${escHtml(item.attemptId)}">Volver a llamar</button></td>
@@ -1659,11 +1824,30 @@ function requestAutomaticSession() {
 
 // ── EVENT BINDING ────────────────────────────────────────────────────
 function bindEvents() {
+  document.addEventListener("reports:open", loadUnifiedReportRows);
+  document.addEventListener("reports:filter", event => {
+    const nextPeriod = { from: event.detail?.from || "", to: event.detail?.to || "" };
+    if (validateReportPeriod(nextPeriod.from, nextPeriod.to)) return;
+    reportPeriod = nextPeriod;
+    reportShiftId = "";
+    reportListFilter = "";
+    reportWorkerFilter = "";
+    reportResultFilter = "";
+    renderCampaignReport();
+  });
+  const shiftSelect = document.getElementById("reportShiftFilter");
+  if (shiftSelect) shiftSelect.onchange = () => { reportShiftId = shiftSelect.value; renderCampaignReport(); };
+  const listSelect = document.getElementById("reportListFilter");
+  if (listSelect) listSelect.onchange = () => { reportListFilter = listSelect.value; renderCampaignReport(); };
+  const workerSelect = document.getElementById("reportWorkerFilter");
+  if (workerSelect) workerSelect.onchange = () => { reportWorkerFilter = workerSelect.value; renderCampaignReport(); };
+  const resultSelect = document.getElementById("reportResultFilter");
+  if (resultSelect) resultSelect.onchange = () => { reportResultFilter = resultSelect.value; renderCampaignReport(); };
   if (refs.campaignReportFilterEl) refs.campaignReportFilterEl.oninput = renderCampaignReport;
   if (refs.campaignReportBodyEl) refs.campaignReportBodyEl.onclick = async (event) => {
     const button = event.target.closest("button[data-report-attempt]");
     if (!button || button.disabled) return;
-    const row = getCampaignReportRows().find((item) => item.attemptId === button.dataset.reportAttempt);
+    const row = getUnifiedReportRows().find((item) => item.attemptId === button.dataset.reportAttempt);
     if (!row) return;
     const slot = getPairingListAssignmentByName(row.list)?.slot;
     const workerId = slot?.deviceId || row.workerId;
@@ -1862,10 +2046,6 @@ function bindEvents() {
     refs.agentDisableBtn.title = "Agente de voz desactivado temporalmente";
   }
   
-  if (refs.testBotAudioBtn) refs.testBotAudioBtn.onclick = () => socket.emit("test:bot_audio");
-
-
-
   // History
   if (refs.openHistoryBtn) refs.openHistoryBtn.onclick = openHistory;
   if (refs.historyCloseBtn) refs.historyCloseBtn.onclick = () => { refs.historyModalEl.style.display = "none"; };
@@ -1876,18 +2056,9 @@ function bindEvents() {
 
   loadHistory();
   
-  // Visual feedback for bot audio activity
-  AudioBridge.setOnAudioActivity((active) => {
-    if (refs.testBotAudioBtn) {
-      refs.testBotAudioBtn.style.boxShadow = active ? "0 0 15px var(--accent)" : "none";
-      refs.testBotAudioBtn.style.transform = active ? "scale(1.05)" : "scale(1)";
-    }
-  });
-  
   
   // Missing button handlers
   if (refs.exportWordBtn) refs.exportWordBtn.onclick = exportContactsToWord;
-  if (refs.openQuotationBtn) refs.openQuotationBtn.onclick = openQuotationModal;
   if (refs.deleteAllContactsBtn) {
     refs.deleteAllContactsBtn.onclick = async () => {
       if (!await requestConfirmation({ title: "Eliminar todos los contactos", message: "Se eliminarán todos los contactos y todas las listas. Esta acción no se puede deshacer.", confirmLabel: "Eliminar todo" })) return;
@@ -1903,83 +2074,11 @@ function bindEvents() {
   }
   if (refs.connectWhatsAppBtn) refs.connectWhatsAppBtn.onclick = WhatsApp.openWhatsAppConnectModal;
   
-  // Quotation modal handlers
-  if (refs.quotationCloseBtn) refs.quotationCloseBtn.onclick = () => {
-    if (refs.quotationModalEl) refs.quotationModalEl.style.display = "none";
-  };
-  if (refs.quotationPreviewBtn) refs.quotationPreviewBtn.onclick = Quotation.previewQuotationHtml;
-  if (refs.quotationDownloadBtn) refs.quotationDownloadBtn.onclick = Quotation.downloadQuotationPdf;
-  if (refs.quotationPreviewCloseBtn) refs.quotationPreviewCloseBtn.onclick = () => {
-    if (refs.quotationPreviewModalEl) refs.quotationPreviewModalEl.style.display = "none";
-  };
-  if (refs.quotationPreviewDownloadBtn) refs.quotationPreviewDownloadBtn.onclick = Quotation.downloadQuotationPdf;
-  
   // WhatsApp modal handlers
   if (refs.whatsappCloseBtn) refs.whatsappCloseBtn.onclick = WhatsApp.closeWhatsAppModal;
   if (refs.whatsappSendBtn) refs.whatsappSendBtn.onclick = WhatsApp.sendWhatsAppMessage;
   if (refs.whatsappLogoutBtn) refs.whatsappLogoutBtn.onclick = WhatsApp.logoutWhatsAppAccount;
   if (refs.whatsappTemplateSaveBtn) refs.whatsappTemplateSaveBtn.onclick = WhatsApp.saveNewWhatsAppPresetMessage;
-  
-  // Quotation form handlers
-  if (refs.quotationAddItemBtn) refs.quotationAddItemBtn.onclick = () => {
-    Quotation.quotationItems.push({ 
-      id: makeId(), 
-      service: "", 
-      customMode: false, 
-      quantity: 1, 
-      price: 0, 
-      image: "" 
-    });
-    Quotation.renderQuotationItems();
-  };
-  
-  // Quotation item change handlers
-  if (refs.quotationItemsBodyEl) {
-    refs.quotationItemsBodyEl.onclick = (e) => {
-      const target = e.target;
-      const field = target.dataset.qField;
-      const id = target.dataset.qId;
-      const action = target.dataset.qAction;
-      
-      if (!id) return;
-      
-      const item = Quotation.quotationItems.find(item => item.id === id);
-      if (!item) return;
-      
-      if (action === "remove") {
-        Quotation.quotationItems = Quotation.quotationItems.filter(i => i.id !== id);
-        Quotation.renderQuotationItems();
-        Quotation.recalcQuotationTotals();
-        return;
-      }
-      
-      if (field === "service_select") {
-        item.service = target.value;
-        item.customMode = target.value === "__other__";
-        Quotation.renderQuotationItems();
-      } else if (field === "service_custom") {
-        item.service = target.value;
-      } else if (field === "quantity") {
-        item.quantity = Number(target.value) || 1;
-      } else if (field === "price") {
-        item.price = Number(target.value) || 0;
-      } else if (field === "image") {
-        item.image = target.value;
-      }
-      
-      Quotation.recalcQuotationTotals();
-    };
-    
-    refs.quotationItemsBodyEl.onchange = refs.quotationItemsBodyEl.onclick;
-  }
-  
-  // IGV checkbox handler
-  if (refs.quotationApplyIgvEl) {
-    refs.quotationApplyIgvEl.onchange = () => Quotation.recalcQuotationTotals();
-  }
-  
-  // Initialize quotation events
-  Quotation.bindQuotationEvents();
   
   // WhatsApp file drop zone handlers
   if (refs.whatsappDropZone) {
@@ -2089,14 +2188,6 @@ async function exportContactsToWord() {
   } catch (error) {
     console.error("Error exporting to Word:", error);
     setStatus("Error al exportar a Word.", true);
-  }
-}
-
-function openQuotationModal() {
-  Quotation.resetQuotationForm();
-  if (refs.quotationModalEl) {
-    refs.quotationModalEl.style.display = "grid";
-    setStatus("Modal de cotización abierto.", true);
   }
 }
 
@@ -2357,7 +2448,28 @@ function updatePairingHint(link) {
 }
 
 function updateSessionUi(st = {}) {
+  if (sessionCode && dashboardToken) {
+    const bookCode = sessionCode;
+    const bookToken = dashboardToken;
+    Contacts.connectDatabase(bookCode, async (method,body) => {
+      const response = await fetch(`${API_BASE}/api/session/${encodeURIComponent(bookCode)}/contact-book`, {
+        method, headers:{"Content-Type":"application/json","X-Dashboard-Token":bookToken},
+        ...(body ? {body:JSON.stringify(body)} : {})
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo guardar la base en MySQL.");
+      return data;
+    }).catch(() => {});
+  }
   latestSessionState = st || {};
+  const storageStatus = document.getElementById("storageStatus");
+  if (storageStatus) {
+    const pending = st.storage?.mode === "pending";
+    storageStatus.hidden = !pending;
+    storageStatus.textContent = pending
+      ? "Hay datos pendientes de guardar. No se iniciarán nuevas llamadas hasta recuperar el guardado."
+      : "";
+  }
   const dashboardConnected = Boolean(st?.connected?.dashboard ?? sessionCode);
 
   const phoneConnected = Boolean(st?.connected?.phone);
@@ -2441,8 +2553,9 @@ async function loadPairingData(code) {
         : "";
       const assignedList = activeWorkerList || listAssignmentBySlotId.get(slot.id)?.listName || "";
       const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
+      const connected = Boolean(worker?.connected);
       const callState = String(worker?.callState || "idle");
-      const calling = Boolean(worker && ["dialing", "ringing", "in_call"].includes(callState));
+      const calling = Boolean(connected && ["dialing", "ringing", "in_call"].includes(callState));
       const ringing = ["dialing", "ringing"].includes(callState);
       const answered = callState === "in_call";
       const ended = Boolean(worker && ["ended", "failed"].includes(callState));
@@ -2460,7 +2573,7 @@ async function loadPairingData(code) {
         <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}">
           <div class="pairing-slot-top">
             <strong>${slotDisplayLabel}</strong>
-            <span class="pairing-slot-state">${assigned ? (slot.connected ? "Conectado" : "Vinculado") : "Disponible"}</span>
+            <span class="pairing-slot-state">${assigned ? (connected ? "Conectado" : "Desconectado") : "Disponible"}</span>
           </div>
           ${qrUrl
             ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
@@ -2480,11 +2593,11 @@ async function loadPairingData(code) {
             <small class="pairing-call-company">${calling || ended ? escHtml(worker.companyName || "Empresa") : heldContact ? escHtml(heldContact.name || "Empresa") : ""}</small>
           </div>
           <div class="pairing-slot-call-actions">
-            <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${assigned && assignedList && !calling ? "" : "disabled"}>▶ Iniciar</button>
+            <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${connected && assignedList && !calling ? "" : "disabled"}>▶ Iniciar</button>
             <button type="button" class="pairing-slot-stop" data-stop-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>■ Detener</button>
             <button type="button" class="pairing-slot-hangup" data-hangup-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>☎ Colgar</button>
           </div>
-          <button type="button" class="pairing-slot-skip-list" data-skip-list-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" data-current-list="${escHtml(assignedList)}" ${assigned && assignedList ? "" : "disabled"}>SALTAR LISTA</button>
+          <button type="button" class="pairing-slot-skip-list" data-skip-list-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" data-current-list="${escHtml(assignedList)}" ${connected && assignedList ? "" : "disabled"}>SALTAR LISTA</button>
           ${assigned ? `<button type="button" class="pairing-slot-disconnect" data-disconnect-pairing-slot="${escHtml(slot.id)}" data-worker-id="${escHtml(slot.deviceId || "")}" data-worker-name="${escHtml(slot.deviceName || "Teléfono vinculado")}">Desvincular teléfono</button>` : ""}
           ${assigned ? "" : `<button type="button" class="pairing-slot-delete" data-delete-pairing-slot="${escHtml(slot.id)}" data-slot-label="${slotDisplayLabel}">Eliminar QR</button>`}
         </article>`;
@@ -2570,7 +2683,6 @@ function renderAssignedListsPanel() {
           </div>
           <div class="assigned-list-head-actions">
             <strong class="assigned-list-status ${finished ? "finished" : ""}">${finished ? "Lista terminada" : `${contacts.length} contactos`}</strong>
-            <button type="button" class="assigned-list-download" data-download-assigned-list="${escHtml(listName)}">⬇ Descargar reporte</button>
             ${finished && listName !== "Principal" ? `<button type="button" class="assigned-list-delete" data-delete-assigned-list="${escHtml(listName)}">Eliminar registro</button>` : ""}
           </div>
         </div>
@@ -2662,7 +2774,7 @@ function buildAssignedListPdf(listName, rows) {
     y -= 25;
   };
 
-  const answeredRows = rows.filter((row) => Boolean(row.answeredAt || row.technicalResult === "contesto"));
+  const answeredRows = rows.filter((row) => Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto")));
   const totalSeconds = rows.reduce((total, row) => total + Number(row.durationSeconds || 0), 0);
   const equipmentCounts = new Map();
   rows.forEach((row) => {
@@ -2720,7 +2832,7 @@ function buildAssignedListPdf(listName, rows) {
         y -= 24;
         tableHeader();
       }
-      const answered = Boolean(row.answeredAt || row.technicalResult === "contesto");
+      const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
       const values = [
         index + 1,
         pdfClipText(row.name || "Sin nombre", 25),
@@ -2830,8 +2942,10 @@ function reportTimeBand(startedAt, shiftType = "") {
 }
 
 function reportResult(row) {
-  const answered = Boolean(row.answeredAt || row.technicalResult === "contesto");
-  if (answered && Number(row.durationSeconds || 0) < 5) return "BUZON DE VOZ / SIN INTERES";
+  const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
+  if (row.technicalResult === "buzon_de_voz") return "BUZON DE VOZ";
+  if (row.technicalResult === "sin_servicio") return "SIN SERVICIO";
+  if (row.technicalResult === "no_disponible") return "NO DISPONIBLE";
   return answered ? "CONTESTO" : "NO CONTESTO";
 }
 
@@ -3019,7 +3133,7 @@ async function legacyBuildCallReportPdf(listName, sourceRows) {
     { label: "CONTESTO", width: 52 },
     { label: "DURACION", width: 54 }
   ];
-  const answeredRows = rows.filter((row) => Boolean(row.answeredAt || row.technicalResult === "contesto"));
+  const answeredRows = rows.filter((row) => Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto")));
   const totalSeconds = rows.reduce((total, row) => total + Number(row.durationSeconds || 0), 0);
   const equipmentCounts = new Map();
   rows.forEach((row) => {
@@ -3166,7 +3280,7 @@ async function legacyBuildCallReportPdf(listName, sourceRows) {
         documentPdf.setFillColor("#f6eef8");
         documentPdf.rect(margin, y, tableWidth, 24, "F");
       }
-      const answered = Boolean(row.answeredAt || row.technicalResult === "contesto");
+      const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
       const values = [
         String(index + 1),
         clip(currentList, 13),
@@ -3234,13 +3348,19 @@ async function deletePairingQr(slotId) {
 
 async function loadApkInfo() {
   try {
-    const res = await fetch(`${API_BASE}/api/apk/info`);
+    const res = await fetch(`${API_BASE}/api/apk/info`, { cache: "no-store" });
     const info = await res.json();
     if (info.ok) {
-      refs.apkNameEl.textContent = info.name;
+      refs.apkNameEl.textContent = "VOIP VC Android";
       const sizeMb = Number(info.size || 0) / (1024 * 1024);
-      refs.apkMetaEl.textContent = `${info.version || info.type || "APK"} · ${sizeMb.toFixed(1)} MB`;
-      refs.apkDlBtn.href = `${API_BASE}/api/apk/download`;
+      const modified = new Date(info.modified);
+      const buildDate = Number.isNaN(modified.getTime()) ? "" : new Intl.DateTimeFormat("es-PE", {
+        timeZone: "America/Lima", day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: false
+      }).format(modified);
+      refs.apkMetaEl.textContent = `${sizeMb.toFixed(1)} MB${buildDate ? ` · Compilación ${buildDate} (Lima)` : ""}`;
+      refs.apkDlBtn.href = `${API_BASE}/api/apk/download?build=${encodeURIComponent(info.modified || "")}`;
+      refs.apkDlBtn.title = `Descargar ${info.name}`;
       return;
     }
     refs.apkMetaEl.textContent = "APK no disponible";
@@ -3250,6 +3370,7 @@ async function loadApkInfo() {
 }
 
 // ── SOCKET HANDLERS ──────────────────────────────────────────────────
+socket.on("call:error", ({message}) => setStatus(message || "No se permite llamar a este número.", true));
 socket.on("state:changed", st => {
   updateSessionUi(st);
   renderShiftManagement();
@@ -3388,12 +3509,11 @@ socket.on("phone:command_ack", ({ commandId, action, ok, message }) => {
 /* ── HISTORY LOGIC ────────────────────────────────────── */
 let callHistory = [];
 function loadHistory() {
-  try { callHistory = JSON.parse(localStorage.getItem("voip.callHistory") || "[]"); }
-  catch { callHistory = []; }
+  callHistory = Contacts.getPreference("recentCalls", []);
 }
 
 function saveHistory() {
-  localStorage.setItem("voip.callHistory", JSON.stringify(callHistory));
+  Contacts.setPreference("recentCalls", callHistory);
 }
 
 function addHistoryEntry(phone, duration) {

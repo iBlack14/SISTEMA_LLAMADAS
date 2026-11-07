@@ -1,6 +1,8 @@
 .idea/
-.local-test/
-local-test.env
+.env
+server/backups/
+server/sessions.json
+server/*.call-history.json
 
 **/build/
 **/.gradle/

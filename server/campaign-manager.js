@@ -2,6 +2,9 @@ import { nanoid } from "nanoid";
 
 const ACTIVE_STATES = new Set(["dialing", "ringing", "in_call"]);
 const ALLOWED_RESULTS = new Set([
+  "buzon_de_voz",
+  "sin_servicio",
+  "no_disponible",
   "contesto",
   "interesado",
   "no_interesado",
@@ -580,6 +583,14 @@ export function updateActiveCallState(session, state, worker = {}, extras = {}) 
   const normalizedState = String(state || "").trim();
   const reportedAttemptId = String(extras.callId || extras.attemptId || "").trim();
   if (reportedAttemptId && attempt?.id && reportedAttemptId !== attempt.id) return null;
+  // Classification alone never releases a worker: wait for physical terminal state.
+  const announcement = extras.detectedAnnouncement || (extras.detectedVoicemail === true ? "buzon_de_voz" : "");
+  const operatorResults = new Set(["buzon_de_voz", "sin_servicio", "no_disponible"]);
+  if (attempt && operatorResults.has(announcement) && reportedAttemptId === attempt.id &&
+      String(extras.contactId || "") === contact.id) {
+    attempt.technicalResult = announcement;
+    contact.technicalResult = announcement;
+  }
 
   if (normalizedState === "dialing" || normalizedState === "ringing" || normalizedState === "in_call") {
     contact.status = normalizedState;
@@ -600,7 +611,13 @@ export function updateActiveCallState(session, state, worker = {}, extras = {}) 
     if (attempt) {
       attempt.endedAt = endedAt;
       attempt.lastError = String(extras.lastError || "").trim();
-      if (attempt.answeredAt) {
+      if (operatorResults.has(attempt.technicalResult)) {
+        attempt.durationSeconds = attempt.answeredAt
+          ? Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(attempt.answeredAt)) / 1000)) : 0;
+        contact.status = "completed";
+        contact.result = attempt.technicalResult;
+        contact.technicalResult = attempt.technicalResult;
+      } else if (attempt.answeredAt) {
         attempt.durationSeconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(attempt.answeredAt)) / 1000));
         attempt.technicalResult = "contesto";
         contact.status = "completed";

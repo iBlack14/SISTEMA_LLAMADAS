@@ -1,169 +1,302 @@
-import fs from 'fs/promises';
-import path from 'path';
-import mysql from 'mysql2/promise';
+import fs from "node:fs/promises";
+import path from "node:path";
+import mysql from "mysql2/promise";
+import { collectCallAttempts, mergeAttempt, HISTORY_SCHEMA, writeCallAttempts } from "./call-history.js";
 
-/**
- * Hybrid persistent storage: MySQL (cPanel) if configured,
- * falling back to local JSON if DB is down or unconfigured.
- */
+const parseJson = value => typeof value === "string" ? JSON.parse(value) : value;
+const keyOf = (code, row) => JSON.stringify([code, row.attemptId]);
+
+/** Session compatibility plus an independent, durable and replayable attempt ledger. */
 export class SessionPersistence {
-  constructor(filePath) {
-    this.filePath = filePath;
+  constructor(filePath = "server/sessions.json", { env = process.env, poolFactory = mysql.createPool, databaseOnly = true } = {}) {
+    this.databaseOnly = databaseOnly;
+    this.filePath = path.resolve(filePath);
+    this.historyPath = this.filePath + ".call-history.json";
+    this.backupDir = path.resolve(env.CALL_BACKUP_DIR || path.join(path.dirname(this.filePath), "backups"));
+    this.env = env;
+    this.poolFactory = poolFactory;
+    this.databaseConfigured = Boolean(env.DB_HOST && env.DB_USER && env.DB_NAME);
     this.pool = null;
     this.usingDb = false;
+    this.schemaReady = false;
+    this.pendingDatabase = false;
     this.saveChain = Promise.resolve();
+    this.records = new Map();
+    this.dirty = new Set();
+    this.lastSnapshot = {};
+    this.lastError = "";
+    this.storageFailed = false;
+  }
+
+  status() {
+    return {
+      mode: this.storageFailed ? "pending" : !this.databaseConfigured ? (this.databaseOnly ? "pending" : "local") : this.usingDb && !this.pendingDatabase ? "mysql" : "pending",
+      databaseConfigured: this.databaseConfigured,
+      pendingDatabase: this.pendingDatabase,
+      attempts: this.records.size,
+      lastError: this.lastError
+    };
+  }
+
+  async atomicJson(file, data) {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const temporary = file + "." + process.pid + ".tmp";
+    try {
+      const handle = await fs.open(temporary, "w", 0o600);
+      try { await handle.writeFile(JSON.stringify(data)); await handle.sync(); }
+      finally { await handle.close(); }
+      await fs.rename(temporary, file);
+      if (process.platform !== "win32") {
+        const directory = await fs.open(path.dirname(file), "r");
+        try { await directory.sync(); } finally { await directory.close(); }
+      }
+    } catch (error) {
+      await fs.unlink(temporary).catch(() => {});
+      throw error;
+    }
+  }
+
+  async readJson(file, fallback) {
+    try { return JSON.parse(await fs.readFile(file, "utf8")); }
+    catch (error) { if (error.code === "ENOENT") return fallback; throw error; }
+  }
+
+  remember(code, incoming, dirty = true) {
+    const key = keyOf(code, incoming);
+    const previous = this.records.get(key);
+    const row = mergeAttempt(previous?.row, incoming);
+    if (JSON.stringify(previous?.row) !== JSON.stringify(row)) {
+      this.records.set(key, { code, row });
+      if (dirty) this.dirty.add(key);
+    }
   }
 
   async initDb() {
-    if (this.pool) return;
-    
-    const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-    if (!DB_HOST || !DB_USER || !DB_NAME) {
-      console.log("[PERSISTENCE] No DB config found in .env, falling back to local JSON.");
-      return;
-    }
-
+    if (!this.databaseConfigured) return false;
     try {
-      this.pool = mysql.createPool({
-        host: DB_HOST,
-        user: DB_USER,
-        password: DB_PASSWORD,
-        database: DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
+      if (!this.pool) this.pool = this.poolFactory({
+        host: this.env.DB_HOST, port: Number(this.env.DB_PORT || 3306),
+        user: this.env.DB_USER, password: this.env.DB_PASSWORD, database: this.env.DB_NAME,
+        waitForConnections: true, connectionLimit: 10, queueLimit: 0,
+        connectTimeout: 10000, timezone: "Z",
+        ...(this.env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: true } } : {})
       });
-
-      // Asegurar que la tabla exista
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS sessions (
-          id VARCHAR(50) PRIMARY KEY,
-          data JSON NOT NULL,
+      await this.pool.query("SELECT 1");
+      if (!this.schemaReady) {
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS sessions (
+          id VARCHAR(50) PRIMARY KEY, data JSON NOT NULL,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `);
-      
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+        for (const ddl of HISTORY_SCHEMA) await this.pool.query(ddl);
+        this.schemaReady = true;
+      }
       this.usingDb = true;
-      console.log("[PERSISTENCE] Conectado exitosamente a la base de datos MySQL en cPanel.");
-    } catch (e) {
-      console.error("[PERSISTENCE] Error conectando a MySQL cPanel. Usando JSON local. Detalle:", e.message);
+      this.lastError = "";
+      return true;
+    } catch (error) {
       this.usingDb = false;
+      this.lastError = error.code || "DATABASE_UNAVAILABLE";
+      return false;
     }
   }
 
   async load() {
-    await this.initDb();
-    const sessions = new Map();
-
-    try {
-      if (this.usingDb) {
-        const [rows] = await this.pool.query("SELECT id, data FROM sessions");
-        if (rows.length === 0) {
-           // Si la DB está vacía, intentar migrar desde el JSON local (solo primera vez)
-           try {
-             const localData = await fs.readFile(this.filePath, 'utf8');
-             const parsed = JSON.parse(localData);
-             if (Object.keys(parsed).length > 0) {
-                console.log("[PERSISTENCE] Migrando sesiones locales a la Base de Datos...");
-                for (const [code, session] of Object.entries(parsed)) {
-                   await this.pool.query("INSERT IGNORE INTO sessions (id, data) VALUES (?, ?)", [code, JSON.stringify(session)]);
-                   rows.push({ id: code, data: session });
-                }
-             }
-           } catch(e) {} // Ignorar si no hay JSON
-        }
-        
-        for (const row of rows) {
-          sessions.set(row.id, this.cleanSessionOnLoad(typeof row.data === 'string' ? JSON.parse(row.data) : row.data));
-        }
-        return sessions;
-      }
-
-      // Fallback JSON
-      const data = await fs.readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(data);
-      for (const [code, session] of Object.entries(parsed)) {
-        sessions.set(code, this.cleanSessionOnLoad(session));
-      }
-      return sessions;
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        console.error('[PERSISTENCE] Error loading sessions:', error.message);
-      }
-      return new Map();
+    if (this.databaseOnly && !this.databaseConfigured) throw new Error("Configura DB_HOST, DB_NAME y DB_USER en .env. MySQL es obligatorio.");
+    const disk = this.databaseOnly ? null : await this.readJson(this.historyPath, null);
+    if (disk && (disk.version !== 1 || !Array.isArray(disk.records))) {
+      throw new Error("Formato de historial local no reconocido; no se sobrescribió.");
     }
+    const local = this.databaseOnly ? {} : disk?.sessions || await this.readJson(this.filePath, {});
+    this.pendingDatabase = this.databaseConfigured && Boolean(disk?.pendingDatabase);
+    for (const entry of disk?.records || []) this.remember(entry.code, entry.row, this.pendingDatabase);
+    let chosen = local;
+    if (await this.initDb()) {
+      try {
+        const [sessions] = await this.pool.query("SELECT id, data FROM sessions");
+        const [attempts] = await this.pool.query("SELECT session_code, row_data FROM vc_call_attempts");
+        const remote = Object.fromEntries(sessions.map(row => [row.id, parseJson(row.data)]));
+        // A pending local snapshot is an outbox and must be replayed, never discarded.
+        chosen = this.pendingDatabase ? { ...remote, ...local } : sessions.length ? remote : local;
+        for (const entry of attempts) {
+          const row = parseJson(entry.row_data);
+          const key = keyOf(entry.session_code, row);
+          if (this.pendingDatabase) {
+            const localRow = this.records.get(key)?.row;
+            this.remember(entry.session_code, row, false);
+            if (localRow) this.remember(entry.session_code, localRow);
+          } else this.remember(entry.session_code, row, false);
+          if (JSON.stringify(this.records.get(key)?.row) !== JSON.stringify(row)) this.dirty.add(key);
+        }
+        // Preserve pre-migration database contents before the first backfill.
+        if (!this.databaseOnly) await this.backup("before-migration", { version: 1, sessions: remote, records: attempts.map(entry => ({
+          code: entry.session_code, row: parseJson(entry.row_data)
+        })) });
+        // Backfill local records missing from MySQL (idempotent on the primary key).
+        const remoteKeys = new Set(attempts.map(entry => keyOf(entry.session_code, parseJson(entry.row_data))));
+        for (const key of this.records.keys()) if (!remoteKeys.has(key)) this.dirty.add(key);
+      } catch (error) {
+        this.usingDb = false;
+        this.lastError = error.code || "DATABASE_READ_FAILED";
+        this.pendingDatabase = true;
+        if (this.databaseOnly) throw error;
+      }
+    } else if (this.databaseConfigured) {
+      this.pendingDatabase = true;
+      if (this.databaseOnly) throw new Error("No se pudo conectar con MySQL: " + this.lastError);
+    }
+
+    this.lastSnapshot = chosen;
+    const result = new Map();
+    for (const [code, session] of Object.entries(chosen)) {
+      for (const row of collectCallAttempts(session)) this.remember(code, row);
+      if ([...this.records.values()].some(entry => entry.code === code)) session.hasCallHistory = true;
+      result.set(code, this.cleanSessionOnLoad(session));
+    }
+    return result;
   }
 
   cleanSessionOnLoad(session) {
-    // Reset socket IDs as they are invalid after restart
-    const phoneWorkers = Array.isArray(session.phoneWorkers)
-      ? session.phoneWorkers.map((worker) => ({
-          ...worker,
-          socketId: null,
-          connected: false,
-          callState: "idle"
-        }))
-      : [];
-
     return {
-      ...session,
-      dashboardSocketId: null,
-      phoneSocketId: null,
-      activePhoneSocketId: null,
-      phoneWorkers
+      ...session, dashboardSocketId: null, phoneSocketId: null, activePhoneSocketId: null,
+      phoneWorkers: (session.phoneWorkers || []).map(worker => ({
+        ...worker, socketId: null, connected: false, callState: "idle"
+      }))
     };
   }
 
   save(sessionsMap) {
-    this.saveChain = this.saveChain
-      .then(() => this.saveNow(sessionsMap))
-      .catch((error) => console.error('[PERSISTENCE] Error saving sessions:', error.message));
-    return this.saveChain;
+    // Capture immediately, before another reset/delete can mutate the live Map.
+    const snapshot = {};
+    for (const [code, session] of sessionsMap) {
+      if (collectCallAttempts(session).length) session.hasCallHistory = true;
+      const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...data } = session;
+      snapshot[code] = JSON.parse(JSON.stringify(data));
+    }
+    const operation = this.saveChain.then(() => this.saveNow(snapshot)).then(result => {
+      this.storageFailed = false;
+      this.lastError = "";
+      return result;
+    }, error => {
+      this.storageFailed = true;
+      this.lastError = error.code || "STORAGE_WRITE_FAILED";
+      throw error;
+    });
+    // A failed save rejects its caller, but cannot permanently poison future retries.
+    this.saveChain = operation.catch(() => {});
+    return operation;
   }
 
-  async saveNow(sessionsMap) {
-    try {
-      if (this.usingDb) {
-        // En MySQL, actualizamos los registros uno por uno (o en batch).
-        // Primero, sacamos los IDs vigentes para borrar los viejos si queremos, pero por seguridad solo haremos UPSERT.
-        const connection = await this.pool.getConnection();
-        try {
-          await connection.beginTransaction();
-          for (const [code, session] of sessionsMap.entries()) {
-             const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...persistentData } = session;
-             await connection.query(
-               "INSERT INTO sessions (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
-               [code, JSON.stringify(persistentData)]
-             );
-          }
-          await connection.commit();
-        } catch (err) {
-          await connection.rollback();
-          throw err;
-        } finally {
-          connection.release();
-        }
-        return;
-      }
-
-      // Fallback JSON
-      const plainObject = {};
-      for (const [code, session] of sessionsMap.entries()) {
-        const {
-          dashboardSocketId,
-          phoneSocketId,
-          activePhoneSocketId,
-          workerCursor,
-          ...persistentData
-        } = session;
-        plainObject[code] = persistentData;
-      }
-      await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-      const temporaryPath = `${this.filePath}.${Date.now()}.tmp`;
-      await fs.writeFile(temporaryPath, JSON.stringify(plainObject, null, 2), 'utf8');
-      await fs.rename(temporaryPath, this.filePath);
-    } catch (error) {
-      console.error('[PERSISTENCE] Error saving sessions:', error.message);
+  async saveNow(snapshot) {
+    for (const [code, session] of Object.entries(snapshot)) {
+      for (const row of collectCallAttempts(session)) this.remember(code, row);
     }
+    this.lastSnapshot = snapshot;
+    if (this.databaseConfigured) this.pendingDatabase = true;
+    if (this.databaseOnly && !this.databaseConfigured) throw new Error("MySQL es obligatorio; configura DB_HOST, DB_NAME y DB_USER.");
+    // Local files are used only by explicit legacy import and test fixtures.
+    if (!this.databaseOnly) {
+    await this.atomicJson(this.historyPath, {
+      version: 1, pendingDatabase: this.pendingDatabase, sessions: snapshot,
+      records: [...this.records.values()]
+    });
+    await this.atomicJson(this.filePath, snapshot);
+    }
+    if (!this.databaseConfigured) return { committed: true, mode: "local" };
+    if (!await this.initDb()) throw new Error("MySQL no disponible; guardado pendiente.");
+    const connection = await this.pool.getConnection();
+    const changed = [...this.dirty];
+    try {
+      await connection.beginTransaction();
+      for (const [code, data] of Object.entries(snapshot)) await connection.query(
+        "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
+        [code, JSON.stringify(data)]);
+      const bySession = new Map();
+      for (const key of changed) {
+        const entry = this.records.get(key);
+        if (!entry) continue;
+        if (!bySession.has(entry.code)) bySession.set(entry.code, []);
+        bySession.get(entry.code).push(entry.row);
+      }
+      for (const [code, rows] of bySession) await writeCallAttempts(connection, code, rows);
+      await connection.commit();
+      for (const key of changed) this.dirty.delete(key);
+      this.pendingDatabase = false;
+      this.usingDb = true;
+      this.lastError = "";
+      if (!this.databaseOnly) await this.atomicJson(this.historyPath, {
+        version: 1, pendingDatabase: false, sessions: snapshot, records: [...this.records.values()]
+      });
+      return { committed: true, mode: "mysql" };
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      this.usingDb = false;
+      this.pendingDatabase = true;
+      this.lastError = error.code || "DATABASE_WRITE_FAILED";
+      throw error;
+    } finally { connection.release(); }
+  }
+
+  hasFinishedAttempt(code, attemptId, contactId) {
+    const row = this.records.get(JSON.stringify([code, attemptId]))?.row;
+    return Boolean(row?.endedAt && row.contactId === contactId);
+  }
+
+  async getCallAttempts(code, { from = "", to = "", phone = "" } = {}) {
+    await this.saveChain;
+    if (this.storageFailed) throw new Error("Hay escrituras pendientes; no se puede confirmar el historial completo.");
+    if (this.databaseConfigured) {
+      if (!this.usingDb || this.pendingDatabase) {
+        throw new Error("MySQL tiene escrituras pendientes; no se puede confirmar el historial completo.");
+      }
+      const clauses = ["session_code=?"];
+      const values = [code];
+      if (from) { clauses.push("report_date>=?"); values.push(from); }
+      if (to) { clauses.push("report_date<=?"); values.push(to); }
+      if (phone) { clauses.push("phone=?"); values.push(phone); }
+      const [rows] = await this.pool.query(
+        "SELECT row_data FROM vc_call_attempts WHERE " + clauses.join(" AND ") + " ORDER BY started_at,attempt_id", values);
+      return rows.map(row => parseJson(row.row_data));
+    }
+    return [...this.records.values()].filter(entry => entry.code === code).map(entry => ({ ...entry.row }))
+      .filter(row => (!from || row.reportDate >= from) && (!to || row.reportDate <= to) && (!phone || row.phone === phone))
+      .sort((a,b) => (Date.parse(a.startedAt) || 0) - (Date.parse(b.startedAt) || 0));
+  }
+
+  async backup(label = "daily", payload = null) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const file = path.join(this.backupDir, "call-history-" + stamp + "-" + label + ".json");
+    await this.atomicJson(file, payload || {
+      version: 1, createdAt: new Date().toISOString(), pendingDatabase: this.pendingDatabase,
+      sessions: this.lastSnapshot, records: [...this.records.values()]
+    });
+    return file;
+  }
+
+  startBackups() {
+    const hours = Number(this.env.CALL_BACKUP_INTERVAL_HOURS ?? (this.databaseOnly ? 0 : 24));
+    if (hours <= 0) return;
+    this.backupTimer = setInterval(() => {
+      this.saveChain.then(() => this.backup()).catch(error =>
+        console.error("[BACKUP] No se pudo crear la copia:", error.code || "BACKUP_FAILED"));
+    }, hours * 60 * 60 * 1000);
+    this.backupTimer.unref();
+  }
+
+  async restoreBackup(file, sessionsMap) {
+    const backup = await this.readJson(file, null);
+    if (backup?.version !== 1 || !Array.isArray(backup.records) || !backup.sessions) {
+      throw new Error("La copia no tiene un formato válido.");
+    }
+    for (const entry of backup.records) this.remember(entry.code, entry.row);
+    for (const [code, session] of Object.entries(backup.sessions)) {
+      if (!sessionsMap.has(code)) sessionsMap.set(code, this.cleanSessionOnLoad(session));
+    }
+    return this.save(sessionsMap);
+  }
+
+  async close() {
+    clearInterval(this.backupTimer);
+    await this.saveChain;
+    if (this.pool) await this.pool.end();
   }
 }
