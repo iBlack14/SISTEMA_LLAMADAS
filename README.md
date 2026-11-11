@@ -41,7 +41,7 @@ npm start
 ```
 
 No se necesita compilar React ni ejecutar Vite. La migración se canceló por
-indicación del usuario; `frontend/` se conserva como referencia inactiva.
+indicación del usuario y se eliminó la carpeta `frontend/`.
 Los marcadores `/panel/*` redirigen al panel original. Se mantienen las API,
 MySQL, el historial y los bloqueos de llamadas. Los cambios recientes de la APK,
 incluida la descarga del modelo español, se conservan.
