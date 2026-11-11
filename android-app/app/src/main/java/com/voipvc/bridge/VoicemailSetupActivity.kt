@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.telecom.TelecomManager
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -24,6 +25,7 @@ import com.google.android.material.button.MaterialButton
 class VoicemailSetupActivity : AppCompatActivity() {
     companion object { const val EXTRA_REQUEST_AUTHORIZATION = "request_voicemail_authorization" }
     private lateinit var statusText: TextView
+    private lateinit var installButton: MaterialButton
     private val handler = Handler(Looper.getMainLooper())
     private var pendingEnable = false
     private var initialRequestHandled = false
@@ -36,8 +38,15 @@ class VoicemailSetupActivity : AppCompatActivity() {
                 guidanceMessage = ""
                 VoicemailDetector.enable()
             }
+            val missingModel = VoicemailModelInstaller.findModel(this@VoicemailSetupActivity) == null
+            installButton.visibility = if (missingModel || VoicemailModelInstaller.installing) View.VISIBLE else View.GONE
+            installButton.isEnabled = !VoicemailModelInstaller.installing
+            installButton.text = if (VoicemailModelInstaller.installing) "Instalando español…" else "Descargar modelo de español (39 MB)"
             statusText.text = guidanceMessage.ifBlank {
-                VoicemailDetector.authorizationIssue() ?: VoicemailDetector.status
+                VoicemailModelInstaller.message.ifBlank {
+                    if (missingModel) "Falta el modelo de español. Descárgalo con el botón de abajo; después funcionará sin internet."
+                    else VoicemailDetector.authorizationIssue() ?: VoicemailDetector.status
+                }
             } + if (VoicemailDetector.lastMatch.isNotBlank())
                 "\n\nÚltima locución detectada:\n" + VoicemailDetector.lastMatch else ""
             handler.postDelayed(this, 1000)
@@ -95,8 +104,8 @@ class VoicemailSetupActivity : AppCompatActivity() {
         column.addView(text("Para autorizar: inicia Shizuku y permite el acceso a VOIP VC. Si ya rechazaste el permiso, abre Shizuku y entra en Aplicaciones autorizadas.", 14f).apply {
             setPadding(0, dp(16), 0, dp(8))
         })
-        fun button(label: String, primary: Boolean = false, action: () -> Unit) {
-            column.addView(MaterialButton(this).apply {
+        fun button(label: String, primary: Boolean = false, action: () -> Unit): MaterialButton {
+            val control = MaterialButton(this).apply {
                 this.text = label
                 isAllCaps = false
                 textSize = 16f
@@ -106,9 +115,15 @@ class VoicemailSetupActivity : AppCompatActivity() {
                 strokeWidth = if (primary) 0 else dp(1)
                 strokeColor = ColorStateList.valueOf(color(R.color.vc_border))
                 setOnClickListener { action() }
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            }
+            column.addView(control, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 topMargin = dp(8)
             })
+            return control
+        }
+        installButton = button("Descargar modelo de español (39 MB)", true) {
+            guidanceMessage = ""
+            VoicemailModelInstaller.install(this)
         }
         button("Autorizar y activar detección", true) { requestActivation() }
         button("Abrir Shizuku") { pendingEnable = true; openShizuku() }

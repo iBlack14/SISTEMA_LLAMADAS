@@ -1,4 +1,12 @@
-# Migración completa de las dos vistas
+# Migración React cancelada
+
+Por indicación del usuario se restauró la interfaz HTML/CSS anterior en el panel,
+Núcleo de Red y login. El arranque ya no depende de frontend/dist ni de Vite.
+Se conservan MySQL, las reglas de llamadas y las mejoras recientes de la APK,
+incluida la descarga del modelo de español. Los archivos frontend/ quedan como
+referencia inactiva. El plan siguiente es histórico y no describe la web activa.
+
+## Plan histórico de las dos vistas
 
 ## Objetivo y límites
 Migrar la interfaz a React + TypeScript + Vite, manteniendo Express, Socket.IO,

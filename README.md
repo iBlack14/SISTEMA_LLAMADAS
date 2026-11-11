@@ -29,30 +29,22 @@ el perfil XAMPP de esta fase es solo para uso local.
 
 Este proyecto crea un **esqueleto funcional** para conectar un dashboard web con un cliente movil usando tiempo real (Socket.IO).
 
-## Migración gradual del panel a React
+## Interfaz web original
 
-El dashboard principal `/` utiliza React, TypeScript y Vite desde `frontend/`.
-Incluye conexión Socket.IO, restauración o creación de sesión, equipos con QR,
-controles de campaña, consulta de listas y actividad reciente. `/panel/contacts`
-permite buscar, filtrar y editar notas. Reutiliza autenticación y API MySQL.
+El panel de llamadas `/` vuelve a utilizar `web/index.html`, sus módulos JavaScript
+y sus estilos originales. Login y Núcleo de Red también usan sus vistas anteriores.
+Contactos, importaciones y reportes permanecen dentro del panel original.
 
 ```powershell
-npm --prefix frontend ci
-npm run panel:build
+npm install
 npm start
 ```
 
-Abre `http://localhost:3000/` e inicia sesión: el dashboard React será la entrada.
-El menú **Contactos y listas** lleva a `/panel/contacts`. Las importaciones y los
-reportes completos siguen en `/legacy` durante la migración. El dashboard restaura
-la sesión del usuario o crea una nueva si todavía no existe una credencial guardada.
-
-Para desarrollo: `npm run panel:dev` inicia Vite en el puerto 5173, con proxy
-hacia el backend del puerto 3000. Las sesiones y credenciales del navegador
-pertenecen al origen: para probar con la sesión real usa el build servido por Express.
-No copies tokens a URLs ni a archivos de configuración. Vuelve a compilar al
-desplegar; `frontend/dist/` y `frontend/node_modules/` no se versionan.
-El panel principal conserva llamadas, importación y reportes durante esta etapa.
+No se necesita compilar React ni ejecutar Vite. La migración se canceló por
+indicación del usuario; `frontend/` se conserva como referencia inactiva.
+Los marcadores `/panel/*` redirigen al panel original. Se mantienen las API,
+MySQL, el historial y los bloqueos de llamadas. Los cambios recientes de la APK,
+incluida la descarga del modelo español, se conservan.
 
 ## Que incluye
 

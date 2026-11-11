@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { Access, Contact } from "./api";
 import { callStatus } from "./api";
 import type { Slot, Worker } from "./dashboard-types";
@@ -7,6 +7,7 @@ import "./dashboard.css";
 import { AudioPanel } from "./components/AudioPanel";
 import { WorkerControls } from "./components/WorkerControls";
 
+const Contacts=lazy(()=>import("./App").then(module=>({default:module.App})));
 const stateLabel:Record<string,string>={idle:"Disponible",ended:"Disponible",failed:"Sin llamada",available:"Disponible",dialing:"Marcando",ringing:"Timbrando",in_call:"En llamada",running:"En curso",paused:"Pausada",completed:"Completada",stopped:"Detenida"};
 function QrCode({slot,access}:{slot:Slot;access:Access}){
  const [url,setUrl]=useState("");const [error,setError]=useState(false);
@@ -35,6 +36,8 @@ function Equipment({slot,worker,access,disabled,onAction}:{slot:Slot;worker?:Wor
 
 export function Dashboard(){
  const panel=useDashboard();
+ const [view,setView]=useState(()=>location.pathname.startsWith("/panel/contacts")?"contacts":"calls");
+ useEffect(()=>{const changed=()=>setView(location.pathname.startsWith("/panel/contacts")?"contacts":"calls");window.addEventListener("popstate",changed);return()=>window.removeEventListener("popstate",changed);},[]);
  const {access,user,data,live,connected,busy,error,message,action}=panel;
  const [tab,setTab]=useState<"equipment"|"lists"|"activity">("equipment");
  const [query,setQuery]=useState("");
@@ -65,14 +68,21 @@ export function Dashboard(){
  const turnPending=campaign?.turn?.pendingContacts||[];
  const uncalledPending=turnPending.filter(contact=>contact.status!=="exhausted"&&(contact.recoveryAttempts||0)<2);
  const recoverPending=()=>action("/campaign/start",{listName:"Pendientes del turno",maxAttempts:1,contacts:uncalledPending.map(contact=>({...contact,id:contact.id||crypto.randomUUID(),targetWorkerId:workerByList.get(contact.list)||""}))});
- return <div className="dash">
+ return <div className="dash" onClick={event=>{
+  const link=(event.target as Element).closest<HTMLAnchorElement>("a[href]");
+  if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||link.target)return;
+  const url=new URL(link.href);if(url.origin!==location.origin||!["/","/panel/contacts"].includes(url.pathname))return;
+  event.preventDefault();window.history.pushState(null,"",url.pathname);setView(url.pathname==="/panel/contacts"?"contacts":"calls");
+  if(url.pathname==="/")panel.refresh().catch(()=>{});
+ }}>
   <aside className="dash-sidebar"><a className="dash-logo" href="/"><img src="/logo-vc-color.png" alt="VC"/><span>ViaVox<small>Gestión de llamadas</small></span></a>
-   <nav aria-label="Navegación principal"><a className="active" href="/" aria-current="page">Panel de llamadas</a><a href="/panel/contacts">Contactos y listas</a><a href="/panel/reports">Reportes y calendario</a>{user?.role==="ADMINISTRADOR"&&<a href="/admin/nucleo-red">Núcleo de Red</a>}</nav>
+   <nav aria-label="Navegación principal"><a className={view==="calls"?"active":undefined} href="/" aria-current={view==="calls"?"page":undefined}>Panel de llamadas</a><a className={view==="contacts"?"active":undefined} href="/panel/contacts" aria-current={view==="contacts"?"page":undefined}>Contactos y listas</a><a href="/panel/reports">Reportes y calendario</a>{user?.role==="ADMINISTRADOR"&&<a href="/admin/nucleo-red">Núcleo de Red</a>}</nav>
    <div className="dash-sidebar-bottom"><a href="/panel/contacts">Importar y administrar bases</a><a href="https://github.com/RikkaApps/Shizuku/releases/download/v13.5.4/shizuku-v13.5.4.r1049.0e53409-release.apk" target="_blank" rel="noopener noreferrer">Descargar Shizuku</a><div><strong>{user?.username||"Comprobando acceso…"}</strong><small>{user?.role==="ADMINISTRADOR"?"Administrador":"Operador"}</small></div><button disabled={busy||!user} onClick={panel.logout}>Cerrar sesión</button></div>
   </aside>
   <div className="dash-content">
    <header className="dash-topbar"><span className={"dash-connection "+(connected?"ready":"")}><i/>{connected?"Conexión en vivo":"Conectando…"}</span><span>{access?"Sesión "+access.code:"Preparando sesión"}</span><a href="/api/apk/download">Descargar APK</a><button className="dash-mobile-logout" disabled={busy||!user} onClick={panel.logout}>Salir</button></header>
-   <main className="dash-main">
+   {view==="contacts"&&<Suspense fallback={<p role="status">Cargando contactos…</p>}>{access?<Contacts embedded providedAccess={access} onBookChanged={()=>{panel.refresh().catch(()=>{});}}/>:<p role="status">Preparando la sesión…</p>}</Suspense>}
+   <main className="dash-main" hidden={view!=="calls"}>
     <div className="dash-heading"><div><h1>Panel de llamadas</h1><p>{new Date(now).toLocaleDateString("es-PE",{weekday:"long",day:"numeric",month:"long",timeZone:"America/Lima"})}</p></div><button className="dash-outline" disabled={disabled} onClick={()=>panel.refresh().catch(()=>{})}>Actualizar panel</button></div>
     <section className="dash-command" aria-label="Control de campaña">
      <div className="dash-command-title"><div><span className="dash-shift">{shift?.label||"Tu jornada de llamadas"}</span><h2>{campaign?.status==="running"?"Campaña en curso":campaign?.status==="paused"?"Listo para continuar":"Prepara tu próxima llamada"}</h2><p>{shift?.schedule||"Vincula los equipos, selecciona una lista y comienza."}</p></div><span className="dash-campaign-status">{stateLabel[campaign?.status||""]||"Sin campaña activa"}</span></div>

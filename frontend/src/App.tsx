@@ -8,7 +8,7 @@ import { downloadBlob,sessionRequest } from "./session-api";
 import { normalizePhone } from "./imports";
 import type { Worker } from "./dashboard-types";
 
-export function App(){
+export function App({embedded=false,providedAccess,onBookChanged}:{embedded?:boolean;providedAccess?:Access;onBookChanged?:()=>void}={}){
  const [access,setAccess]=useState<Access|null>(null);const [book,setBook]=useState<Book|null>(null);
  const revision=useRef(0);const writing=useRef(false);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);
@@ -27,18 +27,18 @@ export function App(){
  }
  useEffect(()=>{
   const controller=new AbortController();
-  openAccess(controller.signal).then(async auth=>{
+  (providedAccess?Promise.resolve(providedAccess):openAccess(controller.signal)).then(async auth=>{
    if(controller.signal.aborted)return;setAccess(auth);await load(auth,controller.signal);
   }).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
   return()=>controller.abort();
- },[]);
+ },[providedAccess]);
  async function refresh(){if(!access){location.assign("/");return;}setLoading(true);setError("");try{await load(access);}catch(cause){setError(cause instanceof Error?cause.message:"No se pudo actualizar.");}finally{setLoading(false);}}
  async function commit(next:Book){
   if(!access||writing.current)throw new Error("Espera a que termine el guardado actual.");
   writing.current=true;setBusy(true);setError("");
   try{
    revision.current=await saveBook(access,next,revision.current);setBook(next);
-   await load(access);setNotice("Cambios guardados.");
+   await load(access);onBookChanged?.();setNotice("Cambios guardados.");
   }finally{writing.current=false;setBusy(false);}
  }
  async function mutate(next:Book){try{await commit(next);}catch(cause){setError(cause instanceof Error?cause.message:"No se pudo guardar.");}}
@@ -77,7 +77,7 @@ export function App(){
   const html='<html><head><meta charset="UTF-8"></head><body><h1>Contactos</h1><table><tr><th>Lista</th><th>Nombre</th><th>Teléfono</th><th>Nota</th></tr>'+rows.map(contact=>'<tr>'+[contact.list,contact.name,contact.phone,contact.note].map(value=>'<td>'+esc(value)+'</td>').join("")+'</tr>').join("")+'</table></body></html>';
   downloadBlob(new Blob([html],{type:"application/msword"}),"contactos.doc");
  }
- return <div className="workspace"><header className="masthead"><a className="brand" href="/"><span className="brand-symbol">VC</span><span>Gestión de llamadas<small>Contactos y listas</small></span></a><div className="account">{access?.user.username}<a href="/">Volver a llamadas</a><a href="/panel/reports">Reportes</a></div></header>
+ return <div className={embedded?"contacts-embedded":"workspace"}>{!embedded&&<header className="masthead"><a className="brand" href="/"><span className="brand-symbol">VC</span><span>Gestión de llamadas<small>Contactos y listas</small></span></a><div className="account">{access?.user.username}<a href="/">Volver a llamadas</a><a href="/panel/reports">Reportes</a></div></header>}
  <div className="body-layout"><aside className="list-panel"><h2>Mis listas</h2><button className={"list-item "+(!list?"selected":"")} onClick={()=>{setList("");setPage(1);}}>Todas las listas <span>{book?.contacts.length||0}</span></button>{book?.lists.map(name=><button key={name} className={"list-item "+(list===name?"selected":"")} onClick={()=>{setList(name);setPage(1);}}>{name}<span>{counts.get(name)||0}</span></button>)}<button className="secondary" disabled={!book||busy} onClick={()=>{setListName("");setListDialog(true);}}>Nueva lista</button></aside>
  <main><div className="page-heading"><div><h1>{list||"Todos los contactos"}</h1><p>Bases importadas, notas y estado de cada número.</p></div><button className="secondary" disabled={loading||busy} onClick={refresh}>Actualizar</button></div>
  {error&&<p className="feedback error" role="alert">{error}</p>}{notice&&<p className="feedback success" role="status">{notice}</p>}

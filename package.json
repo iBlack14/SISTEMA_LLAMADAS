@@ -7,8 +7,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "panel:dev": "npm --prefix frontend run dev",
-    "panel:build": "npm --prefix frontend run build",
     "auth:local": "node server/auth/local.js",
     "auth:setup": "node server/auth/local.js --setup-only",
     "auth:mysql:stop": "node server/auth/stop-local-mysql.js",

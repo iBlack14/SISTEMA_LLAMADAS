@@ -167,14 +167,12 @@ app.use("/admin", (req, res, next) => {
   if (!req.user) return res.redirect("/login");
   auth.requireAdmin(req, res, next);
 });
-app.get("/admin/nucleo-red", (_, res) => res.sendFile(path.join(__dirname, "../frontend/dist/index.html")));
+app.get("/admin/nucleo-red", (_, res) => res.sendFile(path.join(__dirname, "auth/views/admin.html")));
 app.get(["/", "/index.html", "/admin.html"], (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   if (!req.user) return res.redirect("/login");
   if (req.path.toLowerCase() === "/admin.html") return auth.requireAdmin(req, res, () => res.redirect("/admin/nucleo-red"));
-  const entry = path.join(__dirname, "../frontend/dist/index.html");
-  if (!fs.existsSync(entry)) return res.status(503).send("Compila el panel con npm run panel:build antes de iniciar.");
-  res.sendFile(entry);
+  res.sendFile(path.join(__dirname, "../web/index.html"));
 });
 app.get("/legacy", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -184,7 +182,7 @@ app.get("/legacy", (req, res) => {
 app.get("/login", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (req.user) return res.redirect(req.user.role === "ADMINISTRADOR" ? "/admin/nucleo-red" : "/");
-  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+  res.sendFile(path.join(__dirname, "../web/login.html"));
 });
 app.get("/legacy/admin", auth.requireAdmin, (_, res) => res.sendFile(path.join(__dirname, "auth/views/admin.html")));
 // These operational helpers are outside /api/session and need their own guard.
@@ -2552,19 +2550,11 @@ app.post("/api/twilio/webhook/voice", express.urlencoded({ extended: false }), (
   return res.status(501).type("text/plain").send("Twilio deshabilitado en este despliegue.");
 });
 
-// Public compiled code is also needed by the login screen; APIs remain protected.
-app.use("/panel/assets", express.static(path.join(__dirname, "../frontend/dist/assets"), { immutable: true, maxAge: "1y" }));
-// React pages; authorization is still enforced by the server.
-app.use("/panel", (req, res, next) => {
+// Compatibility for bookmarks from the retired React interface.
+app.use("/panel", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!req.user) return res.redirect("/login");
-  next();
-});
-app.use("/panel", express.static(path.join(__dirname, "../frontend/dist"), {index:false}));
-app.get(["/panel", "/panel/", "/panel/contacts", "/panel/reports"], (_, res) => {
-  const entry = path.join(__dirname, "../frontend/dist/index.html");
-  if (!fs.existsSync(entry)) return res.status(503).send("La vista de contactos aún no se ha compilado. Ejecuta npm run panel:build.");
-  res.sendFile(entry);
+  return res.redirect("/");
 });
 
 app.use(express.static(path.join(__dirname, "../web")));

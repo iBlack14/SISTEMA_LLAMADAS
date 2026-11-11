@@ -157,13 +157,15 @@ object VoicemailDetector {
         }
     }
 
+    fun prepareModel() {
+        if (initialized) decoder.execute { loadModel() }
+    }
+
     private fun loadModel(): Model? {
         model?.let { return it }
-        val internalFolder = File(app.filesDir, "models/vosk-model-small-es-0.42")
-        val folder = if (File(internalFolder, "am/final.mdl").isFile) internalFolder
-            else File(app.getExternalFilesDir("models"), "vosk-model-small-es-0.42")
-        if (!File(folder, "am/final.mdl").isFile) {
-            say("Falta instalar el modelo de español para detectar buzones")
+        val folder = VoicemailModelInstaller.findModel(app)
+        if (folder == null) {
+            say("Falta el modelo de español. Pulsa Descargar modelo de español.")
             return null
         }
         return try {
