@@ -1,17 +1,45 @@
 
 (() => {
   const $ = id => document.getElementById(id);
+  const reportPdfTableTheme = {
+    header: [102, 0, 115],
+    border: [219, 186, 222],
+    text: [36, 16, 43],
+    rows: [
+      [255, 255, 255],
+      [250, 247, 252]
+    ]
+  };
 
   const months = [
     "Enero", "Febrero", "Marzo", "Abril",
     "Mayo", "Junio", "Julio", "Agosto",
     "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
+  const formatDetailedDate = value => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+    if (!match) return value;
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    if (
+      date.getFullYear() !== Number(year) ||
+      date.getMonth() !== Number(month) - 1 ||
+      date.getDate() !== Number(day)
+    ) return value;
+    const weekdays = ["DOM", "LUN", "MAR", "MIERC", "JUEV", "VIE", "SAB"];
+    return `${weekdays[date.getDay()]} ${day}/${month}/${year}`;
+  };
 
   let year = new Date().getFullYear();
   let selectedDate = "";
   let reports = [];
   let selectedReport = "";
+  let reportSearchTerm = "";
+  let showingDetailedReport = false;
+  let detailedPendingOnly = false;
+  let selectedDetailedTeam = "";
+  let visibleRubrosStart = 0;
+  const rubrosPerPage = 3;
 
   const esc = value => String(value ?? "").replace(
     /[&<>"']/g,
@@ -64,15 +92,15 @@ function dashboardToken() {
       ? `?date=${encodeURIComponent(date)}`
       : "";
 
-const response = await fetch(
-  endpoint("/reports/daily" + query),
-  {
-    method: "GET",
-    headers: {
-      "X-Dashboard-Token": dashboardToken()
-    }
-  }
-);
+    const response = await fetch(
+      endpoint("/reports/daily" + query),
+      {
+        method: "GET",
+        headers: {
+          "X-Dashboard-Token": dashboardToken()
+        }
+      }
+    );
     const data = await response.json();
 
     if (!response.ok) {
@@ -81,8 +109,8 @@ const response = await fetch(
 
     return data.reports || [];
   }
-function showError(error) {
-    $("annualReport").innerHTML = `
+  function showError(error) {
+    $("dailyReportMount").innerHTML = `
       <p class="report-error">${esc(error.message || error)}</p>
       <button id="retryReports">Reintentar</button>
     `;
@@ -91,7 +119,9 @@ function showError(error) {
   }
 
  async function showCalendar() {
-  try {
+   clearDayNavigation();
+
+ try {
     reports = await fetchReports();
 
     selectedReport = "";
@@ -148,9 +178,9 @@ function showError(error) {
       `;
     }).join("");
 
-    $("annualReport").innerHTML = `
+    $("dailyReportMount").innerHTML = `
       <div class="report-heading">
-        <h2>CALENDARIO ANUAL · REPORTES</h2>
+        <h2>CALENDARIO ANUAL · REPORTES DE LLAMADAS</h2>
         <div>
           <button id="prevYear" class="secondary">‹</button>
           <strong>${year}</strong>
@@ -170,7 +200,7 @@ function showError(error) {
       renderCalendar();
     };
 
-    $("annualReport")
+    $("dailyReportMount")
       .querySelectorAll("[data-date]")
       .forEach(button => {
         button.onclick = () => showDay(button.dataset.date);
@@ -179,6 +209,8 @@ function showError(error) {
 
   async function showDay(date) {
   selectedDate = date;
+  reportSearchTerm = "";
+   visibleRubrosStart = 0;
 
   document.querySelectorAll(
     "#annualReport .report-days button"
@@ -192,66 +224,187 @@ function showError(error) {
   try {
     reports = await fetchReports(date);
     selectedReport = reports[0]?.id || "";
+    showingDetailedReport = false;
+    detailedPendingOnly = false;
     renderDay();
   } catch (error) {
     showError(error);
   }
 }
-  function renderDay() {
-    $("annualReport").innerHTML = `
-      <div class="report-heading">
-        <div>
-          <button id="backCalendar" class="secondary">
-            ← CALENDARIO
-          </button>
-          <h2>REPORTE DEL ${esc(selectedDate)}</h2>
-        </div>
-      </div>
 
-      <div class="report-search">
-        <label>
-          🔎 Buscar empresa o número
-          <input
-            id="reportSearch"
-            placeholder="Empresa o teléfono"
-          />
-        </label>
-        <span>
-          El envío de información solo aparece si está
-          registrado en el sistema.
-        </span>
+function shiftReportDate(value, offset) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+  if (!match) return "";
+  const date = new Date(Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]) + offset
+  ));
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function renderDay() {
+  const activeReport = reports.find(item => item.id === selectedReport);
+  const detailedTeams = showingDetailedReport && activeReport
+    ? Array.from(new Set([
+        ...(activeReport.rows || []).map(contact => contact.workerName),
+        ...(activeReport.calls || []).map(call => call.workerName)
+      ].map(name => String(name || "").trim()).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right, "es", {
+          numeric: true
+        }))
+    : [];
+  if (showingDetailedReport && activeReport?.rows?.some(contact =>
+    !String(contact.workerName || "").trim() && !contact.lastCallAt
+  )) {
+    detailedTeams.push("SIN EQUIPO");
+  }
+  if (showingDetailedReport) {
+    if (!detailedTeams.length) detailedTeams.push("SIN EQUIPO");
+    if (!detailedTeams.includes(selectedDetailedTeam)) {
+      selectedDetailedTeam = detailedTeams[0];
+    }
+  }
+
+  $("dailyReportMount").innerHTML = `
+    <div class="report-day-toolbar">
+      <div class="report-day-title">
+        <h2>REPORTE DE LLAMADAS</h2>
       </div>
+      <div class="report-tools ${showingDetailedReport ? "report-tools-teams" : ""}">
+        ${showingDetailedReport
+          ? `<div class="report-rubros" aria-label="Equipos del reporte">
+              ${detailedTeams.map((team, index) => `
+                <button
+                  type="button"
+                  data-team="${esc(team)}"
+                  class="${team === selectedDetailedTeam ? "chosen" : ""}"
+                  aria-pressed="${team === selectedDetailedTeam}"
+                >
+                  <span class="report-rubro-number">${index + 1}</span>
+                  <span>${esc(team)}</span>
+                </button>
+              `).join("")}
+            </div>`
+          : `<label class="report-search-input">
+              <span aria-hidden="true">🔎</span>
+              <input
+                id="reportSearch"
+                type="search"
+                placeholder="Buscar rubro, empresa o teléfono"
+                value="${esc(reportSearchTerm)}"
+              />
+            </label>
+            <div class="report-rubros" aria-label="Rubros del reporte">
+              ${reports
+                .slice(visibleRubrosStart, visibleRubrosStart + rubrosPerPage)
+                .map((report, index) => `
+                <button
+                  type="button"
+                  data-rubro="${esc(report.id)}"
+                  class="${report.id === selectedReport ? "chosen" : ""}"
+                  aria-pressed="${report.id === selectedReport}"
+                >
+                  <span class="report-rubro-number">${visibleRubrosStart + index + 1}</span>
+                  <span>${esc(report.rubro)}</span>
+                </button>
+              `).join("")}
+            </div>`}
+      </div>
+    </div>
 
       ${reports.length ? `
-        <div class="report-rubros">
-          ${reports.map((report, index) => `
-            <button
-              data-rubro="${esc(report.id)}"
-              class="${report.id === selectedReport ? "chosen" : ""}"
-            >
-              ${index + 1}. ${esc(report.rubro)}
-            </button>
-          `).join("")}
-        </div>
         <div id="reportDetails"></div>
       ` : `
         <p>No existen campañas registradas para esta fecha.</p>
       `}
+      <nav class="report-date-navigation" aria-label="Navegar por fecha">
+        <button id="reportPreviousDay" class="secondary" type="button"
+          ${shiftReportDate(selectedDate, -1) ? "" : "disabled"}>
+          ← ANTERIOR
+        </button>
+        <button id="reportNextDay" class="secondary" type="button"
+          ${shiftReportDate(selectedDate, 1) ? "" : "disabled"}>
+          SIGUIENTE →
+        </button>
+      </nav>
     `;
 
-    $("backCalendar").onclick = showCalendar;
-    $("reportSearch").oninput = renderDetails;
+    renderDayNavigation();
 
-    $("annualReport")
+    $("reportPreviousDay").onclick = () => {
+      const previousDate = shiftReportDate(selectedDate, -1);
+      if (previousDate) showDay(previousDate);
+    };
+    $("reportNextDay").onclick = () => {
+      const nextDate = shiftReportDate(selectedDate, 1);
+      if (nextDate) showDay(nextDate);
+    };
+
+    $("backCalendar").onclick = showCalendar;
+    if (!showingDetailedReport) {
+      $("reportSearch").oninput = event => {
+        reportSearchTerm = event.currentTarget.value;
+        renderDetails();
+      };
+    }
+
+    $("dailyReportMount")
       .querySelectorAll("[data-rubro]")
       .forEach(button => {
         button.onclick = () => {
           selectedReport = button.dataset.rubro;
+          showingDetailedReport = false;
+          detailedPendingOnly = false;
+          const selectedIndex = reports.findIndex(
+            report => report.id === selectedReport
+          );
+          if (selectedIndex >= 0) {
+            visibleRubrosStart = Math.max(
+              0,
+              Math.min(
+                selectedIndex - 1,
+                reports.length - rubrosPerPage
+              )
+            );
+          }
+          renderDay();
+        };
+      });
+
+    $("dailyReportMount")
+      .querySelectorAll("[data-team]")
+      .forEach(button => {
+        button.onclick = () => {
+          selectedDetailedTeam = button.dataset.team;
           renderDay();
         };
       });
 
     if (reports.length) renderDetails();
+  }
+
+  function clearDayNavigation() {
+    document.querySelectorAll(
+      ".report-nav #backCalendar"
+    ).forEach(button => button.remove());
+  }
+
+  function renderDayNavigation() {
+    clearDayNavigation();
+
+    const backToCalls = $("reportBackBtn");
+    if (!backToCalls) return;
+
+    backToCalls.insertAdjacentHTML("afterend", `
+      <button id="backCalendar" class="secondary" type="button">
+        ← CALENDARIO
+      </button>
+    `);
   }
 
   function renderDetails() {
@@ -261,83 +414,879 @@ function showError(error) {
 
     if (!report) return;
 
-    const term = (
-      $("reportSearch")?.value || ""
-    ).toLowerCase();
-
+    const normalizeSearchText = value => String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const term = normalizeSearchText(reportSearchTerm).trim();
+    const tableRows = (term
+      ? reports.flatMap(reportItem =>
+        reportItem.rows.map(contact => ({ report: reportItem, contact }))
+      ).filter(({ report: reportItem, contact }) =>
+        normalizeSearchText(
+          `${reportItem.rubro} ${contact.name} ${contact.phone} ` +
+          `${contact.list || ""} ${contact.workerName || ""} ` +
+          `${contact.technicalResult || ""}`
+        ).includes(term)
+      )
+      : report.rows.map(contact => ({ report, contact }))
+    );
     const rows = report.rows.filter(contact =>
-      `${contact.name} ${contact.phone}`
-        .toLowerCase()
-        .includes(term)
+      normalizeSearchText(
+        `${report.rubro} ${contact.name} ${contact.phone} ` +
+        `${contact.list || ""} ${contact.workerName || ""} ` +
+        `${contact.technicalResult || ""}`
+      ).includes(term)
     );
 
+    const equipmentCount = new Set(
+      report.rows
+        .map(contact => String(contact.workerName || "").trim())
+        .filter(Boolean)
+    ).size;
+    const formatReportDate = value => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+      if (!match) return value;
+      const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      const date = new Date(year, month - 1, day);
+      if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day
+      ) return value;
+      const weekdays = ["DOM", "LUN", "MAR", "MIERC", "JUEV", "VIE", "SAB"];
+      return `${weekdays[date.getDay()]} ${match[3]}/` +
+        `${monthNames[month - 1]}/${match[1]}`;
+    };
     const metrics = [
-      ["Fecha", report.date],
-      ["Rubro", report.rubro],
-      ["Números usados", report.numbers],
-      ["Llamadas totales", report.totalCalls],
-      ["Contestadas ≥35 s", report.answered],
-      ["Pendientes", report.pending]
+      ["RUBRO", report.rubro],
+      ["FECHA", formatReportDate(report.date)],
+      ["EQUIPOS USADOS", equipmentCount || "—"],
+      ["NÚMEROS USADOS", report.numbers],
+      ["LLAMADAS TOTALES", report.totalCalls],
+      ["CONTESTADAS", report.answered],
+      ["PENDIENTES", report.pending]
     ];
 
     const status = contact =>
-      contact.answered ? "Contestada" :
-      contact.inoperable ? "Inoperable" : "Pendiente";
+      contact.answered ? "CONTESTO" :
+      contact.inoperable ? "INOPERABLE" : "PENDIENTE";
+    const statusClass = contact =>
+      contact.answered ? "is-answered" :
+      contact.inoperable ? "is-inoperable" : "is-pending";
+    const limaDateTime = value => {
+      if (!value) return "—";
+      const timestamp = new Date(value);
+      if (Number.isNaN(timestamp.getTime())) return "—";
+      return new Intl.DateTimeFormat("es-PE", {
+        timeZone: "America/Lima",
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+      }).format(timestamp);
+    };
+    const formatDuration = value => {
+      const seconds = Math.max(0, Number(value) || 0);
+      return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:` +
+        `${String(seconds % 60).padStart(2, "0")}`;
+    };
+
+    const makeDetailedRows = () => {
+      const sourceContacts = report.rows || [];
+      const contactsByKey = new Map();
+      const getContactKey = item =>
+        String(item.contactId || item.id || item.phone || item.name || "");
+      for (const contact of sourceContacts) {
+        contactsByKey.set(getContactKey(contact), contact);
+        if (contact.phone) contactsByKey.set(String(contact.phone), contact);
+      }
+
+      const historyCalls = Array.isArray(report.calls) ? report.calls : [];
+      const calls = historyCalls.length
+        ? historyCalls.map(call => ({
+            ...call,
+            startedAt: call.startedAt || call.lastCallAt,
+            workerName: call.workerName ||
+              contactsByKey.get(getContactKey(call))?.workerName ||
+              contactsByKey.get(String(call.phone || ""))?.workerName ||
+              ""
+          }))
+        : sourceContacts
+            .filter(contact => contact.lastCallAt)
+            .map(contact => ({
+              ...contact,
+              startedAt: contact.lastCallAt
+            }));
+
+      const isInoperable = call => {
+        const result = String(
+          call.technicalResult || call.disposition || ""
+        ).toLowerCase();
+        return Boolean(call.inoperable) ||
+          /invalid|inoperable|unreachable|not.in.service|disconnected/
+            .test(result);
+      };
+      const isAnswered = call => {
+        const result = String(
+          call.technicalResult || call.disposition || ""
+        ).toLowerCase();
+        return Boolean(call.answered || call.answeredAt) ||
+          Number(call.durationSeconds || 0) >= 35 ||
+          /^(contesto|interesado|no_interesado|requiere_asesor|agendado)$/
+            .test(result);
+      };
+      const toLimaHour = value => {
+        if (!value) return null;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        const hourText = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Lima",
+          hour: "2-digit",
+          hourCycle: "h23"
+        }).format(date);
+        const hour = Number(hourText);
+        return Number.isInteger(hour) ? hour : null;
+      };
+      const hourLabel = hour => {
+        const formatHour = value =>
+          `${String(value % 24).padStart(2, "0")}:00`;
+        return `${formatHour(hour)}–${formatHour(hour + 1)}`;
+      };
+
+      const designatedContacts = new Map();
+      const contactAssignedTeam = new Map();
+      const latestCallByContact = new Map();
+      for (const call of calls) {
+        const key = getContactKey(call);
+        const time = new Date(call.startedAt || 0).getTime() || 0;
+        const previous = latestCallByContact.get(key);
+        if (!previous || time >= previous.time) {
+          latestCallByContact.set(key, {
+            time,
+            team: String(call.workerName || "").trim()
+          });
+        }
+      }
+      for (const contact of sourceContacts) {
+        const key = getContactKey(contact);
+        const team = latestCallByContact.get(key)?.team ||
+          String(contact.workerName || "").trim() ||
+          "SIN EQUIPO";
+        if (!designatedContacts.has(team)) {
+          designatedContacts.set(team, new Set());
+        }
+        designatedContacts.get(team).add(key);
+        contactAssignedTeam.set(key, team);
+        if (contact.phone) contactAssignedTeam.set(String(contact.phone), team);
+      }
+      for (const call of calls) {
+        const key = getContactKey(call);
+        const team = latestCallByContact.get(key)?.team ||
+          String(call.workerName || "").trim() ||
+          "SIN EQUIPO";
+        if (!designatedContacts.has(team)) {
+          designatedContacts.set(team, new Set());
+        }
+        designatedContacts.get(team).add(key);
+        contactAssignedTeam.set(key, team);
+        if (call.phone) contactAssignedTeam.set(String(call.phone), team);
+      }
+
+      const hourlyRows = new Map();
+      const metricsByTeam = new Map();
+      const getTeamMetrics = team => {
+        if (!metricsByTeam.has(team)) {
+          metricsByTeam.set(team, {
+            calls: 0,
+            answered: 0,
+            noAnswer: 0,
+            inoperable: 0,
+            pending: 0
+          });
+        }
+        return metricsByTeam.get(team);
+      };
+      for (const call of calls) {
+        const team = String(call.workerName || "").trim() ||
+          contactAssignedTeam.get(getContactKey(call)) ||
+          contactAssignedTeam.get(String(call.phone || "")) ||
+          "SIN EQUIPO";
+        const teamMetrics = getTeamMetrics(team);
+        teamMetrics.calls++;
+        const hour = toLimaHour(call.startedAt);
+        const key = `${team}|${hour === null ? "SIN HORA" : hour}`;
+        if (!hourlyRows.has(key)) {
+          hourlyRows.set(key, {
+            team,
+            hour: hour === null ? "SIN HORA" : hourLabel(hour),
+            calls: 0,
+            answered: 0,
+            noAnswer: 0,
+            inoperable: 0,
+            pending: 0
+          });
+        }
+        const row = hourlyRows.get(key);
+        row.calls++;
+        if (isInoperable(call)) {
+          row.inoperable++;
+          teamMetrics.inoperable++;
+        } else if (isAnswered(call)) {
+          row.answered++;
+          teamMetrics.answered++;
+        } else {
+          row.noAnswer++;
+          teamMetrics.noAnswer++;
+        }
+      }
+
+      const calledContactKeys = new Set();
+      for (const call of calls) {
+        calledContactKeys.add(getContactKey(call));
+        if (call.phone) calledContactKeys.add(String(call.phone));
+      }
+      const pendingByTeam = new Map();
+      for (const contact of sourceContacts) {
+        const key = getContactKey(contact);
+        const attempted = Boolean(contact.lastCallAt) ||
+          calledContactKeys.has(key) ||
+          (contact.phone && calledContactKeys.has(String(contact.phone)));
+        if (attempted) continue;
+        const team = contactAssignedTeam.get(key) ||
+          String(contact.workerName || "").trim() ||
+          "SIN EQUIPO";
+        pendingByTeam.set(team, (pendingByTeam.get(team) || 0) + 1);
+        getTeamMetrics(team).pending++;
+      }
+      for (const [team, count] of pendingByTeam) {
+        const key = `${team}|SIN LLAMADA`;
+        hourlyRows.set(key, {
+          team,
+          hour: "SIN LLAMADA",
+          calls: 0,
+          answered: 0,
+          noAnswer: 0,
+          inoperable: 0,
+          pending: count
+        });
+      }
+
+      const resultRows = Array.from(hourlyRows.values())
+        .sort((left, right) =>
+          left.team.localeCompare(right.team, "es") ||
+          left.hour.localeCompare(right.hour, "es", { numeric: true })
+        )
+        .map(row => ({
+          team: row.team,
+          designated: designatedContacts.get(row.team)?.size || 0,
+          hour: row.hour,
+          calls: row.calls,
+          answered: row.answered,
+          noAnswer: row.noAnswer,
+          inoperable: row.inoperable,
+          pending: row.pending
+        }));
+
+      return {
+        rows: resultRows.filter(row =>
+          row.team === selectedDetailedTeam &&
+          (!detailedPendingOnly || row.pending > 0)
+        ),
+        metrics: getTeamMetrics(selectedDetailedTeam)
+      };
+    };
+
+    const renderDetailedReport = () => {
+      const detailed = makeDetailedRows();
+      const teamNames = Array.from(new Set([
+        ...(report.rows || []).map(contact => contact.workerName),
+        ...(report.calls || []).map(call => call.workerName)
+      ].map(name => String(name || "").trim()).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right, "es", {
+          numeric: true
+        }));
+      const teamIndex = Math.max(0, teamNames.indexOf(selectedDetailedTeam));
+      const teamLabel = /^EQUIPO\s+\d+$/i.test(selectedDetailedTeam)
+        ? selectedDetailedTeam.toUpperCase()
+        : selectedDetailedTeam === "SIN EQUIPO"
+          ? selectedDetailedTeam
+          : `EQUIPO ${teamIndex + 1}`;
+      const modelName = report.teamModels?.[selectedDetailedTeam] ||
+        (/^EQUIPO\s+\d+$/i.test(selectedDetailedTeam)
+          ? "MODELO NO REGISTRADO"
+          : selectedDetailedTeam);
+      const teamCalls = (report.calls || []).filter(call =>
+        String(call.workerName || "").trim() === selectedDetailedTeam
+      );
+      const teamShiftTypes = new Set(teamCalls.map(call => {
+        if (!call.startedAt) return "";
+        const callDate = new Date(call.startedAt);
+        if (Number.isNaN(callDate.getTime())) return "";
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Lima",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23"
+        }).formatToParts(callDate);
+        const hour = Number(parts.find(part => part.type === "hour")?.value);
+        const minute = Number(parts.find(part => part.type === "minute")?.value);
+        if (!Number.isFinite(hour) || !Number.isFinite(minute)) return "";
+        const minutes = hour * 60 + minute;
+        if (minutes >= 7 * 60 && minutes < 13 * 60 + 30) return "TURNO MAÑANA";
+        if (minutes >= 13 * 60 + 30 && minutes < 20 * 60 + 30) return "TURNO TARDE";
+        return "FUERA DE TURNO";
+      }).filter(Boolean));
+      const teamShift = report.teamShifts?.[selectedDetailedTeam] ||
+        (teamShiftTypes.size === 1
+          ? [...teamShiftTypes][0]
+          : teamShiftTypes.size > 1
+            ? "TURNOS MIXTOS"
+            : "TURNO SIN REGISTRO");
+      const teamSummary = [
+        ["LLAMADAS TOTALES", detailed.metrics.calls, "total"],
+        ["CONTESTADAS", detailed.metrics.answered, "answered"],
+        ["NO CONTESTADAS", detailed.metrics.noAnswer, "no-answer"],
+        ["INOPERABLE", detailed.metrics.inoperable, "inoperable"],
+        ["PENDIENTE", detailed.metrics.pending, "pending"]
+      ];
+      const detailedColumns = [
+        "EQUIPO",
+        "TOTAL DESIGNADO",
+        "HORA",
+        "LLAMADAS TOTALES",
+        "CONTESTADAS",
+        "NO CONTESTADAS",
+        "INOPERABLE",
+        "PENDIENTE"
+      ];
+
+      $("reportDetails").innerHTML = `
+        <section class="report-content-panel report-detailed-panel"
+          aria-label="Reporte detallado">
+          <div class="report-detailed-summary">
+            <div class="report-detailed-equipment">
+              <h3>${esc(teamLabel)}: ${esc(modelName)}</h3>
+              <span>${esc(teamShift)} | ${esc(formatDetailedDate(report.date))} | ${
+                detailed.metrics.calls
+              } llamadas</span>
+            </div>
+            <div class="report-detailed-metrics">
+              ${teamSummary.map(([label, value, tone]) => `
+                <article class="report-detailed-metric ${tone}">
+                  <span>${label}</span>
+                  <strong>${value}</strong>
+                </article>
+              `).join("")}
+            </div>
+          </div>
+          <div class="report-detailed-table-wrap">
+            <table class="report-detailed-table">
+              <thead>
+                <tr>${detailedColumns.map(column =>
+                  `<th class="${column === "HORA" ? "report-detailed-hour-cell" : ""}">${column}</th>`
+                ).join("")}</tr>
+              </thead>
+              <tbody>
+                ${detailed.rows.map((row, index) => `
+                  <tr>
+                    ${index === 0 ? `
+                      <td rowspan="${detailed.rows.length}">
+                        ${esc(row.team)}
+                      </td>
+                      <td rowspan="${detailed.rows.length}">
+                        ${row.designated}
+                      </td>
+                    ` : ""}
+                    <td class="report-detailed-hour-cell">${esc(row.hour)}</td>
+                    <td>${row.calls}</td>
+                    <td>${row.answered}</td>
+                    <td>${row.noAnswer}</td>
+                    <td>${row.inoperable}</td>
+                    <td>${row.pending}</td>
+                  </tr>
+                `).join("") || `
+                  <tr><td colspan="8">${
+                    detailedPendingOnly
+                      ? "No hay contactos pendientes."
+                      : "No hay llamadas registradas."
+                  }</td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+          <div class="report-footer report-detailed-footer">
+            <div class="report-actions">
+              <button id="detailedBack" class="secondary" type="button">
+                ← VOLVER AL REPORTE
+              </button>
+              <button id="detailedPdf" type="button">
+                ⬇ DESCARGAR REPORTE
+              </button>
+              <button id="detailedPending" class="secondary" type="button"
+                aria-pressed="${detailedPendingOnly}">
+                ${detailedPendingOnly ? "VER TODO" : "PENDIENTE"}
+              </button>
+            </div>
+            <div class="report-continue report-detailed-campaign-actions">
+              <button id="detailedStop" class="secondary" type="button"
+                >
+                DETENER
+              </button>
+              <button id="detailedCallPending" type="button"
+                ${!report.pending ? "disabled" : ""}>
+                LLAMAR PENDIENTES
+              </button>
+            </div>
+          </div>
+        </section>
+      `;
+
+      $("detailedBack").onclick = () => {
+        showingDetailedReport = false;
+        detailedPendingOnly = false;
+        renderDay();
+      };
+      $("detailedPending").onclick = () => {
+        detailedPendingOnly = !detailedPendingOnly;
+        renderDetailedReport();
+      };
+      $("detailedStop").onclick = async () => {
+        if (!confirm("¿Detener la campaña y las llamadas activas?")) return;
+        const button = $("detailedStop");
+        button.disabled = true;
+        try {
+          const response = await fetch(endpoint("/campaign/stop"), {
+            method: "POST",
+            headers: {
+              "X-Dashboard-Token": dashboardToken()
+            }
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw Error(data.error || "No se pudo detener la campaña.");
+          }
+          alert("Campaña detenida. El historial se conservó.");
+        } catch (error) {
+          alert(error.message || "No se pudo detener la campaña.");
+        } finally {
+          button.disabled = false;
+        }
+      };
+      $("detailedCallPending").onclick = async () => {
+        if (!confirm(
+          `¿Llamar los contactos pendientes del rubro ${report.rubro}?`
+        )) return;
+        const button = $("detailedCallPending");
+        button.disabled = true;
+        try {
+          const response = await fetch(
+            endpoint(`/reports/${encodeURIComponent(report.id)}/continue`),
+            {
+              method: "POST",
+              headers: {
+                "X-Dashboard-Token": dashboardToken()
+              }
+            }
+          );
+          const data = await response.json();
+          if (!response.ok) {
+            throw Error(data.error || "No se pudieron iniciar las llamadas.");
+          }
+          alert(
+            `${data.queued} contactos pendientes agregados a la campaña.`
+          );
+          $("reportBackBtn").click();
+        } catch (error) {
+          alert(error.message || "No se pudieron iniciar las llamadas.");
+        } finally {
+          button.disabled = false;
+        }
+      };
+      $("detailedPdf").onclick = async () => {
+        const JsPDF = window.jspdf?.jsPDF;
+        if (!JsPDF) {
+          alert("Librería PDF no disponible");
+          return;
+        }
+        const button = $("detailedPdf");
+        button.disabled = true;
+        try {
+          const logoResponse = await fetch("/logo-vc-color.png");
+          if (!logoResponse.ok) {
+            throw Error("No se pudo cargar el logotipo del reporte.");
+          }
+          const logoBlob = await logoResponse.blob();
+          const logoData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(
+              Error("No se pudo preparar el logotipo del reporte.")
+            );
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(logoBlob);
+          });
+
+          const pdf = new JsPDF("landscape", "mm", "a4");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const margin = 10;
+          const columnWidths = [38, 31, 31, 38, 32, 38, 31, 38];
+          const rowHeightFor = lines => Math.max(
+            8,
+            ...lines.map(linesInCell => linesInCell.length * 3.6 + 3)
+          );
+          const drawHeader = y => {
+            pdf.setFillColor(232, 0, 169);
+            pdf.rect(0, 0, pageWidth, 3, "F");
+            pdf.addImage(logoData, "PNG", margin, 7, 32, 19);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(17);
+            pdf.setTextColor(84, 20, 105);
+            pdf.text("REPORTE DE LLAMADAS", margin + 38, 17);
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(...reportPdfTableTheme.text);
+            pdf.text("Lima - Peru", pageWidth - margin, 16, {
+              align: "right"
+            });
+            pdf.setDrawColor(...reportPdfTableTheme.border);
+            pdf.line(margin, 28, pageWidth - margin, 28);
+
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(11);
+            pdf.setTextColor(192, 0, 132);
+            pdf.text(
+              pdf.splitTextToSize(
+                `${teamLabel}: ${modelName}`,
+                84
+              ),
+              margin + 2,
+              37
+            );
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(7.5);
+            pdf.setTextColor(...reportPdfTableTheme.text);
+            pdf.text(
+              pdf.splitTextToSize(
+                `${teamShift} | ${formatDetailedDate(report.date)} | ${detailed.metrics.calls} llamadas`,
+                84
+              ),
+              margin + 2,
+              44
+            );
+            const cardGap = 2;
+            const cardStartX = margin + 90;
+            const cardWidth = (
+              pageWidth - margin - cardStartX - cardGap * 4
+            ) / 5;
+            const cardTop = 32;
+            const cardHeight = 22;
+            teamSummary.forEach(([label, value, tone], index) => {
+              const colors = {
+                total: [117, 0, 138],
+                answered: [2, 132, 199],
+                "no-answer": [176, 0, 96],
+                inoperable: [117, 0, 138],
+                pending: [0, 129, 84]
+              };
+              const color = colors[tone];
+              const x = cardStartX + index * (cardWidth + cardGap);
+              pdf.setDrawColor(...color);
+              pdf.setLineWidth(0.35);
+              pdf.setFillColor(255, 255, 255);
+              pdf.roundedRect(x, cardTop, cardWidth, cardHeight, 2, 2, "FD");
+              pdf.setFont("helvetica", "bold");
+              pdf.setFontSize(5.5);
+              pdf.setTextColor(...color);
+              pdf.text(
+                pdf.splitTextToSize(label, cardWidth - 4),
+                x + 2,
+                cardTop + 6
+              );
+              pdf.setFontSize(11);
+              pdf.text(String(value), x + 2, cardTop + 17);
+            });
+            const tableWidth = columnWidths.reduce(
+              (total, width) => total + width,
+              0
+            );
+            pdf.setDrawColor(...reportPdfTableTheme.header);
+            pdf.setFillColor(...reportPdfTableTheme.header);
+            pdf.roundedRect(
+              margin,
+              y,
+              tableWidth,
+              10,
+              2,
+              2,
+              "FD"
+            );
+            let x = margin;
+            for (let index = 0; index < detailedColumns.length; index++) {
+              pdf.setFont("helvetica", "bold");
+              pdf.setFontSize(6.7);
+              pdf.setTextColor(255, 255, 255);
+              pdf.text(
+                pdf.splitTextToSize(
+                  detailedColumns[index],
+                  columnWidths[index] - 3
+                ),
+                x + 1.5,
+                y + 4
+              );
+              x += columnWidths[index];
+            }
+            return { y: y + 10, tableTop: y, tableWidth };
+          };
+
+          let { y, tableTop, tableWidth } = drawHeader(62);
+          const drawTableFrame = bottom => {
+            pdf.setDrawColor(...reportPdfTableTheme.border);
+            pdf.roundedRect(
+              margin,
+              tableTop,
+              tableWidth,
+              Math.max(10, bottom - tableTop),
+              2,
+              2,
+              "S"
+            );
+          };
+          const exportRows = detailed.rows.length
+            ? detailed.rows.map(row => [
+                row.team,
+                String(row.designated),
+                row.hour,
+                String(row.calls),
+                String(row.answered),
+                String(row.noAnswer),
+                String(row.inoperable),
+                String(row.pending)
+              ])
+            : [["", "", "", "", "", "", "", "Sin registros"]];
+          const rowHeights = exportRows.map(values => {
+            const lines = values.map((value, index) =>
+              pdf.splitTextToSize(value, columnWidths[index] - 3)
+            );
+            return rowHeightFor(lines);
+          });
+          let rowIndex = 0;
+          while (rowIndex < exportRows.length) {
+            if (y + rowHeights[rowIndex] > pageHeight - 12) {
+              drawTableFrame(y);
+              pdf.addPage();
+              ({ y, tableTop, tableWidth } = drawHeader(62));
+            }
+            const pageStart = rowIndex;
+            let mergedHeight = 0;
+            while (
+              rowIndex < exportRows.length &&
+              (rowIndex === pageStart ||
+                y + mergedHeight + rowHeights[rowIndex] <= pageHeight - 12)
+            ) {
+              mergedHeight += rowHeights[rowIndex];
+              rowIndex++;
+            }
+
+            const mergedFill = reportPdfTableTheme.rows[pageStart % 2];
+            let x = margin;
+            for (let index = 0; index < 2; index++) {
+              pdf.setFillColor(...mergedFill);
+              pdf.rect(x, y, columnWidths[index], mergedHeight, "F");
+              pdf.setFont("helvetica", "normal");
+              pdf.setFontSize(7.5);
+              pdf.setTextColor(...reportPdfTableTheme.text);
+              const label = exportRows[pageStart][index];
+              const textY = y + mergedHeight / 2 + 1.3;
+              pdf.text(
+                pdf.splitTextToSize(label, columnWidths[index] - 3),
+                index === 1 ? x + columnWidths[index] / 2 : x + 1.5,
+                textY,
+                index === 1 ? { align: "center" } : undefined
+              );
+              x += columnWidths[index];
+            }
+            const mergedColumnsWidth = columnWidths[0] + columnWidths[1];
+
+            for (let index = pageStart; index < rowIndex; index++) {
+              const values = exportRows[index];
+              const lines = values.map((value, columnIndex) =>
+                pdf.splitTextToSize(value, columnWidths[columnIndex] - 3)
+              );
+              const rowHeight = rowHeights[index];
+              x = margin + mergedColumnsWidth;
+              pdf.setFillColor(
+                ...reportPdfTableTheme.rows[index % reportPdfTableTheme.rows.length]
+              );
+              pdf.rect(
+                x,
+                y,
+                tableWidth - mergedColumnsWidth,
+                rowHeight,
+                "F"
+              );
+              for (let columnIndex = 2; columnIndex < values.length; columnIndex++) {
+                pdf.setFont("helvetica", "normal");
+                pdf.setFontSize(7.5);
+                pdf.setTextColor(...reportPdfTableTheme.text);
+                pdf.text(
+                  lines[columnIndex],
+                  x + columnWidths[columnIndex] / 2,
+                  y + 4.7,
+                  { align: "center" }
+                );
+                x += columnWidths[columnIndex];
+              }
+              pdf.setDrawColor(...reportPdfTableTheme.border);
+              pdf.line(
+                margin + mergedColumnsWidth,
+                y + rowHeight,
+                margin + tableWidth,
+                y + rowHeight
+              );
+              y += rowHeight;
+            }
+            pdf.setDrawColor(...reportPdfTableTheme.border);
+            pdf.line(
+              margin + columnWidths[0],
+              y - mergedHeight,
+              margin + columnWidths[0],
+              y
+            );
+            pdf.line(
+              margin + mergedColumnsWidth,
+              y - mergedHeight,
+              margin + mergedColumnsWidth,
+              y
+            );
+          }
+          drawTableFrame(y);
+          const pageCount = pdf.internal.getNumberOfPages();
+          for (let page = 1; page <= pageCount; page++) {
+            pdf.setPage(page);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(7);
+            pdf.setTextColor(110, 100, 115);
+            pdf.text(
+              `Pagina ${page} de ${pageCount}`,
+              pageWidth - margin,
+              pageHeight - 4,
+              { align: "right" }
+            );
+          }
+          const suffix = detailedPendingOnly ? "-pendientes" : "";
+          const rubroFileName = normalizeSearchText(report.rubro)
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+          const teamFileName = normalizeSearchText(selectedDetailedTeam)
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+          pdf.save(
+            `reporte-detallado-${rubroFileName}-${teamFileName}-${report.date}${suffix}.pdf`
+          );
+        } catch (error) {
+          alert(error.message || "No se pudo generar el reporte detallado.");
+        } finally {
+          button.disabled = false;
+        }
+      };
+    };
+
+    if (showingDetailedReport) {
+      renderDetailedReport();
+      return;
+    }
 
     $("reportDetails").innerHTML = `
-      <div class="report-metrics">
-        ${metrics.map(([name, value]) => `
-          <article>
-            <span>${esc(name)}</span>
-            <strong>${esc(value)}</strong>
-          </article>
-        `).join("")}
-      </div>
+      <section class="report-content-panel" aria-label="Detalle del reporte">
+        <section class="report-summary" aria-label="Resumen del reporte">
+          <div class="report-metrics">
+            ${metrics.map(([name, value]) => `
+              <div class="report-metric">
+                <span class="report-metric-label">${esc(name)}:</span>
+                <strong class="report-metric-value">${esc(value)}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </section>
 
-      <div class="report-actions">
-        <button id="reportPdf">⬇ DESCARGAR PDF</button>
-        <button id="reportExcel" class="secondary">
-          ⬇ DESCARGAR EXCEL
-        </button>
-        <button
-          id="reportContinue"
-          ${report.pending ? "" : "disabled"}
-        >
-          ☎ CONTINUAR LLAMADAS
-        </button>
-      </div>
-
-      <div class="report-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Empresa</th>
-              <th>Teléfono</th>
-              <th>Estado</th>
-              <th>Duración</th>
-              <th>ENVIÓ INF.</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(contact => `
-              <tr>
-                <td>${esc(contact.name)}</td>
-                <td>${esc(contact.phone)}</td>
-                <td>${status(contact)}</td>
-                <td>${esc(contact.durationSeconds)} s</td>
-                <td>Sin registro</td>
-              </tr>
-            `).join("") || `
-              <tr>
-                <td colspan="5">Sin resultados</td>
-              </tr>
-            `}
-          </tbody>
-        </table>
-      </div>
+        <section class="report-detail-card" aria-label="Llamadas del reporte">
+          ${term ? `
+            <div class="report-detail-heading">
+              <h3>RESULTADOS DE BÚSQUEDA (${tableRows.length})</h3>
+            </div>
+          ` : ""}
+          <div id="report-detail-table" class="report-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>N.</th>
+                  <th>BASE</th>
+                  <th>EMPRESA</th>
+                  <th>TELEFONO</th>
+                  <th>EQUIPO</th>
+                  <th>HORA LIMA</th>
+                  <th>INT.</th>
+                  <th>DURACION</th>
+                  <th>RESULTADO</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows.map(({ report: rowReport, contact }, index) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${esc(contact.list || rowReport.rubro)}</td>
+                    <td>${esc(contact.name)}</td>
+                    <td>${esc(contact.phone)}</td>
+                    <td>${esc(contact.workerName || "—")}</td>
+                    <td>${esc(limaDateTime(contact.lastCallAt))}</td>
+                    <td>${esc(contact.attemptNumber || "—")}</td>
+                    <td>${esc(formatDuration(contact.durationSeconds))}</td>
+                    <td class="report-result ${statusClass(contact)}">
+                      ${esc(status(contact))}
+                    </td>
+                  </tr>
+                `).join("") || `
+                  <tr>
+                    <td colspan="9">Sin resultados</td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+          <div class="report-footer">
+            <div class="report-actions">
+              <button id="reportPdf" type="button">⬇ DESCARGAR REPORTE</button>
+              <button id="reportTotalPdf" class="secondary" type="button">
+                ⬇ DESCARGA TOTAL
+              </button>
+            </div>
+            <div class="report-continue">
+              <button id="reportDetailed" class="secondary" type="button">
+                DETALLADO
+              </button>
+              <button
+                id="reportContinue"
+                ${report.pending ? "" : "disabled"}
+              >
+                COMENZAR LLAMADAS PENDIENTES
+              </button>
+            </div>
+          </div>
+        </section>
+      </section>
     `;
 
-    $("reportPdf").onclick = () => {
+    const exportReportsToPdf = async (reportsForExport, clickedButton) => {
       const JsPDF = window.jspdf?.jsPDF;
 
       if (!JsPDF) {
@@ -345,63 +1294,358 @@ function showError(error) {
         return;
       }
 
-      const pdf = new JsPDF();
-      pdf.setFontSize(15);
-      pdf.text("Reporte diario - " + report.date, 12, 16);
-      pdf.setFontSize(10);
-
-      pdf.text(
-        `Rubro: ${report.rubro} | Total: ${report.totalCalls}`,
-        12, 25
-      );
-
-      let y = 35;
-
-      for (const contact of rows) {
-        if (y > 275) {
-          pdf.addPage();
-          y = 18;
+      clickedButton.disabled = true;
+      try {
+        const calledReports = reportsForExport.filter(reportItem =>
+          Number(reportItem.totalCalls || 0) > 0 ||
+          (Array.isArray(reportItem.calls) && reportItem.calls.length > 0) ||
+          (Array.isArray(reportItem.rows) &&
+            reportItem.rows.some(contact => contact.lastCallAt))
+        );
+        const reportsToExport = Array.from(
+          calledReports.reduce((reportsByRubro, reportItem) => {
+            const rubroKey = normalizeSearchText(reportItem.rubro);
+            let combined = reportsByRubro.get(rubroKey);
+            if (!combined) {
+              combined = {
+                ...reportItem,
+                numbers: 0,
+                totalCalls: 0,
+                answered: 0,
+                pending: 0,
+                rows: []
+              };
+              reportsByRubro.set(rubroKey, combined);
+            }
+            combined.numbers += Number(reportItem.numbers || 0);
+            combined.totalCalls += Number(reportItem.totalCalls || 0);
+            combined.answered += Number(reportItem.answered || 0);
+            combined.pending += Number(reportItem.pending || 0);
+            combined.rows.push(...(reportItem.rows || []));
+            return reportsByRubro;
+          }, new Map()).values()
+        );
+        if (!reportsToExport.length) {
+          alert("No hay rubros con llamadas registradas para esta fecha.");
+          return;
         }
 
-        pdf.text(
-          `${String(contact.name).slice(0, 34)} | ` +
-          `${contact.phone} | ${status(contact)}`,
-          12, y
+        const logoResponse = await fetch("/logo-vc-color.png");
+        if (!logoResponse.ok) {
+          throw Error("No se pudo cargar el logotipo del reporte.");
+        }
+        const logoBlob = await logoResponse.blob();
+        const logoData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(
+            Error("No se pudo preparar el logotipo del reporte.")
+          );
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(logoBlob);
+        });
+
+        for (const report of reportsToExport) {
+          const term = "";
+          const pdf = new JsPDF("landscape", "mm", "a4");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const margin = 10;
+          const columns = [
+            { title: "N.", width: 9 },
+            { title: "BASE", width: 31 },
+            { title: "EMPRESA", width: 53 },
+            { title: "TELEFONO", width: 43 },
+            { title: "EQUIPO", width: 31 },
+            { title: "HORA LIMA", width: 35 },
+            { title: "INT.", width: 13 },
+            { title: "DURACION", width: 24 },
+            { title: "RESULTADO", width: pageWidth - margin * 2 - 239 }
+          ];
+          const tableWidth = columns.reduce(
+            (width, column) => width + column.width,
+            0
+          );
+          const callRecords = report.rows.map(contact => ({
+            ...contact,
+            list: contact.list || report.rubro,
+            startedAt: contact.lastCallAt,
+            answeredAt: contact.answered ? contact.lastCallAt : null
+          }));
+          const filteredCalls = callRecords.filter(call =>
+            normalizeSearchText(
+            `${report.rubro} ${call.name || ""} ${call.phone || ""} ${call.list || ""} ` +
+            `${call.workerName || ""} ${call.technicalResult || ""} ` +
+            `${call.disposition || ""}`
+            ).includes(term)
+          );
+          const resultForCall = call => {
+            if (call.inoperable) return "INOPERABLE";
+            if (call.pending) return "PENDIENTE";
+            if (call.answered) return "CONTESTO";
+            const outcome = String(
+              call.disposition || call.technicalResult || ""
+            ).toLowerCase();
+            if (/buz[oó]n|voicemail|sin.inter[eé]s/.test(outcome)) {
+              return "CONTESTO";
+            }
+            if (
+              call.answeredAt ||
+              call.answered ||
+              Number(call.durationSeconds || 0) >= 35 ||
+              /^(contesto|interesado|no_interesado|requiere_asesor|agendado)$/
+                .test(String(call.technicalResult || "").toLowerCase())
+            ) {
+              return "CONTESTO";
+            }
+            return "PENDIENTE";
+          };
+          const groups = new Map([[
+            report.id,
+            { name: report.rubro, equipmentLabel: "", calls: filteredCalls }
+          ]]);
+
+          const totalCalls = Number(
+            report.totalCalls ||
+            filteredCalls.filter(call => call.startedAt).length
+          );
+          const resultCounts = filteredCalls.reduce((counts, call) => {
+            const result = resultForCall(call);
+            if (result === "CONTESTO") counts.answered++;
+            if (result === "PENDIENTE") counts.pending++;
+            return counts;
+          }, { answered: 0, pending: 0 });
+          const equipmentCount = new Set(
+            report.rows.map(contact => String(contact.workerName || "").trim())
+              .filter(Boolean)
+          ).size;
+          const rowHeightFor = lines => Math.max(
+            8,
+            ...lines.map(value => value.length * 3.6 + 3)
+          );
+          const drawHeader = (pageInTeam, showSummary) => {
+            const cardTop = 37;
+            pdf.setFillColor(232, 0, 169);
+            pdf.rect(0, 0, pageWidth, 3, "F");
+            pdf.addImage(logoData, "PNG", margin, 7, 26, 14);
+            pdf.setTextColor(84, 20, 105);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(14);
+            pdf.text("REPORTE DE LLAMADAS", 42, 13);
+            pdf.setFontSize(8);
+            pdf.text(report.rubro.toUpperCase(), 42, 19);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(7.5);
+            pdf.text("LIMA - PERU", pageWidth - margin, 10, { align: "right" });
+            pdf.text(`FECHA: ${formatReportDate(report.date)}`, pageWidth - margin, 16, {
+              align: "right"
+            });
+            pdf.setDrawColor(218, 198, 226);
+            pdf.line(margin, 29, pageWidth - margin, 29);
+
+            pdf.setDrawColor(112, 9, 127);
+            pdf.setFillColor(255, 255, 255);
+            pdf.roundedRect(margin, cardTop, tableWidth, 12, 2, 2, "FD");
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(9);
+            pdf.setTextColor(84, 20, 105);
+            pdf.text(
+              `REPORTE DE LLAMADAS${pageInTeam > 1 ? " (CONTINUACION)" : ""}`,
+              margin + 3,
+              cardTop + 7.5
+            );
+            pdf.setFillColor(232, 0, 169);
+            pdf.roundedRect(pageWidth - margin - 42, cardTop + 2, 39, 8, 4, 4, "F");
+            pdf.setFontSize(7);
+            pdf.setTextColor(255, 255, 255);
+            pdf.text(report.rubro.toUpperCase(), pageWidth - margin - 22.5, cardTop + 7.2, {
+              align: "center",
+              maxWidth: 34
+            });
+
+            let y = cardTop + 18;
+            if (showSummary) {
+              const metrics = [
+                ["RUBRO:", report.rubro],
+                ["FECHA:", formatReportDate(report.date)],
+                ["EQUIPOS USADOS:", equipmentCount || "—"],
+                ["NÚMEROS USADOS:", report.numbers],
+                ["LLAMADAS TOTALES:", totalCalls],
+                ["CONTESTADAS:", report.answered ?? resultCounts.answered],
+                ["PENDIENTES:", report.pending ?? resultCounts.pending]
+              ];
+              pdf.setFontSize(7.5);
+              for (const [label, value] of metrics) {
+                pdf.setFont("helvetica", "bold");
+                pdf.setTextColor(84, 20, 105);
+                pdf.text(label, margin + 3, y);
+                pdf.setFont("helvetica", "normal");
+                pdf.setTextColor(118, 114, 123);
+                pdf.text(String(value), margin + 36, y);
+                y += 5;
+              }
+            }
+
+            y += 2;
+            pdf.setDrawColor(218, 0, 169);
+            pdf.line(margin + 2, y, pageWidth - margin - 2, y);
+            y += 8;
+
+            const tableTop = y;
+            pdf.setDrawColor(...reportPdfTableTheme.header);
+            pdf.setFillColor(...reportPdfTableTheme.header);
+            pdf.roundedRect(
+              margin,
+              y,
+              tableWidth,
+              9,
+              2,
+              2,
+              "FD"
+            );
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(7);
+            pdf.setTextColor(255, 255, 255);
+            let x = margin;
+            for (const column of columns) {
+              pdf.text(column.title, x + 1.5, y + 6);
+              x += column.width;
+            }
+            return { y: y + 9, tableTop };
+          };
+          const drawRows = (group, showSummary) => {
+            let pageInTeam = 1;
+            let { y, tableTop } = drawHeader(pageInTeam, showSummary);
+            let groupRowNumber = 0;
+            const records = group.calls.length ? group.calls : [null];
+            const drawCardFrame = bottom => {
+              pdf.setDrawColor(...reportPdfTableTheme.border);
+              pdf.roundedRect(
+                margin,
+                tableTop,
+                tableWidth,
+                Math.max(9, bottom - tableTop),
+                2,
+                2,
+                "S"
+              );
+            };
+
+            for (const call of records) {
+              const dateTime = call
+                ? call.startedAt
+                  ? limaDateTime(call.startedAt).replace(", ", "\n")
+                  : "—"
+                : "";
+              const values = call
+                ? [
+                    String(++groupRowNumber),
+                    String(call.list || report.rubro),
+                    String(call.name || ""),
+                    String(call.phone || ""),
+                    String(call.workerName || "—"),
+                    dateTime,
+                    String(call.attemptNumber || "—"),
+                    formatDuration(call.durationSeconds),
+                    resultForCall(call)
+                  ]
+                : ["", "", "Sin llamadas registradas", "", "", "", "", "", ""];
+              const lines = values.map((value, index) =>
+                value.split("\n").flatMap(line =>
+                  pdf.splitTextToSize(
+                    line,
+                    columns[index].width - 3
+                  )
+                )
+              );
+              const rowHeight = rowHeightFor(lines);
+
+              if (y + rowHeight > pageHeight - 12) {
+                drawCardFrame(y);
+                pdf.addPage();
+                pageInTeam++;
+                ({ y, tableTop } = drawHeader(pageInTeam, false));
+              }
+
+              pdf.setFillColor(
+                ...reportPdfTableTheme.rows[
+                  Math.max(groupRowNumber - 1, 0) %
+                    reportPdfTableTheme.rows.length
+                ]
+              );
+              pdf.rect(margin, y, tableWidth, rowHeight, "F");
+              let x = margin;
+              for (let index = 0; index < columns.length; index++) {
+                const isResult = index === 8;
+                pdf.setFont("helvetica", isResult ? "bold" : "normal");
+                pdf.setFontSize(7.5);
+                pdf.setTextColor(...reportPdfTableTheme.text);
+                const resultColors = {
+                  CONTESTO: [0, 118, 79],
+                  INOPERABLE: [220, 38, 38],
+                  PENDIENTE: [0, 129, 84]
+                };
+                pdf.setTextColor(
+                  ...(isResult
+                    ? resultColors[values[index]] || [46, 40, 50]
+                    : reportPdfTableTheme.text)
+                );
+                pdf.text(lines[index], x + 1.5, y + 4.7);
+                x += columns[index].width;
+              }
+              pdf.setDrawColor(...reportPdfTableTheme.border);
+              pdf.line(
+                margin,
+                y + rowHeight,
+                margin + tableWidth,
+                y + rowHeight
+              );
+              y += rowHeight;
+            }
+            drawCardFrame(y);
+          };
+
+          let groupIndex = 0;
+          for (const group of groups.values()) {
+            if (groupIndex > 0) pdf.addPage();
+            drawRows(group, groupIndex === 0);
+            groupIndex++;
+          }
+
+          const pageCount = pdf.internal.getNumberOfPages();
+          for (let page = 1; page <= pageCount; page++) {
+            pdf.setPage(page);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(7);
+            pdf.setTextColor(110, 100, 115);
+            pdf.text(
+              `Lima - Peru  |  Pagina ${page}`,
+              pageWidth - margin,
+              pageHeight - 4,
+              { align: "right" }
+            );
+          }
+
+          const rubroFileName = normalizeSearchText(report.rubro)
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+          pdf.save(`reporte-${rubroFileName}-${report.date}.pdf`);
+        }
+        alert(
+          reportsToExport.length === 1
+            ? `Se descargó el reporte de ${reportsToExport[0].rubro}.`
+            : `Se generaron ${reportsToExport.length} archivos PDF, uno por cada rubro con llamadas.`
         );
-        y += 7;
+      } catch (error) {
+        alert(error.message || "No se pudo generar el reporte PDF.");
+      } finally {
+        clickedButton.disabled = false;
       }
-
-      pdf.save(`reporte-${report.date}.pdf`);
     };
 
-    $("reportExcel").onclick = () => {
-      if (!window.XLSX) {
-        alert("Librería Excel no disponible");
-        return;
-      }
-
-      const data = rows.map(contact => ({
-        Fecha: report.date,
-        Rubro: report.rubro,
-        Empresa: contact.name,
-        Telefono: contact.phone,
-        Estado: status(contact),
-        Duracion_segundos: contact.durationSeconds,
-        Envio_informacion: "Sin registro"
-      }));
-
-      const sheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-
-      XLSX.utils.book_append_sheet(
-        workbook, sheet, "Reporte"
-      );
-
-      XLSX.writeFile(
-        workbook,
-        `reporte-${report.date}.xlsx`
-      );
-    };
+    $("reportPdf").onclick = () =>
+      exportReportsToPdf([report], $("reportPdf"));
+    $("reportTotalPdf").onclick = () =>
+      exportReportsToPdf(reports, $("reportTotalPdf"));
 
     $("reportContinue").onclick = async () => {
       if (!confirm(
@@ -437,9 +1681,16 @@ function showError(error) {
         alert(error.message);
       }
     };
+
+    $("reportDetailed").onclick = () => {
+      showingDetailedReport = true;
+      detailedPendingOnly = false;
+      selectedDetailedTeam = "";
+      renderDay();
+    };
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  const bindReportNav = () => {
     $("reportNavBtn")?.addEventListener("click", () => {
       $("callsContent").hidden = true;
       $("annualReport").hidden = false;
@@ -454,5 +1705,10 @@ function showError(error) {
       $("reportNavBtn").hidden = false;
       $("reportBackBtn").hidden = true;
     });
-  });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindReportNav);
+  } else {
+    bindReportNav();
+  }
 })();
