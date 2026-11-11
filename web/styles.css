@@ -5960,6 +5960,17 @@ body .panel .report-detailed-table tbody tr:nth-child(even) td {
   border-color: var(--report-line);
   border-radius: 10px !important;
 }
+#annualReport .report-search-input input {
+  min-height: 0;
+  height: 24px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #4b1261;
+}
 #annualReport input[type="date"] { color-scheme: dark; padding: 10px 12px; font: inherit; }
 #annualReport button { text-transform: none; transform: none; }
 #annualReport .report-period-apply { min-height: 46px; padding: 10px 20px; border-radius: 10px !important; box-shadow: none; }
