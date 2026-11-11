@@ -4,6 +4,8 @@ import { refs, setStatus, setBadge, setAckBadge } from './modules/dom.js?v=20260
 import * as Contacts from './modules/contacts.js?v=20261106-mysql-book';
 import * as AudioBridge from './modules/audio-bridge.js?v=2';
 import * as WhatsApp from './modules/whatsapp.js?v=20261106-mysql-book';
+import { apiFetch as fetch, currentUser, bindAccountControls } from './modules/auth.js';
+import { isAnsweredAttempt } from './modules/report-metrics.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let sessionCode = "";
@@ -37,9 +39,9 @@ const pendingCommandTimeouts = new Map();
 // The contact database is browsed inside a seven-row scroll area. Render the
 // complete selected list so scrolling can reach every record without paging.
 const PAGE_SIZE = 10000;
-const DASHBOARD_SESSION_KEY = "voip vc.dashboardSessionCode";
-const DASHBOARD_TOKEN_PREFIX = "voip vc.dashboardToken.";
-const DASHBOARD_CLIENT_KEY = "voip vc.dashboardClientId";
+const DASHBOARD_SESSION_KEY = `voip vc.auth.${currentUser.id}.dashboardSessionCode`;
+const DASHBOARD_TOKEN_PREFIX = `voip vc.auth.${currentUser.id}.dashboardToken.`;
+const DASHBOARD_CLIENT_KEY = `voip vc.auth.${currentUser.id}.dashboardClientId`;
 const dashboardClientId = (() => {
   let value = String(sessionStorage.getItem(DASHBOARD_CLIENT_KEY) || "").trim();
   if (!value) {
@@ -85,11 +87,9 @@ window.addEventListener("contact-book:error", event => {
 
 async function init() {
   console.log("Dashboard init starting...");
-  Contacts.loadContacts();
-  Contacts.loadCalledCounts();
-  Contacts.loadContactRowStatus();
-  Contacts.loadCallDurations();
-  Contacts.loadDismissedReminders();
+  // Authenticated accounts only load data from their authorized MySQL session.
+  // The anonymous legacy browser database is deliberately left untouched.
+  bindAccountControls();
   WhatsApp.loadWhatsAppPresetMessages();
   
   renderContacts();
@@ -2774,7 +2774,7 @@ function buildAssignedListPdf(listName, rows) {
     y -= 25;
   };
 
-  const answeredRows = rows.filter((row) => Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto")));
+  const answeredRows = rows.filter(isAnsweredAttempt);
   const totalSeconds = rows.reduce((total, row) => total + Number(row.durationSeconds || 0), 0);
   const equipmentCounts = new Map();
   rows.forEach((row) => {
@@ -2832,7 +2832,7 @@ function buildAssignedListPdf(listName, rows) {
         y -= 24;
         tableHeader();
       }
-      const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
+      const answered = isAnsweredAttempt(row);
       const values = [
         index + 1,
         pdfClipText(row.name || "Sin nombre", 25),
@@ -2942,7 +2942,7 @@ function reportTimeBand(startedAt, shiftType = "") {
 }
 
 function reportResult(row) {
-  const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
+  const answered = isAnsweredAttempt(row);
   if (row.technicalResult === "buzon_de_voz") return "BUZON DE VOZ";
   if (row.technicalResult === "sin_servicio") return "SIN SERVICIO";
   if (row.technicalResult === "no_disponible") return "NO DISPONIBLE";
@@ -3133,7 +3133,7 @@ async function legacyBuildCallReportPdf(listName, sourceRows) {
     { label: "CONTESTO", width: 52 },
     { label: "DURACION", width: 54 }
   ];
-  const answeredRows = rows.filter((row) => Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto")));
+  const answeredRows = rows.filter(isAnsweredAttempt);
   const totalSeconds = rows.reduce((total, row) => total + Number(row.durationSeconds || 0), 0);
   const equipmentCounts = new Map();
   rows.forEach((row) => {
@@ -3280,7 +3280,7 @@ async function legacyBuildCallReportPdf(listName, sourceRows) {
         documentPdf.setFillColor("#f6eef8");
         documentPdf.rect(margin, y, tableWidth, 24, "F");
       }
-      const answered = Boolean(!["buzon_de_voz", "sin_servicio", "no_disponible"].includes(row.technicalResult) && (row.answeredAt || row.technicalResult === "contesto"));
+      const answered = isAnsweredAttempt(row);
       const values = [
         String(index + 1),
         clip(currentList, 13),
@@ -3460,6 +3460,12 @@ socket.on("session:joined", ({ code, role }) => {
 });
 
 socket.on("session:error", ({ message, reason }) => {
+  if (["AUTH_REQUIRED", "AUTH_ORIGIN", "AUTH_UNAVAILABLE", "FORBIDDEN"].includes(reason)) {
+    autoSessionRequested = false;
+    setStatus(message || "No se pudo validar el acceso.", true);
+    if (reason === "AUTH_REQUIRED") window.location.replace("/login");
+    return;
+  }
   if (sessionCode && !autoSessionRequested) {
     if (reason === "dashboard_in_use") {
       localStorage.removeItem(DASHBOARD_SESSION_KEY);

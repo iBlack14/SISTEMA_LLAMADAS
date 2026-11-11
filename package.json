@@ -7,6 +7,12 @@
     "node": ">=20"
   },
   "scripts": {
+    "auth:local": "node server/auth/local.js",
+    "auth:setup": "node server/auth/local.js --setup-only",
+    "auth:mysql:stop": "node server/auth/stop-local-mysql.js",
+    "auth:user:add": "node server/auth/create-user.js",
+    "test:auth": "node --test server/auth/auth.integration.test.js",
+    "test:network": "node --test server/network-monitor.test.js",
     "start": "node server/server.js",
     "migrate:history": "node server/migrate-call-history.js",
     "backup:history": "node server/migrate-call-history.js --backup-only",

@@ -69,7 +69,7 @@ export function connectDatabase(key, request) {
   connectionKey = key;
   transport = request;
   ready = false;
-  const legacy = localStorage.getItem("voip vc.contacts") ? snapshot() : null;
+  const legacy = !window.VOIP_VC_AUTH_USER && localStorage.getItem("voip vc.contacts") ? snapshot() : null;
   loading = (async () => {
     const result = await request("GET");
     if (connectionKey !== key) return;
@@ -93,7 +93,9 @@ export function connectDatabase(key, request) {
     }
     ready = true;
     saveError = null;
-    for (const key of ["voip vc.contacts",LISTS_KEY,CALLED_COUNTS_KEY,CONTACT_ROW_STATUS_KEY,CONTACT_CALL_DURATIONS_KEY,NOTE_REMINDERS_DISMISSED_KEY]) localStorage.removeItem(key);
+    if (!window.VOIP_VC_AUTH_USER) {
+      for (const key of ["voip vc.contacts",LISTS_KEY,CALLED_COUNTS_KEY,CONTACT_ROW_STATUS_KEY,CONTACT_CALL_DURATIONS_KEY,NOTE_REMINDERS_DISMISSED_KEY]) localStorage.removeItem(key);
+    }
     window.dispatchEvent(new Event("contact-book:loaded"));
   })().catch(error => {
     saveError = error;

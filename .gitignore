@@ -8,3 +8,5 @@ server/*.call-history.json
 **/.gradle/
 android-app/local.properties
 **/node_modules/
+.auth-local/
+.playwright-mcp/

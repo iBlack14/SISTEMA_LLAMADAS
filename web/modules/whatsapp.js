@@ -1,6 +1,7 @@
 import { API_BASE } from './socket.js?v=2';
 import { getPreference, setPreference } from './contacts.js?v=20261106-mysql-book';
 import { refs, setStatus } from './dom.js?v=2';
+import { apiFetch as fetch } from './auth.js';
 
 export const WHATSAPP_API_BASE = API_BASE;
 export const WA_STATUS_PATHS = ["/api/whatsapp/status"];
@@ -23,7 +24,7 @@ let whatsappQrPollTimer = null;
 
 export function loadWhatsAppPresetMessages() {
   try {
-    const raw = getPreference("whatsappPresetMessages", JSON.parse(localStorage.getItem(WHATSAPP_PRESETS_KEY) || "[]"));
+    const raw = getPreference("whatsappPresetMessages", window.VOIP_VC_AUTH_USER ? [] : JSON.parse(localStorage.getItem(WHATSAPP_PRESETS_KEY) || "[]"));
     if (Array.isArray(raw)) {
       whatsappPresetMessages = raw.map((msg) => String(msg || "").trim()).filter(Boolean);
     }

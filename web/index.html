@@ -59,6 +59,12 @@
         </div>
       </div>
       <input id="sessionCode" type="hidden" />
+      <nav class="account-bar" aria-label="Cuenta">
+        <span id="accountIdentity"></span>
+        <a id="adminLink" href="/admin/nucleo-red" hidden>Núcleo de Red</a>
+        <button id="logoutButton" type="button" class="secondary">Cerrar sesión</button>
+        <span id="accountError" role="alert"></span>
+      </nav>
 
       <!-- STATUS -->
       <div class="status-pill" id="status">
@@ -431,27 +437,8 @@
   <script type="module" src="/modules/calendar-ui.js?v=20261106-calendar-range"></script>
   <script>
     (function bootstrapDashboard() {
-      const params = new URLSearchParams(window.location.search);
-      function resolveApiBase() {
-        const fromQuery = String(params.get("apiBase") || "").trim();
-        if (fromQuery) return fromQuery.replace(/\/+$/, "");
-
-        const hostname = window.location.hostname;
-
-        // Local detection
-        if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.")) {
-          return window.location.origin;
-        }
-
-        // Production mapping
-        if (hostname === "llamada.viacomunicativa.com") {
-          return "https://llamada.viacomunicativa.com";
-        }
-
-        return window.location.origin;
-      }
-
-      const apiBase = resolveApiBase();
+      // Isolated authentication uses one origin for pages, cookies and sockets.
+      const apiBase = window.location.origin;
       window.VOIP_VC_API_BASE = apiBase;
 
       const socketScript = document.createElement("script");

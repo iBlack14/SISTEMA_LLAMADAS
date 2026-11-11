@@ -1,0 +1,24 @@
+:root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; color: #f8f2ff; background: #030014; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.access-page { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
+.access-shell { width: min(920px, 100%); display: grid; grid-template-columns: 1fr 1fr; background: #110018; border: 1px solid #492960; border-radius: 18px; overflow: hidden; }
+.access-brand { padding: 52px 40px; background: #1d0b36; border-bottom: 5px solid #7c3aed; }
+.access-brand h1 { margin: 42px 0 20px; font-size: clamp(32px, 4vw, 46px); line-height: 1.12; letter-spacing: -.035em; }
+.access-brand p { line-height: 1.6; max-width: 28ch; }
+.access-form { padding: 52px 40px; }
+h2 { margin: 0 0 12px; font-size: 28px; }
+.access-form > p { color: #d8cce6; margin-bottom: 30px; }
+label { display: block; font-weight: 600; margin: 20px 0 8px; }
+input { width: 100%; padding: 13px; background: #080012; color: #f8f2ff; border: 1px solid #806393; border-radius: 6px; font: inherit; }
+button, .panel-link { background: #6d28d9; color: white; border: 0; border-radius: 6px; padding: 13px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+form button { width: 100%; }
+button:disabled { opacity: .6; cursor: wait; }
+:focus-visible { outline: 3px solid #c4b5fd; outline-offset: 3px; }
+.access-error { color: #fda4af; line-height: 1.5; min-height: 24px; }
+.admin-reserve { background: #110018; border: 1px solid #492960; padding: 40px; border-radius: 16px; width: min(740px, 100%); }
+.admin-reserve h1 { font-size: 36px; }
+.admin-reserve p { line-height: 1.65; }
+.panel-link { display: inline-block; margin-top: 16px; text-decoration: none; }
+.account-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 22px 0; }
+@media (max-width: 620px) { .access-page { padding: 16px; } .access-shell { grid-template-columns: 1fr; } .access-brand, .access-form { padding: 28px; } .access-brand h1 { margin-top: 20px; } .access-brand h1 br { display: none; } }

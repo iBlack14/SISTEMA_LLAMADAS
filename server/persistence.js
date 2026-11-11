@@ -241,6 +241,24 @@ export class SessionPersistence {
     return Boolean(row?.endedAt && row.contactId === contactId);
   }
 
+  async getCallAttemptsForSessions(codes) {
+    await this.saveChain;
+    if (this.storageFailed || (this.databaseConfigured && (!this.usingDb || this.pendingDatabase))) {
+      throw new Error("No se puede confirmar el historial mientras hay guardados pendientes.");
+    }
+    const unique = [...new Set(codes)];
+    const grouped = new Map(unique.map(code => [code, []]));
+    if (!unique.length) return grouped;
+    if (this.databaseConfigured) {
+      const [rows] = await this.pool.query(
+        `SELECT session_code,row_data FROM vc_call_attempts WHERE session_code IN (${unique.map(() => "?").join(",")}) ORDER BY started_at,attempt_id`, unique);
+      for (const entry of rows) grouped.get(entry.session_code)?.push(parseJson(entry.row_data));
+    } else {
+      for (const entry of this.records.values()) grouped.get(entry.code)?.push({ ...entry.row });
+    }
+    return grouped;
+  }
+
   async getCallAttempts(code, { from = "", to = "", phone = "" } = {}) {
     await this.saveChain;
     if (this.storageFailed) throw new Error("Hay escrituras pendientes; no se puede confirmar el historial completo.");

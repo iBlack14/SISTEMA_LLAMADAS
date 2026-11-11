@@ -18,7 +18,25 @@ import { bindDeviceToPairingSlot, clearDeviceFromPairingSlots, dedupePairingSlot
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import dotenv from "dotenv";
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
+// The dedicated launcher supplies all settings. Never read the existing .env in isolated mode.
+if (process.env.AUTH_LOCAL_ISOLATED !== "1") dotenv.config({ path: path.join(__dirname, "..", ".env") });
+import { assertIsolatedConfig, assertXamppConfig } from "./auth/config.js";
+import { AuthService } from "./auth/service.js";
+import { installSocketAuth } from "./auth/sockets.js";
+import { NetworkMonitor } from "./network-monitor.js";
+if (process.env.AUTH_LOCAL_ISOLATED === "1") assertIsolatedConfig();
+else {
+  assertXamppConfig();
+  const port = Number(process.env.PORT || 3000);
+  const localBase = `http://127.0.0.1:${port}`;
+  process.env.DB_HOST = "127.0.0.1";
+  process.env.HOST = "127.0.0.1";
+  process.env.TRUST_PROXY = "0";
+  process.env.CORS_ORIGIN = `${localBase},http://localhost:${port}`;
+  process.env.PUBLIC_BASE_URL = localBase;
+  process.env.PUBLIC_WEB_BASE_URL = localBase;
+  process.env.LOCAL_LAN_BASE_URL = "";
+}
 
 import { SessionPersistence } from "./persistence.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, annualPhoneBlocks, phoneKey } from "./contact-book.js";
@@ -77,6 +95,15 @@ const io = new Server(server, {
   maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE || 1048576)
 });
 
+const authOrigins = [`http://127.0.0.1:${Number(process.env.PORT || 3000)}`, `http://localhost:${Number(process.env.PORT || 3000)}`];
+const auth = new AuthService(null, { origins: authOrigins });
+const network = new NetworkMonitor({ pool: null, persistence, getSessions: () => sessions,
+  isSocketConnected: id => Boolean(io.sockets.sockets.get(id)?.connected),
+  broadcast: snapshot => io.to("admin:network").emit("admin:network", snapshot) });
+const disconnectAuthSockets = installSocketAuth(io, auth, {
+  onAdminSubscribe: async socket => socket.emit("admin:network", await network.snapshot())
+});
+
 
 app.use((req, res, next) => {
   const allowedOrigin = CORS_ORIGIN;
@@ -95,6 +122,7 @@ app.use((req, res, next) => {
 });
 
 
+app.use("/api/auth/login", express.json({ limit: "4kb" }));
 app.use(express.json({ limit: process.env.MAX_JSON_SIZE || "20mb" }));
 app.use((_, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -103,6 +131,52 @@ app.use((_, res, next) => {
   res.setHeader("Permissions-Policy", "camera=(), geolocation=(), payment=()");
   next();
 });
+
+app.use(auth.middleware());
+auth.routes(app, disconnectAuthSockets);
+app.use("/api/admin", auth.requireAdmin, auth.csrf);
+app.get("/api/admin/network/access", (req, res) => res.json({ ok: true, role: req.user.role }));
+app.get("/api/admin/network", async (_, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try { res.json({ ok: true, ...await network.snapshot() }); }
+  catch { res.status(503).json({ ok: false, error: "No se pudo consultar Núcleo de Red." }); }
+});
+app.get("/api/admin/network/activity", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const raw = String(req.query.equipment || "");
+  if (!/^(?:[1-9]|10)(?:,(?:[1-9]|10))*$/.test(raw) || raw.split(",").length > 10) {
+    return res.status(400).json({ ok: false, error: "Selecciona equipos del 1 al 10." });
+  }
+  const numbers = [...new Set(raw.split(",").map(Number))];
+  try {
+    const snapshot = await network.snapshot({ detailNumbers: numbers });
+    res.json({ ok: true, equipment: snapshot.equipment.filter(item => numbers.includes(item.number)) });
+  } catch { res.status(503).json({ ok: false, error: "No se pudo consultar la actividad." }); }
+});
+app.get("/api/admin/network/equipment/:number", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const number = Number(req.params.number);
+  if (!Number.isInteger(number) || number < 1 || number > 10) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
+  try {
+    const snapshot = await network.snapshot({ detailNumbers: [number] });
+    res.json({ ok: true, generatedAt: snapshot.generatedAt, equipment: snapshot.equipment[number - 1] });
+  } catch { res.status(503).json({ ok: false, error: "No se pudo consultar el equipo." }); }
+});
+app.use("/admin", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!req.user) return res.redirect("/login");
+  auth.requireAdmin(req, res, next);
+});
+app.get("/admin/nucleo-red", (_, res) => res.sendFile(path.join(__dirname, "auth/views/admin.html")));
+app.get(["/", "/index.html", "/admin.html"], (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!req.user) return res.redirect("/login");
+  if (req.path.toLowerCase() === "/admin.html") return auth.requireAdmin(req, res, () => res.redirect("/admin/nucleo-red"));
+  next();
+});
+app.get("/login", (_, res) => res.sendFile(path.join(__dirname, "../web/login.html")));
+// These operational helpers are outside /api/session and need their own guard.
+app.use(["/api/fetch-url", "/api/server-info", "/api/twilio/configure"], auth.requireUser, auth.csrf);
 
 function createRateLimiter({ windowMs = 60000, max = 60 } = {}) {
   const buckets = new Map();
@@ -136,7 +210,20 @@ let sessions = new Map();
 const historyGate = new CallHistoryGate(persistence, () => sessions);
 
 async function bootstrap() {
+  if (!await persistence.initDb()) throw new Error("No se pudo conectar a MySQL. Verifica que XAMPP esté iniciado y que DB_* en .env sean correctos.");
+  // Operational state is kept in memory: never run two writers on this database.
+  const runtimeLock = await persistence.pool.getConnection();
+  const [[lock]] = await runtimeLock.query("SELECT GET_LOCK('sistema_llamadas_runtime',0) AS acquired");
+  if (Number(lock.acquired) !== 1) {
+    runtimeLock.release();
+    throw new Error("Ya hay otro servidor operativo conectado a esta instancia de MySQL. Detén el otro proceso antes de iniciar uno nuevo.");
+  }
+  // MySQL releases this dedicated connection's lock when the process exits.
   sessions = await persistence.load();
+  auth.pool = persistence.pool;
+  await auth.initialize();
+  network.pool = persistence.pool;
+  await network.initialize();
   // Socket IDs and live calls cannot survive a backend restart. Return every
   // interrupted assignment to the retry queue so campaigns never stay stuck.
   for (const [code, loadedSession] of sessions.entries()) {
@@ -151,13 +238,14 @@ async function bootstrap() {
   // MySQL is the sole session/history store; file backups are optional exports.
   await persistence.save(sessions);
   persistence.startBackups();
+  network.start();
   setInterval(() => historyGate.retryPending().catch(error => {
     console.error("[HISTORY] Reintento pendiente:", error.code || "STORAGE_UNAVAILABLE");
   }), 10000).unref();
   console.log(`[PERSISTENCE] Loaded ${sessions.size} sessions. Mode: ${persistence.status().mode}`);
 
   const port = Number(process.env.PORT || 3000);
-  const host = process.env.HOST || "0.0.0.0";
+  const host = process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
   server.listen(port, host, () => {
     console.log(`Call bridge running on http://localhost:${port}`);
   });
@@ -836,10 +924,15 @@ function getPairingLink(req, code, token) {
 }
 
 io.on("connection", (socket) => {
-  socket.on("session:create", ({ dashboardClientId } = {}) => {
-    detachSocketFromCurrentSession(socket);
+  socket.on("session:create", async ({ dashboardClientId } = {}) => {
+    const user = socket.data.authUser;
+    if (!user) return;
+    // Explicit grants for newly created local test sessions; legacy sessions stay unassigned.
     let code;
     do code = nanoid(6).toUpperCase(); while (sessions.has(code));
+    try { await auth.grant(user, code); }
+    catch { socket.emit("session:error", { reason: "AUTH_UNAVAILABLE", message: "No se pudo autorizar la sesión." }); return; }
+    detachSocketFromCurrentSession(socket);
     const session = getOrCreateSession(code);
     session.updatedAt = Date.now();
 
@@ -1065,6 +1158,9 @@ io.on("connection", (socket) => {
 
     const worker = getPhoneWorkerBySocketId(session, socket.id);
     const isExternalIncoming = Boolean(externalIncoming);
+    // Independent of commands/optimistic campaign state: only an Android event is evidence.
+    const currentAttemptId = worker ? getActiveAttemptId(session, worker.id) : "";
+    if (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId) network.observe(code, worker, payload);
     if (worker) {
       worker.callState = callState || worker.callState || "idle";
       worker.speakerOn = Boolean(speakerOn);
@@ -1250,8 +1346,18 @@ io.on("connection", (socket) => {
 
 function hasDashboardAccess(req, session) {
   const token = String(req.headers["x-dashboard-token"] || req.query.dashboardToken || "").trim();
-  return Boolean(session?.dashboardToken && token === session.dashboardToken);
+  return Boolean(req.user && req.operationalAccess && session?.dashboardToken && token === session.dashboardToken);
 }
+
+app.use(["/api/session/:code", "/api/pairing/:code", "/api/pairing-qr/:code.svg"], auth.requireUser, auth.csrf,
+  async (req, res, next) => {
+    try {
+      req.operationalAccess = await auth.canAccess(req.user, String(req.params.code || "").toUpperCase().trim());
+      if (!req.operationalAccess) return res.status(403).json({ ok: false, error: "No tienes acceso a esta sesión operativa." });
+      res.setHeader("Cache-Control", "no-store");
+      next();
+    } catch { res.status(503).json({ ok: false, error: "No se pudo validar el acceso." }); }
+  });
 
 function requireDashboardAccess(req, res, next) {
   const code = String(req.params.code || "").toUpperCase().trim();

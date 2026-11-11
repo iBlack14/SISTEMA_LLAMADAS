@@ -1,5 +1,32 @@
 # VOIP VC - Skeleton de Vinculacion Celular <-> Web
 
+## Inicio de sesión, roles y XAMPP local
+
+Inicia MySQL desde XAMPP y verifica que `.env` tenga `DB_HOST=localhost`,
+`DB_PORT=3306` (opcional), `DB_NAME` y `DB_USER`. Luego ejecuta `npm start` y
+abre `http://127.0.0.1:3000/login`. El servidor queda limitado a esta PC. La
+autenticación crea únicamente las tablas `auth_*` en la base indicada, sin
+borrar las tablas existentes. En este perfil un teléfono físico no puede
+conectarse al servidor usando `localhost`.
+
+Para crear la primera cuenta, abre otra terminal en la raíz y ejecuta:
+
+```powershell
+npm run auth:user:add -- admin ADMINISTRADOR
+```
+
+La contraseña se solicita dos veces sin mostrarse en pantalla. Usa el mismo
+comando con rol `EMPLEADO` para las demás cuentas. Instrucciones del entorno
+alternativo aislado y pruebas: [server/auth/README.md](server/auth/README.md).
+
+El administrador dispone de **Núcleo de Red** en `/admin/nucleo-red`, con diez
+equipos, estados Android en vivo y actividad del turno. Fuentes, definiciones
+y pruebas simuladas: [server/NETWORK_MONITOR.md](server/NETWORK_MONITOR.md).
+
+`npm run auth:local` sigue disponible para pruebas con un MySQL separado en el
+puerto 3308. No uses `npm start` para exponer el servicio a una red o a internet:
+el perfil XAMPP de esta fase es solo para uso local.
+
 Este proyecto crea un **esqueleto funcional** para conectar un dashboard web con un cliente movil usando tiempo real (Socket.IO).
 
 ## Que incluye
@@ -13,9 +40,9 @@ Este proyecto crea un **esqueleto funcional** para conectar un dashboard web con
 
 ## Arranque
 
-```bash
+```powershell
 npm install
-npm run start
+npm start
 ```
 
 Abrir:
@@ -23,13 +50,19 @@ Abrir:
 - Dashboard: `http://localhost:3000/`
 - Cliente movil: `http://localhost:3000/phone`
 
-Variables opcionales en `.env`:
+El perfil XAMPP fuerza el acceso local y no permite configurar los siguientes
+valores para una publicación de red desde este arranque. La configuración de
+producción histórica de abajo no corresponde a este perfil local.
 
-- `PUBLIC_BASE_URL`: URL publica del backend/API
-- `PUBLIC_WEB_BASE_URL`: URL publica del frontend si lo separas del API
-- `CORS_ORIGIN`: dominios permitidos, separados por coma
-- `HOST`: por defecto `0.0.0.0` para VPS
+Variables de conexión local en `.env`:
 
+- `DB_HOST`: `localhost` o `127.0.0.1` (el servidor normaliza a `127.0.0.1`)
+- `DB_PORT`: `3306` por defecto
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`: credenciales de la base MySQL de XAMPP
+- `PORT`: puerto web, `3000` por defecto
+
+`HOST`, `TRUST_PROXY`, `CORS_ORIGIN` y las URLs públicas se fuerzan a valores
+locales en este perfil; no habilitan acceso desde otros equipos.
 ## Flujo de prueba
 
 1. En dashboard, click en **Crear Sesion**.
@@ -95,9 +128,12 @@ Respuesta:
 }
 ```
 
-## Produccion en VPS
+## Produccion en VPS (instrucciones históricas; no compatibles con el perfil local)
 
-Este repo ya queda preparado para subir **solo el server** al VPS y que el APK se conecte por internet.
+El arranque actual de XAMPP es solo local y rechaza conexiones MySQL remotas.
+No sigas estas instrucciones para desplegar esta fase en internet; requieren un
+perfil de producción separado, con HTTPS, cuentas y configuración autorizada.
+La información siguiente se conserva como referencia histórica.
 
 ### Recomendado
 
