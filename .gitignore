@@ -1,4 +1,6 @@
 .idea/
+frontend/node_modules/
+frontend/dist/
 .env
 server/backups/
 server/sessions.json

@@ -167,14 +167,26 @@ app.use("/admin", (req, res, next) => {
   if (!req.user) return res.redirect("/login");
   auth.requireAdmin(req, res, next);
 });
-app.get("/admin/nucleo-red", (_, res) => res.sendFile(path.join(__dirname, "auth/views/admin.html")));
+app.get("/admin/nucleo-red", (_, res) => res.sendFile(path.join(__dirname, "../frontend/dist/index.html")));
 app.get(["/", "/index.html", "/admin.html"], (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   if (!req.user) return res.redirect("/login");
   if (req.path.toLowerCase() === "/admin.html") return auth.requireAdmin(req, res, () => res.redirect("/admin/nucleo-red"));
-  next();
+  const entry = path.join(__dirname, "../frontend/dist/index.html");
+  if (!fs.existsSync(entry)) return res.status(503).send("Compila el panel con npm run panel:build antes de iniciar.");
+  res.sendFile(entry);
 });
-app.get("/login", (_, res) => res.sendFile(path.join(__dirname, "../web/login.html")));
+app.get("/legacy", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!req.user) return res.redirect("/login");
+  res.sendFile(path.join(__dirname, "../web/index.html"));
+});
+app.get("/login", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.user) return res.redirect(req.user.role === "ADMINISTRADOR" ? "/admin/nucleo-red" : "/");
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+});
+app.get("/legacy/admin", auth.requireAdmin, (_, res) => res.sendFile(path.join(__dirname, "auth/views/admin.html")));
 // These operational helpers are outside /api/session and need their own guard.
 app.use(["/api/fetch-url", "/api/server-info", "/api/twilio/configure"], auth.requireUser, auth.csrf);
 
@@ -1690,7 +1702,7 @@ app.get("/api/session/:code/reports/attempts", async (req, res) => {
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
   if (!hasDashboardAccess(req, session)) return res.status(403).json({ ok: false, error: "Acceso no autorizado" });
   const from = String(req.query.from || ""), to = String(req.query.to || "");
-  const valid = value => !value || (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+  const valid = value => !value || (value.length === 10 &&
     Number.isFinite(Date.parse(value + "T00:00:00Z")) && new Date(value + "T00:00:00Z").toISOString().slice(0,10) === value);
   if (!valid(from) || !valid(to) || (from && to && from > to)) {
     return res.status(400).json({ ok: false, error: "Rango de fechas inválido" });
@@ -2538,6 +2550,21 @@ app.post("/api/twilio/configure", async (req, res) => {
 
 app.post("/api/twilio/webhook/voice", express.urlencoded({ extended: false }), (req, res) => {
   return res.status(501).type("text/plain").send("Twilio deshabilitado en este despliegue.");
+});
+
+// Public compiled code is also needed by the login screen; APIs remain protected.
+app.use("/panel/assets", express.static(path.join(__dirname, "../frontend/dist/assets"), { immutable: true, maxAge: "1y" }));
+// React pages; authorization is still enforced by the server.
+app.use("/panel", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!req.user) return res.redirect("/login");
+  next();
+});
+app.use("/panel", express.static(path.join(__dirname, "../frontend/dist"), {index:false}));
+app.get(["/panel", "/panel/", "/panel/contacts", "/panel/reports"], (_, res) => {
+  const entry = path.join(__dirname, "../frontend/dist/index.html");
+  if (!fs.existsSync(entry)) return res.status(503).send("La vista de contactos aún no se ha compilado. Ejecuta npm run panel:build.");
+  res.sendFile(entry);
 });
 
 app.use(express.static(path.join(__dirname, "../web")));

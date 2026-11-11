@@ -176,4 +176,5 @@ import { validateReportPeriod, reportPeriodLabel } from "./report-period.js?v=20
     openButton.setAttribute("aria-expanded", "false");
     openButton.focus();
   };
+  if (window.location.hash === "#reports") openButton.click();
 })();

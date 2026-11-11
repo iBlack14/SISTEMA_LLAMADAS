@@ -1,6 +1,6 @@
 // Shared with the administrator API and the unified call report exports.
 export function isAnsweredAttempt(row) {
-  return !["buzon_de_voz", "sin_servicio", "no_disponible", "numero_incorrecto", "inoperable"].includes(row.technicalResult)
+  return !["buzon_de_voz", "sin_servicio", "no_disponible", "numero_incorrecto", "numero_inexistente", "inoperable"].includes(row.technicalResult)
     && Boolean(row.answeredAt || row.technicalResult === "contesto");
 }
 
