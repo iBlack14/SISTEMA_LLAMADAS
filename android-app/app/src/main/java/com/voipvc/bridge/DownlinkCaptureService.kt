@@ -35,9 +35,13 @@ class DownlinkCaptureService(private val context: Context) : Binder() {
 
     private fun enforceOwner() {
         val uid = getCallingUid()
-        val owner = context.packageManager.getApplicationInfo("com.voipvc.bridge", 0).uid
-        if (uid != owner || context.packageManager.checkSignatures(uid, owner) != PackageManager.SIGNATURE_MATCH) {
-            throw SecurityException("Only the owning APK may capture call audio")
+        val ownerUid = try {
+            context.packageManager.getApplicationInfo("com.voipvc.bridge", 0).uid
+        } catch (_: Exception) {
+            throw SecurityException("Could not verify owning APK UID")
+        }
+        if (uid != ownerUid) {
+            throw SecurityException("Only the owning APK may capture call audio (caller=$uid owner=$ownerUid)")
         }
     }
 

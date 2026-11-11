@@ -23,5 +23,11 @@ export const AUTH_SCHEMA = [
     session_code VARCHAR(50) NOT NULL,
     PRIMARY KEY(user_id,session_code),
     FOREIGN KEY (user_id) REFERENCES auth_users(id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS auth_user_workspaces (
+    user_id BIGINT UNSIGNED PRIMARY KEY,
+    session_code VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES auth_users(id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
 ];

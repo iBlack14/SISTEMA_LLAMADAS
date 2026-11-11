@@ -1090,7 +1090,7 @@ async function fetchCampaignState(code = sessionCode) {
 
 async function postCampaignAction(path, body = {}) {
   if (!sessionCode) {
-    setStatus("Crea o restaura una sesión primero.", true);
+    setStatus("Espera a que cargue tu espacio de trabajo.", true);
     return null;
   }
 
@@ -1270,7 +1270,7 @@ async function hangupWorkerWithResult(workerId) {
 }
 
 async function disconnectWorker(workerId, workerName = "este teléfono") {
-  const accepted = window.confirm(`¿Cerrar la sesión de ${workerName || "este teléfono"}?`);
+  const accepted = window.confirm(`¿Desvincular ${workerName || "este teléfono"}?`);
   if (!accepted) return;
   const data = await postCampaignAction(`/workers/${encodeURIComponent(workerId)}/disconnect`);
   if (data) setStatus("Teléfono desvinculado correctamente.", true);
@@ -1381,7 +1381,7 @@ function getVisibleReportRows() {
 async function loadUnifiedReportRows() {
   const status = document.getElementById("reportsLoadStatus");
   if (!sessionCode || !dashboardToken) {
-    if (status) status.textContent = "Conecta una sesión para consultar el historial.";
+    if (status) status.textContent = "Espera a que cargue tu historial.";
     return false;
   }
   const code = sessionCode;
@@ -1723,9 +1723,9 @@ async function finalizeWorkTurn() {
 
 async function finalizeOperationalSession() {
   const accepted = await requestConfirmation({
-    title: "Reiniciar sesión",
+    title: "Desvincular todos los equipos",
     message: "Se colgarán las llamadas, se desvincularán los teléfonos y se generarán nuevos códigos QR. El turno, sus listas, avance, pendientes y reportes se conservarán.",
-    confirmLabel: "Reiniciar sesión"
+    confirmLabel: "Desvincular equipos"
   });
   if (!accepted) return;
   const data = await postCampaignAction("/session/finalize");
@@ -1734,7 +1734,7 @@ async function finalizeOperationalSession() {
   pairingStateSignature = "";
   await loadPairingData(sessionCode);
   renderCampaignPanel();
-  setStatus("Sesión reiniciada. El turno y todos sus datos fueron conservados.", true);
+  setStatus("Equipos desvinculados. Tu cuenta, bases e historial se conservan.", true);
 }
 
 async function pauseCampaignRun() {
@@ -1798,31 +1798,17 @@ async function markContactDisposition(contactId, result) {
 
 function restoreSavedSession() {
   if (restoreAttempted) return;
-  const savedCode = getSavedSessionCode();
   restoreAttempted = true;
-  if (!savedCode) {
-    requestAutomaticSession();
-    return;
-  }
-  sessionCode = savedCode;
-  dashboardToken = getSavedDashboardToken(savedCode);
-  refs.sessionCodeIn.value = savedCode;
-  if (!dashboardToken) {
-    setStatus("Preparando una sesión nueva...");
-    sessionCode = "";
-    requestAutomaticSession();
-    return;
-  }
-  setStatus(`Restaurando sesión ${savedCode}...`);
-  socket.emit("session:join", { code: savedCode, role: "dashboard", token: dashboardToken, dashboardClientId });
-  loadPairingData(savedCode);
+  requestAutomaticSession();
 }
 
 function requestAutomaticSession() {
-  if (sessionCode || autoSessionRequested || !socket.connected) return;
+  if (autoSessionRequested || !socket.connected) return;
   autoSessionRequested = true;
-  setStatus("Creando sesión automática...");
-  socket.emit("session:create", { dashboardClientId });
+  setStatus("Cargando tu espacio de trabajo...");
+  // MySQL selects the same account workspace on every browser. The old code
+  // is only a migration hint; the server checks ownership before using it.
+  socket.emit("workspace:open", { dashboardClientId, previousCode: getSavedSessionCode() });
 }
 
 // ── EVENT BINDING ────────────────────────────────────────────────────
@@ -1866,13 +1852,13 @@ function bindEvents() {
       button.disabled = false;
     }
   };
-  if (refs.createBtn) refs.createBtn.onclick = () => socket.emit("session:create", { dashboardClientId });
+  if (refs.createBtn) refs.createBtn.onclick = () => requestAutomaticSession();
   if (refs.joinBtn) refs.joinBtn.onclick = () => {
     const code = refs.sessionCodeIn.value.trim().toUpperCase();
     if (code) {
       dashboardToken = getSavedDashboardToken(code);
       if (!dashboardToken) {
-        setStatus("No existe una credencial privada guardada para esa sesión en este navegador.", true);
+        setStatus("Recarga para recuperar el acceso de tu cuenta.", true);
         return;
       }
       socket.emit("session:join", { code, role: "dashboard", token: dashboardToken, dashboardClientId });
@@ -2496,7 +2482,7 @@ function updateSessionUi(st = {}) {
   if (refs.linkedDevice) {
     if (phoneConnected) {
       const deviceLabel = phoneDeviceName || (phoneCount > 1 ? `${phoneCount} dispositivos conectados` : "Dispositivo conectado");
-      refs.linkedDevice.textContent = `${deviceLabel} · Sesión ${sessionCode || "activa"}`;
+      refs.linkedDevice.textContent = deviceLabel;
     } else {
       refs.linkedDevice.textContent = "Dispositivo conectado";
     }
@@ -2513,10 +2499,10 @@ function updateSessionUi(st = {}) {
   }
 
   if (dashboardConnected) {
-    setStatus(phoneConnected ? `${phoneCount} teléfono(s) vinculado(s). Cada dispositivo utiliza su propio QR.` : "Sesión creada. Escanea un QR diferente en cada teléfono.", true);
+    setStatus(phoneConnected ? `${phoneCount} teléfono(s) vinculado(s). Cada dispositivo utiliza su propio QR.` : "Tu espacio está listo. Escanea un QR diferente en cada teléfono.", true);
     renderCampaignPanel();
   } else {
-    setStatus("Sin vincular. Crea o une a una sesión.");
+    setStatus("Cargando tu espacio de trabajo...");
   }
 }
 
@@ -3463,7 +3449,7 @@ socket.on("session:joined", ({ code, role }) => {
 });
 
 socket.on("session:error", ({ message, reason }) => {
-  if (["AUTH_REQUIRED", "AUTH_ORIGIN", "AUTH_UNAVAILABLE", "FORBIDDEN"].includes(reason)) {
+  if (["AUTH_REQUIRED", "AUTH_ORIGIN", "AUTH_UNAVAILABLE", "FORBIDDEN", "SESSION_FORBIDDEN", "WORKSPACE_UNAVAILABLE"].includes(reason)) {
     autoSessionRequested = false;
     setStatus(message || "No se pudo validar el acceso.", true);
     if (reason === "AUTH_REQUIRED") window.location.replace("/login");
@@ -3473,7 +3459,7 @@ socket.on("session:error", ({ message, reason }) => {
     if (reason === "dashboard_in_use") {
       localStorage.removeItem(DASHBOARD_SESSION_KEY);
       localStorage.removeItem(`${DASHBOARD_TOKEN_PREFIX}${sessionCode}`);
-      setStatus(message || "La sesión pertenece a otro operador. Creando una sesión independiente...", true);
+      setStatus(message || "Recuperando el espacio de tu cuenta...", true);
     }
     sessionCode = "";
     dashboardToken = "";
@@ -3481,17 +3467,12 @@ socket.on("session:error", ({ message, reason }) => {
     return;
   }
   autoSessionRequested = false;
-  setStatus(message || "No se pudo abrir la sesión.", true);
+  setStatus(message || "No se pudo cargar tu espacio de trabajo.", true);
 });
 
 socket.on("connect", () => {
-  if (sessionCode && dashboardToken) {
-    socket.emit("session:join", { code: sessionCode, role: "dashboard", token: dashboardToken, dashboardClientId });
-    fetchCampaignState(sessionCode);
-  } else {
-    restoreSavedSession();
-    requestAutomaticSession();
-  }
+  autoSessionRequested = false;
+  requestAutomaticSession();
 });
 
 socket.on("phone:command_ack", ({ commandId, action, ok, message }) => {

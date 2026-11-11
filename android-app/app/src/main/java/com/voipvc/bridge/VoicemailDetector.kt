@@ -31,6 +31,10 @@ object VoicemailDetector {
         private set
     @Volatile var lastMatch = ""
         private set
+    /** True while waiting for onServiceConnected after bindUserService. */
+    val isConnecting: Boolean get() = binding && remote == null
+    /** True once the Shizuku UserService is bound and alive. */
+    val isConnected: Boolean get() = remote?.isBinderAlive == true
 
     private fun say(message: String) {
         status = message
@@ -41,6 +45,7 @@ object VoicemailDetector {
         if (initialized) return
         initialized = true
         app = context.applicationContext
+        VoicemailModelInstaller.install(app)
         Shizuku.addBinderReceivedListenerSticky {
             if (enabled()) connect()
         }
@@ -111,7 +116,24 @@ object VoicemailDetector {
         if (serviceArgs != null) try { Shizuku.unbindUserService(serviceArgs, connection, true) } catch (_: Exception) {}
         remote = null
         binding = false
+        args = null
         say("Detección de buzón desactivada")
+    }
+
+    /** Force-unbind the current UserService and reconnect from scratch. */
+    fun reconnect() {
+        stop()
+        val serviceArgs = args
+        if (serviceArgs != null) {
+            try { Shizuku.unbindUserService(serviceArgs, connection, true) } catch (_: Exception) {}
+        }
+        remote = null
+        binding = false
+        args = null
+        say("Reiniciando conexión con Shizuku…")
+        if (enabled()) {
+            main.postDelayed({ connect() }, 800)
+        }
     }
 
     private fun connect() {
@@ -130,9 +152,9 @@ object VoicemailDetector {
                     main.postDelayed({
                         if (binding && remote == null) {
                             binding = false
-                            say("Shizuku no conectó. Abre su aplicación y vuelve a activar la detección")
+                            say("Shizuku tardó demasiado. Usa 'Reiniciar conexión' o abre Shizuku y vuelve a activar la detección.")
                         }
-                    }, 15000)
+                    }, 8000)
                 }
                 decoder.execute { loadModel() }
             } catch (e: Exception) {
@@ -165,7 +187,7 @@ object VoicemailDetector {
         model?.let { return it }
         val folder = VoicemailModelInstaller.findModel(app)
         if (folder == null) {
-            say("Falta el modelo de español. Pulsa Descargar modelo de español.")
+            say("Preparando el modelo español incluido en la APK…")
             return null
         }
         return try {

@@ -19,13 +19,13 @@ export function installSocketAuth(io, auth, { onAdminSubscribe } = {}) {
   });
   io.on("connection", socket => {
     socket.use(async ([event, payload], next) => {
-      if (["session:create", "session:join"].includes(event)
+      if (["workspace:open", "session:create", "session:join"].includes(event)
           && payload !== undefined && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
         return deny(socket, next, "INVALID_PAYLOAD", "Solicitud inválida.");
       }
       // Android has its own per-device credential, checked by session:join.
       if (event === "session:join" && payload?.role === "phone") return next();
-      if (socket.data.role === "phone" && event !== "session:create" && event !== "session:join"
+      if (socket.data.role === "phone" && event !== "workspace:open" && event !== "session:create" && event !== "session:join"
           && event !== "admin:subscribe") return next();
       try {
         if (!auth.validOrigin(socket.request)) return deny(socket, next, "AUTH_ORIGIN", "Origen no autorizado.");
@@ -35,7 +35,7 @@ export function installSocketAuth(io, auth, { onAdminSubscribe } = {}) {
         socket.join(`auth:${user.tokenHash}`);
         if (event === "admin:subscribe") {
           if (user.role !== "ADMINISTRADOR") return deny(socket, next, "FORBIDDEN", "Acceso exclusivo de administrador.");
-        } else if (event !== "session:create") {
+        } else if (!["workspace:open", "session:create"].includes(event)) {
           const code = event === "session:join" ? String(payload?.code || "").trim().toUpperCase() : socket.data.code;
           if (!await auth.canAccess(user, code)) return deny(socket, next, "SESSION_FORBIDDEN", "No tienes acceso a esta sesión operativa.");
         }

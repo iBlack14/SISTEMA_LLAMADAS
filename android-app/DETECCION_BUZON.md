@@ -12,13 +12,14 @@ de audio; no debe tomar las llamadas mientras se prueba el detector de VOIP VC.
   También admite `files/models/vosk-model-small-es-0.42/` dentro del almacenamiento
   privado de la app; esta ubicación tiene prioridad y se usa en el equipo de prueba.
 - En VOIP VC, abrir Configurar detección de buzón y activar.
-- Si falta el modelo, pulsa **Descargar modelo de español (39 MB)** desde la
-  pantalla de configuración. Descarga el ZIP oficial por HTTPS y lo instala en
-  almacenamiento privado, en un hilo de trabajo. Se publica al terminar la
-  extracción y se pueden reintentar errores; no se reutilizan descargas parciales.
-  La conexión solo es necesaria para esta instalación, no para reconocer voz.
-  La descarga continúa al rotar la pantalla; si Android cierra el proceso,
-  vuelve a abrir la app y reintenta. No se simula detección si falta el modelo.
+- El modelo español viene dentro de la APK. Al abrir la app se extrae en
+  almacenamiento privado, en un hilo de trabajo, sin internet y sin pulsar
+  botones de descarga. Se publica solamente al completar la extracción.
+  Si Android cierra el proceso, vuelve a abrir la app para reintentar.
+- Gradle obtiene el ZIP oficial al compilar (tarea prepareSpanishModel) y lo
+  empaqueta como assets/models/vosk-model-small-es-0.42.zip en debug y release.
+  La APK será mayor porque incluye los aproximadamente 39 MB del archivo.
+  El celular necesita espacio libre para extraerlo, pero no conexión de red.
 - Shizuku debe iniciarse de nuevo tras reiniciar el celular.
 
 ## Comportamiento

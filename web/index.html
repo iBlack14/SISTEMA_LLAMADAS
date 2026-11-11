@@ -66,20 +66,20 @@
       <!-- STATUS -->
       <div class="status-pill" id="status">
         <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Preparando sesión automática...</span>
+        <span id="statusText">Cargando tu espacio de trabajo...</span>
       </div>
       <p id="storageStatus" class="storage-status" role="status" hidden></p>
 
       <section class="shift-management" id="shiftManagement">
         <div class="shift-management-info">
-          <span>GESTIÓN DE SESIÓN</span>
+          <span>GESTIÓN DEL TURNO</span>
           <strong id="currentShiftLabel">Detectando turno...</strong>
           <small id="currentShiftSchedule">Horario de Lima</small>
         </div>
         <div class="shift-management-actions">
           <button id="reportNavBtn" class="secondary" type="button">REPORTES</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
-          <button id="finalizeSessionBtn" class="danger-soft">REINICIAR SESIÓN</button>
+          <button id="finalizeSessionBtn" class="danger-soft">DESVINCULAR EQUIPOS</button>
         </div>
       </section>
 
@@ -444,7 +444,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20261111-do-not-call");
+        import("/dashboard.js?v=20261111-user-workspace");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);

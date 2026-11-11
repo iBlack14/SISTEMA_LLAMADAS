@@ -12,6 +12,8 @@ import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import { nanoid } from "nanoid";
+import { runtimeIdentity, runtimeLockName, probeRuntime, waitForRuntime } from "./runtime-instance.js";
+import { UserWorkspaces } from "./user-workspace.js";
 import QRCode from "qrcode";
 import { bindDeviceToPairingSlot, clearDeviceFromPairingSlots, dedupePairingSlotDevices } from "./pairing-lifecycle.js";
 
@@ -75,6 +77,9 @@ import {
   getShiftSnapshot
 } from "./shift-manager.js";
 const persistence = new SessionPersistence();
+const instanceIdentity = runtimeIdentity(process.env, path.join(__dirname, ".."));
+const instancePort = Number(process.env.PORT || 3000);
+const alreadyRunning = () => console.log(`El servidor ya está activo en http://localhost:${instancePort}/. Usa esa dirección; no se inició otra instancia.`);
 
 const app = express();
 app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
@@ -220,13 +225,18 @@ let sessions = new Map();
 const historyGate = new CallHistoryGate(persistence, () => sessions);
 
 async function bootstrap() {
+  const running = await probeRuntime(instancePort, instanceIdentity);
+  if (running === "same") { alreadyRunning(); process.exit(0); }
+  if (running === "other") throw new Error(`El puerto ${instancePort} está ocupado por otro servicio. No se cerró ningún proceso.`);
   if (!await persistence.initDb()) throw new Error("No se pudo conectar a MySQL. Verifica que XAMPP esté iniciado y que DB_* en .env sean correctos.");
   // Operational state is kept in memory: never run two writers on this database.
   const runtimeLock = await persistence.pool.getConnection();
-  const [[lock]] = await runtimeLock.query("SELECT GET_LOCK('sistema_llamadas_runtime',0) AS acquired");
+  const [[legacyLock]] = await runtimeLock.query("SELECT IS_USED_LOCK('sistema_llamadas_runtime') AS owner");
+  const [[lock]] = legacyLock.owner ? [[{ acquired: 0 }]] : await runtimeLock.query("SELECT GET_LOCK(?,0) AS acquired", [runtimeLockName(process.env)]);
   if (Number(lock.acquired) !== 1) {
     runtimeLock.release();
-    throw new Error("Ya hay otro servidor operativo conectado a esta instancia de MySQL. Detén el otro proceso antes de iniciar uno nuevo.");
+    if (await waitForRuntime(instancePort, instanceIdentity) === "same") { alreadyRunning(); process.exit(0); }
+    throw new Error("Otro servidor utiliza esta base MySQL desde otro puerto o una versión anterior. Detén esa instancia; no se inició un segundo escritor.");
   }
   // MySQL releases this dedicated connection's lock when the process exits.
   sessions = await persistence.load();
@@ -511,7 +521,7 @@ function disconnectAllSessionPhones(session, reason = "turn_finished") {
 
 function hasPersistentCampaignData(session) {
   const campaign = ensureCampaign(session);
-  return Boolean(session.contactBook || session.hasCallHistory) || campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
+  return Boolean(session.ownerUserId || session.contactBook || session.hasCallHistory) || campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
 }
 
 function detachSocketFromCurrentSession(socket) {
@@ -934,31 +944,37 @@ function getPairingLink(req, code, token) {
   return `${webBase}/pairing?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}&apiBase=${encodeURIComponent(apiBase)}`;
 }
 
+const workspaces = new UserWorkspaces({
+  getPool: () => persistence.pool, getSessions: () => sessions,
+  create: () => { let code; do code = nanoid(6).toUpperCase(); while (sessions.has(code)); return {code, session: getOrCreateSession(code)}; },
+  save: () => persistence.save(sessions), grant: (user, code) => auth.grant(user, code)
+});
+
 io.on("connection", (socket) => {
-  socket.on("session:create", async ({ dashboardClientId } = {}) => {
+  const openWorkspace = async ({ dashboardClientId, previousCode } = {}) => {
     const user = socket.data.authUser;
     if (!user) return;
-    // Explicit grants for newly created local test sessions; legacy sessions stay unassigned.
-    let code;
-    do code = nanoid(6).toUpperCase(); while (sessions.has(code));
-    try { await auth.grant(user, code); }
-    catch { socket.emit("session:error", { reason: "AUTH_UNAVAILABLE", message: "No se pudo autorizar la sesión." }); return; }
-    detachSocketFromCurrentSession(socket);
-    const session = getOrCreateSession(code);
-    session.updatedAt = Date.now();
-
-    // Auto-join as dashboard so state:changed fires without a manual join click
-    socket.data.code = code;
-    socket.data.role = "dashboard";
-    socket.data.dashboardClientId = String(dashboardClientId || "").trim();
-    socket.join(code);
-    session.dashboardSocketId = socket.id;
-    session.dashboardClientId = socket.data.dashboardClientId;
-
-    socket.emit("session:created", { code, dashboardToken: session.dashboardToken });
-    emitState(code);
-    emitCampaignState(code);
-  });
+    try {
+      const { code, session } = await workspaces.open(user, String(previousCode || "").toUpperCase());
+      if (!socket.connected) return;
+      detachSocketFromCurrentSession(socket);
+      session.updatedAt = Date.now();
+      socket.data.code = code;
+      socket.data.role = "dashboard";
+      socket.data.dashboardClientId = String(dashboardClientId || "").trim();
+      socket.join(code);
+      session.dashboardSocketId = socket.id;
+      session.dashboardClientId = socket.data.dashboardClientId;
+      socket.emit("session:created", { code, dashboardToken: session.dashboardToken });
+      emitState(code);
+      emitCampaignState(code);
+    } catch (error) {
+      socket.emit("session:error", { reason: "WORKSPACE_UNAVAILABLE", message: error.message || "No se pudo abrir tu espacio de trabajo." });
+    }
+  };
+  socket.on("workspace:open", openWorkspace);
+  // Compatibility: older dashboards also reopen the account workspace.
+  socket.on("session:create", openWorkspace);
 
 
   socket.on("session:join", ({ code, role, token, deviceName, deviceId, dashboardClientId }) => {
@@ -996,7 +1012,8 @@ io.on("connection", (socket) => {
         ? io.sockets.sockets.get(session.dashboardSocketId)
         : null;
       const activeClientId = String(session.dashboardClientId || activeDashboard?.data?.dashboardClientId || "").trim();
-      if (activeDashboard?.connected && activeDashboard.id !== socket.id
+      const sameAccount = String(activeDashboard?.data?.authUser?.id || "") === String(socket.data.authUser?.id || "");
+      if (activeDashboard?.connected && activeDashboard.id !== socket.id && !sameAccount
         && (!requestedClientId || !activeClientId || requestedClientId !== activeClientId)) {
         socket.emit("session:error", {
           reason: "dashboard_in_use",
@@ -2558,7 +2575,7 @@ app.use("/panel", (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, "../web")));
-app.get("/health", (_, res) => res.json({ ok: true }));
+app.get("/health", (_, res) => res.json({ ok: true, application: "voip-vc", instance: instanceIdentity }));
 
 bootstrap().catch(err => {
   console.error("Fallo critico al iniciar el servidor:", err);

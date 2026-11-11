@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.telecom.TelecomManager
-import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -25,7 +24,7 @@ import com.google.android.material.button.MaterialButton
 class VoicemailSetupActivity : AppCompatActivity() {
     companion object { const val EXTRA_REQUEST_AUTHORIZATION = "request_voicemail_authorization" }
     private lateinit var statusText: TextView
-    private lateinit var installButton: MaterialButton
+    private lateinit var reconnectButton: com.google.android.material.button.MaterialButton
     private val handler = Handler(Looper.getMainLooper())
     private var pendingEnable = false
     private var initialRequestHandled = false
@@ -39,17 +38,27 @@ class VoicemailSetupActivity : AppCompatActivity() {
                 VoicemailDetector.enable()
             }
             val missingModel = VoicemailModelInstaller.findModel(this@VoicemailSetupActivity) == null
-            installButton.visibility = if (missingModel || VoicemailModelInstaller.installing) View.VISIBLE else View.GONE
-            installButton.isEnabled = !VoicemailModelInstaller.installing
-            installButton.text = if (VoicemailModelInstaller.installing) "Instalando español…" else "Descargar modelo de español (39 MB)"
-            statusText.text = guidanceMessage.ifBlank {
+            val stateText = guidanceMessage.ifBlank {
                 VoicemailModelInstaller.message.ifBlank {
-                    if (missingModel) "Falta el modelo de español. Descárgalo con el botón de abajo; después funcionará sin internet."
+                    if (missingModel) "Preparando el español incluido en la APK…"
                     else VoicemailDetector.authorizationIssue() ?: VoicemailDetector.status
                 }
-            } + if (VoicemailDetector.lastMatch.isNotBlank())
+            }
+            val matchText = if (VoicemailDetector.lastMatch.isNotBlank())
                 "\n\nÚltima locución detectada:\n" + VoicemailDetector.lastMatch else ""
-            handler.postDelayed(this, 1000)
+            val connecting = VoicemailDetector.isConnecting
+            val connected = VoicemailDetector.isConnected
+            statusText.text = stateText + matchText
+            // Highlight status box: green=connected, yellow=connecting, default=idle/error
+            val borderColor = when {
+                connected -> android.graphics.Color.parseColor("#22a86a")
+                connecting -> android.graphics.Color.parseColor("#e0a020")
+                else -> color(R.color.vc_border)
+            }
+            (statusText.background as? android.graphics.drawable.GradientDrawable)
+                ?.setStroke(dp(2), borderColor)
+            reconnectButton.isEnabled = !connecting
+            handler.postDelayed(this, 500)
         }
     }
     private val roleResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -65,6 +74,7 @@ class VoicemailSetupActivity : AppCompatActivity() {
         initialRequestHandled = savedInstanceState?.getBoolean("initial_request_handled") == true
         pendingEnable = savedInstanceState?.getBoolean("pending_enable") == true
         VoicemailDetector.initialize(this)
+        VoicemailModelInstaller.install(this)
         val padding = dp(20)
         val root = ScrollView(this).apply {
             setBackgroundColor(color(R.color.vc_bg))
@@ -121,11 +131,11 @@ class VoicemailSetupActivity : AppCompatActivity() {
             })
             return control
         }
-        installButton = button("Descargar modelo de español (39 MB)", true) {
-            guidanceMessage = ""
-            VoicemailModelInstaller.install(this)
-        }
         button("Autorizar y activar detección", true) { requestActivation() }
+        reconnectButton = button("Reiniciar conexión Shizuku") {
+            guidanceMessage = ""
+            VoicemailDetector.reconnect()
+        }
         button("Abrir Shizuku") { pendingEnable = true; openShizuku() }
         button("Desactivar detección") {
             pendingEnable = false

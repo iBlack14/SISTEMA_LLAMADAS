@@ -29,6 +29,23 @@ el perfil XAMPP de esta fase es solo para uso local.
 
 Este proyecto crea un **esqueleto funcional** para conectar un dashboard web con un cliente movil usando tiempo real (Socket.IO).
 
+## Arranque y espacio por usuario
+
+Si esta misma aplicación ya está activa, `npm start` muestra su dirección y
+termina correctamente. No inicia otro escritor ni detiene procesos ajenos.
+El bloqueo de MySQL se mantiene y está separado por base de datos.
+
+Cada cuenta recupera su espacio operativo desde MySQL, incluso al cambiar de
+navegador. No hay que crear ni escribir códigos de sesión. Los códigos y tokens
+de vinculación de celulares siguen siendo internos. Al migrar se reutiliza un
+espacio anterior autorizado del usuario; no se borran las bases ni el historial.
+Desvincular equipos conserva la cuenta y los datos.
+
+La APK lleva el modelo español de reconocimiento de voz. Se prepara de forma
+automática en el celular, sin descarga manual. La primera compilación de Android
+necesita internet para obtener el modelo oficial; los siguientes builds usan el
+archivo generado en caché.
+
 ## Interfaz web original
 
 El panel de llamadas `/` vuelve a utilizar `web/index.html`, sus módulos JavaScript

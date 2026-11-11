@@ -1,4 +1,9 @@
 import java.util.Properties
+import java.io.File
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -107,6 +112,51 @@ dependencies {
 base {
     archivesName.set("VOIP-VC")
 }
+
+// The build fetches the official archive once. Every APK carries the model,
+// including release builds; the phone only extracts it and needs no download.
+val spanishModelAssets = layout.buildDirectory.dir("generated/spanish-model-assets")
+val spanishModelArchive = spanishModelAssets.map { it.file("models/vosk-model-small-es-0.42.zip") }
+android.sourceSets.getByName("main").assets.srcDir(spanishModelAssets)
+val prepareSpanishModel = tasks.register("prepareSpanishModel") {
+    val modelUrl = "https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip"
+    inputs.property("modelUrl", modelUrl)
+    outputs.file(spanishModelArchive)
+    doLast {
+        val archive = spanishModelArchive.get().asFile
+        archive.parentFile.mkdirs()
+        val temporary = File(archive.parentFile, archive.name + ".tmp")
+        try {
+            val connection = URI(modelUrl).toURL().openConnection() as javax.net.ssl.HttpsURLConnection
+            connection.connectTimeout = 30000
+            connection.readTimeout = 60000
+            connection.instanceFollowRedirects = false
+            try {
+                check(connection.responseCode == 200) { "No se pudo obtener el modelo oficial: HTTP ${connection.responseCode}" }
+                var total = 0L
+                connection.inputStream.use { source ->
+                    temporary.outputStream().use { destination ->
+                        val buffer = ByteArray(32768)
+                        while (true) {
+                            val count = source.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            check(total <= 100L * 1024 * 1024) { "El modelo excede el tamaño esperado." }
+                            destination.write(buffer, 0, count)
+                        }
+                    }
+                }
+            } finally { connection.disconnect() }
+            ZipFile(temporary).use { zip ->
+                listOf("am/final.mdl", "conf/model.conf").forEach { required ->
+                    check(zip.getEntry("vosk-model-small-es-0.42/" + required) != null) { "Modelo español incompleto." }
+                }
+            }
+            Files.move(temporary.toPath(), archive.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally { temporary.delete() }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(prepareSpanishModel) }
 
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     doFirst {
