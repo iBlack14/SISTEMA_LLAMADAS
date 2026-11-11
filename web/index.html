@@ -444,7 +444,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20261106-annual-call-limit");
+        import("/dashboard.js?v=20261111-do-not-call");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);

@@ -158,7 +158,7 @@ class BridgeService : Service() {
             }
             val announcement = intent.getStringExtra("detected_announcement").orEmpty()
                 .ifBlank { if (intent.getBooleanExtra("detected_voicemail", false)) "buzon_de_voz" else "" }
-            if (announcement in setOf("buzon_de_voz", "sin_servicio", "no_disponible") &&
+            if (announcement in setOf("buzon_de_voz", "sin_servicio", "no_disponible", "numero_inexistente") &&
                 activeCommandId.isNotBlank() && numbersMatch(campaignPhoneNumber, incomingNumber)) {
                 detectedAnnouncement = announcement
                 detectedVoicemail = announcement == "buzon_de_voz"

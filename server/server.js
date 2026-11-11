@@ -567,6 +567,7 @@ function callRestrictions(session) {
 }
 
 function blockedCallMessage(block) {
+  if (block.permanent) return "NO VOLVER A LLAMAR: número inexistente o incorrecto.";
   return "Número llamado anteriormente. Disponible desde " +
     new Date(block.nextAllowedAt).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) + ".";
 }

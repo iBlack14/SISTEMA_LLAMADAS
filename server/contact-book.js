@@ -35,13 +35,20 @@ export function annualPhoneBlocks(attempts, now = new Date()) {
   for (const row of attempts) {
     const started = new Date(row.startedAt);
     if (!row.startedAt || !Number.isFinite(started.getTime()) || started.getTime() > current) continue;
+    const phone = phoneKey(row.phone);
+    const permanent = row.technicalResult === "numero_inexistente";
+    const existing = blocks.get(phone);
+    if (existing?.permanent) continue;
+    if (permanent) {
+      blocks.set(phone,{lastCalledAt:started.toISOString(),nextAllowedAt:null,permanent:true,reason:"NO VOLVER A LLAMAR: número inexistente o incorrecto"});
+      continue;
+    }
     const until = new Date(started);
     const month = started.getUTCMonth();
     until.setUTCFullYear(started.getUTCFullYear() + 1);
     // Feb 29 expires on Feb 28 in the following non-leap year.
     if (until.getUTCMonth() !== month) until.setUTCDate(0);
     if (until.getTime() <= current) continue;
-    const phone = phoneKey(row.phone);
     const previous = blocks.get(phone);
     if (!previous || started.getTime() > Date.parse(previous.lastCalledAt)) {
       blocks.set(phone,{lastCalledAt:started.toISOString(),nextAllowedAt:until.toISOString()});
@@ -63,15 +70,17 @@ export function withProgress(book, attempts, globalAttempts = attempts, now = ne
   const result = structuredClone(book);
   const blocks = annualPhoneBlocks(globalAttempts, now);
   for (const contact of result.contacts) {
-    contact.callBlockedUntil = blocks.get(phoneKey(contact.phone))?.nextAllowedAt || null;
-    contact.callBlockReason = contact.callBlockedUntil ? "Número llamado anteriormente" : "";
+    const block = blocks.get(phoneKey(contact.phone));
+    contact.doNotCall = Boolean(block?.permanent);
+    contact.callBlockedUntil = block?.nextAllowedAt || null;
+    contact.callBlockReason = block?.reason || (block ? "Número llamado anteriormente" : "");
     const state = byPhone.get(phoneKey(contact.phone));
     if (!state) continue;
     result.calledCounts[contact.id] = state.count;
     result.callDurations[contact.id] = state.duration;
     result.contactRowStatus[contact.id] = state.result;
     contact.attempts = state.count;
-    contact.campaignStatus = contact.callBlockedUntil ? "completed" : "pending";
+    contact.campaignStatus = block ? "completed" : "pending";
   }
   return result;
 }
@@ -84,9 +93,10 @@ export function excludeCalledPending(campaign, attempts, now = new Date()) {
     const block = called.get(phoneKey(contact.phone));
     if (block) {
       contact.status = "failed";
-      contact.result = "numero_llamado_anteriormente";
+      contact.result = block.permanent ? "numero_inexistente" : "numero_llamado_anteriormente";
+      contact.doNotCall = Boolean(block.permanent);
       contact.callBlockedUntil = block.nextAllowedAt;
-      contact.callBlockReason = "Número llamado anteriormente";
+      contact.callBlockReason = block.reason || "Número llamado anteriormente";
     }
   }
 }

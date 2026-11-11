@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 
 const ACTIVE_STATES = new Set(["dialing", "ringing", "in_call"]);
 const ALLOWED_RESULTS = new Set([
+  "numero_inexistente",
   "buzon_de_voz",
   "sin_servicio",
   "no_disponible",
@@ -585,7 +586,7 @@ export function updateActiveCallState(session, state, worker = {}, extras = {}) 
   if (reportedAttemptId && attempt?.id && reportedAttemptId !== attempt.id) return null;
   // Classification alone never releases a worker: wait for physical terminal state.
   const announcement = extras.detectedAnnouncement || (extras.detectedVoicemail === true ? "buzon_de_voz" : "");
-  const operatorResults = new Set(["buzon_de_voz", "sin_servicio", "no_disponible"]);
+  const operatorResults = new Set(["buzon_de_voz", "sin_servicio", "no_disponible", "numero_inexistente"]);
   if (attempt && operatorResults.has(announcement) && reportedAttemptId === attempt.id &&
       String(extras.contactId || "") === contact.id) {
     attempt.technicalResult = announcement;

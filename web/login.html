@@ -3,27 +3,45 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Iniciar sesión · Gestión de llamadas VC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth.css">
   <script type="module" src="/login.js"></script>
 </head>
 <body class="access-page">
+  <div class="access-bg" aria-hidden="true"></div>
   <main class="access-shell">
     <aside class="access-brand">
       <img src="/logo-vc-color.png" alt="ViaVox VC" width="180">
       <h1>Tu centro<br>de llamadas.</h1>
       <p>Accede para gestionar tus campañas y equipos Android.</p>
+      <ul class="access-features">
+        <li><span class="feature-dot"></span>Campañas en tiempo real</li>
+        <li><span class="feature-dot"></span>Equipos Android sincronizados</li>
+        <li><span class="feature-dot"></span>Reportes y auditoría</li>
+      </ul>
     </aside>
     <section class="access-form" aria-labelledby="loginTitle">
-      <h2 id="loginTitle">Iniciar sesión</h2>
-      <p>Ingresa con tu cuenta de trabajo.</p>
+      <div class="form-header">
+        <h2 id="loginTitle">Iniciar sesión</h2>
+        <p>Ingresa con tu cuenta de trabajo.</p>
+      </div>
       <form id="loginForm">
         <label for="username">Usuario</label>
-        <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="80" required>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="80" required placeholder="usuario">
+        </div>
         <label for="password">Contraseña</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required placeholder="••••••••">
+        </div>
         <p id="loginError" class="access-error" role="alert" aria-live="polite"></p>
         <button id="loginButton" type="submit">Ingresar</button>
       </form>
+      <p class="access-note">Acceso restringido · Sesión monitoreada</p>
     </section>
   </main>
 </body>

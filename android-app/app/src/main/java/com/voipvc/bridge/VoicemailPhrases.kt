@@ -8,20 +8,24 @@ object VoicemailPhrases {
     private val prefixes = listOf(
         "te has comunicado con" to "buzon_de_voz",
         "se ha comunicado con" to "buzon_de_voz",
-        "el numero que has" to "sin_servicio",
         "hola deja tu mensaje" to "buzon_de_voz",
         "el numero al que" to "no_disponible",
         "debe dejar tu mensaje" to "buzon_de_voz",
         "debe dejar su mensaje" to "buzon_de_voz",
-        "hola el numero que" to "sin_servicio",
         "lo sentimos la persona" to "no_disponible",
-        "el numero que usted" to "sin_servicio"
+        "el numero esta suspendido" to "sin_servicio"
     )
 
     fun result(text: String): String? {
         val normalized = Normalizer.normalize(text.lowercase(Locale.ROOT), Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "").replace(Regex("[^a-z0-9 ]"), " ")
             .replace(Regex("\\s+"), " ").trim()
+        // Wait for the distinguishing words before permanently rejecting a number.
+        val invalidNumber = Regex("\\b(el numero (que |al que )?(usted )?(ha |has )?marcado (no existe|es incorrecto)|el numero (no existe|es incorrecto)|la cantidad de digitos que marcaste es incorrecta)\\b")
+            .containsMatchIn(normalized)
+        if (invalidNumber) return "numero_inexistente"
+        if (Regex("\\b(sin servicio|fuera de servicio|esta suspendido)\\b").containsMatchIn(normalized))
+            return "sin_servicio"
         // Match complete words at the start, never a substring in ordinary speech.
         prefixes.firstOrNull { (prefix, _) ->
             normalized == prefix || normalized.startsWith("${prefix} ")

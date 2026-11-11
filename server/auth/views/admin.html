@@ -1,34 +1,82 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Núcleo de Red · Gestión de llamadas VC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/admin.css">
   <script src="/socket.io/socket.io.js" defer></script>
   <script type="module" src="/admin.js"></script>
 </head>
 <body class="network-page">
+  <div class="ambient-bg" aria-hidden="true"></div>
   <main class="network-shell">
-    <header class="network-header">
-      <div class="network-brand"><img src="/logo-vc-color.png" alt="ViaVox VC" width="72"><div><h1>Núcleo de Red</h1><p>Supervisión de equipos y actividad del turno</p></div></div>
-      <nav class="account-bar" aria-label="Cuenta"><span id="accountIdentity"></span><a href="/" class="network-pill secondary">Panel de llamadas</a><button id="logoutButton" class="network-pill" type="button">Cerrar sesión</button></nav>
+
+    <header class="net-header">
+      <div class="net-brand">
+        <div class="net-logo"><img src="/logo-vc-color.png" alt="ViaVox VC"></div>
+        <div>
+          <div class="net-title-row">
+            <h1>VOIP VC · Gestión de Llamadas</h1>
+            <span class="net-badge">NÚCLEO DE RED</span>
+          </div>
+          <p class="net-sub"><span class="net-dot"></span><span id="liveStatus" role="status">Conectando…</span> · <span id="updatedAt">Sin actualización</span></p>
+        </div>
+      </div>
+      <nav class="account-bar" aria-label="Cuenta">
+        <span id="accountIdentity"></span>
+        <a href="/" class="net-pill secondary">Panel de llamadas</a>
+        <button id="logoutButton" class="net-pill" type="button">Cerrar sesión</button>
+      </nav>
     </header>
-    <div class="network-connection"><span id="liveStatus" role="status">Conectando con el servidor…</span><span id="updatedAt">Sin actualización</span></div>
     <p id="accountError" role="alert"></p>
-    <section class="network-surface network-overview" aria-labelledby="equipmentTitle">
-      <div class="campaign-report-head"><h2 id="equipmentTitle">Los 10 equipos</h2><strong id="callingCount" class="network-count" aria-live="polite">Sin datos</strong></div>
-      <div id="equipmentIndicators" class="network-indicators" aria-label="Estado de los equipos"></div>
-      <div class="network-legend"><span><i class="legend-active"></i>En llamada</span><span><i class="legend-dialing"></i>Marcando</span><span><i class="legend-ready"></i>Disponible</span><span><i class="legend-offline"></i>Desconectado</span><span><i></i>Sin vincular</span></div>
+
+    <div class="net-page-title">
+      <h2>Núcleo de Red y Monitoreo Telefónico</h2>
+      <p>Matriz de equipos, telemetría y métricas en tiempo real.</p>
+    </div>
+
+    <section class="net-glass net-overview" aria-labelledby="equipmentTitle">
+      <div class="net-section-head">
+        <h3 id="equipmentTitle"><span class="material-symbols-outlined">hub</span> Estado General de Dispositivos</h3>
+        <span class="net-sync"><span class="net-dot"></span>Sincronización activa</span>
+      </div>
+      <div id="equipmentIndicators" class="net-orbs" aria-label="Estado de los equipos"></div>
+      <div class="net-legend">
+        <span><i class="lg lg-green"></i>En llamada <b id="legendActive">0</b></span>
+        <span><i class="lg lg-amber"></i>Marcando <b id="legendDialing">0</b></span>
+        <span><i class="lg lg-gray"></i>Disponible <b id="legendReady">0</b></span>
+        <span><i class="lg lg-red"></i>Desconectado <b id="legendOffline">0</b></span>
+        <span><i class="lg lg-none"></i>Sin vincular <b id="legendNone">0</b></span>
+      </div>
       <p id="overflowNotice" hidden></p>
     </section>
-    <details id="turnSummary" class="network-surface network-summary-disclosure">
-      <summary><h2>Resumen del turno</h2></summary>
-      <p id="turnUnavailable" class="network-context">No hay un turno verificable para consolidar el resumen.</p>
-      <div id="turnSummaryContent" class="network-summary-strip" hidden><div class="network-summary-heading"><p id="turnLabel"></p><p id="turnScope" class="network-note"></p></div><dl id="turnMetrics" class="network-summary-metrics"></dl></div>
-    </details>
-    <section id="equipmentGrid" class="network-monitor-grid" aria-label="Monitoreo de los 10 equipos"></section>
-    <details class="network-definitions network-surface"><summary>Cómo se cuentan los datos</summary><p>Total de llamadas cuenta intentos registrados, incluidos los que siguen en curso. Contestadas usa la conexión registrada y excluye buzón y anuncios del operador; no confirma atención humana.</p><p>No contestadas incluye intentos finalizados sin respuesta y buzón. Inoperable se muestra separado. Pendientes cuenta contactos en cola atribuibles al equipo, no llamadas.</p><p>Sin datos indica que no existe un turno, asignación o historial verificable. Los horarios corresponden al turno de la sesión; no hay horarios individuales configurados.</p><p>El historial cuenta intentos gestionados y guardados en este sistema. La actividad Android puede incluir llamadas externas.</p></details>
-    <footer class="network-footer">Estados confirmados por Android · Historial MySQL · Horario de Lima</footer>
+
+    <section class="net-kpis" aria-label="Resumen del turno">
+      <div class="net-kpi">
+        <div class="kpi-top"><div><span class="kpi-label">Total de llamadas</span><strong class="kpi-value" id="kpiTotal">—</strong></div><span class="kpi-icon material-symbols-outlined">dialpad</span></div>
+      </div>
+      <div class="net-kpi kpi-green">
+        <div class="kpi-top"><div><span class="kpi-label">Contestadas</span><strong class="kpi-value" id="kpiAnswered">—</strong></div><span class="kpi-icon material-symbols-outlined">phone_in_talk</span></div>
+      </div>
+      <div class="net-kpi kpi-amber">
+        <div class="kpi-top"><div><span class="kpi-label">Pendientes</span><strong class="kpi-value" id="kpiPending">—</strong></div><span class="kpi-icon material-symbols-outlined">hourglass_top</span></div>
+      </div>
+      <div class="net-kpi">
+        <div class="kpi-top"><div><span class="kpi-label">En curso</span><strong class="kpi-value" id="kpiProgress">—</strong></div><span class="kpi-icon material-symbols-outlined">progress_activity</span></div>
+      </div>
+    </section>
+    <p id="turnUnavailable" class="net-note" hidden>No hay un turno verificable para consolidar el resumen.</p>
+
+    <div id="alertBanner" class="net-alert" hidden>
+      <span class="material-symbols-outlined">warning</span>
+      <div><strong id="alertTitle"></strong><p id="alertText"></p></div>
+    </div>
+
+    <section id="equipmentGrid" class="net-grid" aria-label="Monitoreo de los equipos"></section>
   </main>
 </body>
 </html>

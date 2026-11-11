@@ -150,16 +150,18 @@ function mobileCallActionIcon() {
 
 function contactAnnualBlock(contact) {
   const phone = normalizeValidPeruPhone(contact.phone);
-  const until = latestSessionState?.callRestrictions?.[phone]?.nextAllowedAt || contact.callBlockedUntil;
+  const restriction = latestSessionState?.callRestrictions?.[phone];
+  if (restriction?.permanent || contact.doNotCall) return "permanent";
+  const until = restriction?.nextAllowedAt || contact.callBlockedUntil;
   return until && Date.parse(until) > Date.now() ? until : null;
 }
 
 function contactActionButtons(contact, scope = "contacts") {
   const until = contactAnnualBlock(contact);
-  const reason = until ? "Número llamado anteriormente. Disponible desde " + new Date(until).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) : "";
+  const reason = until === "permanent" ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : until ? "Número llamado anteriormente. Disponible desde " + new Date(until).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) : "";
   return `<div class="contact-action-buttons">
     <button type="button" class="wa-action-btn" data-action="whatsapp-direct" data-id="${escHtml(contact.id || "")}" data-list-contact-scope="${scope}" aria-label="Contactar por WhatsApp" title="Contactar por WhatsApp">${whatsappActionIcon()}<span>WHATSAPP</span></button>
-    <button type="button" class="call-action-btn" data-action="call-direct" data-id="${escHtml(contact.id || "")}" data-list="${escHtml(contact.list || "Principal")}" data-list-contact-scope="${scope}" aria-label="Llamar a este contacto" title="${escHtml(reason || "Llamar desde el equipo asignado")}" ${until ? "disabled" : ""}>${mobileCallActionIcon()}<span>${until ? "YA LLAMADO" : "LLAMAR"}</span></button>
+    <button type="button" class="call-action-btn" data-action="call-direct" data-id="${escHtml(contact.id || "")}" data-list="${escHtml(contact.list || "Principal")}" data-list-contact-scope="${scope}" aria-label="Llamar a este contacto" title="${escHtml(reason || "Llamar desde el equipo asignado")}" ${until ? "disabled" : ""}>${mobileCallActionIcon()}<span>${until === "permanent" ? "NO VOLVER A LLAMAR" : until ? "YA LLAMADO" : "LLAMAR"}</span></button>
   </div>`;
 }
 
@@ -788,7 +790,7 @@ function renderContacts() {
     
     tr.innerHTML = `
       <td>${escHtml(c.name)}</td>
-      <td style="font-family:monospace;font-size:13px;">${escHtml(c.phone)}${contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">Número llamado anteriormente</small>' : ""}</td>
+      <td style="font-family:monospace;font-size:13px;">${escHtml(c.phone)}${contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">' + (contactAnnualBlock(c) === "permanent" ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : "Número llamado anteriormente") + '</small>' : ""}</td>
       <td class="actions-cell contact-direct-cell">${contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
@@ -1476,6 +1478,7 @@ function reportResultLabel(value) {
   const labels = {
     buzon_de_voz: "Buzón de voz",
     sin_servicio: "Sin servicio",
+    numero_inexistente: "NO VOLVER A LLAMAR · Número inexistente o incorrecto",
     numero_llamado_anteriormente: "Número llamado anteriormente",
     no_disponible: "No disponible",
     contesto: "Conectada",
