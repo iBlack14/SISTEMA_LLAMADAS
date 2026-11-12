@@ -21,6 +21,13 @@ function fixture() {
       mappings.set(args[0], args[1]);
       return [{}];
     }
+    if (sql.startsWith("DELETE FROM auth_user_workspaces")) {
+      if (mappings.get(args[0]) === args[1]) mappings.delete(args[0]);
+      return [{}];
+    }
+    if (sql.startsWith("SELECT user_id, session_code FROM auth_user_workspaces")) {
+      return [[...mappings].map(([user_id, session_code]) => ({user_id, session_code}))];
+    }
     throw new Error("Unexpected query");
   }};
   const options = {
@@ -65,10 +72,21 @@ test("storage failure never publishes an account mapping",async()=>{
   await assert.rejects(f.manager.open({id:1}),/storage offline/);
   assert.equal(f.mappings.size,0);
 });
-test("missing persisted account data fails without silently creating a replacement",async()=>{
+test("orphaned account mapping is removed and the account recovers a workspace",async()=>{
   const f=fixture();f.mappings.set(1,"LOST01");
-  await assert.rejects(f.manager.open({id:1}),/recuperar/);
-  assert.equal(f.created(),0);
+  const recovered=await f.manager.open({id:1});
+  assert.notEqual(recovered.code,"LOST01");
+  assert.equal(f.mappings.get(1),recovered.code);
+  assert.equal(f.created(),1);
+});
+test("sweep removes only mappings whose session no longer exists",async()=>{
+  const f=fixture();
+  f.sessions.set("KEEP01",{updatedAt:1});
+  f.mappings.set(1,"KEEP01");
+  f.mappings.set(2,"GONE01");
+  assert.equal(await f.manager.sweep(),1);
+  assert.equal(f.mappings.get(1),"KEEP01");
+  assert.equal(f.mappings.has(2),false);
 });
 test("operational access requires a grant even outside production",async()=>{
   const auth=new AuthService({query:async()=>[[]]},{origins:[]});

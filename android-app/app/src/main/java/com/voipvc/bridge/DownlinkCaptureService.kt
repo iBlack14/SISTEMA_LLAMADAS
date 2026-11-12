@@ -22,12 +22,25 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Only this APK's UID may request a downlink pipe, and only while a phone call exists.
  */
 @Keep
-class DownlinkCaptureService(private val context: Context) : Binder() {
+class DownlinkCaptureService @Keep constructor(private val context: Context) : Binder() {
+    init {
+        Log.i("BuzonCapture", "UserService constructed with Shizuku context")
+    }
+
+    @Keep
+    constructor() : this(systemContext())
+
     companion object {
         const val DESCRIPTOR = "com.voipvc.bridge.DownlinkCapture"
         const val OPEN = FIRST_CALL_TRANSACTION
         const val STOP = FIRST_CALL_TRANSACTION + 1
         private const val DESTROY = 16777115
+
+        private fun systemContext(): Context {
+            val activityThread = Class.forName("android.app.ActivityThread")
+            val systemThread = activityThread.getMethod("systemMain").invoke(null)
+            return activityThread.getMethod("getSystemContext").invoke(systemThread) as Context
+        }
     }
     private val running = AtomicBoolean(false)
     private var recorder: AudioRecord? = null

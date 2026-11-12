@@ -57,6 +57,7 @@ class BridgeService : Service() {
         const val ACTION_UI_ANSWER = "com.voipvc.bridge.UI_ANSWER"
         const val ACTION_UI_TOGGLE_MUTE = "com.voipvc.bridge.UI_TOGGLE_MUTE"
         const val ACTION_UI_TOGGLE_SPEAKER = "com.voipvc.bridge.UI_TOGGLE_SPEAKER"
+        const val ACTION_UI_BLOCKLIST_CHANGE = "com.voipvc.bridge.UI_BLOCKLIST_CHANGE"
         const val ACTION_UI_SYNC = "com.voipvc.bridge.UI_SYNC"
 
         // Extras
@@ -69,6 +70,8 @@ class BridgeService : Service() {
         const val EXTRA_COMPANY_NAME = "company_name"
         const val EXTRA_CONTACT_NAME = "contact_name"
         const val EXTRA_IMAGE_URL = "image_url"
+        const val EXTRA_BLOCKLIST_ACTION = "blocklist_action"
+        const val EXTRA_BLOCKLIST_JSON = "blocklist_json"
 
         // SharedPreferences
         const val PREFS_NAME       = "voip vc_prefs"
@@ -87,6 +90,7 @@ class BridgeService : Service() {
         const val ACTION_STATUS        = "com.voipvc.bridge.STATUS"
         const val EXTRA_STATUS_MESSAGE = "status_msg"
         const val ACTION_CALL_UI_STATE = "com.voipvc.bridge.CALL_UI_STATE"
+        const val ACTION_BLOCKLIST_STATE = "com.voipvc.bridge.BLOCKLIST_STATE"
         const val ACTION_CLOSE_CALL_UI = "com.voipvc.bridge.CLOSE_CALL_UI"
         const val ACTION_TELECOM_CALL_STATE = "com.voipvc.bridge.TELECOM_CALL_STATE"
         const val EXTRA_CALL_STATE = "call_state"
@@ -203,6 +207,7 @@ class BridgeService : Service() {
             ACTION_UI_ANSWER -> answerIncomingCall()
             ACTION_UI_TOGGLE_MUTE -> setMicMute(!isMicMuted)
             ACTION_UI_TOGGLE_SPEAKER -> setSpeakerOn(!isSpeakerOn)
+            ACTION_UI_BLOCKLIST_CHANGE -> sendBlockedNumberChange(intent)
             ACTION_UI_SYNC -> {
                 emitCallUiState()
                 emitPhoneStatus(lastCallState, "ui_sync", correlateCampaign = activeCommandId.isNotBlank())
@@ -335,6 +340,19 @@ class BridgeService : Service() {
         client.on("state:changed") { args ->
             if (client !== socket) return@on
             val data = args.firstOrNull() as? JSONObject ?: return@on
+            val blockedNumbers = data.optJSONArray("blockedNumbers")
+            if (blockedNumbers != null) {
+                val entries = BlockedNumberStore.fromJsonArray(blockedNumbers)
+                mainHandler.post {
+                    if (client !== socket) return@post
+                    BlockedNumberStore.replace(this@BridgeService, entries)
+                    sendBroadcast(
+                        Intent(ACTION_BLOCKLIST_STATE)
+                            .setPackage(packageName)
+                            .putExtra(EXTRA_BLOCKLIST_JSON, BlockedNumberStore.toJsonArray(entries).toString())
+                    )
+                }
+            }
             val workers = data.optJSONArray("phoneWorkers") ?: return@on
             var ownWorker: JSONObject? = null
             for (index in 0 until workers.length()) {
@@ -358,6 +376,11 @@ class BridgeService : Service() {
 
         client.on("session:force_logout") {
             if (client === socket) mainHandler.post { logoutAndStop() }
+        }
+
+        client.on("blocked-numbers:error") { args ->
+            val message = (args.firstOrNull() as? JSONObject)?.optString("message").orEmpty()
+            if (message.isNotBlank()) mainHandler.post { setStatus("No se pudo sincronizar la lista: $message") }
         }
 
         client.on("phone:status_ack") { args ->
@@ -474,6 +497,9 @@ class BridgeService : Service() {
     ): DialResult {
         if (number.isBlank() || commandId.isBlank()) {
             return DialResult(false, "Número o identificador de llamada inválido")
+        }
+        if (BlockedNumberStore.contains(this, number)) {
+            return DialResult(false, "Número bloqueado. Quítalo de la lista de bloqueos antes de llamar.")
         }
         if (isActuallyInCall() || activeCommandId.isNotBlank()) {
             return DialResult(false, "El teléfono ya está atendiendo otra llamada")
@@ -1300,6 +1326,25 @@ class BridgeService : Service() {
 
     private fun hasPermission(perm: String) =
         ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+
+    private fun sendBlockedNumberChange(intent: Intent) {
+        val action = intent.getStringExtra(EXTRA_BLOCKLIST_ACTION).orEmpty()
+        val number = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
+        val name = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty().trim().ifBlank { number }
+        if (action !in setOf("add", "remove") || number.filter(Char::isDigit).length !in 6..15) {
+            setStatus("No se pudo actualizar la lista: nombre o número inválido")
+            return
+        }
+        val client = socket
+        if (client?.connected() != true) {
+            Log.w(TAG, "Blocked number saved locally; server is not connected")
+            return
+        }
+        client.emit(
+            "blocked-numbers:change",
+            JSONObject().put("action", action).put("name", name).put("phone", number)
+        )
+    }
 
     private fun setStatus(msg: String) {
         Log.d(TAG, msg)

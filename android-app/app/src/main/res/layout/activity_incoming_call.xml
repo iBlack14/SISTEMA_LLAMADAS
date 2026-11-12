@@ -131,5 +131,37 @@
                 android:textAllCaps="false"
                 android:textColor="@color/vc_text_inverse" />
         </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/messageButton"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Mensaje"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_primary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/blockButton"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_danger_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Bloquear"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_text_inverse" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -129,11 +129,12 @@ Se agrego proyecto Android en `android-app/` con:
 - Pairing a `POST /api/android/pair`
 - Socket.IO como `role=phone`
 - Ejecucion de llamada con `CALL_PHONE`
+- Lista de bloqueos sincronizada entre la APK vinculada y el panel; el SMS se abre como borrador para que el usuario lo revise y lo envie.
 
 ### Build rapido
 
-1. Abre `android-app/` en Android Studio.
-2. Espera sync de Gradle.
+1. Copia `android-app/.env.example` a `android-app/.env` y configura las URL que pueda alcanzar el dispositivo. Para desarrollo por USB usa `ANDROID_DEV_BASE_URL=http://127.0.0.1:3000` y ejecuta `adb reverse tcp:3000 tcp:3000`.
+2. Abre `android-app/` en Android Studio y espera sync de Gradle.
 3. Ejecuta `Build > Build APK(s)`.
 4. APK debug en:
    `android-app/app/build/outputs/apk/debug/app-debug.apk`
@@ -234,13 +235,12 @@ Luego:
 
 ## APK para produccion
 
-- La APK usa `BuildConfig.DEFAULT_BASE_URL` como base por defecto.
+- `debug` toma `ANDROID_DEV_BASE_URL`; `release` toma `ANDROID_PROD_BASE_URL`.
+- Gradle las lee del entorno del proceso o de `android-app/.env`; tambien `ANDROID_VOSK_MODEL_URL` configura el archivo de modelo descargado durante el build.
+- Si falta alguna variable requerida, la compilacion falla en lugar de incluir una URL incorrecta.
 - `release` ahora queda con `cleartext` desactivado.
-- Solo `debug` permite HTTP plano para `localhost`, `127.0.0.1` y `10.0.2.2`.
-
-Para publicar con otro dominio por defecto, cambia este valor en:
-
-- `android-app/app/build.gradle.kts`
+- `debug` permite HTTP para desarrollo local/USB; `release` requiere HTTPS para el servidor.
+- No pongas claves privadas en la APK: cualquier valor compilado en una app cliente se puede extraer. Las credenciales y secretos deben permanecer en el servidor.
 
 ## Siguiente integracion real
 

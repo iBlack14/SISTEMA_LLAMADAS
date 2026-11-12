@@ -1,3 +1,9 @@
+import { showPanelView } from "./panel-navigation.js";
+import { apiFetch as fetch, currentUser } from "./auth.js";
+import { readDashboardSession } from "./dashboard-session.js";
+import { buildDetailedReport } from "./detailed-report.js";
+import { isInReportPeriod, reportPeriodLabel } from "./report-period.js";
+import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel } from "./report-metrics.js";
 
 (() => {
   const $ = id => document.getElementById(id);
@@ -32,8 +38,12 @@
 
   let year = new Date().getFullYear();
   let selectedDate = "";
+  let calendarRange = { from: "", to: "" };
+  let viewedPeriod = null;
   let reports = [];
   let selectedReport = "";
+  let selectionReportId = "";
+  const selectedContactIds = new Set();
   let reportSearchTerm = "";
   let showingDetailedReport = false;
   let detailedPendingOnly = false;
@@ -52,30 +62,19 @@
     }[char])
   );
 
+function reportSession() {
+  return readDashboardSession(localStorage, currentUser?.id);
+}
+
 function sessionCode() {
-  return String(
-    localStorage.getItem("voip vc.dashboardSessionCode") ||
-    ""
-  ).trim().toUpperCase();
+  return reportSession().code;
 }
 
 function dashboardToken() {
-  const code = sessionCode();
-
-  if (!code) return "";
-
-  return String(
-    localStorage.getItem(
-      `voip vc.dashboardToken.${code}`
-    ) || ""
-  ).trim();
+  return reportSession().token;
 }
   function endpoint(path) {
-  const base = String(
-    window.VOIP_VC_API_BASE ||
-    new URLSearchParams(window.location.search).get("apiBase") ||
-    window.location.origin
-  ).trim().replace(/\/+$/, "");
+  const base = window.location.origin;
 
   return new URL(
     `/api/session/${encodeURIComponent(sessionCode())}${path}`,
@@ -84,8 +83,9 @@ function dashboardToken() {
 }
 
   async function fetchReports(date = "") {
-    if (!sessionCode()) {
-      throw Error("Inicia una sesión para consultar reportes.");
+    const context = reportSession();
+    if (!context.code || !context.token) {
+      throw Error("Tu espacio de llamadas aún se está conectando. Espera unos segundos y pulsa Reintentar.");
     }
 
     const query = date
@@ -120,6 +120,7 @@ function dashboardToken() {
 
  async function showCalendar() {
    clearDayNavigation();
+   viewedPeriod = null;
 
  try {
     reports = await fetchReports();
@@ -154,6 +155,8 @@ function dashboardToken() {
   <button
     type="button"
     data-date="${date}"
+    aria-label="${date}: clic para seleccionar; doble clic o Enter para abrir el día"
+    aria-pressed="false"
     class="${[
       dates.has(date) ? "has-report" : "",
       selectedDate === date ? "selected-date" : ""
@@ -187,6 +190,11 @@ function dashboardToken() {
           <button id="nextYear" class="secondary">›</button>
         </div>
       </div>
+      <p id="calendarRangeHint" role="status"></p>
+      <div class="report-tools" style="margin-bottom:16px">
+        <button id="reportRangeOpen" type="button" disabled>Ver reportes del rango</button>
+        <button id="reportRangeClear" class="secondary" type="button">Limpiar selección</button>
+      </div>
       <div class="months-grid">${monthCards}</div>
     `;
 
@@ -203,11 +211,78 @@ function dashboardToken() {
     $("dailyReportMount")
       .querySelectorAll("[data-date]")
       .forEach(button => {
-        button.onclick = () => showDay(button.dataset.date);
+        button.onclick = event => {
+          if (event.detail > 1) return;
+          const date = button.dataset.date;
+          if (!calendarRange.from || calendarRange.to) {
+            calendarRange = { from: date, to: "" };
+          } else {
+            calendarRange = {
+              from: date < calendarRange.from ? date : calendarRange.from,
+              to: date < calendarRange.from ? calendarRange.from : date
+            };
+          }
+          paintCalendarRange();
+        };
+        button.ondblclick = () => showDay(button.dataset.date);
+        button.onkeydown = event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            showDay(button.dataset.date);
+          }
+        };
       });
+    $("reportRangeOpen").onclick = showRange;
+    $("reportRangeClear").onclick = () => {
+      calendarRange = { from: "", to: "" };
+      paintCalendarRange();
+    };
+    paintCalendarRange();
+  }
+
+  function paintCalendarRange() {
+    const { from, to } = calendarRange;
+    $("dailyReportMount").querySelectorAll("[data-date]").forEach(button => {
+      const date = button.dataset.date;
+      const edge = date === from || date === to;
+      const inside = Boolean(from && to && date >= from && date <= to);
+      button.classList.toggle("range-start", date === from);
+      button.classList.toggle("range-end", date === to);
+      button.classList.toggle("selected-date", edge);
+      button.classList.toggle("in-range", inside);
+      button.setAttribute("aria-pressed", String(edge || inside));
+    });
+    $("calendarRangeHint").textContent = !from
+      ? "Un clic: fecha de inicio; otro clic: fecha final. Doble clic: abrir el día."
+      : !to ? `Desde ${reportPeriodLabel({from, to: from})}. Ahora elige la fecha final.`
+        : `Rango seleccionado: ${reportPeriodLabel(calendarRange)}. Doble clic para abrir un día.`;
+    $("reportRangeOpen").disabled = !from || !to;
+    $("reportRangeClear").disabled = !from;
+  }
+
+  async function showRange() {
+    if (!calendarRange.from || !calendarRange.to) return;
+    const period = { ...calendarRange };
+    $("reportRangeOpen").disabled = true;
+    try {
+      const allReports = await fetchReports();
+      reports = allReports.filter(report => isInReportPeriod(report.date, period));
+      viewedPeriod = period;
+      selectedDate = "";
+      selectedReport = reports[0]?.id || "";
+      reportSearchTerm = "";
+      visibleRubrosStart = 0;
+      showingDetailedReport = false;
+      detailedPendingOnly = false;
+      renderDay();
+    } catch (error) {
+      showError(error);
+    }
   }
 
   async function showDay(date) {
+  viewedPeriod = null;
+  calendarRange = { from: date, to: date };
   selectedDate = date;
   reportSearchTerm = "";
    visibleRubrosStart = 0;
@@ -274,6 +349,12 @@ function renderDay() {
     <div class="report-day-toolbar">
       <div class="report-day-title">
         <h2>REPORTE DE LLAMADAS</h2>
+        <p id="reportPeriodSummary">${esc(reportPeriodLabel(viewedPeriod || {from: selectedDate, to: selectedDate}))}</p>
+        ${viewedPeriod && reports.length ? `
+          <label for="reportRangeRecord">Fecha y rubro</label>
+          <select id="reportRangeRecord">
+            ${reports.map(report => `<option value="${esc(report.id)}" ${report.id === selectedReport ? "selected" : ""}>${esc(formatDetailedDate(report.date))} · ${esc(report.rubro)}</option>`).join("")}
+          </select>` : ""}
       </div>
       <div class="report-tools ${showingDetailedReport ? "report-tools-teams" : ""}">
         ${showingDetailedReport
@@ -310,7 +391,7 @@ function renderDay() {
                   aria-pressed="${report.id === selectedReport}"
                 >
                   <span class="report-rubro-number">${visibleRubrosStart + index + 1}</span>
-                  <span>${esc(report.rubro)}</span>
+                  <span>${esc(report.rubro)}${viewedPeriod ? ` · ${esc(formatDetailedDate(report.date))}` : ""}</span>
                 </button>
               `).join("")}
             </div>`}
@@ -320,9 +401,9 @@ function renderDay() {
       ${reports.length ? `
         <div id="reportDetails"></div>
       ` : `
-        <p>No existen campañas registradas para esta fecha.</p>
+        <p>No existen campañas registradas para ${viewedPeriod ? "este rango de fechas" : "esta fecha"}.</p>
       `}
-      <nav class="report-date-navigation" aria-label="Navegar por fecha">
+      <nav class="report-date-navigation" aria-label="Navegar por fecha" ${viewedPeriod ? "hidden" : ""}>
         <button id="reportPreviousDay" class="secondary" type="button"
           ${shiftReportDate(selectedDate, -1) ? "" : "disabled"}>
           ← ANTERIOR
@@ -346,6 +427,10 @@ function renderDay() {
     };
 
     $("backCalendar").onclick = showCalendar;
+    if ($("reportRangeRecord")) $("reportRangeRecord").onchange = event => {
+      selectedReport = event.currentTarget.value;
+      renderDay();
+    };
     if (!showingDetailedReport) {
       $("reportSearch").oninput = event => {
         reportSearchTerm = event.currentTarget.value;
@@ -414,6 +499,14 @@ function renderDay() {
 
     if (!report) return;
 
+    if (selectionReportId !== report.id) {
+      selectionReportId = report.id;
+      selectedContactIds.clear();
+    }
+    const canSelect = contact => !contact.doNotCall && !contact.manualBlocked && !isInoperableAttempt(contact);
+    const eligibleIds = new Set(report.rows.filter(canSelect).map(contact => String(contact.id)));
+    for (const id of selectedContactIds) if (!eligibleIds.has(id)) selectedContactIds.delete(id);
+
     const normalizeSearchText = value => String(value ?? "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -471,15 +564,16 @@ function renderDay() {
       ["NÚMEROS USADOS", report.numbers],
       ["LLAMADAS TOTALES", report.totalCalls],
       ["CONTESTADAS", report.answered],
+      ["BUZONES", report.voicemail ?? report.rows.filter(isVoicemailAttempt).length],
+      ["INOPERABLES", report.rows.filter(isInoperableAttempt).length],
       ["PENDIENTES", report.pending]
     ];
 
-    const status = contact =>
-      contact.answered ? "CONTESTO" :
-      contact.inoperable ? "INOPERABLE" : "PENDIENTE";
+    const status = attemptResultLabel;
     const statusClass = contact =>
-      contact.answered ? "is-answered" :
-      contact.inoperable ? "is-inoperable" : "is-pending";
+      isVoicemailAttempt(contact) ? "is-voicemail" :
+      isAnsweredAttempt(contact) ? "is-answered" :
+      isInoperableAttempt(contact) ? "is-inoperable" : "is-pending";
     const limaDateTime = value => {
       if (!value) return "—";
       const timestamp = new Date(value);
@@ -501,210 +595,7 @@ function renderDay() {
         `${String(seconds % 60).padStart(2, "0")}`;
     };
 
-    const makeDetailedRows = () => {
-      const sourceContacts = report.rows || [];
-      const contactsByKey = new Map();
-      const getContactKey = item =>
-        String(item.contactId || item.id || item.phone || item.name || "");
-      for (const contact of sourceContacts) {
-        contactsByKey.set(getContactKey(contact), contact);
-        if (contact.phone) contactsByKey.set(String(contact.phone), contact);
-      }
-
-      const historyCalls = Array.isArray(report.calls) ? report.calls : [];
-      const calls = historyCalls.length
-        ? historyCalls.map(call => ({
-            ...call,
-            startedAt: call.startedAt || call.lastCallAt,
-            workerName: call.workerName ||
-              contactsByKey.get(getContactKey(call))?.workerName ||
-              contactsByKey.get(String(call.phone || ""))?.workerName ||
-              ""
-          }))
-        : sourceContacts
-            .filter(contact => contact.lastCallAt)
-            .map(contact => ({
-              ...contact,
-              startedAt: contact.lastCallAt
-            }));
-
-      const isInoperable = call => {
-        const result = String(
-          call.technicalResult || call.disposition || ""
-        ).toLowerCase();
-        return Boolean(call.inoperable) ||
-          /invalid|inoperable|unreachable|not.in.service|disconnected/
-            .test(result);
-      };
-      const isAnswered = call => {
-        const result = String(
-          call.technicalResult || call.disposition || ""
-        ).toLowerCase();
-        return Boolean(call.answered || call.answeredAt) ||
-          Number(call.durationSeconds || 0) >= 35 ||
-          /^(contesto|interesado|no_interesado|requiere_asesor|agendado)$/
-            .test(result);
-      };
-      const toLimaHour = value => {
-        if (!value) return null;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        const hourText = new Intl.DateTimeFormat("en-US", {
-          timeZone: "America/Lima",
-          hour: "2-digit",
-          hourCycle: "h23"
-        }).format(date);
-        const hour = Number(hourText);
-        return Number.isInteger(hour) ? hour : null;
-      };
-      const hourLabel = hour => {
-        const formatHour = value =>
-          `${String(value % 24).padStart(2, "0")}:00`;
-        return `${formatHour(hour)}–${formatHour(hour + 1)}`;
-      };
-
-      const designatedContacts = new Map();
-      const contactAssignedTeam = new Map();
-      const latestCallByContact = new Map();
-      for (const call of calls) {
-        const key = getContactKey(call);
-        const time = new Date(call.startedAt || 0).getTime() || 0;
-        const previous = latestCallByContact.get(key);
-        if (!previous || time >= previous.time) {
-          latestCallByContact.set(key, {
-            time,
-            team: String(call.workerName || "").trim()
-          });
-        }
-      }
-      for (const contact of sourceContacts) {
-        const key = getContactKey(contact);
-        const team = latestCallByContact.get(key)?.team ||
-          String(contact.workerName || "").trim() ||
-          "SIN EQUIPO";
-        if (!designatedContacts.has(team)) {
-          designatedContacts.set(team, new Set());
-        }
-        designatedContacts.get(team).add(key);
-        contactAssignedTeam.set(key, team);
-        if (contact.phone) contactAssignedTeam.set(String(contact.phone), team);
-      }
-      for (const call of calls) {
-        const key = getContactKey(call);
-        const team = latestCallByContact.get(key)?.team ||
-          String(call.workerName || "").trim() ||
-          "SIN EQUIPO";
-        if (!designatedContacts.has(team)) {
-          designatedContacts.set(team, new Set());
-        }
-        designatedContacts.get(team).add(key);
-        contactAssignedTeam.set(key, team);
-        if (call.phone) contactAssignedTeam.set(String(call.phone), team);
-      }
-
-      const hourlyRows = new Map();
-      const metricsByTeam = new Map();
-      const getTeamMetrics = team => {
-        if (!metricsByTeam.has(team)) {
-          metricsByTeam.set(team, {
-            calls: 0,
-            answered: 0,
-            noAnswer: 0,
-            inoperable: 0,
-            pending: 0
-          });
-        }
-        return metricsByTeam.get(team);
-      };
-      for (const call of calls) {
-        const team = String(call.workerName || "").trim() ||
-          contactAssignedTeam.get(getContactKey(call)) ||
-          contactAssignedTeam.get(String(call.phone || "")) ||
-          "SIN EQUIPO";
-        const teamMetrics = getTeamMetrics(team);
-        teamMetrics.calls++;
-        const hour = toLimaHour(call.startedAt);
-        const key = `${team}|${hour === null ? "SIN HORA" : hour}`;
-        if (!hourlyRows.has(key)) {
-          hourlyRows.set(key, {
-            team,
-            hour: hour === null ? "SIN HORA" : hourLabel(hour),
-            calls: 0,
-            answered: 0,
-            noAnswer: 0,
-            inoperable: 0,
-            pending: 0
-          });
-        }
-        const row = hourlyRows.get(key);
-        row.calls++;
-        if (isInoperable(call)) {
-          row.inoperable++;
-          teamMetrics.inoperable++;
-        } else if (isAnswered(call)) {
-          row.answered++;
-          teamMetrics.answered++;
-        } else {
-          row.noAnswer++;
-          teamMetrics.noAnswer++;
-        }
-      }
-
-      const calledContactKeys = new Set();
-      for (const call of calls) {
-        calledContactKeys.add(getContactKey(call));
-        if (call.phone) calledContactKeys.add(String(call.phone));
-      }
-      const pendingByTeam = new Map();
-      for (const contact of sourceContacts) {
-        const key = getContactKey(contact);
-        const attempted = Boolean(contact.lastCallAt) ||
-          calledContactKeys.has(key) ||
-          (contact.phone && calledContactKeys.has(String(contact.phone)));
-        if (attempted) continue;
-        const team = contactAssignedTeam.get(key) ||
-          String(contact.workerName || "").trim() ||
-          "SIN EQUIPO";
-        pendingByTeam.set(team, (pendingByTeam.get(team) || 0) + 1);
-        getTeamMetrics(team).pending++;
-      }
-      for (const [team, count] of pendingByTeam) {
-        const key = `${team}|SIN LLAMADA`;
-        hourlyRows.set(key, {
-          team,
-          hour: "SIN LLAMADA",
-          calls: 0,
-          answered: 0,
-          noAnswer: 0,
-          inoperable: 0,
-          pending: count
-        });
-      }
-
-      const resultRows = Array.from(hourlyRows.values())
-        .sort((left, right) =>
-          left.team.localeCompare(right.team, "es") ||
-          left.hour.localeCompare(right.hour, "es", { numeric: true })
-        )
-        .map(row => ({
-          team: row.team,
-          designated: designatedContacts.get(row.team)?.size || 0,
-          hour: row.hour,
-          calls: row.calls,
-          answered: row.answered,
-          noAnswer: row.noAnswer,
-          inoperable: row.inoperable,
-          pending: row.pending
-        }));
-
-      return {
-        rows: resultRows.filter(row =>
-          row.team === selectedDetailedTeam &&
-          (!detailedPendingOnly || row.pending > 0)
-        ),
-        metrics: getTeamMetrics(selectedDetailedTeam)
-      };
-    };
+    const makeDetailedRows = () => buildDetailedReport(report, selectedDetailedTeam, detailedPendingOnly);
 
     const renderDetailedReport = () => {
       const detailed = makeDetailedRows();
@@ -725,6 +616,8 @@ function renderDay() {
         (/^EQUIPO\s+\d+$/i.test(selectedDetailedTeam)
           ? "MODELO NO REGISTRADO"
           : selectedDetailedTeam);
+      const equipmentHeading = selectedDetailedTeam === "SIN EQUIPO" ? "Equipo no registrado" :
+        teamLabel === modelName ? teamLabel : `${teamLabel}: ${modelName}`;
       const teamCalls = (report.calls || []).filter(call =>
         String(call.workerName || "").trim() === selectedDetailedTeam
       );
@@ -756,6 +649,7 @@ function renderDay() {
         ["LLAMADAS TOTALES", detailed.metrics.calls, "total"],
         ["CONTESTADAS", detailed.metrics.answered, "answered"],
         ["NO CONTESTADAS", detailed.metrics.noAnswer, "no-answer"],
+        ["BUZONES", detailed.metrics.voicemail, "voicemail"],
         ["INOPERABLE", detailed.metrics.inoperable, "inoperable"],
         ["PENDIENTE", detailed.metrics.pending, "pending"]
       ];
@@ -766,6 +660,7 @@ function renderDay() {
         "LLAMADAS TOTALES",
         "CONTESTADAS",
         "NO CONTESTADAS",
+        "BUZONES",
         "INOPERABLE",
         "PENDIENTE"
       ];
@@ -775,7 +670,7 @@ function renderDay() {
           aria-label="Reporte detallado">
           <div class="report-detailed-summary">
             <div class="report-detailed-equipment">
-              <h3>${esc(teamLabel)}: ${esc(modelName)}</h3>
+              <h3>${esc(equipmentHeading)}</h3>
               <span>${esc(teamShift)} | ${esc(formatDetailedDate(report.date))} | ${
                 detailed.metrics.calls
               } llamadas</span>
@@ -811,11 +706,12 @@ function renderDay() {
                     <td>${row.calls}</td>
                     <td>${row.answered}</td>
                     <td>${row.noAnswer}</td>
+                    <td>${row.voicemail}</td>
                     <td>${row.inoperable}</td>
                     <td>${row.pending}</td>
                   </tr>
                 `).join("") || `
-                  <tr><td colspan="8">${
+                  <tr><td colspan="9">${
                     detailedPendingOnly
                       ? "No hay contactos pendientes."
                       : "No hay llamadas registradas."
@@ -882,35 +778,10 @@ function renderDay() {
           button.disabled = false;
         }
       };
-      $("detailedCallPending").onclick = async () => {
-        if (!confirm(
-          `¿Llamar los contactos pendientes del rubro ${report.rubro}?`
-        )) return;
-        const button = $("detailedCallPending");
-        button.disabled = true;
-        try {
-          const response = await fetch(
-            endpoint(`/reports/${encodeURIComponent(report.id)}/continue`),
-            {
-              method: "POST",
-              headers: {
-                "X-Dashboard-Token": dashboardToken()
-              }
-            }
-          );
-          const data = await response.json();
-          if (!response.ok) {
-            throw Error(data.error || "No se pudieron iniciar las llamadas.");
-          }
-          alert(
-            `${data.queued} contactos pendientes agregados a la campaña.`
-          );
-          $("reportBackBtn").click();
-        } catch (error) {
-          alert(error.message || "No se pudieron iniciar las llamadas.");
-        } finally {
-          button.disabled = false;
-        }
+      $("detailedCallPending").onclick = () => {
+        showingDetailedReport = false;
+        detailedPendingOnly = false;
+        renderDay();
       };
       $("detailedPdf").onclick = async () => {
         const JsPDF = window.jspdf?.jsPDF;
@@ -939,7 +810,7 @@ function renderDay() {
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const margin = 10;
-          const columnWidths = [38, 31, 31, 38, 32, 38, 31, 38];
+          const columnWidths = [36, 26, 29, 34, 28, 32, 28, 30, 34];
           const rowHeightFor = lines => Math.max(
             8,
             ...lines.map(linesInCell => linesInCell.length * 3.6 + 3)
@@ -966,7 +837,7 @@ function renderDay() {
             pdf.setTextColor(192, 0, 132);
             pdf.text(
               pdf.splitTextToSize(
-                `${teamLabel}: ${modelName}`,
+                equipmentHeading,
                 84
               ),
               margin + 2,
@@ -986,8 +857,8 @@ function renderDay() {
             const cardGap = 2;
             const cardStartX = margin + 90;
             const cardWidth = (
-              pageWidth - margin - cardStartX - cardGap * 4
-            ) / 5;
+              pageWidth - margin - cardStartX - cardGap * (teamSummary.length - 1)
+            ) / teamSummary.length;
             const cardTop = 32;
             const cardHeight = 22;
             teamSummary.forEach(([label, value, tone], index) => {
@@ -995,6 +866,7 @@ function renderDay() {
                 total: [117, 0, 138],
                 answered: [2, 132, 199],
                 "no-answer": [176, 0, 96],
+                voicemail: [153, 94, 0],
                 inoperable: [117, 0, 138],
                 pending: [0, 129, 84]
               };
@@ -1069,10 +941,11 @@ function renderDay() {
                 String(row.calls),
                 String(row.answered),
                 String(row.noAnswer),
+                String(row.voicemail),
                 String(row.inoperable),
                 String(row.pending)
               ])
-            : [["", "", "", "", "", "", "", "Sin registros"]];
+            : [["", "", "", "", "", "", "", "", "Sin registros"]];
           const rowHeights = exportRows.map(values => {
             const lines = values.map((value, index) =>
               pdf.splitTextToSize(value, columnWidths[index] - 3)
@@ -1229,6 +1102,7 @@ function renderDay() {
             <table>
               <thead>
                 <tr>
+                  <th class="report-select-cell"><input id="reportSelectAll" type="checkbox" aria-label="Seleccionar todos los números disponibles visibles" /></th>
                   <th>N.</th>
                   <th>BASE</th>
                   <th>EMPRESA</th>
@@ -1238,11 +1112,16 @@ function renderDay() {
                   <th>INT.</th>
                   <th>DURACION</th>
                   <th>RESULTADO</th>
+                  <th class="report-row-action-cell">LLAMAR</th>
                 </tr>
               </thead>
               <tbody>
                 ${tableRows.map(({ report: rowReport, contact }, index) => `
                   <tr>
+                    <td class="report-select-cell"><input type="checkbox" data-select-contact="${esc(String(contact.id))}"
+                      aria-label="Seleccionar ${esc(contact.name)} ${esc(contact.phone)}"
+                      ${rowReport.id === report.id && canSelect(contact) ? "" : 'disabled title="Número bloqueado, inoperable o de otro rubro"'}
+                      ${rowReport.id === report.id && selectedContactIds.has(String(contact.id)) ? "checked" : ""} /></td>
                     <td>${index + 1}</td>
                     <td>${esc(contact.list || rowReport.rubro)}</td>
                     <td>${esc(contact.name)}</td>
@@ -1254,10 +1133,15 @@ function renderDay() {
                     <td class="report-result ${statusClass(contact)}">
                       ${esc(status(contact))}
                     </td>
+                    <td class="report-row-action-cell">
+                      ${canSelect(contact)
+                        ? `<button type="button" class="report-row-call" data-call-report-contact="${esc(String(contact.id))}" data-call-report-id="${esc(rowReport.id)}" aria-label="Llamar a ${esc(contact.name)} ${esc(contact.phone)}">☎ Llamar</button>`
+                        : `<span class="report-no-call">${contact.doNotCall || ["numero_inexistente", "numero_incorrecto"].includes(contact.technicalResult) ? "NO VOLVER A LLAMAR" : contact.manualBlocked ? "BLOQUEADO" : "INOPERABLE"}</span>`}
+                    </td>
                   </tr>
                 `).join("") || `
                   <tr>
-                    <td colspan="9">Sin resultados</td>
+                    <td colspan="11">Sin resultados</td>
                   </tr>
                 `}
               </tbody>
@@ -1271,20 +1155,49 @@ function renderDay() {
               </button>
             </div>
             <div class="report-continue">
+              <span id="reportSelectionCount" role="status">0 seleccionados</span>
               <button id="reportDetailed" class="secondary" type="button">
                 DETALLADO
               </button>
               <button
-                id="reportContinue"
-                ${report.pending ? "" : "disabled"}
+                id="reportContinue" type="button" disabled
               >
-                COMENZAR LLAMADAS PENDIENTES
+                LLAMAR SELECCIONADOS
               </button>
             </div>
           </div>
+          <p id="reportSelectionFeedback" role="status" hidden></p>
         </section>
       </section>
     `;
+
+    let selectionSubmitting = false;
+    const checkboxes = () => [...$("reportDetails").querySelectorAll("[data-select-contact]:not(:disabled)")];
+    const updateSelection = () => {
+      const visible = checkboxes();
+      const checked = visible.filter(input => selectedContactIds.has(input.dataset.selectContact)).length;
+      $("reportSelectAll").disabled = !visible.length;
+      $("reportSelectAll").checked = visible.length > 0 && checked === visible.length;
+      $("reportSelectAll").indeterminate = checked > 0 && checked < visible.length;
+      $("reportSelectionCount").textContent = `${selectedContactIds.size} seleccionados`;
+      $("reportContinue").disabled = selectionSubmitting || !selectedContactIds.size;
+      $("reportDetails").querySelectorAll("[data-call-report-contact]").forEach(button => { button.disabled = selectionSubmitting; });
+      $("reportContinue").textContent = selectedContactIds.size ? `LLAMAR SELECCIONADOS (${selectedContactIds.size})` : "LLAMAR SELECCIONADOS";
+    };
+    $("reportSelectAll").onchange = event => {
+      for (const input of checkboxes()) {
+        input.checked = event.currentTarget.checked;
+        if (input.checked) selectedContactIds.add(input.dataset.selectContact);
+        else selectedContactIds.delete(input.dataset.selectContact);
+      }
+      updateSelection();
+    };
+    for (const input of checkboxes()) input.onchange = () => {
+      if (input.checked) selectedContactIds.add(input.dataset.selectContact);
+      else selectedContactIds.delete(input.dataset.selectContact);
+      updateSelection();
+    };
+    updateSelection();
 
     const exportReportsToPdf = async (reportsForExport, clickedButton) => {
       const JsPDF = window.jspdf?.jsPDF;
@@ -1312,6 +1225,7 @@ function renderDay() {
                 numbers: 0,
                 totalCalls: 0,
                 answered: 0,
+                voicemail: 0,
                 pending: 0,
                 rows: []
               };
@@ -1320,6 +1234,7 @@ function renderDay() {
             combined.numbers += Number(reportItem.numbers || 0);
             combined.totalCalls += Number(reportItem.totalCalls || 0);
             combined.answered += Number(reportItem.answered || 0);
+            combined.voicemail += Number(reportItem.voicemail ?? (reportItem.rows || []).filter(isVoicemailAttempt).length);
             combined.pending += Number(reportItem.pending || 0);
             combined.rows.push(...(reportItem.rows || []));
             return reportsByRubro;
@@ -1378,27 +1293,7 @@ function renderDay() {
             `${call.disposition || ""}`
             ).includes(term)
           );
-          const resultForCall = call => {
-            if (call.inoperable) return "INOPERABLE";
-            if (call.pending) return "PENDIENTE";
-            if (call.answered) return "CONTESTO";
-            const outcome = String(
-              call.disposition || call.technicalResult || ""
-            ).toLowerCase();
-            if (/buz[oó]n|voicemail|sin.inter[eé]s/.test(outcome)) {
-              return "CONTESTO";
-            }
-            if (
-              call.answeredAt ||
-              call.answered ||
-              Number(call.durationSeconds || 0) >= 35 ||
-              /^(contesto|interesado|no_interesado|requiere_asesor|agendado)$/
-                .test(String(call.technicalResult || "").toLowerCase())
-            ) {
-              return "CONTESTO";
-            }
-            return "PENDIENTE";
-          };
+          const resultForCall = attemptResultLabel;
           const groups = new Map([[
             report.id,
             { name: report.rubro, equipmentLabel: "", calls: filteredCalls }
@@ -1471,6 +1366,8 @@ function renderDay() {
                 ["NÚMEROS USADOS:", report.numbers],
                 ["LLAMADAS TOTALES:", totalCalls],
                 ["CONTESTADAS:", report.answered ?? resultCounts.answered],
+                ["BUZONES:", report.voicemail ?? report.rows.filter(isVoicemailAttempt).length],
+                ["INOPERABLES:", report.rows.filter(isInoperableAttempt).length],
                 ["PENDIENTES:", report.pending ?? resultCounts.pending]
               ];
               pdf.setFontSize(7.5);
@@ -1581,6 +1478,7 @@ function renderDay() {
                 pdf.setTextColor(...reportPdfTableTheme.text);
                 const resultColors = {
                   CONTESTO: [0, 118, 79],
+                  "BUZÓN DE VOZ": [153, 94, 0],
                   INOPERABLE: [220, 38, 38],
                   PENDIENTE: [0, 129, 84]
                 };
@@ -1647,23 +1545,25 @@ function renderDay() {
     $("reportTotalPdf").onclick = () =>
       exportReportsToPdf(reports, $("reportTotalPdf"));
 
-    $("reportContinue").onclick = async () => {
-      if (!confirm(
-        `¿Continuar las llamadas pendientes del rubro ${report.rubro}?`
-      )) return;
-
+    const startReportCalls = async (targetReportId, contactIds) => {
+      if (!contactIds.length || selectionSubmitting) return;
+      selectionSubmitting = true;
+      updateSelection();
+      const button = $("reportContinue");
+      const feedback = $("reportSelectionFeedback");
+      button.disabled = true;
+      feedback.hidden = true;
       try {
         const response = await fetch(
           endpoint(
-            `/reports/${encodeURIComponent(report.id)}/continue`
+            `/reports/${encodeURIComponent(targetReportId)}/continue`
           ),
         
-{
-  method: "POST",
-  headers: {
-    "X-Dashboard-Token": dashboardToken()
-  }
-}
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardToken() },
+            body: JSON.stringify({ contactIds, manualRetry: true })
+          }
         );
 
         const data = await response.json();
@@ -1672,15 +1572,23 @@ function renderDay() {
           throw Error(data.error || "No se pudo iniciar");
         }
 
-        alert(
-          `${data.queued} contactos pendientes agregados a la campaña.`
-        );
-
+        selectedContactIds.clear();
         $("reportBackBtn").click();
+        const statusText = $("statusText");
+        if (statusText) statusText.textContent = `${data.queued} contactos seleccionados agregados a la campaña.`;
       } catch (error) {
-        alert(error.message);
+        feedback.textContent = error.message || "No se pudieron iniciar las llamadas seleccionadas.";
+        feedback.hidden = false;
+      } finally {
+        selectionSubmitting = false;
+        updateSelection();
       }
     };
+
+    $("reportContinue").onclick = () => startReportCalls(report.id, [...selectedContactIds]);
+    $("reportDetails").querySelectorAll("[data-call-report-contact]").forEach(button => {
+      button.onclick = () => startReportCalls(button.dataset.callReportId, [button.dataset.callReportContact]);
+    });
 
     $("reportDetailed").onclick = () => {
       showingDetailedReport = true;
@@ -1692,18 +1600,12 @@ function renderDay() {
 
   const bindReportNav = () => {
     $("reportNavBtn")?.addEventListener("click", () => {
-      $("callsContent").hidden = true;
-      $("annualReport").hidden = false;
-      $("reportNavBtn").hidden = true;
-      $("reportBackBtn").hidden = false;
+      showPanelView("reports");
       showCalendar();
     });
 
     $("reportBackBtn")?.addEventListener("click", () => {
-      $("callsContent").hidden = false;
-      $("annualReport").hidden = true;
-      $("reportNavBtn").hidden = false;
-      $("reportBackBtn").hidden = true;
+      showPanelView("calls");
     });
   };
   if (document.readyState === "loading") {

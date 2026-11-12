@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin.css?v=20261111-clean">
+  <link rel="stylesheet" href="/admin.css?v=20261111-users">
   <script src="/socket.io/socket.io.js" defer></script>
   <script type="module" src="/admin.js?v=20261111-clean"></script>
 </head>
@@ -28,7 +28,7 @@
     <p id="accountError" class="notice error" role="alert"></p>
     <div class="page-heading">
       <div><h1>Núcleo de Red</h1><p>Estado de los equipos y actividad del turno.</p></div>
-      <div class="actions"><button id="refreshButton" class="button secondary" type="button">Actualizar</button><button id="downloadLog" class="button primary" type="button" disabled>Descargar registro</button></div>
+      <div class="actions"><button id="usersButton" class="button secondary" type="button">Usuarios</button><button id="refreshButton" class="button secondary" type="button">Actualizar</button><button id="downloadLog" class="button primary" type="button" disabled>Descargar registro</button></div>
     </div>
     <div class="connection" role="status"><span id="liveDot" class="status-dot"></span><span id="liveStatus">Conectando con el servidor…</span><span id="updatedAt">Sin actualización</span></div>
     <section class="summary" aria-label="Resumen del turno">
@@ -68,5 +68,24 @@
     </section>
     <footer>Los estados dependen de la conexión de cada equipo. Horas de Lima.</footer>
   </main>
+  <dialog id="usersDialog" class="users-dialog" aria-labelledby="usersTitle">
+    <div class="users-dialog-header"><div><h2 id="usersTitle">Usuarios</h2><p>Crea cuentas y define a qué pueden acceder.</p></div><button id="usersClose" class="button secondary" type="button" aria-label="Cerrar usuarios">Cerrar</button></div>
+    <p id="usersMessage" class="notice" role="status" hidden></p>
+    <p id="usersError" class="notice error" role="alert" hidden></p>
+    <form id="createUserForm" class="user-form">
+      <h3>Crear usuario</h3>
+      <label for="newUsername">Usuario<input id="newUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="usernameHint"><small id="usernameHint">Letras, números, punto, guion o guion bajo.</small></label>
+      <label for="newUserRole">Acceso<select id="newUserRole" name="role"><option value="EMPLEADO">Ventas · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Núcleo y llamadas</option></select></label>
+      <label for="newUserPassword">Contraseña<input id="newUserPassword" name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="passwordHint"><small id="passwordHint">Mínimo 12 caracteres.</small></label>
+      <label for="newUserConfirmation">Confirmar contraseña<input id="newUserConfirmation" name="passwordConfirmation" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+      <div class="user-form-actions"><button id="createUserButton" class="button primary" type="submit">Crear usuario</button></div>
+    </form>
+    <section class="users-list" aria-labelledby="usersListTitle">
+      <div class="section-heading"><h3 id="usersListTitle">Cuentas registradas</h3><button id="usersRefresh" class="button secondary" type="button">Actualizar lista</button></div>
+      <p id="usersLoading" class="muted" role="status">Cargando usuarios…</p>
+      <div class="users-table-scroll" tabindex="0" role="region" aria-label="Usuarios registrados"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Acceso</th><th scope="col">Estado</th></tr></thead><tbody id="usersRows"></tbody></table></div>
+    </section>
+  </dialog>
+  <script type="module" src="/admin-users.js?v=20261111-users"></script>
 </body>
 </html>

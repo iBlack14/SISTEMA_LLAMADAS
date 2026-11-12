@@ -6,6 +6,8 @@ import * as AudioBridge from './modules/audio-bridge.js?v=2';
 import * as WhatsApp from './modules/whatsapp.js?v=20261106-mysql-book';
 import { apiFetch as fetch, currentUser, bindAccountControls } from './modules/auth.js';
 import { isAnsweredAttempt } from './modules/report-metrics.js';
+import { showPanelView } from './modules/panel-navigation.js';
+import { dashboardSessionKeys } from './modules/dashboard-session.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let sessionCode = "";
@@ -39,9 +41,11 @@ const pendingCommandTimeouts = new Map();
 // The contact database is browsed inside a seven-row scroll area. Render the
 // complete selected list so scrolling can reach every record without paging.
 const PAGE_SIZE = 10000;
-const DASHBOARD_SESSION_KEY = `voip vc.auth.${currentUser.id}.dashboardSessionCode`;
-const DASHBOARD_TOKEN_PREFIX = `voip vc.auth.${currentUser.id}.dashboardToken.`;
-const DASHBOARD_CLIENT_KEY = `voip vc.auth.${currentUser.id}.dashboardClientId`;
+const {
+  session: DASHBOARD_SESSION_KEY,
+  tokenPrefix: DASHBOARD_TOKEN_PREFIX,
+  client: DASHBOARD_CLIENT_KEY
+} = dashboardSessionKeys(currentUser.id);
 const dashboardClientId = (() => {
   let value = String(sessionStorage.getItem(DASHBOARD_CLIENT_KEY) || "").trim();
   if (!value) {
@@ -477,7 +481,7 @@ function requestListName({ title = "Nueva lista", defaultValue = "", label = "No
     refs.listNameErrorEl.textContent = "";
     input.value = defaultValue;
     input.placeholder = placeholder;
-    modal.style.display = "flex";
+    modal.style.display = "grid";
 
     const finish = (value) => {
       modal.style.display = "none";
@@ -517,7 +521,7 @@ function requestConfirmation({ title = "Confirmar acción", message = "", confir
     refs.confirmAcceptBtn.textContent = confirmLabel;
     refs.confirmCancelBtn.textContent = cancelLabel;
     refs.confirmCancelBtn.style.display = showCancel ? "" : "none";
-    modal.style.display = "flex";
+    modal.style.display = "grid";
 
     const finish = (accepted) => {
       modal.style.display = "none";
@@ -972,6 +976,58 @@ function renderWorkersPanel() {
   });
 }
 
+function setBlockedNumbersFeedback(message, isError = false) {
+  const feedback = document.getElementById("blockedNumbersFeedback");
+  if (!feedback) return;
+  feedback.textContent = message;
+  feedback.hidden = !message;
+  feedback.dataset.error = String(isError);
+  feedback.setAttribute("role", isError ? "alert" : "status");
+}
+
+function renderBlockedNumbers() {
+  const body = document.getElementById("blockedNumbersBody");
+  if (!body) return;
+  const entries = Array.isArray(latestSessionState.blockedNumbers) ? latestSessionState.blockedNumbers : [];
+  const query = (document.getElementById("blockedNumbersSearch")?.value || "").trim().toLocaleLowerCase("es");
+  const phoneQuery = query.replace(/\D/g, "");
+  const filtered = entries.filter(entry =>
+    [entry.name || "", entry.phone || ""].join(" ").toLocaleLowerCase("es").includes(query)
+    || (phoneQuery && !/\p{L}/u.test(query) && String(entry.phone || "").replace(/\D/g, "").includes(phoneQuery))
+  );
+  const count = document.getElementById("blockedNumbersCount");
+  if (count) count.textContent = query ? `${filtered.length} de ${entries.length}` : `${entries.length} ${entries.length === 1 ? "número" : "números"}`;
+  body.innerHTML = filtered.length
+    ? filtered.map(entry => `<tr>
+        <td>${escHtml(entry.name || entry.phone || "")}</td>
+        <td>${escHtml(entry.phone || "")}</td>
+        <td><button type="button" class="secondary" data-remove-blocked-number="${escHtml(entry.phone || "")}">Quitar</button></td>
+      </tr>`).join("")
+    : `<tr><td class="blocked-empty" colspan="3">${query ? "No hay coincidencias con esa búsqueda." : "No hay números bloqueados."}</td></tr>`;
+}
+
+function changeBlockedNumber(action, name, phone) {
+  const normalizedPhone = String(phone || "").trim();
+  if (!sessionCode || !socket.connected) {
+    setStatus("Espera a que el panel esté conectado para actualizar los bloqueos.", true);
+    setBlockedNumbersFeedback("Espera a que el panel esté conectado para actualizar los bloqueos.", true);
+    return false;
+  }
+  const digitCount = normalizedPhone.replace(/\D/g, "").length;
+  if (action === "add" && (!/^\+?[\d\s().-]{6,24}$/.test(normalizedPhone) || digitCount < 6 || digitCount > 15)) {
+    setStatus("Ingresa un número válido.", true);
+    setBlockedNumbersFeedback("Ingresa un número válido.", true);
+    return false;
+  }
+  setBlockedNumbersFeedback("Guardando cambios…");
+  socket.emit("blocked-numbers:change", {
+    action,
+    name: String(name || "").trim() || normalizedPhone,
+    phone: normalizedPhone
+  });
+  return true;
+}
+
 function renderCampaignPanel() {
   syncTurnPendingContacts();
   renderTurnPendingContacts();
@@ -990,7 +1046,11 @@ function renderCampaignPanel() {
     refs.campaignStartBtn.disabled = campaignBusy || !availableLists.length || !availableWorkers;
     refs.campaignStartBtn.title = !availableLists.length
       ? "Importa una lista de contactos primero."
-      : !availableWorkers ? "Vincula al menos un telefono." : campaignBusy ? "Deten o completa la campana actual antes de iniciar otra." : "";
+      : !availableWorkers ? "No hay teléfonos conectados y disponibles. Revisa la conexión de la APK y pulsa Reconectar bridge." : campaignBusy ? "Detén o completa la campaña actual antes de iniciar otra." : "";
+    if (refs.campaignStartHint) {
+      refs.campaignStartHint.textContent = refs.campaignStartBtn.title;
+      refs.campaignStartHint.hidden = !refs.campaignStartBtn.title;
+    }
   }
   if (refs.campaignStartBtn) refs.campaignStartBtn.textContent = "▶ Iniciar llamada general";
   if (refs.pendingTurnCallBtn) {
@@ -1451,8 +1511,8 @@ async function getAllCampaignReportRows() {
       numeric: true
     });
     if (workerOrder !== 0) return workerOrder;
-    const leftAnswered = Boolean(left.answeredAt || left.technicalResult === "contesto");
-    const rightAnswered = Boolean(right.answeredAt || right.technicalResult === "contesto");
+    const leftAnswered = isAnsweredAttempt(left);
+    const rightAnswered = isAnsweredAttempt(right);
     if (leftAnswered !== rightAnswered) return leftAnswered ? -1 : 1;
     const leftTime = new Date(left.startedAt || 0).getTime() || 0;
     const rightTime = new Date(right.startedAt || 0).getTime() || 0;
@@ -1813,6 +1873,32 @@ function requestAutomaticSession() {
 
 // ── EVENT BINDING ────────────────────────────────────────────────────
 function bindEvents() {
+  const blockedNameInput = document.getElementById("blockedContactName");
+  const blockedPhoneInput = document.getElementById("blockedContactPhone");
+  const blockedNumbersBody = document.getElementById("blockedNumbersBody");
+  document.getElementById("blockedNumbersOpen")?.addEventListener("click", () => {
+    renderBlockedNumbers();
+    setBlockedNumbersFeedback("");
+    showPanelView("blocked");
+    document.getElementById("blockedNumbersSearch")?.focus({ preventScroll: true });
+  });
+  document.getElementById("blockedNumbersBack")?.addEventListener("click", () => showPanelView("calls"));
+  document.getElementById("blockedNumbersSearch")?.addEventListener("input", renderBlockedNumbers);
+  const blockedForm = document.getElementById("blockedNumberForm");
+  if (blockedForm) blockedForm.onsubmit = event => {
+    event.preventDefault();
+    const name = blockedNameInput?.value.trim() || "";
+    const phone = blockedPhoneInput?.value.trim() || "";
+    if (changeBlockedNumber("add", name, phone)) {
+      if (blockedNameInput) blockedNameInput.value = "";
+      if (blockedPhoneInput) blockedPhoneInput.value = "";
+    }
+  };
+  if (blockedNumbersBody) blockedNumbersBody.onclick = event => {
+    const button = event.target.closest("button[data-remove-blocked-number]");
+    if (!button) return;
+    changeBlockedNumber("remove", "", button.dataset.removeBlockedNumber);
+  };
   document.addEventListener("reports:open", loadUnifiedReportRows);
   document.addEventListener("reports:filter", event => {
     const nextPeriod = { from: event.detail?.from || "", to: event.detail?.to || "" };
@@ -2648,21 +2734,6 @@ function renderAssignedListsPanel() {
         <td>${contactActionButtons(contact, "assigned-pending")}</td>
       </tr>`).join("");
 
-    const calledRows = called.map((contact) => {
-      const attempt = latestHistoryByContact.get(String(contact.id)) || {};
-      const answered = Boolean(attempt.answeredAt || attempt.technicalResult === "contesto" || contact.technicalResult === "contesto");
-      const duration = Number(attempt.durationSeconds ?? contact.callDurationSeconds ?? 0);
-      return `
-        <tr>
-          <td>${contacts.indexOf(contact) + 1}</td>
-          <td>${escHtml(contact.name || attempt.name || "Sin nombre")}</td>
-          <td>${escHtml(contact.phone || attempt.phone || "-")}</td>
-          <td><span class="answered-badge ${answered ? "yes" : "no"}">${answered ? "Sí" : "No"}</span></td>
-          <td>${escHtml(formatCallDuration(duration))}</td>
-          <td>${contactActionButtons(contact, "assigned")}</td>
-        </tr>`;
-    }).join("");
-
     return `
       <article class="assigned-list-card">
         <div class="assigned-list-head">
@@ -2680,13 +2751,6 @@ function renderAssignedListsPanel() {
           <div class="assigned-list-table-wrap">
             <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contacto</th></tr></thead>
             <tbody>${pendingRows || `<tr><td colspan="4" class="assigned-list-none">No quedan contactos pendientes.</td></tr>`}</tbody></table>
-          </div>
-        </div>
-        <div class="assigned-list-group called">
-          <h4>Contactos llamados <span>${called.length}</span></h4>
-          <div class="assigned-list-table-wrap">
-            <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contestó</th><th>Duración</th><th>Contacto</th></tr></thead>
-            <tbody>${calledRows || `<tr><td colspan="6" class="assigned-list-none">Todavía no se realizaron llamadas.</td></tr>`}</tbody></table>
           </div>
         </div>
       </article>`;
@@ -3100,8 +3164,8 @@ async function legacyBuildCallReportPdf(listName, sourceRows) {
       numeric: true
     });
     if (workerOrder !== 0) return workerOrder;
-    const leftAnswered = Boolean(left.answeredAt || left.technicalResult === "contesto");
-    const rightAnswered = Boolean(right.answeredAt || right.technicalResult === "contesto");
+    const leftAnswered = isAnsweredAttempt(left);
+    const rightAnswered = isAnsweredAttempt(right);
     if (leftAnswered !== rightAnswered) return leftAnswered ? -1 : 1;
     return (new Date(left.startedAt || 0).getTime() || 0) - (new Date(right.startedAt || 0).getTime() || 0);
   });
@@ -3364,6 +3428,7 @@ socket.on("state:changed", st => {
   updateSessionUi(st);
   renderShiftManagement();
   applyState(st.callState, st.lastNumber, st);
+  renderBlockedNumbers();
   renderContacts();
   const nextPairingSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
     worker.id,
@@ -3377,6 +3442,16 @@ socket.on("state:changed", st => {
     pairingStateSignature = nextPairingSignature;
     if (sessionCode) loadPairingData(sessionCode);
   }
+});
+socket.on("blocked-numbers:ack", ({ action, phone }) => {
+  const message = action === "add" ? `Número ${phone} agregado a la lista de bloqueos.` : `Número ${phone} quitado de la lista.`;
+  setStatus(message, true);
+  setBlockedNumbersFeedback(message);
+});
+socket.on("blocked-numbers:error", ({ message }) => {
+  const text = message || "No se pudo actualizar la lista de bloqueos.";
+  setStatus(text, true);
+  setBlockedNumbersFeedback(text, true);
 });
 
 function syncCampaignResultsToContacts() {
@@ -3567,8 +3642,8 @@ function renderTabs() {
   );
   container.innerHTML = lists.map(list => `
     <div class="tab-item ${Contacts.activeList === list ? "active" : ""}" data-name="${escHtml(list)}">
-      <span>${escHtml(list)}</span>
-      ${list !== "Principal" ? `<button class="delete-tab-btn" data-list="${escHtml(list)}">×</button>` : ""}
+      <button type="button" class="contact-list-name" aria-pressed="${Contacts.activeList === list}" title="${escHtml(list)}">${escHtml(list)}</button>
+      ${list !== "Principal" ? `<button type="button" class="delete-tab-btn" data-list="${escHtml(list)}" aria-label="Eliminar lista ${escHtml(list)}" title="Eliminar lista ${escHtml(list)}">×</button>` : ""}
     </div>
   `).join("");
   
@@ -3633,5 +3708,3 @@ function openEditModal(contact) {
 }
 
 init();
-
-

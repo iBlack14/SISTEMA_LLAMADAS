@@ -1,10 +1,12 @@
 package com.voipvc.bridge
 
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -12,6 +14,7 @@ import android.os.Looper
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
@@ -28,6 +31,8 @@ class IncomingCallActivity : AppCompatActivity() {
     private lateinit var callTimer: TextView
     private lateinit var micBtn: MaterialButton
     private lateinit var speakerBtn: MaterialButton
+    private lateinit var messageBtn: MaterialButton
+    private lateinit var blockBtn: MaterialButton
     private lateinit var answerBtn: MaterialButton
     private lateinit var hangupBtn: MaterialButton
 
@@ -50,6 +55,10 @@ class IncomingCallActivity : AppCompatActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == BridgeService.ACTION_CLOSE_CALL_UI) {
                 finish()
+                return
+            }
+            if (intent?.action == BridgeService.ACTION_BLOCKLIST_STATE) {
+                updateBlockButtonState(phoneNumber.text.toString())
                 return
             }
             if (telecomUi && intent?.action == BridgeService.ACTION_TELECOM_CALL_STATE) {
@@ -76,6 +85,8 @@ class IncomingCallActivity : AppCompatActivity() {
         callTimer = findViewById(R.id.callTimerText)
         micBtn = findViewById(R.id.micButton)
         speakerBtn = findViewById(R.id.speakerButton)
+        messageBtn = findViewById(R.id.messageButton)
+        blockBtn = findViewById(R.id.blockButton)
         answerBtn = findViewById(R.id.answerButton)
         hangupBtn = findViewById(R.id.hangupButton)
 
@@ -96,6 +107,33 @@ class IncomingCallActivity : AppCompatActivity() {
             if (telecomUi) VoipVcInCallService.toggleSpeaker()?.let { speaker ->
                 speakerBtn.text = if (speaker) "Quitar altavoz" else "Altavoz"
             } else sendServiceAction(BridgeService.ACTION_UI_TOGGLE_SPEAKER)
+        }
+        messageBtn.setOnClickListener {
+            val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.fromParts("smsto", number, null)
+            }
+            try {
+                startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(this, "No hay una aplicación SMS instalada. Instala o activa Mensajes.", Toast.LENGTH_LONG).show()
+            }
+        }
+        blockBtn.setOnClickListener {
+            val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
+            val shouldBlock = !BlockedNumberStore.contains(this, number)
+            val name = companyName.text.toString().ifBlank { number }
+            BlockedNumberStore.setBlocked(this, name, number, shouldBlock)
+            sendBlockedNumberChange(if (shouldBlock) "add" else "remove", name, number)
+            if (shouldBlock) {
+                if (telecomUi) {
+                    if (!VoipVcInCallService.disconnectCall(number)) {
+                        Toast.makeText(this, "Número bloqueado. No se pudo cortar la llamada; pulsa Colgar.", Toast.LENGTH_LONG).show()
+                    }
+                } else sendServiceAction(BridgeService.ACTION_UI_HANGUP)
+            }
+            updateBlockButtonState(number)
+            Toast.makeText(this, if (shouldBlock) "Agregado a la lista de bloqueos" else "Número quitado de la lista", Toast.LENGTH_SHORT).show()
         }
         hangupBtn.setOnClickListener {
             if (telecomUi) VoipVcInCallService.disconnectCall(phoneNumber.text.toString().let { if (it == "-") "" else it })
@@ -120,6 +158,7 @@ class IncomingCallActivity : AppCompatActivity() {
             addAction(BridgeService.ACTION_CALL_UI_STATE)
             addAction(BridgeService.ACTION_TELECOM_CALL_STATE)
             addAction(BridgeService.ACTION_CLOSE_CALL_UI)
+            addAction(BridgeService.ACTION_BLOCKLIST_STATE)
         }
         ContextCompat.registerReceiver(this, uiReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         if (telecomUi) VoipVcInCallService.currentCallIntent()?.let { renderFromIntent(it) }
@@ -138,6 +177,15 @@ class IncomingCallActivity : AppCompatActivity() {
         } else {
             startService(i)
         }
+    }
+
+    private fun sendBlockedNumberChange(action: String, name: String, number: String) {
+        val intent = Intent(this, BridgeService::class.java)
+            .setAction(BridgeService.ACTION_UI_BLOCKLIST_CHANGE)
+            .putExtra(BridgeService.EXTRA_BLOCKLIST_ACTION, action)
+            .putExtra(BridgeService.EXTRA_CONTACT_NAME, name)
+            .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+        ContextCompat.startForegroundService(this, intent)
     }
 
     private fun renderFromIntent(data: Intent) {
@@ -170,6 +218,11 @@ class IncomingCallActivity : AppCompatActivity() {
         hangupBtn.text = if (state == "ringing") "Rechazar" else "Colgar"
         micBtn.isEnabled = state == "in_call"
         speakerBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
+        messageBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
+        blockBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
+        messageBtn.visibility = if (state in setOf("dialing", "ringing", "in_call")) View.VISIBLE else View.GONE
+        blockBtn.visibility = if (state in setOf("dialing", "ringing", "in_call")) View.VISIBLE else View.GONE
+        updateBlockButtonState(number)
 
         if (state == "in_call") {
             if (callStartedAt == null) callStartedAt = System.currentTimeMillis()
@@ -191,6 +244,14 @@ class IncomingCallActivity : AppCompatActivity() {
         }
 
         if (state == "idle" || state == "ended") finish()
+    }
+
+    private fun updateBlockButtonState(number: String) {
+        if (number.isBlank()) {
+            blockBtn.text = "Bloquear"
+            return
+        }
+        blockBtn.text = if (BlockedNumberStore.contains(this, number)) "Bloqueado" else "Bloquear"
     }
 
     private fun applyToggleStyles(micMuted: Boolean, speakerOn: Boolean) {

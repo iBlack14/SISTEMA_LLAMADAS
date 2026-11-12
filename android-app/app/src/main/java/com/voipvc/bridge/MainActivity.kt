@@ -3,12 +3,14 @@ package com.voipvc.bridge
 import android.Manifest
 import android.app.AlertDialog
 import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -84,6 +86,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hangupBtn: MaterialButton
     private lateinit var muteBtn: MaterialButton
     private lateinit var speakerBtn: MaterialButton
+    private lateinit var messageBtn: MaterialButton
+    private lateinit var blockBtn: MaterialButton
+    private lateinit var blockedNumbersText: TextView
 
     private var bridgeMode = BridgeMode.ONBOARDING
     private var transientStatusMessage = "Escanea el QR del dashboard para vincular."
@@ -209,6 +214,10 @@ class MainActivity : AppCompatActivity() {
                     consumeServiceStatusMessage(msg)
                 }
                 BridgeService.ACTION_CALL_UI_STATE -> renderCallState(intent)
+                BridgeService.ACTION_BLOCKLIST_STATE -> {
+                    updateBlockedNumbersUi()
+                    applyControlStyles()
+                }
             }
         }
     }
@@ -314,6 +323,7 @@ class MainActivity : AppCompatActivity() {
         val filter = IntentFilter().apply {
             addAction(BridgeService.ACTION_STATUS)
             addAction(BridgeService.ACTION_CALL_UI_STATE)
+            addAction(BridgeService.ACTION_BLOCKLIST_STATE)
         }
         ContextCompat.registerReceiver(this, statusReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         if (bridgeMode == BridgeMode.CONNECTED) {
@@ -369,6 +379,9 @@ class MainActivity : AppCompatActivity() {
         hangupBtn = findViewById(R.id.hangupBtn)
         muteBtn = findViewById(R.id.muteBtn)
         speakerBtn = findViewById(R.id.speakerBtn)
+        messageBtn = findViewById(R.id.messageBtn)
+        blockBtn = findViewById(R.id.blockBtn)
+        blockedNumbersText = findViewById(R.id.blockedNumbersText)
     }
 
     private fun bindActions() {
@@ -399,6 +412,28 @@ class MainActivity : AppCompatActivity() {
         hangupBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_HANGUP) }
         muteBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_TOGGLE_MUTE) }
         speakerBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_TOGGLE_SPEAKER) }
+        messageBtn.setOnClickListener {
+            val number = currentPhoneNumber.takeIf { it.isNotBlank() } ?: return@setOnClickListener
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.fromParts("smsto", number, null)
+            }
+            try {
+                startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(this, "No hay una aplicación SMS instalada. Instala o activa Mensajes.", Toast.LENGTH_LONG).show()
+            }
+        }
+        blockBtn.setOnClickListener {
+            val number = currentPhoneNumber.takeIf { it.isNotBlank() } ?: return@setOnClickListener
+            val shouldBlock = !BlockedNumberStore.contains(this, number)
+            val name = currentContactName.ifBlank { currentCompanyName.ifBlank { number } }
+            BlockedNumberStore.setBlocked(this, name, number, shouldBlock)
+            sendBlockedNumberChange(if (shouldBlock) "add" else "remove", name, number)
+            if (shouldBlock) sendServiceAction(BridgeService.ACTION_UI_HANGUP)
+            updateBlockedNumbersUi()
+            applyControlStyles()
+            Toast.makeText(this, if (shouldBlock) "Agregado a la lista de bloqueos" else "Número quitado de la lista", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun hydrateTechnicalInputs() {
@@ -560,10 +595,10 @@ class MainActivity : AppCompatActivity() {
                             showTransientStatus("Pairing inválido.", Tone.ERROR)
                             return@withContext
                         }
-                        val socketUrl = json.getJSONObject("socket").getString("url")
+                        val socketUrl = socketUrlForCurrentBuild(json.getJSONObject("socket").getString("url"))
                         persistManualInputs(baseUrl, code, token)
                         setBridgeMode(BridgeMode.CONNECTED)
-                        updatePersistentStatus("Bridge vinculado. Iniciando servicio…", "Activo", Tone.SUCCESS)
+                        updatePersistentStatus("Bridge vinculado. Conectando al servidor…", "Conectando", Tone.WARNING)
                         showTransientStatus("Vinculado correctamente.", Tone.SUCCESS)
                         startBridgeService(socketUrl, code, token, deviceId, deviceName)
                         if (fromConnectedMode) settingsSection.visibility = View.GONE
@@ -597,9 +632,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun socketUrlForCurrentBuild(savedUrl: String): String {
+        if (!BuildConfig.DEBUG) return savedUrl
+        val configured = Uri.parse(defaultBaseUrl)
+        if (configured.host !in setOf("127.0.0.1", "localhost")) return savedUrl
+        val saved = Uri.parse(savedUrl)
+        if (saved.host.isNullOrBlank()) return savedUrl
+        return saved.buildUpon()
+            .scheme(configured.scheme)
+            .encodedAuthority(configured.encodedAuthority)
+            .build()
+            .toString()
+    }
+
     private fun reconnectBridgeFromSavedSession() {
         val prefs = getSharedPreferences(BridgeService.PREFS_NAME, Context.MODE_PRIVATE)
-        val url = prefs.getString(BridgeService.PREF_SOCKET_URL, "") ?: ""
+        val url = socketUrlForCurrentBuild(prefs.getString(BridgeService.PREF_SOCKET_URL, "") ?: "")
         val code = prefs.getString(BridgeService.PREF_CODE, "") ?: ""
         val token = prefs.getString(BridgeService.PREF_TOKEN, "") ?: ""
         val devId = prefs.getString(BridgeService.PREF_DEVICE_ID, "") ?: ""
@@ -628,7 +676,7 @@ class MainActivity : AppCompatActivity() {
         ) return
         autoReconnectAttempted = true
         val prefs = getSharedPreferences(BridgeService.PREFS_NAME, Context.MODE_PRIVATE)
-        val url = prefs.getString(BridgeService.PREF_SOCKET_URL, "") ?: ""
+        val url = socketUrlForCurrentBuild(prefs.getString(BridgeService.PREF_SOCKET_URL, "") ?: "")
         val code = prefs.getString(BridgeService.PREF_CODE, "") ?: ""
         val token = prefs.getString(BridgeService.PREF_TOKEN, "") ?: ""
         val devId = prefs.getString(BridgeService.PREF_DEVICE_ID, "") ?: ""
@@ -761,15 +809,22 @@ class MainActivity : AppCompatActivity() {
         hangupBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
         muteBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
         speakerBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
+        messageBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
+        blockBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
         hangupBtn.isEnabled = liveCall
         muteBtn.isEnabled = lastCallState == "in_call"
         speakerBtn.isEnabled = liveCall
+        messageBtn.isEnabled = liveCall
+        blockBtn.isEnabled = liveCall
+        updateBlockedNumbersUi()
         applyControlStyles()
     }
 
     private fun applyControlStyles() {
         muteBtn.text = if (isMicMuted) "Activar micrófono" else "Silenciar"
         speakerBtn.text = if (isSpeakerOn) "Desactivar altavoz" else "Activar altavoz"
+        val blocked = BlockedNumberStore.contains(this, currentPhoneNumber)
+        blockBtn.text = if (blocked) "Desbloquear" else "Bloquear"
         muteBtn.background = ContextCompat.getDrawable(
             this,
             if (isMicMuted) R.drawable.bg_danger_button else R.drawable.bg_secondary_button
@@ -784,6 +839,31 @@ class MainActivity : AppCompatActivity() {
         speakerBtn.setTextColor(
             ContextCompat.getColor(this, if (isSpeakerOn) R.color.vc_text_inverse else R.color.vc_text_primary)
         )
+        blockBtn.background = ContextCompat.getDrawable(
+            this,
+            if (blocked) R.drawable.bg_secondary_button else R.drawable.bg_danger_button
+        )
+        blockBtn.setTextColor(
+            ContextCompat.getColor(this, if (blocked) R.color.vc_text_primary else R.color.vc_text_inverse)
+        )
+    }
+
+    private fun sendBlockedNumberChange(action: String, name: String, number: String) {
+        val intent = Intent(this, BridgeService::class.java)
+            .setAction(BridgeService.ACTION_UI_BLOCKLIST_CHANGE)
+            .putExtra(BridgeService.EXTRA_BLOCKLIST_ACTION, action)
+            .putExtra(BridgeService.EXTRA_CONTACT_NAME, name)
+            .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+        ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun updateBlockedNumbersUi() {
+        val blocked = BlockedNumberStore.read(this).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        blockedNumbersText.text = if (blocked.isEmpty()) {
+            "Lista de bloqueos: sin números"
+        } else {
+            "Lista de bloqueos:\n" + blocked.joinToString("\n") { "${it.name} — ${it.number}" }
+        }
     }
 
     private fun consumeServiceStatusMessage(msg: String) {
@@ -792,6 +872,9 @@ class MainActivity : AppCompatActivity() {
         when {
             normalized.contains("activo") && normalized.contains("esperando") -> {
                 updatePersistentStatus("Bridge conectado y esperando llamadas.", "Activo", Tone.SUCCESS)
+            }
+            normalized.contains("sin servidor") -> {
+                updatePersistentStatus("Sin conexión con el servidor. Reintentando…", "Sin servidor", Tone.ERROR)
             }
             normalized.contains("conectando") || normalized.contains("reconectando") -> {
                 updatePersistentStatus("Bridge conectando con el servidor.", "Conectando", Tone.WARNING)

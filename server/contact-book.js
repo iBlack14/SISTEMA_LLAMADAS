@@ -36,7 +36,7 @@ export function annualPhoneBlocks(attempts, now = new Date()) {
     const started = new Date(row.startedAt);
     if (!row.startedAt || !Number.isFinite(started.getTime()) || started.getTime() > current) continue;
     const phone = phoneKey(row.phone);
-    const permanent = row.technicalResult === "numero_inexistente";
+    const permanent = ["numero_inexistente", "numero_incorrecto"].includes(row.technicalResult);
     const existing = blocks.get(phone);
     if (existing?.permanent) continue;
     if (permanent) {
@@ -87,10 +87,14 @@ export function withProgress(book, attempts, globalAttempts = attempts, now = ne
 
 export function excludeCalledPending(campaign, attempts, now = new Date()) {
   const called = annualPhoneBlocks(attempts, now);
+  const manualContacts = new Set((campaign.manualReportRetry?.contactIds || []).map(String));
   const assigned = new Set(Object.values(campaign.assignments || {}).map(row => row.contactId));
   for (const contact of campaign.contacts || []) {
     if (assigned.has(contact.id) || !["pending","retry_pending","held"].includes(contact.status)) continue;
     const block = called.get(phoneKey(contact.phone));
+    // Only server-authorized report selections may retry within the annual window.
+    // Permanent invalid-number blocks are never bypassed.
+    if (block && !block.permanent && manualContacts.has(String(contact.id))) continue;
     if (block) {
       contact.status = "failed";
       contact.result = block.permanent ? "numero_inexistente" : "numero_llamado_anteriormente";
@@ -98,6 +102,18 @@ export function excludeCalledPending(campaign, attempts, now = new Date()) {
       contact.callBlockedUntil = block.nextAllowedAt;
       contact.callBlockReason = block.reason || "Número llamado anteriormente";
     }
+  }
+}
+
+export function excludeBlockedPending(campaign, blockedNumbers = []) {
+  const blocked = new Set(blockedNumbers.map(entry => phoneKey(entry.phone || entry.number)).filter(Boolean));
+  const assigned = new Set(Object.values(campaign.assignments || {}).map(row => row.contactId));
+  for (const contact of campaign.contacts || []) {
+    if (assigned.has(contact.id) || !["pending", "retry_pending", "held"].includes(contact.status)) continue;
+    if (!blocked.has(phoneKey(contact.phone))) continue;
+    contact.status = "failed";
+    contact.result = "numero_bloqueado";
+    contact.callBlockReason = "Número en la lista de bloqueos";
   }
 }
 

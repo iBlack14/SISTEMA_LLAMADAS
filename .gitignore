@@ -9,5 +9,6 @@ server/*.call-history.json
 **/build/
 **/.gradle/
 android-app/local.properties
+android-app/.env
 .auth-local/
 .playwright-mcp/

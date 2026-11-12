@@ -17,6 +17,7 @@ export const refs = {
   linkedBanner: document.getElementById("linkedBanner"),
   linkedDevice: document.getElementById("linkedDevice"),
   campaignStartBtn: document.getElementById("campaignStartBtn"),
+  campaignStartHint: document.getElementById("campaignStartHint"),
   pendingTurnCallBtn: document.getElementById("pendingTurnCallBtn"),
   pendingTurnPanelEl: document.getElementById("pendingTurnPanel"),
   pendingTurnBodyEl: document.getElementById("pendingTurnBody"),

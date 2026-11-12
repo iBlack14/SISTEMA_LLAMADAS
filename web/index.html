@@ -14,7 +14,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
- <link rel="stylesheet" href="/styles.css?v=20261111-clean-report-search" />
+ <link rel="stylesheet" href="/styles.css?v=20261112-centered-modals" />
+ <link rel="stylesheet" href="/contact-tabs.css?v=20261111-compact-lists" />
+ <link rel="stylesheet" href="/call-outcomes.css?v=20261111-voicemail" />
+ <link rel="stylesheet" href="/report-selection.css?v=20261111-individual-calls" />
+ <link rel="stylesheet" href="/report-details.css?v=20261111-device-details" />
+ <link rel="stylesheet" href="/account.css?v=20261111-account-bar" />
+ <link rel="stylesheet" href="/blocked-numbers.css?v=20261111-internal" />
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -57,10 +63,18 @@
       </div>
       <input id="sessionCode" type="hidden" />
       <nav class="account-bar" aria-label="Cuenta">
-        <span id="accountIdentity"></span>
-        <a id="adminLink" href="/admin/nucleo-red" hidden>Núcleo de Red</a>
-        <button id="logoutButton" type="button" class="secondary">Cerrar sesión</button>
-        <span id="accountError" role="alert"></span>
+        <div id="accountIdentity" class="account-user">
+          <span id="accountAvatar" class="account-avatar" aria-hidden="true">VC</span>
+          <div class="account-details">
+            <strong id="accountUsername">Cargando cuenta…</strong>
+            <span id="accountRole" class="account-role"></span>
+          </div>
+        </div>
+        <div class="account-actions">
+          <a id="adminLink" href="/admin/nucleo-red" hidden>Núcleo de Red</a>
+          <button id="logoutButton" type="button" class="secondary">Cerrar sesión</button>
+        </div>
+        <p id="accountError" role="alert"></p>
       </nav>
 
       <!-- STATUS -->
@@ -78,6 +92,7 @@
         </div>
         <div class="shift-management-actions">
           <button id="reportNavBtn" class="secondary" type="button">REPORTES</button>
+          <button id="blockedNumbersOpen" class="secondary" type="button" aria-controls="blockedNumbersView">Lista de bloqueos</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">DESVINCULAR EQUIPOS</button>
         </div>
@@ -104,10 +119,11 @@
           <div class="general-call-heading">
             <strong>Llamada general</strong>
             <span>Inicia las llamadas en todos los teléfonos disponibles.</span>
+            <span id="campaignStartHint" role="status" hidden></span>
           </div>
           <div class="campaign-actions">
             <button id="campaignStopBtn" class="danger-soft">■ Detener</button>
-            <button id="campaignStartBtn">▶ Iniciar llamada general</button>
+            <button id="campaignStartBtn" aria-describedby="campaignStartHint">▶ Iniciar llamada general</button>
             <button id="pendingTurnCallBtn" class="secondary">☎ Llamar números pendientes</button>
             <button id="campaignPauseBtn" class="secondary">⏸ Pausar</button>
             <button id="campaignResumeBtn" class="secondary">⏯ Continuar</button>
@@ -118,7 +134,7 @@
 
       <!-- CONTACTS SECTION -->
       <section id="contactsSection" style="display:none">
-        <div class="contacts-tabs" id="contactsTabs"></div>
+        <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>
 
         <div class="contacts-topbar">
           <p class="section-title contacts-title">📋 Contactos</p>
@@ -234,9 +250,6 @@
       </section>
 
 
-      <section id="assignedListsPanel" class="assigned-lists-panel" aria-live="polite">
-        <div class="campaign-list-empty">Las listas asignadas aparecerán aquí.</div>
-      </section>
       </div>
 
       <section id="annualReport" class="annual-report" aria-label="Reportes de llamadas" hidden>
@@ -275,6 +288,26 @@
       </section>
         </div>
       </section>
+
+  <section id="blockedNumbersView" class="blocked-numbers-view" aria-labelledby="blockedNumbersTitle" hidden>
+    <div class="blocked-view-nav"><button id="blockedNumbersBack" class="secondary" type="button">← Volver a llamadas</button></div>
+    <header class="blocked-window-header">
+      <div><h2 id="blockedNumbersTitle">Lista de bloqueos</h2><p>Administra los números bloqueados en tus teléfonos vinculados.</p></div>
+    </header>
+    <p id="blockedNumbersFeedback" class="blocked-feedback" role="status" hidden></p>
+    <form id="blockedNumberForm" class="blocked-number-form">
+      <div><label for="blockedContactName">Nombre (opcional)</label><input id="blockedContactName" placeholder="Nombre del contacto" maxlength="120" autocomplete="off" /></div>
+      <div><label for="blockedContactPhone">Número</label><input id="blockedContactPhone" type="tel" placeholder="Ej. 900 000 000" inputmode="tel" maxlength="24" autocomplete="off" required /></div>
+      <button id="addBlockedContactBtn" type="submit">Agregar número</button>
+    </form>
+    <div class="blocked-list-toolbar">
+      <div><label for="blockedNumbersSearch">Buscar en la lista</label><input id="blockedNumbersSearch" type="search" placeholder="Nombre o número…" autocomplete="off" /></div>
+      <span id="blockedNumbersCount" role="status">0 números</span>
+    </div>
+    <div class="blocked-table-scroll" tabindex="0" role="region" aria-label="Números bloqueados">
+      <table><colgroup><col class="blocked-name-column"><col class="blocked-phone-column"><col class="blocked-action-column"></colgroup><thead><tr><th scope="col">Nombre</th><th scope="col">Número</th><th scope="col">Acción</th></tr></thead><tbody id="blockedNumbersBody"><tr><td colspan="3">No hay números bloqueados.</td></tr></tbody></table>
+    </div>
+  </section>
 
     </section>
   </main>
@@ -433,7 +466,7 @@
     </div>
   </div>
   <script type="module">
-    await import("/modules/reports.js?v=20261109-detailed-pdf-header-v1");
+    await import("/modules/reports.js?v=20261111-device-details");
   </script>
   <script>
     (function bootstrapDashboard() {
@@ -444,7 +477,7 @@
       const socketScript = document.createElement("script");
       socketScript.src = `${apiBase}/socket.io/socket.io.js`;
       socketScript.onload = () => {
-        import("/dashboard.js?v=20261111-user-workspace");
+        import("/dashboard.js?v=20261111-no-assigned-duplicate");
       };
       socketScript.onerror = () => {
         console.error("No se pudo cargar Socket.IO desde", socketScript.src);

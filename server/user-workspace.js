@@ -20,11 +20,18 @@ export class UserWorkspaces {
     if (existing.length) {
       const code = existing[0].session_code;
       const session = sessions.get(code);
-      if (!session) throw new Error("No se pudo recuperar tu espacio de trabajo. No se creó otro para evitar perder continuidad.");
-      if (session.ownerUserId && String(session.ownerUserId) !== String(user.id))
-        throw new Error("El espacio de trabajo pertenece a otra cuenta.");
-      session.ownerUserId = user.id;
-      return { code, session };
+      if (!session) {
+        // The mapped workspace no longer exists; drop the stale mapping so the
+        // account can recover through grants or a fresh workspace.
+        await pool.query("DELETE FROM auth_user_workspaces WHERE user_id=? AND session_code=?",
+          [user.id, code]);
+        console.warn(`[WORKSPACE] Mapeo obsoleto eliminado: user_id=${user.id} session_code=${code}`);
+      } else {
+        if (session.ownerUserId && String(session.ownerUserId) !== String(user.id))
+          throw new Error("El espacio de trabajo pertenece a otra cuenta.");
+        session.ownerUserId = user.id;
+        return { code, session };
+      }
     }
     const [grants] = await pool.query(`SELECT a.session_code FROM auth_session_access a
       LEFT JOIN auth_user_workspaces w ON w.session_code=a.session_code
@@ -43,5 +50,20 @@ export class UserWorkspaces {
     await pool.query("INSERT INTO auth_user_workspaces(user_id,session_code) VALUES (?,?)",
       [user.id, selected.code]);
     return selected;
+  }
+  /** Removes account mappings whose session no longer exists. Returns the count. */
+  async sweep() {
+    const pool = this.getPool();
+    const sessions = this.getSessions();
+    const [rows] = await pool.query("SELECT user_id, session_code FROM auth_user_workspaces");
+    let removed = 0;
+    for (const row of rows) {
+      if (sessions.has(row.session_code)) continue;
+      await pool.query("DELETE FROM auth_user_workspaces WHERE user_id=? AND session_code=?",
+        [row.user_id, row.session_code]);
+      removed++;
+    }
+    if (removed) console.warn(`[WORKSPACE] ${removed} mapeo(s) obsoleto(s) eliminado(s) al iniciar.`);
+    return removed;
   }
 }

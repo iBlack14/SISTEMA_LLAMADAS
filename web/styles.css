@@ -2557,6 +2557,8 @@ button:disabled {
 
 .edit-card {
   width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   position: relative;
   background: var(--card);
   border: 1px solid var(--border-bright);
@@ -3599,6 +3601,227 @@ button:disabled {
 .add-tab-btn:hover {
   border-color: #6366F1;
   background: rgba(99, 102, 241, 0.05);
+}
+
+/* ── CONTACTS PANEL: circular + premium UI ───────────────────── */
+#contactsSection {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 92, 221, 0.42) !important;
+  background: linear-gradient(135deg, rgba(68, 9, 84, 0.94), rgba(43, 2, 61, 0.86)) !important;
+  box-shadow: 0 18px 38px rgba(27, 0, 54, 0.34), inset 0 1px rgba(255,255,255,0.04) !important;
+}
+
+#contactsSection::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(255, 118, 215, 0.16), transparent 24%),
+              radial-gradient(circle at bottom right, rgba(164, 94, 255, 0.18), transparent 32%);
+  pointer-events: none;
+}
+
+#contactsSection > * {
+  position: relative;
+  z-index: 1;
+}
+
+#contactsSection .contacts-tabs {
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 6px 0 4px;
+}
+
+#contactsSection .tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(250, 130, 240, 0.3);
+  background: rgba(36, 5, 52, 0.7);
+  color: #f5d9ff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+#contactsSection .tab-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff4ac6, #b000ff 70%);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow: 0 8px 18px rgba(236, 72, 153, 0.26);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+#contactsSection .tab-item.active {
+  background: linear-gradient(135deg, rgba(255, 64, 185, 0.22), rgba(178, 0, 255, 0.18));
+  border-color: rgba(255, 140, 224, 0.68);
+  box-shadow: 0 0 0 1px rgba(255, 105, 206, 0.25), 0 12px 22px rgba(205, 46, 180, 0.25);
+}
+
+#contactsSection .tab-item.active span {
+  background: linear-gradient(135deg, #ff59d0, #c64dff);
+  box-shadow: 0 10px 24px rgba(236, 72, 153, 0.38);
+}
+
+#contactsSection .delete-tab-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: #ffd6f8;
+  border: 1px solid rgba(255,255,255,0.18);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#contactsSection .delete-tab-btn:hover {
+  background: rgba(255, 105, 145, 0.78);
+  border-color: rgba(255, 165, 189, 0.8);
+  color: white;
+}
+
+#contactsSection .contacts-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 18px 20px 12px;
+  border-top: 1px solid rgba(255, 101, 224, 0.3);
+}
+
+#contactsSection .contacts-title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f7d9ff;
+  font-weight: 700;
+}
+
+#contactsSection .called-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 129, 225, 0.4);
+  border-radius: 999px;
+  background: rgba(42, 5, 57, 0.52);
+  color: #f5d9ff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#contactsSection .called-counter strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff5cc8, #b24dff);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(236,72,153,0.3);
+}
+
+#contactsSection .contact-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 122, 228, 0.25);
+  background: rgba(24, 3, 41, 0.28);
+}
+
+#contactsSection .contact-actions .danger-soft {
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border-color: rgba(255, 151, 220, 0.34);
+  background: linear-gradient(135deg, rgba(255, 77, 190, 0.26), rgba(191, 70, 245, 0.22));
+  color: #ffd9f5;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+#contactsSection .contact-actions input {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 137, 226, 0.18);
+  background: rgba(17, 2, 30, 0.45);
+  color: #fef3ff;
+  box-shadow: inset 0 1px rgba(255,255,255,0.02);
+}
+
+#contactsSection .contact-actions input::placeholder {
+  color: rgba(239, 220, 255, 0.55);
+}
+
+#contactsSection .import-panel {
+  margin-top: 18px;
+  border-radius: 20px;
+  border-color: rgba(255, 122, 228, 0.28);
+  background: rgba(23, 2, 41, 0.26);
+  box-shadow: inset 0 1px rgba(255,255,255,0.04);
+}
+
+#contactsSection .import-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+#contactsSection .import-tab {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 128, 223, 0.28);
+  background: rgba(40, 6, 58, 0.6);
+  color: #f8d9ff;
+  font-weight: 600;
+}
+
+#contactsSection .import-tab.active,
+#contactsSection .import-tab:hover {
+  background: linear-gradient(135deg, rgba(255, 67, 191, 0.38), rgba(181, 57, 255, 0.28));
+  border-color: rgba(255, 156, 226, 0.6);
+  box-shadow: 0 10px 18px rgba(170, 58, 255, 0.18);
+}
+
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 67, 191, 0.38), rgba(181, 57, 255, 0.28));
+  border: 1px solid rgba(255, 156, 226, 0.5);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 /* Audio active states */

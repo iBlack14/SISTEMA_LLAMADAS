@@ -14,6 +14,10 @@ import { Server } from "socket.io";
 import { nanoid } from "nanoid";
 import { runtimeIdentity, runtimeLockName, probeRuntime, waitForRuntime } from "./runtime-instance.js";
 import { UserWorkspaces } from "./user-workspace.js";
+import { splitReportByList } from "./report-lists.js";
+import { hydrateReportDetails } from "./report-details.js";
+import { selectPendingReportContacts } from "./report-selection.js";
+import { isAnsweredAttempt, isVoicemailAttempt, attemptResultLabel } from "../web/modules/report-metrics.js";
 import QRCode from "qrcode";
 import { bindDeviceToPairingSlot, clearDeviceFromPairingSlots, dedupePairingSlotDevices } from "./pairing-lifecycle.js";
 
@@ -41,7 +45,7 @@ else {
 }
 
 import { SessionPersistence } from "./persistence.js";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, annualPhoneBlocks, phoneKey } from "./contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "./contact-book.js";
 import { collectReportAttempts } from "./report-attempts.js";
 import { collectCallAttempts } from "./call-history.js";
 import { CallHistoryGate } from "./call-history-gate.js";
@@ -263,6 +267,7 @@ async function bootstrap() {
     console.error("[HISTORY] Reintento pendiente:", error.code || "STORAGE_UNAVAILABLE");
   }), 10000).unref();
   console.log(`[PERSISTENCE] Loaded ${sessions.size} sessions. Mode: ${persistence.status().mode}`);
+  await workspaces.sweep();
 
   const port = Number(process.env.PORT || 3000);
   const host = process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
@@ -320,6 +325,7 @@ function normalizeSessionShape(session = {}) {
     phoneDevice: null,
     phoneWorkers: [],
     pairingSlots: [],
+    blockedNumbers: [],
     micMuted: true,
     isSpeakerOn: false,
     pbx: {
@@ -342,6 +348,15 @@ function normalizeSessionShape(session = {}) {
 
   if (!Array.isArray(normalized.phoneWorkers)) normalized.phoneWorkers = [];
   normalized.phoneWorkers = normalized.phoneWorkers.map((worker) => createPhoneWorker(worker));
+  const blockedByPhone = new Map();
+  for (const entry of Array.isArray(normalized.blockedNumbers) ? normalized.blockedNumbers : []) {
+    const phone = String(entry?.phone || entry?.number || "").trim();
+    const key = phoneKey(phone);
+    if (!/^\d{6,15}$/.test(key)) continue;
+    const name = String(entry?.name || "").trim().slice(0, 120) || phone;
+    blockedByPhone.set(key, { name, phone });
+  }
+  normalized.blockedNumbers = [...blockedByPhone.values()];
 
   // Keep one canonical record per physical device. Prefer the connected copy
   // when older persisted data contains a disconnected duplicate.
@@ -618,6 +633,7 @@ function dispatchNextCampaignCallLegacy(code) {
   // Seleccionar worker para saber si vamos directo o por PBX
   const worker = getActivePhoneWorker(session);
   excludeCalledPending(campaign, allCallAttempts());
+  excludeBlockedPending(campaign, session.blockedNumbers);
   const next = assignNextContact(session, worker || {});
   session.updatedAt = Date.now();
   saveSoon();
@@ -667,6 +683,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
   excludeCalledPending(campaign, allCallAttempts());
+  excludeBlockedPending(campaign, session.blockedNumbers);
 
   const dispatched = [];
   const connectedWorkers = getConnectedPhoneWorkers(session);
@@ -689,6 +706,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
 
   for (const worker of workers) {
     excludeCalledPending(campaign, allCallAttempts());
+    excludeBlockedPending(campaign, session.blockedNumbers);
     const next = assignNextContact(session, worker);
     if (!next) continue;
     worker.callState = "dialing";
@@ -783,6 +801,7 @@ function emitState(code) {
     },
     phoneDevice: session.phoneDevice,
     phoneWorkers,
+    blockedNumbers: session.blockedNumbers,
     callState: session.callState,
     lastNumber: session.lastNumber,
     lastCompanyName: session.lastCompanyName,
@@ -877,6 +896,10 @@ function getFirstLanAddress() {
 }
 
 function getLocalLanBaseUrl(req) {
+  // A loopback-only listener is reached from Android through adb reverse.
+  // Advertising a LAN address here makes pairing succeed but the socket fail.
+  if (isLoopbackHost(process.env.HOST)) return getRequestBaseUrl(req);
+
   const envCandidates = parseEnvUrlCandidates(process.env.LOCAL_LAN_BASE_URL);
   if (envCandidates.length) return envCandidates[0];
 
@@ -1077,6 +1100,43 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("blocked-numbers:change", (payload = {}) => {
+    const code = socket.data.code;
+    const role = socket.data.role;
+    if (!code || !["dashboard", "phone"].includes(role)) return;
+    const session = sessions.get(code);
+    if (!session) return;
+
+    const data = payload && typeof payload === "object" ? payload : {};
+    const action = String(data.action || "");
+    const phone = String(data.phone || "").trim();
+    const key = phoneKey(phone);
+    const name = String(data.name || "").trim().slice(0, 120) || phone;
+    if (!["add", "remove"].includes(action) || !/^\d{6,15}$/.test(key)) {
+      socket.emit("blocked-numbers:error", { message: "Ingresa un nombre y un número válido." });
+      return;
+    }
+
+    const blockedNumbers = Array.isArray(session.blockedNumbers) ? session.blockedNumbers : [];
+    if (action === "add") {
+      const current = blockedNumbers.find((item) => phoneKey(item.phone) === key);
+      if (!current && blockedNumbers.length >= 5000) {
+        socket.emit("blocked-numbers:error", { message: "La lista alcanzó el límite de 5000 números." });
+        return;
+      }
+      session.blockedNumbers = [
+        ...blockedNumbers.filter((item) => phoneKey(item.phone) !== key),
+        { name, phone }
+      ];
+    } else {
+      session.blockedNumbers = blockedNumbers.filter((item) => phoneKey(item.phone) !== key);
+    }
+    session.updatedAt = Date.now();
+    saveSoon();
+    emitState(code);
+    socket.emit("blocked-numbers:ack", { accepted: true, action, phone });
+  });
+
   socket.on("call:action", ({ action, phoneNumber, companyName, contactName, imageUrl, commandId, contactId, workerId }) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -1088,6 +1148,10 @@ io.on("connection", (socket) => {
   if (action === "dial") {
       if (historyGate.blocked(code)) {
         socket.emit("session:error", { error: "El historial tiene un guardado pendiente. Espera antes de llamar." });
+        return;
+      }
+      if ((session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(phoneNumber))) {
+        socket.emit("call:error", { message: "Número en la lista de bloqueos. Desbloquéalo antes de llamar." });
         return;
       }
       const block = annualBlock(phoneNumber);
@@ -1636,6 +1700,9 @@ function archiveCurrentCampaign(session) {
       phone: c.phone,
       list: c.list,
       status: c.status,
+      targetWorkerId: c.targetWorkerId,
+      assignedWorkerId: c.assignedWorkerId,
+      assignedWorkerName: c.assignedWorkerName,
       technicalResult: c.technicalResult,
       result: c.result,
       durationSeconds: c.durationSeconds
@@ -1655,13 +1722,18 @@ function archiveCurrentCampaign(session) {
 
 function reportData(session, date) {
   archiveCurrentCampaign(session);
+  const restrictions = annualPhoneBlocks(allCallAttempts());
+  const knownAttempts = new Map(collectReportAttempts(session).map(attempt => [attempt.attemptId, attempt]));
+  const blocked = new Set((session.blockedNumbers || []).map(entry => phoneKey(entry.phone)));
 
   return (session.reportArchive || [])
     .filter(r => !date || r.date === date)
+    .flatMap(splitReportByList)
+    .map(record => hydrateReportDetails(record, session, knownAttempts))
     .map(r => {
       const last = new Map();
 
-      for (const h of r.history) {
+      for (const h of r.calls) {
         last.set(String(h.phone), h);
       }
 
@@ -1680,18 +1752,21 @@ function reportData(session, date) {
           ""
         ).toLowerCase();
 
-        const answered = duration >= 35;
-
-        const inoperable =
-          /invalid|inoperable|unreachable|not.in.service|disconnected/
-            .test(result);
+        const outcome = { ...c, ...h, technicalResult: result };
+        const answered = isAnsweredAttempt(outcome);
+        const voicemail = isVoicemailAttempt(outcome);
+        const inoperable = attemptResultLabel(outcome) === "INOPERABLE";
 
         return {
           ...c,
           durationSeconds: duration,
+          technicalResult: result,
+          doNotCall: Boolean(restrictions.get(phoneKey(c.phone))?.permanent),
+          manualBlocked: blocked.has(phoneKey(c.phone)),
           answered,
+          voicemail,
           inoperable,
-          pending: !answered && !inoperable,
+          pending: !answered && !inoperable && !voicemail,
           lastCallAt: h?.startedAt || null
         };
       });
@@ -1702,7 +1777,10 @@ function reportData(session, date) {
         rubro: r.rubro,
         numbers: rows.length,
         totalCalls: r.history.length,
+        calls: r.calls,
+        teamShifts: r.teamShifts,
         answered: rows.filter(c => c.answered).length,
+        voicemail: rows.filter(c => c.voicemail).length,
         pending: rows.filter(c => c.pending).length,
         rows
       };
@@ -1762,7 +1840,7 @@ app.get("/api/session/:code/reports/daily", (req, res) => {
 
 app.post(
   "/api/session/:code/reports/:id/continue",
-  (req, res) => {
+  async (req, res) => {
     const code = String(req.params.code || "")
       .toUpperCase().trim();
 
@@ -1798,12 +1876,26 @@ app.post(
       });
     }
 
-    const pending = report.rows.filter(c =>
-      c.pending &&
-      /^\d{9}$/.test(
-        String(c.phone || "").replace(/^\+?51/, "")
-      )
-    );
+    const manualRetry = req.body?.manualRetry === true;
+    const selection = selectPendingReportContacts(report, req.body?.contactIds, { allowManualRetry: manualRetry });
+    if (selection.error) return res.status(selection.status).json({ ok: false, error: selection.error });
+    const pending = selection.contacts;
+    try {
+      await persistence.getCallAttempts(code);
+    } catch {
+      return res.status(503).json({ ok: false, error: "No se pudo comprobar el historial en MySQL." });
+    }
+    const latestCampaign = ensureCampaign(session);
+    if (latestCampaign.status === "running" || Object.keys(latestCampaign.assignments || {}).length) {
+      return res.status(409).json({ ok: false, error: "Hay una campaña en curso" });
+    }
+    const restricted = pending.find(contact =>
+      (session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(contact.phone)) ||
+      (manualRetry ? annualBlock(contact.phone)?.permanent : annualBlock(contact.phone)));
+    if (restricted) {
+      const block = annualBlock(restricted.phone);
+      return res.status(409).json({ ok: false, error: block ? blockedCallMessage(block) : "Uno de los números seleccionados está en la lista de bloqueos." });
+    }
 
     if (!pending.length) {
       return res.status(409).json({
@@ -1820,11 +1912,11 @@ app.post(
         id: c.id,
         name: c.name,
         phone: c.phone,
-        list: report.rubro
+        list: c.list || report.rubro
       })),
       {
         listName: report.rubro,
-        maxAttempts: 2
+        maxAttempts: manualRetry ? 1 : 2
       }
     );
 
@@ -1836,8 +1928,16 @@ app.post(
         timeZone: "America/Lima"
       });
     started.reportRubro = report.rubro;
+    if (manualRetry) started.manualReportRetry = {
+      reportId: report.id,
+      contactIds: pending.map(contact => String(contact.id)),
+      requestedBy: req.user.id,
+      requestedAt: new Date().toISOString()
+    };
 
-    saveSoon();
+    try { await persistence.save(sessions); }
+    catch { return res.status(503).json({ ok: false, error: "No se pudo guardar la selección en MySQL." }); }
+    emitState(code);
     emitCampaignState(code);
 
     const dispatched = dispatchCampaignCalls(code);
@@ -2073,6 +2173,9 @@ app.post("/api/session/:code/workers/:workerId/call-contact", (req, res) => {
     return res.status(409).json({ ok: false, error: "El contacto pertenece a otro equipo" });
   }
 
+  if ((session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(requested.phone))) {
+    return res.status(409).json({ ok: false, error: "Número en la lista de bloqueos. Desbloquéalo antes de llamar.", reason: "numero_bloqueado" });
+  }
   const block = annualBlock(requested.phone);
   if (block) return res.status(409).json({ok:false,error:blockedCallMessage(block),reason:"numero_llamado_anteriormente",nextAllowedAt:block.nextAllowedAt});
   const held = holdActiveContact(session, workerId);

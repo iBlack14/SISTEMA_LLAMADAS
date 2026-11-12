@@ -218,6 +218,7 @@ export function syncCampaignContacts(session, contacts = [], options = {}) {
   campaign.assignments = {};
   campaign.pausedWorkerIds = [];
   campaign.history = [];
+  campaign.manualReportRetry = null;
   campaign.listName = String(options.listName || "").trim();
   campaign.maxAttempts = Math.min(5, Math.max(1, Number(options.maxAttempts || 2)));
   campaign.completedAt = null;

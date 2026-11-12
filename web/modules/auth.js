@@ -29,7 +29,15 @@ export async function apiFetch(input, options = {}) {
 
 export function bindAccountControls() {
   const label = document.getElementById("accountIdentity");
-  if (label) label.textContent = `${currentUser.username} · ${currentUser.role}`;
+  const username = document.getElementById("accountUsername");
+  const role = document.getElementById("accountRole");
+  if (label && username && role) {
+    username.textContent = currentUser.username;
+    username.title = currentUser.username;
+    role.textContent = currentUser.role === "ADMINISTRADOR" ? "Administrador" : "Operador";
+    const avatar = document.getElementById("accountAvatar");
+    if (avatar) avatar.textContent = currentUser.username.slice(0, 1).toLocaleUpperCase("es");
+  } else if (label) label.textContent = `${currentUser.username} · ${currentUser.role}`;
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.hidden = currentUser.role !== "ADMINISTRADOR";
   const button = document.getElementById("logoutButton");

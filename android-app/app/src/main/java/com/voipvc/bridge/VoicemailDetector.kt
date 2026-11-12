@@ -144,21 +144,32 @@ object VoicemailDetector {
                 if (remote == null && !binding) {
                     binding = true
                     say("Conectando captura de audio con Shizuku…")
-                    val serviceArgs = Shizuku.UserServiceArgs(ComponentName(app, DownlinkCaptureService::class.java))
-                        .daemon(false).processNameSuffix("buzon").tag("voipvc-downlink")
+                    val serviceArgs = Shizuku.UserServiceArgs(
+                        ComponentName(BuildConfig.APPLICATION_ID, DownlinkCaptureService::class.java.name)
+                    )
+                        .daemon(false).processNameSuffix("buzon").tag("voipvc-downlink-v2")
                         .debuggable(BuildConfig.DEBUG).version(BuildConfig.VERSION_CODE)
                     args = serviceArgs
+                    Log.i("BuzonDetector", "Binding UserService component=${DownlinkCaptureService::class.java.name} Shizuku=${Shizuku.getVersion()} uid=${Shizuku.getUid()} version=${BuildConfig.VERSION_CODE}")
                     Shizuku.bindUserService(serviceArgs, connection)
                     main.postDelayed({
                         if (binding && remote == null) {
                             binding = false
-                            say("Shizuku tardó demasiado. Usa 'Reiniciar conexión' o abre Shizuku y vuelve a activar la detección.")
+                            val runningVersion = try {
+                                Shizuku.peekUserService(serviceArgs, connection)
+                            } catch (e: Exception) {
+                                Log.e("BuzonDetector", "Could not inspect timed-out UserService", e)
+                                -2
+                            }
+                            Log.e("BuzonDetector", "UserService bind timed out; peek version=$runningVersion")
+                            say("Shizuku no inició el servicio de audio (API ${Shizuku.getVersion()}, servicio $runningVersion). Reinicia Shizuku y reintenta.")
                         }
                     }, 8000)
                 }
                 decoder.execute { loadModel() }
             } catch (e: Exception) {
                 binding = false
+                Log.e("BuzonDetector", "Could not bind Shizuku UserService", e)
                 say("Error de Shizuku: ${e.message}")
             }
         }
@@ -166,16 +177,34 @@ object VoicemailDetector {
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            Log.i("BuzonDetector", "Shizuku UserService callback: connected name=$name binder=${binder?.javaClass?.name} alive=${binder?.isBinderAlive}")
             remote = binder
             binding = false
-            say(if (model != null) "Detector listo: audio celular y español sin conexión"
-                else "Shizuku conectado; preparando modelo de español…")
+            if (binder == null || !binder.isBinderAlive) {
+                say("Shizuku respondió sin un binder activo; reinicia la conexión")
+            } else {
+                say(if (model != null) "Detector listo: audio celular y español sin conexión"
+                    else "Shizuku conectado; preparando modelo de español…")
+            }
         }
         override fun onServiceDisconnected(name: ComponentName?) {
+            Log.w("BuzonDetector", "Shizuku UserService disconnected: $name")
             remote = null
             binding = false
             stop()
             say("Captura desconectada; activa nuevamente la detección")
+        }
+        override fun onBindingDied(name: ComponentName?) {
+            Log.e("BuzonDetector", "Shizuku UserService binding died: $name")
+            remote = null
+            binding = false
+            say("Shizuku cerró el servicio de audio; reinicia la conexión")
+        }
+        override fun onNullBinding(name: ComponentName?) {
+            Log.e("BuzonDetector", "Shizuku UserService returned a null binder: $name")
+            remote = null
+            binding = false
+            say("El servicio de audio devolvió una conexión vacía")
         }
     }
 

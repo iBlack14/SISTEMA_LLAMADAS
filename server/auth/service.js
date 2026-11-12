@@ -1,5 +1,6 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { AUTH_SCHEMA } from "./schema.js";
+import { registerUserRoutes } from "./users.js";
 import { hashPassword, verifyPassword } from "./passwords.js";
 
 const digest = value => createHash("sha256").update(value).digest("hex");
@@ -113,6 +114,7 @@ export class AuthService {
   };
 
   routes(app, disconnect) {
+    registerUserRoutes(app, this);
     app.use("/api/auth", (_, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
     app.post("/api/auth/login", async (req, res) => {
       if (!this.validOrigin(req) || !req.is("application/json")) return res.status(403).json({ ok: false, error: "Origen no autorizado." });

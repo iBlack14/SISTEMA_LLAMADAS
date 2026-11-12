@@ -62,6 +62,21 @@ humana, silencio, ruido, negaciones, otras locuciones y llamadas concurrentes.
 El corte automático sigue siendo experimental hasta completar esas pruebas.
 Revisar logs BuzonDetector y BuzonCapture.
 
+## Números inexistentes o incorrectos
+Estas locuciones se clasifican como `numero_inexistente`:
+1. «El número que ha marcado no existe».
+2. «[Operador] te informa que el número que usted ha marcado no existe».
+3. «Este es un mensaje de Claro: el número que usted ha marcado es incorrecto».
+4. «Hola, la cantidad de dígitos que marcaste es incorrecta, volver a llamar».
+
+El detector espera las palabras que distinguen «no existe» o «incorrecto/incorrecta»;
+no bloquea permanentemente solo por escuchar «el número que ha marcado».
+Al reconocerlas solicita cortar la llamada y guarda el resultado. El servidor espera
+la confirmación de finalización antes de avanzar. Se muestra INOPERABLE y
+NO VOLVER A LLAMAR, con bloqueo permanente del teléfono normalizado en todas las listas.
+El resultado anterior `numero_incorrecto` recibe el mismo bloqueo permanente.
+Los avisos de apagado o fuera de servicio conservan su categoría temporal.
+
 ## Dependencias
 - Shizuku API/provider 13.1.5: https://github.com/RikkaApps/Shizuku-API
 - Vosk Android 0.3.75: https://github.com/alphacep/vosk-api

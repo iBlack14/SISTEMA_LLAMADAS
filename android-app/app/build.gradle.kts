@@ -32,6 +32,49 @@ val generatedVersionCode = providers.environmentVariable("ANDROID_VERSION_CODE")
 val generatedVersionName = providers.environmentVariable("ANDROID_VERSION_NAME")
     .orElse("1.1")
 
+val androidEnv = rootProject.file(".env").takeIf { it.isFile }?.readLines()
+    ?.mapNotNull { line ->
+        val entry = line.trim()
+        if (entry.isEmpty() || entry.startsWith("#")) return@mapNotNull null
+        val separator = entry.indexOf('=')
+        if (separator <= 0) return@mapNotNull null
+        val key = entry.substring(0, separator).trim()
+        var value = entry.substring(separator + 1).trim()
+        if (value.length >= 2 &&
+            ((value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith('\'') && value.endsWith('\'')))) {
+            value = value.substring(1, value.length - 1)
+        }
+        key to value
+    }?.toMap().orEmpty()
+
+fun androidBaseUrl(name: String): String {
+    val value = providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
+        ?: androidEnv[name]?.takeIf { it.isNotBlank() }
+        ?: error("Falta $name. Configúralo en android-app/.env o como variable de entorno.")
+    val uri = runCatching { URI(value) }.getOrElse {
+        error("$name no contiene una URL válida.")
+    }
+    require(uri.isAbsolute && uri.host != null && uri.userInfo == null &&
+        uri.scheme in setOf("http", "https")) {
+        "$name debe ser una URL HTTP(S) absoluta sin credenciales."
+    }
+    return value.trimEnd('/')
+}
+
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val developmentBaseUrl = androidBaseUrl("ANDROID_DEV_BASE_URL")
+val productionBaseUrl = androidBaseUrl("ANDROID_PROD_BASE_URL")
+val spanishModelUrl = androidBaseUrl("ANDROID_VOSK_MODEL_URL")
+require(URI(productionBaseUrl).scheme == "https") {
+    "ANDROID_PROD_BASE_URL debe usar HTTPS."
+}
+require(URI(spanishModelUrl).scheme == "https") {
+    "ANDROID_VOSK_MODEL_URL debe usar HTTPS."
+}
+
 android {
     namespace = "com.voipvc.bridge"
     compileSdk = 35
@@ -44,8 +87,6 @@ android {
         versionCode = generatedVersionCode.get().toInt()
         versionName = generatedVersionName.get()
         manifestPlaceholders["cleartextTraffic"] = "false"
-        buildConfigField("String", "DEFAULT_BASE_URL", "\"https://llamada.viacomunicativa.com\"")
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -61,11 +102,13 @@ android {
     buildTypes {
         debug {
             manifestPlaceholders["cleartextTraffic"] = "true"
+            buildConfigField("String", "DEFAULT_BASE_URL", buildConfigString(developmentBaseUrl))
         }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
             manifestPlaceholders["cleartextTraffic"] = "false"
+            buildConfigField("String", "DEFAULT_BASE_URL", buildConfigString(productionBaseUrl))
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -119,15 +162,14 @@ val spanishModelAssets = layout.buildDirectory.dir("generated/spanish-model-asse
 val spanishModelArchive = spanishModelAssets.map { it.file("models/vosk-model-small-es-0.42.zip") }
 android.sourceSets.getByName("main").assets.srcDir(spanishModelAssets)
 val prepareSpanishModel = tasks.register("prepareSpanishModel") {
-    val modelUrl = "https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip"
-    inputs.property("modelUrl", modelUrl)
+    inputs.property("modelUrl", spanishModelUrl)
     outputs.file(spanishModelArchive)
     doLast {
         val archive = spanishModelArchive.get().asFile
         archive.parentFile.mkdirs()
         val temporary = File(archive.parentFile, archive.name + ".tmp")
         try {
-            val connection = URI(modelUrl).toURL().openConnection() as javax.net.ssl.HttpsURLConnection
+            val connection = URI(spanishModelUrl).toURL().openConnection() as javax.net.ssl.HttpsURLConnection
             connection.connectTimeout = 30000
             connection.readTimeout = 60000
             connection.instanceFollowRedirects = false
