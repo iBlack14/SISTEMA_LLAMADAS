@@ -583,32 +583,32 @@ class MainActivity : AppCompatActivity() {
             try {
                 val request = Request.Builder().url("$baseUrl/api/android/pair").post(body).build()
                 client.newCall(request).execute().use { response ->
-                val payload = response.body?.string().orEmpty()
-                withContext(Dispatchers.Main) {
-                    if (!response.isSuccessful) {
-                        updatePersistentStatus("No se pudo vincular el equipo.", "Error", Tone.ERROR)
-                        showTransientStatus("Error HTTP ${response.code}", Tone.ERROR)
-                        return@withContext
-                    }
-                    try {
-                        val json = JSONObject(payload)
-                        if (!json.optBoolean("ok")) {
-                            updatePersistentStatus("Respuesta inválida del servidor.", "Error", Tone.ERROR)
-                            showTransientStatus("Pairing inválido.", Tone.ERROR)
+                    val payload = response.body?.string().orEmpty()
+                    withContext(Dispatchers.Main) {
+                        if (!response.isSuccessful) {
+                            updatePersistentStatus("No se pudo vincular el equipo.", "Error", Tone.ERROR)
+                            showTransientStatus("Error HTTP ${response.code}", Tone.ERROR)
                             return@withContext
                         }
-                        val socketUrl = socketUrlForCurrentBuild(json.getJSONObject("socket").getString("url"))
-                        persistManualInputs(baseUrl, code, token)
-                        setBridgeMode(BridgeMode.CONNECTED)
-                        updatePersistentStatus("Bridge vinculado. Conectando al servidor…", "Conectando", Tone.WARNING)
-                        showTransientStatus("Vinculado correctamente.", Tone.SUCCESS)
-                        startBridgeService(socketUrl, code, token, deviceId, deviceName)
-                        if (fromConnectedMode) settingsSection.visibility = View.GONE
-                    } catch (_: Exception) {
-                        updatePersistentStatus("La respuesta del servidor no fue válida.", "Error", Tone.ERROR)
-                        showTransientStatus("Respuesta de pairing inválida.", Tone.ERROR)
+                        try {
+                            val json = JSONObject(payload)
+                            if (!json.optBoolean("ok")) {
+                                updatePersistentStatus("Respuesta inválida del servidor.", "Error", Tone.ERROR)
+                                showTransientStatus("Pairing inválido.", Tone.ERROR)
+                                return@withContext
+                            }
+                            val socketUrl = socketUrlForCurrentBuild(json.getJSONObject("socket").getString("url"))
+                            persistManualInputs(baseUrl, code, token)
+                            setBridgeMode(BridgeMode.CONNECTED)
+                            updatePersistentStatus("Bridge vinculado. Conectando al servidor…", "Conectando", Tone.WARNING)
+                            showTransientStatus("Vinculado correctamente.", Tone.SUCCESS)
+                            startBridgeService(socketUrl, code, token, deviceId, deviceName)
+                            if (fromConnectedMode) settingsSection.visibility = View.GONE
+                        } catch (_: Exception) {
+                            updatePersistentStatus("La respuesta del servidor no fue válida.", "Error", Tone.ERROR)
+                            showTransientStatus("Respuesta de pairing inválida.", Tone.ERROR)
+                        }
                     }
-                }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

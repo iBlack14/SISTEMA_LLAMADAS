@@ -107,6 +107,7 @@ class DownlinkCaptureService @Keep constructor(private val context: Context) : B
             override fun getPackageName(): String = "com.android.shell"
             override fun getApplicationContext(): Context = this
             override fun getOpPackageName(): String = "com.android.shell"
+            @androidx.annotation.RequiresApi(Build.VERSION_CODES.S)
             override fun getAttributionSource(): AttributionSource =
                 AttributionSource.Builder(Process.myUid()).setPackageName("com.android.shell").build()
         }
