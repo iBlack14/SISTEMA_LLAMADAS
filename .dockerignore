@@ -1,0 +1,16 @@
+**
+!package.json
+!package-lock.json
+!server/
+!server/**
+!web/
+!web/**
+!Dockerfile
+server/**/node_modules
+web/**/node_modules
+**/.env
+**/.env.*
+**/sessions.json
+**/*.call-history.json
+**/backups
+**/*.test.js

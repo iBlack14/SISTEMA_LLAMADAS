@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
-import { assertXamppConfig } from "./config.js";
+import { assertXamppConfig, assertEasypanelConfig } from "./config.js";
 import { hashPassword } from "./passwords.js";
 import { AUTH_SCHEMA } from "./schema.js";
 
@@ -45,7 +45,9 @@ async function main() {
       || !["EMPLEADO", "ADMINISTRADOR"].includes(role)) {
     throw new Error("Uso: npm run auth:user:add -- <usuario> <EMPLEADO|ADMINISTRADOR>");
   }
-  assertXamppConfig();
+  const easypanel = process.env.APP_ENV === "easypanel";
+  if (easypanel) assertEasypanelConfig();
+  else assertXamppConfig();
 
   const password = await readSecret("Contraseña (mínimo 12 caracteres): ");
   if (password.length < 12 || password.length > 256) throw new Error("La contraseña debe tener entre 12 y 256 caracteres.");
@@ -53,7 +55,7 @@ async function main() {
   if (password !== confirmation) throw new Error("Las contraseñas no coinciden.");
 
   const connection = await mysql.createConnection({
-    host: "127.0.0.1",
+    host: easypanel ? process.env.DB_HOST : "127.0.0.1",
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -63,8 +65,8 @@ async function main() {
   });
   try {
     const [[instance]] = await connection.query("SELECT DATABASE() AS db, @@port AS port");
-    if (instance.db !== process.env.DB_NAME || Number(instance.port) !== 3306) {
-      throw new Error("La conexión no corresponde a la base XAMPP configurada; no se creó el usuario.");
+    if (instance.db !== process.env.DB_NAME || (!easypanel && Number(instance.port) !== 3306)) {
+      throw new Error("La conexión no corresponde a la base configurada; no se creó el usuario.");
     }
     for (const statement of AUTH_SCHEMA) await connection.query(statement);
     const [existing] = await connection.query("SELECT id FROM auth_users WHERE username=?", [username]);

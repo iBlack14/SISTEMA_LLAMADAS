@@ -101,7 +101,7 @@ android {
 
     buildTypes {
         debug {
-            manifestPlaceholders["cleartextTraffic"] = "true"
+            manifestPlaceholders["cleartextTraffic"] = "false"
             buildConfigField("String", "DEFAULT_BASE_URL", buildConfigString(developmentBaseUrl))
         }
         release {

@@ -44,7 +44,9 @@ class MainActivity : AppCompatActivity() {
     private enum class BridgeMode { ONBOARDING, CONNECTED }
 
     private val defaultBaseUrl = BuildConfig.DEFAULT_BASE_URL
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .callTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
 
     private lateinit var onboardingSection: View
     private lateinit var connectedSection: View
@@ -578,9 +580,9 @@ class MainActivity : AppCompatActivity() {
         deviceNameText.text = deviceName
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val request = Request.Builder().url("$baseUrl/api/android/pair").post(body).build()
             try {
-                val response = client.newCall(request).execute()
+                val request = Request.Builder().url("$baseUrl/api/android/pair").post(body).build()
+                client.newCall(request).execute().use { response ->
                 val payload = response.body?.string().orEmpty()
                 withContext(Dispatchers.Main) {
                     if (!response.isSuccessful) {
@@ -606,6 +608,7 @@ class MainActivity : AppCompatActivity() {
                         updatePersistentStatus("La respuesta del servidor no fue válida.", "Error", Tone.ERROR)
                         showTransientStatus("Respuesta de pairing inválida.", Tone.ERROR)
                     }
+                }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

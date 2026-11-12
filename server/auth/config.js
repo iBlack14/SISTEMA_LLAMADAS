@@ -15,3 +15,21 @@ export function assertXamppConfig(env = process.env) {
     throw new Error("XAMPP local requiere DB_HOST=localhost, DB_PORT=3306 (o sin definir), DB_NAME y DB_USER en .env.");
   }
 }
+
+export function assertEasypanelConfig(env = process.env) {
+  if (env.APP_ENV !== "easypanel" || env.AUTH_LOCAL_ISOLATED === "1") {
+    throw new Error("El perfil EasyPanel requiere APP_ENV=easypanel, sin AUTH_LOCAL_ISOLATED.");
+  }
+  for (const key of ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"]) {
+    if (!String(env[key] || "").trim()) throw new Error(`Falta ${key} en EasyPanel.`);
+  }
+  for (const [key, fallback] of [["PORT", 3000], ["DB_PORT", 3306]]) {
+    const port = Number(env[key] || fallback);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Puerto inválido: ${key}.`);
+  }
+  let url;
+  try { url = new URL(env.PUBLIC_BASE_URL); } catch { throw new Error("PUBLIC_BASE_URL debe ser una URL HTTPS."); }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash
+      || url.pathname !== "/") throw new Error("PUBLIC_BASE_URL debe ser un origen HTTPS sin ruta ni credenciales.");
+  return url.origin;
+}

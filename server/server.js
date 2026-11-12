@@ -26,11 +26,20 @@ const __dirname = path.dirname(__filename);
 import dotenv from "dotenv";
 // The dedicated launcher supplies all settings. Never read the existing .env in isolated mode.
 if (process.env.AUTH_LOCAL_ISOLATED !== "1") dotenv.config({ path: path.join(__dirname, "..", ".env") });
-import { assertIsolatedConfig, assertXamppConfig } from "./auth/config.js";
+import { assertIsolatedConfig, assertXamppConfig, assertEasypanelConfig } from "./auth/config.js";
 import { AuthService } from "./auth/service.js";
 import { installSocketAuth } from "./auth/sockets.js";
 import { NetworkMonitor } from "./network-monitor.js";
-if (process.env.AUTH_LOCAL_ISOLATED === "1") assertIsolatedConfig();
+const easypanel = process.env.APP_ENV === "easypanel";
+if (easypanel) {
+  const origin = assertEasypanelConfig();
+  process.env.PUBLIC_BASE_URL = origin;
+  process.env.PUBLIC_WEB_BASE_URL = origin;
+  process.env.CORS_ORIGIN = origin;
+  process.env.HOST = "0.0.0.0";
+  process.env.TRUST_PROXY = "1";
+  process.env.LOCAL_LAN_BASE_URL = "";
+} else if (process.env.AUTH_LOCAL_ISOLATED === "1") assertIsolatedConfig();
 else {
   assertXamppConfig();
   const port = Number(process.env.PORT || 3000);
@@ -104,8 +113,8 @@ const io = new Server(server, {
   maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE || 1048576)
 });
 
-const authOrigins = [`http://127.0.0.1:${Number(process.env.PORT || 3000)}`, `http://localhost:${Number(process.env.PORT || 3000)}`];
-const auth = new AuthService(null, { origins: authOrigins });
+const authOrigins = easypanel ? [process.env.PUBLIC_BASE_URL] : [`http://127.0.0.1:${Number(process.env.PORT || 3000)}`, `http://localhost:${Number(process.env.PORT || 3000)}`];
+const auth = new AuthService(null, { origins: authOrigins, secure: easypanel });
 const network = new NetworkMonitor({ pool: null, persistence, getSessions: () => sessions,
   isSocketConnected: id => Boolean(io.sockets.sockets.get(id)?.connected),
   broadcast: snapshot => io.to("admin:network").emit("admin:network", snapshot) });
@@ -232,7 +241,7 @@ async function bootstrap() {
   const running = await probeRuntime(instancePort, instanceIdentity);
   if (running === "same") { alreadyRunning(); process.exit(0); }
   if (running === "other") throw new Error(`El puerto ${instancePort} está ocupado por otro servicio. No se cerró ningún proceso.`);
-  if (!await persistence.initDb()) throw new Error("No se pudo conectar a MySQL. Verifica que XAMPP esté iniciado y que DB_* en .env sean correctos.");
+  if (!await persistence.initDb()) throw new Error("No se pudo conectar a MySQL. Verifica el servicio MySQL y las variables DB_*.");
   // Operational state is kept in memory: never run two writers on this database.
   const runtimeLock = await persistence.pool.getConnection();
   const [[legacyLock]] = await runtimeLock.query("SELECT IS_USED_LOCK('sistema_llamadas_runtime') AS owner");
@@ -270,7 +279,7 @@ async function bootstrap() {
   await workspaces.sweep();
 
   const port = Number(process.env.PORT || 3000);
-  const host = process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
+  const host = easypanel ? "0.0.0.0" : process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
   server.listen(port, host, () => {
     console.log(`Call bridge running on http://localhost:${port}`);
   });

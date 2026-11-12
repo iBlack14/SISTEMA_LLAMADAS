@@ -98,7 +98,9 @@ class DownlinkCaptureService @Keep constructor(private val context: Context) : B
 
     @Synchronized
     private fun openCapture(): ParcelFileDescriptor {
-        check(Build.VERSION.SDK_INT >= 31) { "La captura de buzón requiere Android 12 o superior" }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            throw IllegalStateException("La captura de buzón requiere Android 12 o superior")
+        }
         val shellBase = context.createPackageContext("com.android.shell", 0)
         // Keep the real shell UID/package through application-context substitution.
         val shellContext = object : ContextWrapper(shellBase) {
@@ -113,17 +115,26 @@ class DownlinkCaptureService @Keep constructor(private val context: Context) : B
         // Fail closed if this platform constructor or call-state query is unavailable.
         val telecom = TelecomManager::class.java.getConstructor(Context::class.java)
             .newInstance(shellContext)
-        check(telecom.isInCall) { "No hay llamada celular activa" }
+        val inCall = try {
+            telecom.isInCall
+        } catch (error: SecurityException) {
+            throw SecurityException("Android no autorizó consultar la llamada activa", error)
+        }
+        check(inCall) { "No hay llamada celular activa" }
         stopCapture()
         val minimum = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT)
         check(minimum > 0) { "Formato de audio no soportado" }
-        val record = AudioRecord.Builder().setContext(shellContext)
-            .setAudioSource(MediaRecorder.AudioSource.VOICE_DOWNLINK)
-            .setAudioFormat(AudioFormat.Builder().setSampleRate(16000)
-                .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
-            .setBufferSizeInBytes(maxOf(minimum * 2, 6400)).build()
+        val record = try {
+            AudioRecord.Builder().setContext(shellContext)
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_DOWNLINK)
+                .setAudioFormat(AudioFormat.Builder().setSampleRate(16000)
+                    .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+                .setBufferSizeInBytes(maxOf(minimum * 2, 6400)).build()
+        } catch (error: SecurityException) {
+            throw SecurityException("Android no autorizó capturar audio de la llamada", error)
+        }
         try {
             check(record.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord no inició" }
             record.startRecording()
