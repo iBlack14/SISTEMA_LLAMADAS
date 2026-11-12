@@ -1,0 +1,83 @@
+/* One surface per list; selection and deletion remain separate buttons. */
+#contactsSection #contactsTabs {
+  gap: 8px;
+  padding: 4px 2px 8px;
+  margin-bottom: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #b74aab transparent;
+}
+#contactsSection #contactsTabs::-webkit-scrollbar { display: block; height: 4px; }
+#contactsSection #contactsTabs .tab-item {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 0;
+  max-width: min(300px, 100%);
+  min-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  background: #310742 !important;
+  border: 1px solid #813475 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  cursor: default;
+  transition: none;
+}
+#contactsSection #contactsTabs .tab-item.active {
+  background: #741363 !important;
+  border-color: #ed58cf !important;
+  box-shadow: inset 0 -2px #ed58cf !important;
+}
+#contactsSection #contactsTabs .tab-item:hover {
+  background: #46104f !important;
+  border-color: #c76bb6 !important;
+}
+#contactsSection #contactsTabs .tab-item.active:hover { background: #741363 !important; }
+#contactsSection #contactsTabs .tab-item > button {
+  margin: 0;
+  min-height: 44px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  background-image: none !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.2;
+  transition: none;
+}
+#contactsSection #contactsTabs .contact-list-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 248px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#contactsSection #contactsTabs .delete-tab-btn {
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 44px;
+  padding: 0;
+  font-size: 22px;
+  font-weight: 400;
+  color: #e9badf !important;
+}
+#contactsSection #contactsTabs .delete-tab-btn:hover {
+  background: #92204d !important;
+  color: #fff !important;
+}
+#contactsSection #contactsTabs .tab-item > button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -4px;
+}
+@media (pointer: coarse) {
+  #contactsSection #contactsTabs .delete-tab-btn { flex-basis: 44px; width: 44px; min-width: 44px; }
+}

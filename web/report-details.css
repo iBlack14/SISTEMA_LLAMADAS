@@ -1,0 +1,11 @@
+#annualReport .report-detailed-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#annualReport .report-detailed-metric span { overflow-wrap: anywhere; }
+body .panel .report-detailed-metric.voicemail,
+body .panel .report-detailed-metric.voicemail * { color: #995e00 !important; }
+#annualReport .report-detailed-metric.voicemail { border-color: #d6aa64; }
+@media (min-width: 1400px) {
+  #annualReport .report-detailed-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  #annualReport .report-detailed-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

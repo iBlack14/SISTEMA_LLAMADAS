@@ -1,0 +1,10 @@
+.answered-badge.voicemail {
+  white-space: nowrap;
+  background: rgba(195, 125, 22, .2);
+  color: #ffdd92 !important;
+  border: 1px solid rgba(255, 199, 92, .5);
+}
+#annualReport .report-result.is-voicemail {
+  color: #ffdd92 !important;
+  font-weight: 700;
+}

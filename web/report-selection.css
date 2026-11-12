@@ -1,0 +1,51 @@
+#annualReport .report-select-cell {
+  width: 40px;
+  min-width: 40px;
+  text-align: center;
+  padding: 8px;
+}
+#annualReport input[type="checkbox"] {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  border-radius: 4px !important;
+  vertical-align: middle;
+  padding: 0;
+  margin: 0;
+  accent-color: #c000b7;
+  cursor: pointer;
+}
+#annualReport input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
+#annualReport input[type="checkbox"]:focus-visible { outline: 2px solid #ad009c; outline-offset: 3px; }
+#annualReport #reportSelectionCount { font-size: 13px; font-weight: 600; white-space: nowrap; }
+#annualReport #reportSelectionFeedback { margin: 14px 0 0; color: #a01846; font-weight: 600; }
+
+#annualReport .report-row-action-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  min-width: 112px;
+  background: #fff;
+  box-shadow: -3px 0 6px rgba(55, 20, 67, .08);
+  text-align: center;
+}
+#annualReport thead .report-row-action-cell { z-index: 3; background: #f2e8f7; }
+#annualReport .report-row-call {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+#annualReport .report-no-call {
+  display: inline-block;
+  max-width: 140px;
+  color: #a01846 !important;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: normal;
+}
+@media (pointer: coarse) { #annualReport .report-row-call { min-height: 44px; } }
