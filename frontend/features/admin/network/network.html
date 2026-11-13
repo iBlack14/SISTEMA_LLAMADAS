@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#170c23">
+  <title>Núcleo de Red · VOIP VC</title>
+  <link rel="icon" href="/shared/assets/images/logo-vc-color.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/features/admin/network/network.css?v=20261114-editusers">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261114-nav-pages">
+  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261114-admin-pages"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script type="module" src="/features/admin/network/network-page.js?v=20261114-cards"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="VOIP VC, ir al panel de llamadas"><img src="/shared/assets/images/logo-vc-color.png" alt="" width="44" height="44"><span>VOIP VC<small>Gestión de llamadas</small></span></a>
+      <nav class="account" aria-label="Cuenta">
+        <div id="accountIdentity"><div class="account-details"><strong id="accountUsername">Cargando cuenta…</strong><span id="accountRole" class="account-role"></span></div></div>
+        <a class="button secondary" href="/">Panel de llamadas</a>
+        <button id="logoutButton" class="button secondary" type="button">Cerrar sesión</button>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <p id="accountError" class="notice error" role="alert"></p>
+
+    <!-- NUCLEO DE RED VIEW -->
+    <div id="networkView">
+      <div class="page-heading">
+        <div><h1>Núcleo de Red</h1><p>Estado de los equipos y actividad del turno.</p></div>
+        <div class="actions">
+          <button id="usersButton" class="button secondary" type="button">Usuarios</button>
+          <button id="refreshButton" class="button secondary" type="button">Actualizar</button>
+          <button id="downloadLog" class="button primary" type="button" disabled>Descargar registro</button>
+        </div>
+      </div>
+      <div class="connection" role="status">
+        <span class="connection-state"><span id="liveDot" class="status-dot"></span><span id="liveStatus">Conectando con el servidor…</span></span>
+        <span id="updatedAt" class="connection-updated">Sin actualización</span>
+      </div>
+      <section class="summary" aria-label="Resumen del turno">
+        <div><span>Intentos</span><strong id="kpiTotal">—</strong></div>
+        <div><span>Contestadas</span><strong id="kpiAnswered">—</strong><small id="kpiAnsweredPct"></small></div>
+        <div><span>Pendientes</span><strong id="kpiPending">—</strong></div>
+        <div><span>En llamada</span><strong id="kpiProgress">—</strong></div>
+      </section>
+      <p id="turnUnavailable" class="muted summary-note" hidden>No hay datos de turno para consolidar el resumen.</p>
+      <section class="equipment-overview" aria-labelledby="equipmentTitle">
+        <div class="section-heading"><h2 id="equipmentTitle">Equipos</h2><span id="nodeCount" class="muted">Cargando equipos…</span></div>
+        <div id="equipmentIndicators" class="indicators" aria-label="Ir a un equipo"></div>
+        <div class="legend">
+          <span><i data-tone="active"></i>En llamada <b id="legendActive">—</b></span>
+          <span><i data-tone="dialing"></i>Marcando <b id="legendDialing">—</b></span>
+          <span><i data-tone="ready"></i>Disponible <b id="legendReady">—</b></span>
+          <span><i data-tone="offline"></i>Desconectado <b id="legendOffline">—</b></span>
+          <span><i data-tone="unknown"></i>Sin datos <b id="legendNone">—</b></span>
+        </div>
+        <p id="overflowNotice" class="notice" hidden></p>
+      </section>
+      <div id="alertBanner" class="notice error" role="status" hidden><strong id="alertTitle"></strong><p id="alertText"></p></div>
+      <section aria-label="Detalle de equipos">
+        <div class="filters">
+          <label class="search" for="searchInput">Buscar equipo<input id="searchInput" type="search" placeholder="Equipo, nombre o rubro…"></label>
+          <div id="stateFilters" class="state-filters" role="group" aria-label="Filtrar por estado">
+            <button class="filter-pill active" data-filter="all" type="button" aria-pressed="true">Todos</button>
+            <button class="filter-pill" data-filter="En llamada" type="button" aria-pressed="false">En llamada</button>
+            <button class="filter-pill" data-filter="Marcando" type="button" aria-pressed="false">Marcando</button>
+            <button class="filter-pill" data-filter="Disponible" type="button" aria-pressed="false">Disponibles</button>
+            <button class="filter-pill" data-filter="Desconectado" type="button" aria-pressed="false">Desconectados</button>
+            <button class="filter-pill" data-filter="Sin datos" type="button" aria-pressed="false">Sin datos</button>
+          </div>
+        </div>
+        <div id="equipmentGrid" class="equipment-grid"></div>
+        <p id="emptyResults" class="empty" role="status" hidden>No hay equipos que coincidan con los filtros.</p>
+      </section>
+      <footer>Los estados dependen de la conexión de cada equipo. Horas de Lima.</footer>
+    </div>
+
+    <!-- USUARIOS VIEW (SECCIÓN INDEPENDIENTE) -->
+    <section id="usersView" class="users-view-section" aria-labelledby="usersTitle" hidden>
+      <div class="users-view-nav">
+        <button id="usersBackBtn" class="button secondary" type="button">← VOLVER AL NÚCLEO DE RED</button>
+      </div>
+      <div class="users-view-card">
+        <div class="users-view-header">
+          <div>
+            <h2 id="usersTitle">USUARIOS</h2>
+            <p>Crea cuentas y define a qué pueden acceder.</p>
+          </div>
+        </div>
+        <p id="usersMessage" class="notice" role="status" hidden></p>
+        <p id="usersError" class="notice error" role="alert" hidden></p>
+        <form id="createUserForm" class="user-form">
+          <h3>Crear usuario</h3>
+          <label for="newUsername">Usuario<input id="newUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="usernameHint"><small id="usernameHint">Letras, números, punto, guion o guion bajo.</small></label>
+          <label for="newUserRole">Acceso<select id="newUserRole" name="role"><option value="EMPLEADO">Ventas · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Núcleo y llamadas</option></select></label>
+          <label for="newUserPassword">Contraseña<span class="password-field"><input id="newUserPassword" name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="passwordHint"><button type="button" class="password-toggle" data-password-toggle="newUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span><small id="passwordHint">Mínimo 12 caracteres.</small></label>
+          <label for="newUserConfirmation">Confirmar contraseña<span class="password-field"><input id="newUserConfirmation" name="passwordConfirmation" type="password" required minlength="12" maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle" data-password-toggle="newUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span></label>
+          <div class="user-form-actions"><button id="createUserButton" class="button primary" type="submit">Crear usuario</button></div>
+        </form>
+        <section class="users-list" aria-labelledby="usersListTitle">
+          <div class="section-heading"><h3 id="usersListTitle">Cuentas registradas</h3><button id="usersRefresh" class="button secondary" type="button">Actualizar lista</button></div>
+          <p id="usersLoading" class="muted" role="status">Cargando usuarios…</p>
+          <div class="users-table-scroll" tabindex="0" role="region" aria-label="Usuarios registrados"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Acceso</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead><tbody id="usersRows"></tbody></table></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- EDITAR USUARIO -->
+    <dialog id="editUserDialog" class="users-dialog">
+      <form id="editUserForm" class="user-form">
+        <div class="users-dialog-header">
+          <div><h2>Editar usuario</h2><p id="editUserSubtitle">Actualiza el usuario, el acceso y la contraseña de la cuenta.</p></div>
+          <button id="editUserClose" class="button secondary" type="button">Cerrar</button>
+        </div>
+        <p id="editUserError" class="notice error" role="alert" hidden></p>
+        <input id="editUserId" name="id" type="hidden">
+        <label for="editUsername">Usuario<input id="editUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false"><small>Letras, números, punto, guion o guion bajo.</small></label>
+        <label for="editUserRole">Acceso<select id="editUserRole" name="role"><option value="EMPLEADO">Ventas · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Núcleo y llamadas</option></select></label>
+        <label for="editUserActive">Estado<select id="editUserActive" name="active"><option value="1">Activo</option><option value="0">Inactivo</option></select></label>
+        <label for="editUserPassword">Nueva contraseña<span class="password-field"><input id="editUserPassword" name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="editPasswordHint"><button type="button" class="password-toggle" data-password-toggle="editUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span><small id="editPasswordHint">Déjala vacía para mantener la actual. Mínimo 12 caracteres.</small></label>
+        <label for="editUserConfirmation">Confirmar contraseña<span class="password-field"><input id="editUserConfirmation" name="passwordConfirmation" type="password" minlength="12" maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle" data-password-toggle="editUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></span></label>
+        <div class="user-form-actions"><button id="editUserSubmit" class="button primary" type="submit">Guardar cambios</button></div>
+      </form>
+    </dialog>
+  </main>
+  <script type="module" src="/features/admin/users/users-page.js?v=20261114-admin-pages"></script>
+</body>
+</html>
