@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel, summarizeAttempts } from "../web/modules/report-metrics.js";
+import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel, summarizeAttempts } from "../shared/reports/report-metrics.js";
 
 test("detected voicemail overrides network connection timestamps and stale answered flags", () => {
   for (const durationSeconds of [2, 3, 60]) {

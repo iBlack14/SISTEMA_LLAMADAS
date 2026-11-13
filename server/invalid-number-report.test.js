@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isInoperableAttempt, attemptResultLabel, summarizeAttempts } from "../web/modules/report-metrics.js";
+import { isInoperableAttempt, attemptResultLabel, summarizeAttempts } from "../shared/reports/report-metrics.js";
 import { annualPhoneBlocks, uncalledContacts, excludeCalledPending } from "./contact-book.js";
 import { selectPendingReportContacts } from "./report-selection.js";
 

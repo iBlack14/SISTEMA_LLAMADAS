@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { hydrateReportDetails } from "./report-details.js";
-import { buildDetailedReport } from "../web/modules/detailed-report.js";
+import { buildDetailedReport } from "../frontend/features/reports/detailed-report.js";
 
 function fixture() {
  const contacts=Array.from({length:5},(_,i)=>({id:"c"+i,phone:"90000000"+i,pending:i>=3,

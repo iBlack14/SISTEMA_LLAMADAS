@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dashboardSessionKeys, readDashboardSession } from "../web/modules/dashboard-session.js";
+import { dashboardSessionKeys, readDashboardSession } from "../frontend/features/workspace/dashboard-session.js";
 
 const storage = entries => {
   const values = new Map(Object.entries(entries));
