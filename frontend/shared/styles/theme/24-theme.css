@@ -1,0 +1,712 @@
+/* ============================================================================
+   MESSAGE TEMPLATES STYLES
+   ============================================================================ */
+
+/* Templates list */
+.templates-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.templates-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted, #999);
+  font-size: 14px;
+}
+
+/* Template card */
+.template-card {
+  background: var(--card-bg, #2a2a3e);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-color, #3a3a4e);
+  transition: all 0.2s ease;
+}
+
+.template-card:hover {
+  border-color: var(--accent-color, #7c3aed);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+  transform: translateY(-2px);
+}
+
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.template-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  flex: 1;
+}
+
+.template-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-template-btn,
+.delete-template-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.edit-template-btn:hover {
+  background: rgba(124, 58, 237, 0.2);
+}
+
+.delete-template-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.template-type {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-muted, #999);
+}
+
+.template-type span {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(124, 58, 237, 0.15);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.template-message {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--input-bg, #1a1a2e);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary, #ddd);
+  min-height: 60px;
+  border: 1px solid var(--border-color, #3a3a4e);
+}
+
+.template-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.send-whatsapp-btn,
+.send-email-btn {
+  flex: 1;
+  min-width: 120px;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.send-whatsapp-btn {
+  background: #25d366;
+  color: white;
+}
+
+.send-whatsapp-btn:hover {
+  background: #20bd5a;
+  transform: translateY(-1px);
+}
+
+.send-email-btn {
+  background: var(--secondary-btn-bg, #4a4a6e);
+  color: var(--text-primary, #fff);
+}
+
+.send-email-btn:hover {
+  background: var(--secondary-btn-hover, #5a5a7e);
+  transform: translateY(-1px);
+}
+
+/* Send message modal specific styles */
+.send-message-card {
+  max-width: 600px;
+  width: 90%;
+}
+
+/* Message tabs (different style from send-tabs) */
+.message-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color, #3a3a4e);
+}
+
+.message-tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-tab:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.message-tab.active {
+  color: var(--accent-color, #7c3aed);
+  border-bottom-color: var(--accent-color, #7c3aed);
+}
+
+.message-tab svg {
+  flex-shrink: 0;
+}
+
+.message-content {
+  display: block;
+}
+
+.message-char-count {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  text-align: right;
+  margin-top: 4px;
+}
+
+.message-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(124, 58, 237, 0.1);
+  border-radius: 8px;
+  margin: 16px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary, #ddd);
+}
+
+.message-note svg {
+  flex-shrink: 0;
+  color: var(--accent-color, #7c3aed);
+  margin-top: 2px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.send-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color, #3a3a4e);
+}
+
+.send-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+
+.send-tab:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.send-tab.active {
+  color: var(--accent-color, #7c3aed);
+  border-bottom-color: var(--accent-color, #7c3aed);
+}
+
+.send-tab-content {
+  display: none;
+}
+
+.send-tab-content.active {
+  display: block;
+}
+
+/* Form spacing for send modals */
+.send-message-card .edit-form label {
+  margin-top: 16px;
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #ddd);
+  margin-bottom: 6px;
+}
+
+.send-message-card .edit-form label:first-of-type {
+  margin-top: 0;
+}
+
+.send-message-card .edit-form input,
+.send-message-card .edit-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--input-bg, #1a1a2e);
+  border: 1px solid var(--border-color, #3a3a4e);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.send-message-card .edit-form input:focus,
+.send-message-card .edit-form textarea:focus {
+  outline: none;
+  border-color: var(--accent-color, #7c3aed);
+}
+
+.send-message-card .edit-form textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.send-message-card .char-count {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  text-align: right;
+}
+
+/* Modal buttons for send */
+.send-message-card .edit-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.send-message-card .edit-buttons button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .templates-list {
+    grid-template-columns: 1fr;
+  }
+
+  .send-message-card {
+    width: 95%;
+  }
+
+  .template-footer {
+    flex-direction: column;
+  }
+
+  .send-whatsapp-btn,
+  .send-email-btn {
+    width: 100%;
+  }
+}
+
+/* Message composer */
+#sendMessageModal {
+  z-index: 1300;
+  background: rgba(18, 8, 35, .76);
+  backdrop-filter: blur(9px);
+}
+
+#sendMessageModal .send-message-card {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(960px, 100%);
+  max-width: 960px;
+  max-height: min(760px, calc(100dvh - 40px));
+  min-height: 570px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #30394f;
+  border-radius: 20px;
+  background: #0e1728;
+  color: #eef2ff;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, .56);
+}
+
+#sendMessageModal .send-message-header {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88px;
+  padding: 18px 62px 16px 22px;
+  border-bottom: 1px solid #293247;
+  background: linear-gradient(110deg, #101a2b, #11152b);
+}
+
+#sendMessageModal .send-message-header h3 {
+  margin: 3px 0 6px;
+  color: #f5f7ff;
+  font-size: 21px;
+  line-height: 1.15;
+}
+
+#sendMessageModal .send-message-eyebrow {
+  color: #a7b0c4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+#sendMessageModal .contact-badge {
+  display: inline-flex;
+  max-width: 240px;
+  overflow: hidden;
+  padding: 3px 9px;
+  border: 1px solid rgba(0, 210, 220, .32);
+  border-radius: 999px;
+  background: rgba(0, 192, 210, .1);
+  color: #50dce1;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sendMessageModal .send-template-panel {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  min-height: 0;
+  padding: 20px 14px;
+  border-right: 1px solid #293247;
+  background: linear-gradient(180deg, #121c2d, #101827);
+}
+
+#sendMessageModal .send-template-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#sendMessageModal .send-template-heading h4 {
+  margin: 5px 0 0;
+  color: #edf1fb;
+  font-size: 14px;
+}
+
+#sendMessageModal .send-template-count {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 50%;
+  background: #5522a4;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+#sendMessageModal .send-template-panel > p {
+  margin: 8px 0 14px;
+  color: #9da8bc;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#sendMessageModal .send-template-list {
+  display: grid;
+  max-height: calc(min(760px, 100dvh - 40px) - 190px);
+  gap: 8px;
+  overflow-y: auto;
+  padding: 1px 3px 1px 0;
+}
+
+#sendMessageModal .send-template-option {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid #354057;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .035);
+  color: #e8ecf7;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+#sendMessageModal .send-template-option:hover,
+#sendMessageModal .send-template-option.is-selected {
+  border-color: #7043cd;
+  background: rgba(115, 64, 204, .18);
+  transform: translateY(-1px);
+}
+
+#sendMessageModal .send-template-option strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sendMessageModal .send-template-option > span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #aab3c5;
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+#sendMessageModal .send-template-option small {
+  color: #80c7e5;
+  font-size: 9px;
+}
+
+#sendMessageModal .send-template-empty {
+  padding: 12px 8px;
+  color: #aab3c5;
+  font-size: 11px;
+}
+
+#sendMessageModal .message-tabs {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  gap: 4px;
+  margin: 12px 14px 0;
+  padding: 4px;
+  border: 1px solid #30394f;
+  border-radius: 12px;
+  background: #0a1120;
+}
+
+#sendMessageModal .message-tab {
+  flex: 1;
+  justify-content: center;
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  color: #aab3c5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#sendMessageModal .message-tab:hover {
+  background: rgba(135, 62, 210, .14);
+  color: #fff;
+}
+
+#sendMessageModal .message-tab.active {
+  background: linear-gradient(100deg, #a20d8d, #5618ae);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(140, 24, 178, .24);
+}
+
+#sendMessageModal .message-tab span {
+  font-size: 13px;
+}
+
+#sendMessageModal .message-content {
+  grid-column: 2;
+  grid-row: 3;
+  min-height: 0;
+  padding: 15px 14px 12px;
+  overflow-y: auto;
+}
+
+#sendMessageModal .message-content label {
+  display: block;
+  margin: 0 0 6px;
+  color: #c4ccda;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#sendMessageModal .message-content input,
+#sendMessageModal .message-content textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #2e394f;
+  border-radius: 11px;
+  outline: none;
+  background: #09111f;
+  color: #f2f4fb;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+#sendMessageModal .message-content input:focus,
+#sendMessageModal .message-content textarea:focus {
+  border-color: #8744c5;
+  box-shadow: 0 0 0 3px rgba(135, 68, 197, .13);
+}
+
+#sendMessageModal .message-content textarea {
+  min-height: 205px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+#sendMessageModal #emailContent textarea {
+  min-height: 185px;
+}
+
+#sendMessageModal .send-message-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#sendMessageModal .message-char-count {
+  margin: 0 0 6px;
+  color: #aab3c5;
+  font-size: 10px;
+}
+
+#sendMessageModal .message-note {
+  margin: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(31, 148, 212, .3);
+  border-radius: 9px;
+  background: rgba(14, 99, 150, .13);
+  color: #c2d8e9;
+  font-size: 10px;
+}
+
+#sendMessageModal .message-note span {
+  flex: 0 0 auto;
+  color: #55c2eb;
+  font-weight: 800;
+}
+
+#sendMessageModal .send-message-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+#sendMessageModal .send-message-footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 39px;
+  padding: 0 17px;
+  border: 1px solid #e423cf;
+  border-radius: 10px;
+  background: linear-gradient(105deg, #e000a8, #9700c9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 5px 17px rgba(214, 0, 183, .25);
+}
+
+#sendMessageModal .send-message-footer button:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+#sendMessageModal .edit-close-btn {
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #414a5e;
+  border-radius: 9px;
+  background: #1a2335;
+  color: #dce2ef;
+}
+
+@media (max-width: 680px) {
+  #sendMessageModal .send-message-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    min-height: min(680px, calc(100dvh - 24px));
+    max-height: calc(100dvh - 24px);
+  }
+
+  #sendMessageModal .send-message-header {
+    grid-column: 1;
+    padding: 14px 56px 13px 16px;
+  }
+
+  #sendMessageModal .send-message-header h3 {
+    font-size: 18px;
+  }
+
+  #sendMessageModal .send-template-panel {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 12px 14px;
+    border-right: 0;
+    border-bottom: 1px solid #293247;
+  }
+
+  #sendMessageModal .send-template-panel > p {
+    margin: 4px 0 8px;
+  }
+
+  #sendMessageModal .send-template-list {
+    display: flex;
+    max-height: 95px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  #sendMessageModal .send-template-option {
+    flex: 0 0 170px;
+  }
+
+  #sendMessageModal .message-tabs {
+    grid-column: 1;
+    grid-row: 3;
+    margin: 10px 12px 0;
+  }
+
+  #sendMessageModal .message-content {
+    grid-column: 1;
+    grid-row: 4;
+    padding: 12px;
+  }
+
+  #sendMessageModal .message-content textarea {
+    min-height: 140px;
+  }
+}

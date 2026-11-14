@@ -1,0 +1,272 @@
+
+
+/* ── IMPORT PANEL ────────────────────────────────────── */
+.import-panel {
+  background: rgba(120, 0, 180, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 10px 0 16px;
+}
+
+.import-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.import-tab {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  min-height: 34px;
+  border-radius: 8px;
+  background: rgba(120, 0, 180, 0.08);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: none;
+}
+
+.import-tab.active,
+.import-tab:hover {
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(192, 38, 211, 0.3);
+}
+
+.import-body {
+  min-height: 60px;
+}
+
+/* ── FILE LABEL ──────────────────────────────────────── */
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(192, 38, 211, 0.25);
+  transition: filter 0.2s, box-shadow 0.2s;
+}
+
+.file-label:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 20px rgba(192, 38, 211, 0.4);
+}
+
+/* ── PREMIUM DIALPAD ───────────────────────────────────── */
+.premium-btn {
+  background: linear-gradient(135deg, #f472b6, #db2777);
+  box-shadow: 0 4px 15px rgba(219, 39, 119, 0.35);
+  font-weight: 700 !important;
+}
+.premium-btn:hover {
+  box-shadow: 0 6px 22px rgba(219, 39, 119, 0.55);
+}
+
+/* Concurrent phone workers */
+.campaign-list-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.campaign-list-picker select {
+  min-height: 38px;
+  min-width: 150px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+}
+
+#workersList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.worker-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 5px 18px rgba(31, 16, 61, 0.06);
+}
+
+.worker-card.is-busy { border-color: rgba(124, 58, 237, .5); }
+.worker-card.is-ready { border-color: rgba(16, 185, 129, .35); }
+.worker-card.is-paused { border-color: rgba(245, 158, 11, .45); background: rgba(245, 158, 11, .05); }
+.worker-card.is-offline { opacity: .62; }
+
+.worker-card-head,
+.worker-actions,
+.worker-contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.worker-card-head > div,
+.worker-contact { flex-direction: column; align-items: flex-start; }
+.worker-card small,
+.worker-contact span,
+.worker-empty { color: var(--muted); font-size: 12px; }
+.worker-state { font-size: 11px; font-weight: 700; padding: 5px 8px; border-radius: 999px; background: rgba(124, 58, 237, .1); }
+.worker-contact { margin-top: 12px; }
+.worker-duration { margin: 8px 0; font: 700 18px/1 monospace; }
+.worker-empty { min-height: 48px; display: flex; align-items: center; }
+.worker-actions { margin-top: 10px; }
+.worker-actions button { min-height: 32px; padding: 0 10px; font-size: 12px; flex: 1; }
+
+.contact-disposition-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.contact-disposition-actions button {
+  min-height: 27px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.list-name-card {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.list-name-error {
+  min-height: 20px;
+  margin: 6px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.confirm-message {
+  margin-top: 12px;
+  color: var(--text2);
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+/* ── CALL HISTORY ────────────────────────────────────── */
+.history-card {
+  width: min(500px, 90vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(180, 0, 230, 0.1);
+  padding: 14px 18px;
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-phone {
+  font-family: monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.history-call-btn {
+  padding: 0 14px;
+  height: 34px;
+  min-height: 34px;
+  font-size: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+/* ── CONTACT TABS ─────────────────────────────────────── */
+.contacts-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding: 10px 0;
+  scrollbar-width: none;
+}
+.contacts-tabs::-webkit-scrollbar { display: none; }
+
+.tab-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 12px;
+  color: #94A3B8;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.tab-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}

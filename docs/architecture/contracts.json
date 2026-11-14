@@ -1,0 +1,228 @@
+{
+  "http": [
+    {
+      "method": "GET",
+      "path": "/api/network/access"
+    },
+    {
+      "method": "GET",
+      "path": "/api/network"
+    },
+    {
+      "method": "GET",
+      "path": "/api/network/activity"
+    },
+    {
+      "method": "GET",
+      "path": "/api/network/equipment/:number"
+    },
+    {
+      "method": "GET",
+      "path": "/nucleo-red"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/index.html"
+    },
+    {
+      "method": "GET",
+      "path": "/admin.html"
+    },
+    {
+      "method": "GET",
+      "path": "/legacy"
+    },
+    {
+      "method": "GET",
+      "path": "/login"
+    },
+    {
+      "method": "GET",
+      "path": "/legacy/admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pairing/:code"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/contact-book"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/session/:code/contact-book"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/pairing-slots"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/session/:code/pairing-slots/:slotId"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/workers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/campaign"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/turn"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/turns/:turnId/report"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/turn/finalize"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/session/finalize"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/reports/attempts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/session/:code/reports/daily"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/reports/:id/continue"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/start"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/pause"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/resume"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/dispatch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/stop"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/pause"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/hangup"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/start-independent"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/switch-list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/call-contact"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/stop-independent"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/workers/:workerId/disconnect"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/skip"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/result"
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/:code/campaign/callback"
+    },
+    {
+      "method": "GET",
+      "path": "/api/pairing-qr/:code.svg"
+    },
+    {
+      "method": "GET",
+      "path": "/api/server-info"
+    },
+    {
+      "method": "POST",
+      "path": "/api/android/pair"
+    },
+    {
+      "method": "GET",
+      "path": "/api/apk/versions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/apk/info"
+    },
+    {
+      "method": "GET",
+      "path": "/api/apk/download"
+    },
+    {
+      "method": "GET",
+      "path": "/api/apk/download/:id"
+    },
+    {
+      "method": "GET",
+      "path": "/api/fetch-url"
+    },
+    {
+      "method": "GET",
+      "path": "/api/twilio/status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/twilio/configure"
+    },
+    {
+      "method": "POST",
+      "path": "/api/twilio/webhook/voice"
+    },
+    {
+      "method": "GET",
+      "path": "/health"
+    }
+  ],
+  "socketEvents": [
+    "workspace:open",
+    "session:create",
+    "session:join",
+    "blocked-numbers:change",
+    "phone:message-contact:add",
+    "call:action",
+    "phone:status",
+    "phone:command_ack",
+    "audio:phone",
+    "audio:dashboard",
+    "session:logout",
+    "disconnect"
+  ],
+  "styleHash": 4226860116,
+  "styleHashNormalization": "LF line endings and no trailing horizontal whitespace (IDE formatting)"
+}

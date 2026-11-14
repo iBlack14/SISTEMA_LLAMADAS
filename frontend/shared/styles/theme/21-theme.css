@@ -1,0 +1,278 @@
+
+
+.report-table-wrap table {
+  width: 100%;
+  min-width: 1050px;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.report-table-wrap th,
+.report-table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(75, 18, 97, 0.14);
+  text-align: left;
+}
+
+.report-table-wrap th {
+  background: #f3e8f7;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.report-table-wrap tbody tr:nth-child(even) {
+  background: #faf7fc;
+}
+
+.report-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.report-continue {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-day-toolbar button,
+.report-date-navigation button,
+.report-rubros button,
+.report-actions button,
+.report-continue button {
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.report-day-toolbar button:hover:not(:disabled),
+.report-date-navigation button:hover:not(:disabled),
+.report-rubros button:hover:not(:disabled),
+.report-actions button:hover:not(:disabled),
+.report-continue button:hover:not(:disabled),
+.report-day-toolbar button:focus-visible,
+.report-date-navigation button:focus-visible,
+.report-rubros button:focus-visible,
+.report-actions button:focus-visible,
+.report-continue button:focus-visible {
+  background: linear-gradient(135deg, #ff31c6, #bd20e5) !important;
+  border-color: #ff9be8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(255, 49, 198, 0.22), 0 8px 20px rgba(211, 0, 180, 0.32);
+  transform: translateY(-1px);
+}
+
+.report-rubros button:hover:not(:disabled),
+.report-rubros button:focus-visible {
+  background: #f3e8f7 !important;
+  border-color: #6d2188 !important;
+  color: #4b1261 !important;
+  box-shadow: 0 0 0 3px rgba(109, 33, 136, 0.16);
+}
+
+.report-result {
+  font-weight: 800;
+}
+
+.report-result.is-answered {
+  color: #4b1261 !important;
+}
+
+.report-actions button,
+.report-continue button {
+  background: #ffffff;
+  border: 1px solid rgba(75, 18, 97, 0.4);
+  color: #4b1261 !important;
+}
+
+.report-actions button:hover:not(:disabled),
+.report-actions button:focus-visible,
+.report-continue button:hover:not(:disabled),
+.report-continue button:focus-visible {
+  background: #f3e8f7 !important;
+  border-color: #6d2188 !important;
+  color: #4b1261 !important;
+  box-shadow: 0 0 0 3px rgba(109, 33, 136, 0.16);
+}
+
+.report-error {
+  color: #fda4af;
+}
+
+@media (max-width: 600px) {
+  .months-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-heading {
+    align-items: flex-start;
+  }
+
+  .report-day-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .report-tools {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .report-search-input {
+    width: 100%;
+  }
+
+  .report-rubros {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .report-content-panel {
+    padding: 12px;
+  }
+
+  .report-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-actions {
+    justify-content: flex-start;
+  }
+
+  .report-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-date-navigation {
+    justify-content: flex-end;
+  }
+
+  .report-continue {
+    justify-content: stretch;
+  }
+
+  .report-actions > button,
+  .report-continue > button {
+    width: 100%;
+  }
+}
+/* =========================================
+   CALENDARIO DE REPORTES
+========================================= */
+
+#annualReport .report-month .report-days button,
+#annualReport .report-month .report-days button.has-report {
+  background: rgba(255, 0, 255, 0.12) !important;
+  background-image: none !important;
+  border: 2px solid #d946ef !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  aspect-ratio: 1.05 / 1;
+  font-size: 12px !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 5px rgba(217, 70, 239, 0.45) !important;
+  filter: none !important;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+
+#annualReport .report-month .report-days button.selected-date,
+#annualReport .report-month .report-days button.has-report.selected-date {
+  background: #7e22ce !important;
+  background-image: none !important;
+  border-color: #9333ea !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.65) !important;
+}
+
+#annualReport .report-month .report-days button:not(.selected-date):hover {
+  background: rgba(255, 0, 255, 0.2) !important;
+  border-color: #e879f9 !important;
+  box-shadow: 0 0 8px rgba(217, 70, 239, 0.65) !important;
+}
+
+#annualReport .report-month .report-days button.selected-date:hover {
+  background: #7e22ce !important;
+  border-color: #9333ea !important;
+}
+
+body .panel .report-day-toolbar,
+body .panel .report-day-toolbar *,
+body .panel .report-content-panel,
+body .panel .report-content-panel * {
+  color: #4b1261 !important;
+}
+
+body .panel .report-content-panel .report-metric-value,
+body .panel .report-table-wrap tbody td {
+  color: #76727b !important;
+}
+
+body .panel .report-day-toolbar,
+body .panel .report-search-input,
+body .panel .report-rubros button,
+body .panel .report-content-panel,
+body .panel .report-detail-heading,
+body .panel .report-table-wrap {
+  background: #ffffff !important;
+}
+
+body .panel .report-rubros button.chosen {
+  background: #eadcf2 !important;
+  border: 2px solid #6d2188 !important;
+  color: #4b1261 !important;
+}
+
+body .panel .report-rubros button {
+  background: linear-gradient(135deg, #ed00b5, #a900d6) !important;
+  border: 1px solid rgba(236, 0, 179, 0.8) !important;
+  color: #ffffff !important;
+}
+
+body .panel .report-rubros button.chosen * {
+  color: #4b1261 !important;
+}
+
+body .panel .report-rubros button *,
+body .panel .report-rubros button:hover *,
+body .panel .report-rubros button:focus-visible * {
+  color: #ffffff !important;
+}
+
+body .panel .report-rubros button .report-rubro-number {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  color: #ffffff !important;
+}
+
+body .panel .report-rubros button.chosen .report-rubro-number {
+  border-color: rgba(75, 18, 97, 0.45) !important;
+  color: #4b1261 !important;
+}
+
+body .panel .report-rubros button:hover:not(:disabled),
+body .panel .report-rubros button:focus-visible {
+  background: linear-gradient(135deg, #ff31c6, #bd20e5) !important;
+  border-color: #ff9be8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(255, 49, 198, 0.22), 0 8px 20px rgba(211, 0, 180, 0.32);
+}
+
+body .panel .report-rubros button.chosen:hover:not(:disabled),
+body .panel .report-rubros button.chosen:focus-visible {
+  background: #eadcf2 !important;
+  border-color: #6d2188 !important;
+  color: #4b1261 !important;
+  box-shadow: 0 0 0 3px rgba(109, 33, 136, 0.16);
+}

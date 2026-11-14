@@ -1,0 +1,279 @@
+
+
+.pairing-slot-card.is-assigned {
+  border-color: rgba(44, 225, 165, 0.50);
+}
+
+.pairing-slot-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pairing-slot-top strong {
+  font-size: 17px;
+}
+
+.pairing-slot-state {
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #fff !important;
+  background: rgba(18, 1, 37, 0.62);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pairing-slot-qr {
+  width: min(210px, 82%);
+  aspect-ratio: 1;
+  padding: 8px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 13px 28px rgba(7, 0, 22, 0.30);
+}
+
+.pairing-slot-card small {
+  min-height: 18px;
+  color: var(--muted) !important;
+  text-align: center;
+}
+
+.pairing-slot-details,
+.pairing-slot-current-call {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(19, 2, 40, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  text-align: left;
+}
+
+.pairing-slot-details span,
+.pairing-slot-current-call span {
+  color: rgba(255, 255, 255, 0.64) !important;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pairing-slot-details strong + span {
+  margin-top: 7px;
+}
+
+.pairing-slot-current-call.is-calling {
+  border-color: rgba(44, 225, 165, 0.48);
+  box-shadow: inset 3px 0 rgba(44, 225, 165, 0.85);
+}
+
+.pairing-slot-current-call .pairing-call-number {
+  width: 100%;
+  text-align: center;
+  font-size: clamp(22px, 2.4vw, 32px);
+  line-height: 1.15;
+  letter-spacing: 0.045em;
+  overflow-wrap: anywhere;
+}
+
+.pairing-slot-current-call .pairing-call-company {
+  width: 100%;
+  min-height: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+@keyframes phone-panel-vibration {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-2px) rotate(-0.25deg); }
+  40% { transform: translateX(2px) rotate(0.25deg); }
+  60% { transform: translateX(-1px) rotate(-0.15deg); }
+  80% { transform: translateX(1px) rotate(0.15deg); }
+}
+
+@keyframes call-icon-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 4px 8px rgba(30, 42, 255, 0.28)); }
+  50% { transform: scale(1.13); filter: drop-shadow(0 7px 15px rgba(86, 116, 255, 0.58)); }
+}
+
+@keyframes call-state-border-motion {
+  0%, 100% { transform: translateX(0) scale(1); opacity: 0.78; }
+  8% { transform: translateX(-1.5px) scale(1.004); }
+  16% { transform: translateX(1.5px) scale(1.007); }
+  24% { transform: translateX(-1px) scale(1.01); }
+  32% { transform: translateX(1px) scale(1.013); }
+  50% { transform: translateX(0) scale(1.018); opacity: 1; }
+  72% { transform: translateX(0) scale(1.008); opacity: 0.88; }
+}
+
+.pairing-slot-current-call.is-ringing,
+.pairing-slot-current-call.is-answered,
+.pairing-slot-current-call.is-ended {
+  position: relative;
+  isolation: isolate;
+  --call-state-border: rgba(255, 255, 255, 0.72);
+}
+
+.pairing-slot-current-call.is-ringing { --call-state-border: rgba(106, 255, 187, 0.96); }
+.pairing-slot-current-call.is-answered { --call-state-border: rgba(255, 115, 221, 0.96); }
+.pairing-slot-current-call.is-ended { --call-state-border: rgba(255, 105, 139, 0.94); }
+
+.pairing-slot-current-call.is-ringing::after,
+.pairing-slot-current-call.is-answered::after,
+.pairing-slot-current-call.is-ended::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -2px;
+  border: 2px solid var(--call-state-border);
+  border-radius: 15px;
+  pointer-events: none;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--call-state-border) 55%, transparent);
+  animation: call-state-border-motion 1.15s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.pairing-slot-current-call.is-ringing {
+  color: #ffffff;
+  background: rgba(19, 2, 40, 0.86);
+  border-color: rgba(106, 255, 187, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(44, 225, 165, 0.28), 0 0 18px rgba(24, 218, 130, 0.24);
+}
+
+.pairing-call-number-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pairing-call-number-row .pairing-call-number {
+  width: auto;
+  min-width: 0;
+}
+
+.pairing-call-status-icon {
+  width: clamp(38px, 4.2vw, 54px);
+  height: clamp(38px, 4.2vw, 54px);
+  flex: 0 0 auto;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.pairing-call-status-icon.is-vibrating {
+  animation: phone-panel-vibration 0.34s linear infinite;
+}
+
+.pairing-call-status-icon.is-pulsing {
+  animation: call-icon-pulse 1.05s ease-in-out infinite;
+}
+
+.pairing-call-status-icon.is-rejected {
+  filter: drop-shadow(0 5px 11px rgba(255, 55, 104, 0.42));
+}
+
+.pairing-slot-current-call.is-answered {
+  background: rgba(19, 2, 40, 0.86);
+  border-color: rgba(255, 115, 221, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(237, 0, 181, 0.3), 0 0 18px rgba(237, 0, 181, 0.25);
+}
+
+.pairing-slot-current-call.is-ended {
+  background: rgba(19, 2, 40, 0.86);
+  border-color: rgba(255, 105, 139, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(234, 42, 92, 0.3), 0 0 18px rgba(234, 42, 92, 0.24);
+}
+
+.pairing-slot-current-call.is-ringing span,
+.pairing-slot-current-call.is-answered span,
+.pairing-slot-current-call.is-ended span,
+.pairing-slot-current-call.is-ringing .pairing-call-company,
+.pairing-slot-current-call.is-answered .pairing-call-company,
+.pairing-slot-current-call.is-ended .pairing-call-company {
+  color: #ffffff !important;
+}
+
+.pairing-slot-current-call .pairing-call-number {
+  margin-top: 7px;
+}
+
+.pairing-slot-current-call .pairing-call-company {
+  padding: 7px 4px 5px;
+  line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pairing-call-status-icon.is-vibrating,
+  .pairing-call-status-icon.is-pulsing,
+  .pairing-slot-current-call.is-ringing::after,
+  .pairing-slot-current-call.is-answered::after,
+  .pairing-slot-current-call.is-ended::after { animation: none; }
+}
+
+.pending-turn-panel {
+  width: 100%;
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid rgba(236, 0, 179, 0.82);
+  border-radius: 20px;
+  background: rgba(25, 1, 47, 0.45);
+  box-shadow: 0 12px 28px rgba(43, 0, 57, 0.18);
+}
+
+.pending-turn-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.pending-turn-head span {
+  color: #f08bdf !important;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.pending-turn-head h3 {
+  margin: 5px 0 0;
+  font-size: 22px;
+}
+
+.pending-turn-head > strong {
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 79, 208, 0.5);
+  border-radius: 999px;
+  background: rgba(208, 0, 159, 0.2);
+}
+
+.pending-turn-team-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.pending-turn-team-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border: 1px solid rgba(236, 0, 179, 0.45);
+  border-radius: 999px;
+  background: rgba(112, 9, 127, 0.35);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}

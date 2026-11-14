@@ -58,6 +58,7 @@ class BridgeService : Service() {
         const val ACTION_UI_TOGGLE_MUTE = "com.voipvc.bridge.UI_TOGGLE_MUTE"
         const val ACTION_UI_TOGGLE_SPEAKER = "com.voipvc.bridge.UI_TOGGLE_SPEAKER"
         const val ACTION_UI_BLOCKLIST_CHANGE = "com.voipvc.bridge.UI_BLOCKLIST_CHANGE"
+        const val ACTION_UI_SAVE_MESSAGE_CONTACT = "com.voipvc.bridge.UI_SAVE_MESSAGE_CONTACT"
         const val ACTION_UI_SYNC = "com.voipvc.bridge.UI_SYNC"
 
         // Extras
@@ -208,6 +209,7 @@ class BridgeService : Service() {
             ACTION_UI_TOGGLE_MUTE -> setMicMute(!isMicMuted)
             ACTION_UI_TOGGLE_SPEAKER -> setSpeakerOn(!isSpeakerOn)
             ACTION_UI_BLOCKLIST_CHANGE -> sendBlockedNumberChange(intent)
+            ACTION_UI_SAVE_MESSAGE_CONTACT -> sendMessageContactToWeb(intent)
             ACTION_UI_SYNC -> {
                 emitCallUiState()
                 emitPhoneStatus(lastCallState, "ui_sync", correlateCampaign = activeCommandId.isNotBlank())
@@ -399,6 +401,15 @@ class BridgeService : Service() {
                     clearCampaignTracking()
                 }
             }
+        }
+
+        client.on("phone:message-contact:ack") { args ->
+            if (client !== socket) return@on
+            val data = args.firstOrNull() as? JSONObject ?: return@on
+            val message = data.optString("message").ifBlank {
+                if (data.optBoolean("ok")) "Contacto guardado en la web." else "No se pudo guardar el contacto."
+            }
+            mainHandler.post { setStatus(message) }
         }
 
         client.on("call:action") { args ->
@@ -1343,6 +1354,26 @@ class BridgeService : Service() {
         client.emit(
             "blocked-numbers:change",
             JSONObject().put("action", action).put("name", name).put("phone", number)
+        )
+    }
+
+    private fun sendMessageContactToWeb(intent: Intent) {
+        val name = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty().trim().take(120)
+        val number = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
+        if (number.isBlank()) {
+            setStatus("No se pudo guardar: falta el número del contacto.")
+            return
+        }
+        val client = socket
+        if (client?.connected() != true) {
+            setStatus("No se pudo enviar el contacto: el celular no está conectado a la web.")
+            return
+        }
+        client.emit(
+            "phone:message-contact:add",
+            JSONObject()
+                .put("name", name.ifBlank { number })
+                .put("phone", number)
         )
     }
 

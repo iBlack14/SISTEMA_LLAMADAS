@@ -1,0 +1,316 @@
+
+
+.qr-description { max-width: 480px; }
+
+#pairQr {
+  width: 190px;
+  height: 190px;
+  margin: 14px auto 8px;
+  box-shadow: 0 12px 26px rgba(55, 20, 67, 0.15);
+}
+
+.contacts-tabs:empty { display: none; }
+
+@media (max-width: 720px) {
+  .qr-block { min-height: 300px; }
+  #pairQr { width: 170px; height: 170px; }
+}
+
+/* Identidad visual ViaVox: video de fondo y paleta de la tarjeta corporativa. */
+:root {
+  --bg: #16002f;
+  --card: rgba(28, 3, 55, 0.88);
+  --card2: rgba(45, 5, 66, 0.78);
+  --surface: rgba(67, 9, 88, 0.72);
+  --border: rgba(241, 0, 180, 0.34);
+  --border-bright: rgba(255, 0, 184, 0.62);
+  --accent: #e600a9;
+  --accent2: #8615d7;
+  --accent-glow: rgba(230, 0, 169, 0.3);
+  --text: #ffffff;
+  --text2: #f0dff5;
+  --muted: #cdb5d5;
+}
+
+body {
+  position: relative;
+  color: var(--text);
+  background: #16002f;
+  background-image: none;
+}
+
+.app-background-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(136, 20, 220, 0.12), transparent 38%),
+    linear-gradient(135deg, rgba(19, 0, 45, 0.34), rgba(69, 0, 74, 0.26));
+}
+
+.layout { position: relative; z-index: 0; }
+
+.panel {
+  color: var(--text);
+  background: linear-gradient(145deg, rgba(25, 2, 52, 0.48), rgba(53, 2, 65, 0.42));
+  border: 1px solid rgba(236, 0, 179, 0.58);
+  backdrop-filter: blur(7px) saturate(112%);
+  -webkit-backdrop-filter: blur(7px) saturate(112%);
+  box-shadow: 0 28px 70px rgba(10, 0, 25, 0.52), inset 0 1px rgba(255,255,255,0.06);
+}
+
+body .panel * { color: inherit !important; }
+.app-title h1 { color: #fff !important; }
+.app-title p,
+.muted,
+.campaign-status-line,
+.campaign-list-empty,
+.campaign-report-empty { color: var(--muted) !important; }
+
+.session-bar,
+.qr-block,
+.campaign-panel,
+.import-panel,
+.worker-card,
+.campaign-counter,
+.campaign-report-card,
+.edit-card,
+.modal-card,
+.apk-bar,
+.campaign-card,
+#contactsSection,
+.import-preview {
+  background: linear-gradient(145deg, rgba(38, 3, 67, 0.39), rgba(65, 3, 73, 0.32)) !important;
+  border-color: rgba(231, 0, 177, 0.38) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,0.045), 0 12px 30px rgba(8,0,24,0.16);
+  backdrop-filter: blur(5px) saturate(110%);
+  -webkit-backdrop-filter: blur(5px) saturate(110%);
+}
+
+.status-pill,
+.campaign-report-table-wrap {
+  color: var(--text2) !important;
+  background: rgba(22, 1, 44, 0.38);
+  border-color: rgba(231, 0, 177, 0.25);
+}
+
+input,
+select,
+textarea {
+  color: #fff !important;
+  background: rgba(20, 1, 42, 0.72);
+  border-color: rgba(236, 160, 224, 0.28);
+}
+
+input::placeholder,
+textarea::placeholder { color: #bfa9ca !important; }
+
+button:not(.danger-soft),
+.btn-apk-dl,
+.contacts-tabs button,
+.import-tab,
+.floating-add-btn {
+  color: #fff !important;
+  background: linear-gradient(135deg, #f000a9 0%, #9c08d2 100%);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 8px 22px rgba(199, 0, 180, 0.24);
+}
+
+button:not(.danger-soft):hover,
+.btn-apk-dl:hover,
+.contacts-tabs button:hover,
+.import-tab:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.09);
+  box-shadow: 0 11px 26px rgba(219, 0, 179, 0.34);
+}
+
+button.secondary,
+button.icon-btn {
+  color: #fff !important;
+  background: rgba(126, 32, 157, 0.42);
+  border-color: rgba(237, 183, 255, 0.25);
+  box-shadow: none;
+}
+
+button.danger-soft {
+  color: #ffe9f5 !important;
+  background: rgba(196, 23, 104, 0.35);
+  border-color: rgba(255, 124, 184, 0.30);
+}
+
+th {
+  color: #fff !important;
+  background: rgba(94, 12, 116, 0.92) !important;
+}
+
+td { color: var(--text2) !important; border-color: rgba(240, 192, 255, 0.10); }
+tbody tr:hover { background: rgba(235, 0, 181, 0.09); }
+a { color: #ff8dda !important; }
+.app-logo { background: rgba(255,255,255,0.92) !important; }
+
+.app-logo.app-logo-wide {
+  width: 104px;
+  height: 68px;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.app-logo.app-logo-wide img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 9px 14px rgba(8, 0, 18, 0.38));
+}
+
+@media (max-width: 600px) {
+  .app-logo.app-logo-wide { width: 82px; height: 54px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    background: radial-gradient(circle at top, #4a0b68, #16002f 72%);
+  }
+}
+
+/* Fondo estático violeta/fucsia. */
+body {
+  background-color: #7900d4;
+  background-image:
+    radial-gradient(circle at 16% 12%, rgba(199, 75, 255, 0.82), transparent 30%),
+    radial-gradient(circle at 82% 22%, rgba(247, 0, 202, 0.44), transparent 36%),
+    radial-gradient(circle at 50% 100%, rgba(112, 0, 209, 0.72), transparent 48%),
+    linear-gradient(135deg, #6b00d7 0%, #a000df 48%, #7a00cf 100%);
+  background-attachment: fixed;
+}
+
+.app-background-overlay {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
+    radial-gradient(circle at 50% 45%, rgba(209, 85, 255, 0.18), transparent 46%);
+}
+
+.pairing-slot-current-call {
+  gap: 8px;
+  padding: 18px 14px 20px;
+}
+
+.pairing-slot-current-call > span {
+  display: block;
+  padding: 9px 0 11px 18px;
+  line-height: 1.35;
+}
+
+.pairing-call-number-row {
+  padding: 7px 0 5px;
+}
+
+.pairing-slot-current-call .pairing-call-number {
+  margin-top: 0;
+  padding: 2px 0;
+  line-height: 1.25;
+}
+
+/* Tarjetas de equipos en lavanda con información magenta. */
+.pairing-slot-card,
+.pairing-slot-card.is-assigned {
+  background: linear-gradient(145deg, #ead7f5 0%, #dfc5ef 100%) !important;
+  border-color: rgba(238, 0, 178, 0.72) !important;
+  box-shadow: 0 15px 32px rgba(72, 0, 105, 0.22), inset 0 1px rgba(255, 255, 255, 0.7) !important;
+}
+
+.pairing-slot-card .pairing-slot-top > strong,
+.pairing-slot-card .pairing-slot-details > span,
+.pairing-slot-card .pairing-slot-details > strong,
+.pairing-slot-card .pairing-slot-current-call > span,
+.pairing-slot-card .pairing-call-number,
+.pairing-slot-card .pairing-call-company,
+.pairing-slot-card .pairing-slot-qr-hint {
+  color: #d900a9 !important;
+}
+
+.pairing-slot-card .pairing-slot-details,
+.pairing-slot-card .pairing-slot-current-call {
+  background: rgba(255, 255, 255, 0.30) !important;
+  border-color: rgba(217, 0, 169, 0.24) !important;
+}
+
+.pairing-slot-card .pairing-slot-current-call,
+.pairing-slot-card .pairing-slot-current-call.is-ringing,
+.pairing-slot-card .pairing-slot-current-call.is-answered,
+.pairing-slot-card .pairing-slot-current-call.is-ended {
+  background: #ffffff !important;
+}
+
+.pairing-slot-card .pairing-slot-current-call .pairing-call-number {
+  color: #6f169f !important;
+}
+
+.pairing-slot-card .pairing-slot-current-call .pairing-call-company,
+.pairing-slot-card .pairing-slot-current-call > span {
+  color: #df00aa !important;
+}
+
+.pairing-slot-card .pairing-slot-current-call .pairing-call-company {
+  font-size: clamp(17px, 1.5vw, 21px);
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.pairing-slot-card .pairing-slot-state {
+  color: #d900a9 !important;
+  background: rgba(255, 255, 255, 0.42) !important;
+  border-color: rgba(217, 0, 169, 0.30) !important;
+}
+
+/* Selector de lista por equipo. */
+.pairing-slot-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.30);
+  border: 1px solid rgba(217, 0, 169, 0.24);
+}
+body .panel .pairing-slot-list-field > span {
+  color: #d900a9 !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+body .panel .pairing-slot-list-select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(217, 0, 169, 0.45);
+  background: #ffffff;
+  color: #6f169f !important;
+  color-scheme: light;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pairing-slot-list-select:focus { outline: 2px solid #ff31c6; outline-offset: 1px; }
+.pairing-slot-list-select:disabled { opacity: .6; cursor: default; }
+body .panel .pairing-slot-list-select option {
+  background: #ffffff;
+  color: #6f169f !important;
+}
+.pairing-slot-list-empty {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+}
+body .panel .pairing-slot-list-empty { color: #6f169f !important; }

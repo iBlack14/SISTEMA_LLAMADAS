@@ -17,10 +17,10 @@ y la página se desplaza verticalmente. «Resumen del turno» y cada historial
 empiezan plegados. Se verificó 1920 × 1080 con zoom al 100 %, laptop y móvil.
 
 Cada «Ver actividad del turno» empieza cerrado y conserva su nodo y apertura
-durante las actualizaciones. Los snapshots de `/api/admin/network` y Socket.IO
+durante las actualizaciones. Los snapshots de `/api/network` y Socket.IO
 contienen los diez resúmenes y una versión del historial, sin filas detalladas.
 Al abrir un desplegable, el navegador consulta
-`/api/admin/network/activity?equipment=1,7` para los equipos que lo necesitan:
+`/api/network/activity?equipment=1,7` para los equipos que lo necesitan:
 agrupa aperturas simultáneas y refresca solo historiales abiertos cuya versión
 cambió. El endpoint individual existente también permite recuperar el detalle.
 
@@ -110,9 +110,9 @@ en la API y «Sin datos» en la interfaz.
 
 La vista y las API comparten `requireAdmin`. Probar directamente como empleado:
 
-- `/admin/nucleo-red` → 403.
-- `/api/admin/network` → 403.
-- `/api/admin/network/equipment/1` → 403.
+- `/nucleo-red` → 403.
+- `/api/network` → 403.
+- `/api/network/equipment/1` → 403.
 
 El evento `admin:subscribe` valida usuario y rol en el servidor antes de entrar
 a la sala privada. Un cliente Android tampoco puede acceder usando solamente

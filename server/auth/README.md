@@ -72,12 +72,12 @@ Get-Content .auth-local/test-accounts.json
 
 1. Inicia sesión con `empleado.prueba`. Debe abrir el panel actual en `/`, con
    sus tres QR iniciales y controles operativos existentes.
-2. Escribe directamente `http://127.0.0.1:3101/admin/nucleo-red`. Debe devolver
-   **403**, igual que `/api/admin/network/access` y `/admin.html`.
+2. Escribe directamente `http://127.0.0.1:3101/nucleo-red`. Debe devolver
+   **403**, igual que `/api/network/access` y `/admin.html`.
 3. En el panel, pulsa **Cerrar sesión**. No equivale a finalizar un turno ni a
    reiniciar la sesión operativa: las campañas y los teléfonos se conservan.
-4. Inicia sesión con `admin.prueba`. Debe abrir `/admin/nucleo-red`, con los diez
-   indicadores y diez tarjetas de equipo simultáneas. La API `/api/admin/network/access` debe responder
+4. Inicia sesión con `admin.prueba`. Debe abrir `/nucleo-red`, con los diez
+   indicadores y diez tarjetas de equipo simultáneas. La API `/api/network/access` debe responder
    **200**. El enlace permite abrir también el panel operativo.
 5. Sin iniciar sesión, `/` y la ruta administrativa redirigen a `/login`; las
    API privadas responden **401**.
@@ -85,7 +85,7 @@ Get-Content .auth-local/test-accounts.json
 También puedes comprobarlo desde la consola del navegador con cada cuenta:
 
 ```javascript
-await fetch('/api/admin/network/access').then(r => r.status)
+await fetch('/api/network/access').then(r => r.status)
 // EMPLEADO: 403; ADMINISTRADOR: 200; sin cuenta: 401.
 ```
 

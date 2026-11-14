@@ -19,7 +19,7 @@ La contraseña se solicita dos veces sin mostrarse en pantalla. Usa el mismo
 comando con rol `EMPLEADO` para las demás cuentas. Instrucciones del entorno
 alternativo aislado y pruebas: [server/auth/README.md](server/auth/README.md).
 
-El administrador dispone de **Núcleo de Red** en `/admin/nucleo-red`, con diez
+El administrador dispone de **Núcleo de Red** en `/nucleo-red`, con diez
 equipos, estados Android en vivo y actividad del turno. Fuentes, definiciones
 y pruebas simuladas: [server/NETWORK_MONITOR.md](server/NETWORK_MONITOR.md).
 
@@ -48,17 +48,16 @@ archivo generado en caché.
 
 ## Interfaz web original
 
-El panel de llamadas `/` vuelve a utilizar `web/index.html`, sus módulos JavaScript
-y sus estilos originales. Login y Núcleo de Red también usan sus vistas anteriores.
-Contactos, importaciones y reportes permanecen dentro del panel original.
+El panel de llamadas `/` utiliza `frontend/index.html`. Sus módulos se organizan por dominio en `frontend/features/`; el servidor arranca desde `backend/index.js`.
+
+Guía de carpetas, contratos y mantenimiento: [Arquitectura](docs/architecture/README.md).
 
 ```powershell
 npm install
 npm start
 ```
 
-No se necesita compilar React ni ejecutar Vite. La migración se canceló por
-indicación del usuario y se eliminó la carpeta `frontend/`.
+No se necesita compilar React ni ejecutar Vite. `frontend/` contiene la aplicación Vanilla JS modular.
 Los marcadores `/panel/*` redirigen al panel original. Se mantienen las API,
 MySQL, el historial y los bloqueos de llamadas. Los cambios recientes de la APK,
 incluida la descarga del modelo español, se conservan.

@@ -1,0 +1,23 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - img "ViaVox VC" [ref=e5]
+    - heading "Tu centro de llamadas." [level=1] [ref=e6]: Tu centrode llamadas.
+    - paragraph [ref=e7]: Accede para gestionar tus campañas y equipos Android.
+    - list [ref=e8]:
+      - listitem [ref=e9]: Campañas en tiempo real
+      - listitem [ref=e11]: Equipos Android sincronizados
+      - listitem [ref=e13]: Reportes y auditoría
+  - region "Iniciar sesión" [ref=e15]:
+    - generic [ref=e16]:
+      - heading "Iniciar sesión" [level=2] [ref=e17]
+      - paragraph [ref=e18]: Ingresa con tu cuenta de trabajo.
+    - generic [ref=e19]:
+      - generic [ref=e20]: Usuario
+      - textbox "Usuario" [ref=e22]:
+        - /placeholder: usuario
+      - generic [ref=e23]: Contraseña
+      - textbox "Contraseña" [ref=e25]:
+        - /placeholder: ••••••••
+      - alert [ref=e26]
+      - button "Ingresar" [ref=e27] [cursor=pointer]
+    - paragraph [ref=e28]: Acceso restringido · Sesión monitoreada

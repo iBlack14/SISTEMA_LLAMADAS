@@ -1,0 +1,140 @@
+#annualReport .report-select-cell {
+  width: 40px;
+  min-width: 40px;
+  text-align: center;
+  padding: 8px;
+}
+#annualReport input[type="checkbox"] {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  border-radius: 4px !important;
+  vertical-align: middle;
+  padding: 0;
+  margin: 0;
+  accent-color: #c000b7;
+  cursor: pointer;
+}
+#annualReport input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
+#annualReport input[type="checkbox"]:focus-visible { outline: 2px solid #ad009c; outline-offset: 3px; }
+#annualReport #reportSelectionCount { font-size: 13px; font-weight: 600; white-space: nowrap; }
+#annualReport #reportSelectionFeedback { margin: 14px 0 0; color: #a01846; font-weight: 600; }
+
+#annualReport .report-row-action-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  min-width: 112px;
+  background: #fff;
+  box-shadow: -3px 0 6px rgba(55, 20, 67, .08);
+  text-align: center;
+}
+#annualReport thead .report-row-action-cell { z-index: 3; background: #f2e8f7; }
+#annualReport .report-row-call {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+#annualReport .report-no-call {
+  display: inline-block;
+  max-width: 140px;
+  color: #a01846 !important;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: normal;
+}
+@media (pointer: coarse) { #annualReport .report-row-call { min-height: 44px; } }
+
+/* Calendario anual de reportes (12 meses) */
+#annualReport .report-heading h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: .02em;
+}
+#annualReport .calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#annualReport .calendar-nav strong {
+  min-width: 5ch;
+  text-align: center;
+  font-size: 19px;
+}
+#annualReport .calendar-nav button { min-width: 44px; padding: 6px 12px; font-size: 20px; }
+#annualReport .calendar-nav #calendarTodayBtn { min-width: 0; font-size: 14px; }
+
+#annualReport .months-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+#annualReport .report-month {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+#annualReport .report-month:hover {
+  transform: translateY(-2px);
+  border-color: rgba(217, 70, 239, .45);
+  box-shadow: 0 8px 22px rgba(124, 58, 237, .2);
+}
+#annualReport .report-month h3 {
+  font-size: 15px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #f5c1ff;
+}
+
+/* Día actual */
+#annualReport .report-days button.is-today {
+  outline: 2px dashed #e879f9;
+  outline-offset: 1px;
+}
+
+/* Hover y vista previa del rango (día final aún sin confirmar) */
+#annualReport .report-days button { cursor: pointer; }
+#annualReport .report-month .report-days button.in-range.is-preview {
+  background: rgba(217, 70, 239, .28) !important;
+  border-color: #e879f9 !important;
+}
+#annualReport .report-days button.is-preview {
+  outline: 2px dashed #f5c1ff;
+  outline-offset: 1px;
+}
+
+/* Rango ya confirmado: fondo más oscuro y permanente para que se note */
+#annualReport .report-month .report-days button.in-range:not(.is-preview) {
+  background: rgba(126, 34, 206, .62) !important;
+  border-color: #d946ef !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+/* Acción en línea, dentro del mes donde termina la selección (no tapa contenido) */
+#annualReport .report-range-fab {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d946ef;
+  background: rgba(126, 34, 206, .25);
+}
+#annualReport .report-range-fab[hidden] { display: none; }
+#annualReport .report-range-fab #reportRangeFabText {
+  color: #f5c1ff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+#annualReport .report-range-fab button { width: 100%; }
+
+@media (max-width: 600px) {
+  #annualReport .months-grid { grid-template-columns: 1fr; }
+  #annualReport .calendar-nav strong { min-width: 0; }
+}

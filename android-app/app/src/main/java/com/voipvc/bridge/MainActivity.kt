@@ -3,7 +3,6 @@ package com.voipvc.bridge
 import android.Manifest
 import android.app.AlertDialog
 import android.app.role.RoleManager
-import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -416,14 +415,12 @@ class MainActivity : AppCompatActivity() {
         speakerBtn.setOnClickListener { sendServiceAction(BridgeService.ACTION_UI_TOGGLE_SPEAKER) }
         messageBtn.setOnClickListener {
             val number = currentPhoneNumber.takeIf { it.isNotBlank() } ?: return@setOnClickListener
-            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.fromParts("smsto", number, null)
-            }
-            try {
-                startActivity(intent)
-            } catch (_: ActivityNotFoundException) {
-                Toast.makeText(this, "No hay una aplicación SMS instalada. Instala o activa Mensajes.", Toast.LENGTH_LONG).show()
-            }
+            val name = currentContactName.ifBlank { currentCompanyName.ifBlank { number } }
+            val intent = Intent(this, BridgeService::class.java)
+                .setAction(BridgeService.ACTION_UI_SAVE_MESSAGE_CONTACT)
+                .putExtra(BridgeService.EXTRA_CONTACT_NAME, name)
+                .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+            ContextCompat.startForegroundService(this, intent)
         }
         blockBtn.setOnClickListener {
             val number = currentPhoneNumber.takeIf { it.isNotBlank() } ?: return@setOnClickListener

@@ -1,0 +1,275 @@
+
+
+.workers-board .worker-actions .worker-disconnect-btn {
+  color: #ffe9f5 !important;
+  background: rgba(196, 23, 104, 0.34) !important;
+  border-color: rgba(255, 124, 184, 0.34) !important;
+  box-shadow: none !important;
+}
+
+/* Leyenda integrada directamente sobre el video, sin bloque de fondo. */
+.contact-status-legend {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Ajustes finales de densidad y alineación (deben prevalecer sobre el tema). */
+.pairing-slots-head {
+  position: relative;
+  justify-content: center;
+  text-align: center;
+  padding-inline: 160px;
+}
+.pairing-slots-head > div { width: 100%; }
+.pairing-slots-head .qr-eyebrow,
+.pairing-slots-head .qr-title,
+.pairing-slots-head .qr-description { text-transform: uppercase; }
+.pairing-slots-head #addPairingQrBtn { position: absolute; right: 0; }
+
+.contacts-table-wrap,
+.assigned-list-table-wrap,
+.pending-turn-table-wrap,
+.campaign-report-table-wrap {
+  max-height: 432px !important;
+  overflow: auto !important;
+  scrollbar-color: #d900a9 rgba(74, 0, 111, 0.16);
+  scrollbar-width: thin;
+}
+.contacts-table-wrap thead,
+.assigned-list-table-wrap thead,
+.pending-turn-table-wrap thead,
+.campaign-report-table-wrap thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.contacts-table-wrap th, .contacts-table-wrap td,
+.assigned-list-table-wrap th, .assigned-list-table-wrap td,
+.pending-turn-table-wrap th, .pending-turn-table-wrap td,
+.campaign-report-table-wrap th, .campaign-report-table-wrap td {
+  height: 54px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .pairing-slots-head {
+    padding-inline: 0;
+    padding-bottom: 62px;
+  }
+  .pairing-slots-head #addPairingQrBtn {
+    right: 50%;
+    bottom: 0;
+    transform: translateX(50%);
+  }
+}
+
+/* Overrides finales del tablero modular. */
+.contact-action-buttons .call-action-btn,
+.contact-direct-cell .call-action-btn {
+  background: linear-gradient(135deg, #d83aad, #b92aa0) !important;
+  border: 0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(190, 31, 151, 0.28) !important;
+}
+
+.contact-action-buttons .call-action-btn svg,
+.contact-direct-cell .call-action-btn svg {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  filter: none !important;
+}
+
+.contact-action-buttons .call-action-btn:hover,
+.contact-direct-cell .call-action-btn:hover {
+  background: linear-gradient(135deg, #e24cbd, #c934ad) !important;
+  box-shadow: 0 10px 24px rgba(190, 31, 151, 0.4) !important;
+}
+
+.pairing-slot-current-call:is(.is-ringing, .is-answered, .is-ended) .pairing-call-number {
+  font-size: clamp(34px, 3.25vw, 44px) !important;
+  line-height: 1.08;
+}
+
+.pairing-slot-current-call:is(.is-ringing, .is-answered, .is-ended) .pairing-call-company {
+  font-size: clamp(21px, 1.8vw, 26px) !important;
+  line-height: 1.2;
+}
+.pairing-slots-head > div,
+.pairing-slots-head .qr-description {
+  text-align: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.general-call-module,
+#contactsSection,
+.pending-turn-panel {
+  width: 100%;
+  margin-top: 24px;
+  padding: 24px !important;
+  border: 1px solid rgba(236, 0, 179, 0.52) !important;
+  border-radius: 24px !important;
+  background: linear-gradient(145deg, rgba(38, 3, 67, 0.48), rgba(65, 3, 73, 0.40)) !important;
+  box-shadow: 0 14px 32px rgba(43, 0, 57, 0.18), inset 0 1px rgba(255, 255, 255, 0.04) !important;
+  overflow: hidden;
+}
+
+.general-call-module .general-call-controls {
+  min-height: 176px;
+  margin: 0;
+  padding: 20px;
+  border: 0 !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#contactsSection .contacts-topbar,
+#contactsSection .contact-actions {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+#contactsSection .import-panel {
+  padding: 20px !important;
+  border-radius: 20px !important;
+}
+
+.qr-block,
+.shift-management,
+.shift-history-panel,
+.apk-bar,
+.status-pill,
+.pairing-slot-card,
+.pairing-slot-details,
+.pairing-slot-current-call,
+.general-call-module,
+.general-call-controls,
+#contactsSection,
+.import-panel,
+.pending-turn-panel,
+.assigned-list-card,
+.assigned-list-group,
+.campaign-panel,
+.campaign-card,
+.worker-card,
+.campaign-report-panel,
+.campaign-report-card,
+.contacts-table-wrap,
+.assigned-list-table-wrap,
+.pending-turn-table-wrap,
+.campaign-report-table-wrap,
+.table-wrap,
+input,
+select,
+textarea,
+button,
+.file-label {
+  border-radius: 18px !important;
+}
+
+.contacts-table-wrap,
+.assigned-list-table-wrap,
+.pending-turn-table-wrap,
+.campaign-report-table-wrap,
+.table-wrap {
+  overflow: auto;
+}
+
+@media (max-width: 760px) {
+  .general-call-module,
+  #contactsSection,
+  .pending-turn-panel {
+    padding: 16px !important;
+    border-radius: 20px !important;
+  }
+
+  #contactsSection .contacts-topbar,
+  #contactsSection .contact-actions {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
+
+/*MÓDULO DE REPORTES - CALENDARIO ANUAL*/
+
+[hidden] {
+  display: none !important;
+}
+
+.report-nav {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.annual-report {
+  padding: 20px 0;
+}
+
+.report-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.report-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* CUADRÍCULA DE LOS 12 MESES */
+
+.months-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(245px, 1fr));
+  gap: 16px;
+}
+
+.report-month {
+  border: 1px solid var(--border);
+  background: rgba(124, 58, 237, 0.08);
+  padding: 15px;
+  border-radius: 16px;
+}
+
+.report-month h3 {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.report-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+}
+
+.report-days b {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-days button {
+  min-height: 32px;
+  padding: 0;
+  font-size: 12px;
+  background: transparent;
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+
+.report-days button.has-report {
+  background: transparent;
+  border-color: #ff00ff;
+  font-weight: bold;
+}

@@ -86,7 +86,7 @@ android {
         // Un valor creciente permite que Android instale cada APK como actualización.
         versionCode = generatedVersionCode.get().toInt()
         versionName = generatedVersionName.get()
-        manifestPlaceholders["cleartextTraffic"] = "false"
+        manifestPlaceholders["cleartextTraffic"] = "true"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -101,13 +101,13 @@ android {
 
     buildTypes {
         debug {
-            manifestPlaceholders["cleartextTraffic"] = "false"
+            manifestPlaceholders["cleartextTraffic"] = "true"
             buildConfigField("String", "DEFAULT_BASE_URL", buildConfigString(developmentBaseUrl))
         }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-            manifestPlaceholders["cleartextTraffic"] = "false"
+            manifestPlaceholders["cleartextTraffic"] = "true"
             buildConfigField("String", "DEFAULT_BASE_URL", buildConfigString(productionBaseUrl))
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

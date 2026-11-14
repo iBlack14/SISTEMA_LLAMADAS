@@ -53,7 +53,7 @@ test("user management enforces login, admin role, CSRF and hashes new credential
   }};
   const auth=new AuthService(pool,{origins:[]});
   const app=express();app.use(express.json());app.use(auth.middleware());auth.routes(app,()=>{});
-  app.get("/admin/nucleo-red",auth.requireAdmin,(req,res)=>res.json({ok:true}));
+  app.get("/nucleo-red",auth.requireAdmin,(req,res)=>res.json({ok:true}));
   const server=http.createServer(app);
   await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
   const base="http://127.0.0.1:"+server.address().port;
@@ -67,14 +67,14 @@ test("user management enforces login, admin role, CSRF and hashes new credential
   try{
     await t.test("anonymous and sales users cannot list or create accounts",async()=>{
       for(const [token,status] of [[null,401],[salesToken,403]]){
-        assert.equal((await request("/api/admin/users",token)).status,status);
-        assert.equal((await request("/api/admin/users",token,{...valid,role:"ADMINISTRADOR"})).status,status);
-        assert.equal((await request("/admin/nucleo-red",token)).status,status);
+        assert.equal((await request("/api/users",token)).status,status);
+        assert.equal((await request("/api/users",token,{...valid,role:"ADMINISTRADOR"})).status,status);
+        assert.equal((await request("/nucleo-red",token)).status,status);
       }
       assert.equal(inserts,0);
     });
     await t.test("administrator listing never exposes password hashes",async()=>{
-      const response=await request("/api/admin/users",adminToken);
+      const response=await request("/api/users",adminToken);
       assert.equal(response.status,200);
       const data=await response.json();
       assert.equal(data.users.length,2);
@@ -82,16 +82,16 @@ test("user management enforces login, admin role, CSRF and hashes new credential
       assert.ok(!Object.hasOwn(data.users[0],"password_hash"));
     });
     await t.test("missing CSRF or foreign origins cannot create accounts",async()=>{
-      assert.equal((await request("/api/admin/users",adminToken,valid,{"X-CSRF-Token":""})).status,403);
-      assert.equal((await request("/api/admin/users",adminToken,valid,{Origin:"http://foreign.invalid"})).status,403);
+      assert.equal((await request("/api/users",adminToken,valid,{"X-CSRF-Token":""})).status,403);
+      assert.equal((await request("/api/users",adminToken,valid,{Origin:"http://foreign.invalid"})).status,403);
       assert.equal(inserts,0);
     });
     await t.test("invalid input creates no account",async()=>{
-      assert.equal((await request("/api/admin/users",adminToken,{...valid,role:"SUPERADMIN"})).status,400);
+      assert.equal((await request("/api/users",adminToken,{...valid,role:"SUPERADMIN"})).status,400);
       assert.equal(inserts,0);
     });
     await t.test("administrator creates a sales account with a one-way hash",async()=>{
-      const response=await request("/api/admin/users",adminToken,valid);
+      const response=await request("/api/users",adminToken,valid);
       assert.equal(response.status,201);
       const data=await response.json();
       assert.equal(data.user.role,"EMPLEADO");
@@ -107,18 +107,18 @@ test("user management enforces login, admin role, CSRF and hashes new credential
       assert.equal(response.status,200);
       assert.equal((await response.json()).redirect,"/");
       const token=response.headers.get("set-cookie").match(/calls_local_sid=([a-f0-9]{64})/)[1];
-      assert.equal((await request("/admin/nucleo-red",token)).status,403);
-      assert.equal((await request("/api/admin/users",token)).status,403);
-      assert.equal((await request("/api/admin/users",token,{...valid,role:"ADMINISTRADOR"})).status,403);
+      assert.equal((await request("/nucleo-red",token)).status,403);
+      assert.equal((await request("/api/users",token)).status,403);
+      assert.equal((await request("/api/users",token,{...valid,role:"ADMINISTRADOR"})).status,403);
     });
     await t.test("duplicate usernames preserve the existing account",async()=>{
-      const response=await request("/api/admin/users",adminToken,valid);
+      const response=await request("/api/users",adminToken,valid);
       assert.equal(response.status,409);
       assert.equal(inserts,1);
     });
     await t.test("database failure returns a retryable error",async()=>{
       failList=true;
-      assert.equal((await request("/api/admin/users",adminToken)).status,503);
+      assert.equal((await request("/api/users",adminToken)).status,503);
     });
   }finally{
     server.closeAllConnections();

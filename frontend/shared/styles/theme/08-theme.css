@@ -1,0 +1,276 @@
+
+
+.assigned-lists-panel {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.assigned-lists-empty,
+.assigned-list-card {
+  border: 1px solid rgba(236, 0, 179, 0.38);
+  border-radius: 22px;
+  background: rgba(34, 2, 59, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.assigned-lists-empty {
+  padding: 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.assigned-list-card {
+  padding: 22px;
+  overflow: hidden;
+}
+
+.assigned-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.assigned-list-head span {
+  display: block;
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.assigned-list-head h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+}
+
+.assigned-list-head > strong,
+.assigned-list-group h4 span {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(154, 53, 220, 0.38);
+  border: 1px solid rgba(224, 111, 255, 0.32);
+}
+
+.assigned-list-group + .assigned-list-group {
+  margin-top: 18px;
+}
+
+.assigned-list-group h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+}
+
+.assigned-list-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+}
+
+.assigned-list-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.assigned-list-table-wrap th,
+.assigned-list-table-wrap td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.assigned-list-group.called .assigned-list-table-wrap table {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+.assigned-list-group.called th:nth-child(1) { width: 7%; }
+.assigned-list-group.called th:nth-child(2) { width: 28%; }
+.assigned-list-group.called th:nth-child(3) { width: 18%; }
+.assigned-list-group.called th:nth-child(4) { width: 13%; }
+.assigned-list-group.called th:nth-child(5) { width: 14%; }
+.assigned-list-group.called th:nth-child(6) { width: 20%; }
+
+.contact-action-buttons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.contact-action-buttons .wa-action-btn,
+.contact-action-buttons .call-action-btn,
+.contact-direct-cell .wa-action-btn,
+.contact-direct-cell .call-action-btn {
+  width: auto;
+  height: 42px;
+  min-width: 116px;
+  padding: 0 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .02em;
+}
+
+.contact-action-buttons .wa-action-btn,
+.contact-direct-cell .wa-action-btn {
+  background: linear-gradient(135deg, #16bd68, #23dc79) !important;
+  border-color: #70efa0 !important;
+  color: #ffffff !important;
+}
+
+.contact-action-buttons .wa-action-btn svg,
+.contact-direct-cell .wa-action-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: #ffffff;
+}
+
+.contact-action-buttons .call-action-btn,
+.contact-direct-cell .call-action-btn {
+  background: linear-gradient(135deg, #210035, #510071) !important;
+  border: none !important;
+  box-shadow: 0 7px 20px rgba(255, 0, 191, .28), inset 0 0 14px rgba(137, 0, 190, .32) !important;
+  color: #ff20c6 !important;
+  line-height: 1;
+}
+
+.contact-action-buttons .call-action-btn svg,
+.contact-direct-cell .call-action-btn svg {
+  width: 21px;
+  height: 21px;
+  display: block;
+  color: #ff28c8;
+  fill: #ff28c8;
+  filter: drop-shadow(0 0 5px rgba(255, 40, 200, .72));
+}
+
+.contact-action-buttons .call-action-btn:not(:disabled):hover,
+.contact-direct-cell .call-action-btn:not(:disabled):hover {
+  background: linear-gradient(135deg, #30004c, #6c0092) !important;
+  color: #ff3bd0 !important;
+  filter: brightness(1.12);
+  box-shadow: 0 9px 24px rgba(255, 20, 202, .46), inset 0 0 16px rgba(166, 0, 220, .38) !important;
+}
+
+.contact-action-buttons .wa-action-btn:hover,
+.contact-action-buttons .call-action-btn:hover {
+  transform: translateY(-1px) scale(1.035);
+}
+
+.pending-contact-phone {
+  display: inline-grid;
+  grid-template-columns: 10ch 42px;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.pending-contact-phone > span {
+  display: block;
+  width: 10ch;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.pending-contact-phone img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 9px rgba(237, 0, 181, 0.24));
+}
+
+#contactsBody td {
+  padding-top: 17px;
+  padding-bottom: 17px;
+}
+
+#contactsBody td:first-child {
+  padding-right: 34px;
+}
+
+#contactsBody td:nth-child(2) {
+  padding-left: 34px;
+}
+
+.assigned-list-table-wrap th {
+  background: rgba(126, 17, 148, 0.42);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.assigned-list-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.assigned-list-none {
+  padding: 18px !important;
+  text-align: center !important;
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.answered-badge {
+  display: inline-flex;
+  min-width: 42px;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.answered-badge.yes {
+  background: rgba(28, 190, 126, 0.22);
+  color: #83f3c4 !important;
+  border: 1px solid rgba(44, 225, 165, 0.38);
+}
+
+.answered-badge.no {
+  background: rgba(221, 43, 112, 0.19);
+  color: #ff9cbd !important;
+  border: 1px solid rgba(255, 92, 145, 0.34);
+}
+
+@media (max-width: 700px) {
+  .assigned-list-head { align-items: flex-start; flex-direction: column; }
+  .assigned-list-card { padding: 16px; }
+}
+
+.qr-general-call-controls .general-call-heading {
+  align-items: center;
+}
+
+.qr-general-call-controls .campaign-actions {
+  justify-content: center;
+}
+
+@media (max-width: 980px) {
+  .pairing-slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .pairing-slots-head { align-items: stretch; flex-direction: column; }
+  .pairing-slots-grid { grid-template-columns: 1fr; }
+  .pairing-slot-card { min-height: 320px; }
+}
+
+/* Panel operativo: teléfonos en fila y llamada general debajo. */
+.campaign-panel-head {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.campaign-panel-head .section-title {
+  font-size: 20px;
+  letter-spacing: 0;
+  text-transform: none;
+}

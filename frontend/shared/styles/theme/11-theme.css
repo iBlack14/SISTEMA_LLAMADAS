@@ -1,0 +1,273 @@
+
+
+.edit-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  min-height: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(120, 0, 180, 0.12);
+  box-shadow: none;
+  padding: 0;
+}
+
+.pagination {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination button {
+  min-height: 32px;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── CALL MODAL ──────────────────────────────────────── */
+.call-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 0, 20, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
+}
+
+.call-card {
+  width: min(500px, 100%);
+  border: 1px solid var(--border-bright);
+  border-radius: 32px;
+  background: rgba(20, 0, 35, 0.6);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  padding: 36px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 30px 100px rgba(0, 0, 0, 0.6),
+    0 0 40px var(--accent-glow);
+}
+
+.call-pulse-ring {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  margin: 0 auto 20px;
+  position: relative;
+  box-shadow: 0 0 30px var(--accent-glow);
+  animation: pulse-ring 2.2s ease-in-out infinite;
+}
+
+.call-pulse-ring img {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+@keyframes pulse-ring {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  50% {
+    box-shadow: 0 0 50px rgba(192, 38, 211, 0.5), 0 0 80px rgba(124, 58, 237, 0.3);
+  }
+}
+
+.call-card-inner {
+  text-align: center;
+}
+
+.call-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #c084fc;
+  margin-bottom: 6px;
+}
+
+.call-kicker.state-dialing,
+.call-kicker.state-ringing {
+  color: var(--yellow);
+}
+
+.call-kicker.state-in_call {
+  color: var(--green);
+}
+
+.call-kicker.state-ended {
+  color: var(--muted);
+}
+
+.call-kicker.state-failed {
+  color: #f87171;
+}
+
+/* New Call Pulsing Behavior */
+.call-pulse-ring.is-calling {
+  animation: call-pulse-yellow 1.4s infinite;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.call-pulse-ring.is-in-call {
+  animation: call-pulse-green 1.4s infinite;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes call-pulse-yellow {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+@keyframes call-pulse-green {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  70% { transform: scale(1.08); box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Modal transitions and state-based styling */
+.call-modal.is-active-call .call-card {
+  border-color: #10b981;
+  box-shadow: 0 0 60px rgba(16, 185, 129, 0.35);
+  background: rgba(6, 78, 59, 0.65); /* Dark green tint */
+}
+
+/* Kicker states inside modal */
+.call-modal.is-ringing .call-card {
+  border-color: #f59e0b;
+  box-shadow: 0 0 50px rgba(245, 158, 11, 0.25);
+}
+
+.call-card h3 {
+  font-size: clamp(24px, 3.6vw, 32px);
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.call-card .call-number {
+  color: var(--muted);
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.call-card .call-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.call-meta {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.call-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.call-controls button {
+  min-width: 88px;
+  max-width: 180px;
+}
+
+.call-controls-main {
+  margin-top: 6px;
+}
+
+.call-controls-main button {
+  min-width: 130px;
+  width: 100%;
+}
+
+.call-controls .icon-btn.secondary {
+  background: rgba(120, 0, 180, 0.16);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #dcc2ff;
+}
+
+/* ── BADGE ───────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(100, 0, 150, 0.4);
+  background: rgba(120, 0, 180, 0.1);
+  color: var(--muted);
+}
+
+.badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge.state-idle,
+.badge.state-ended {
+  color: var(--muted);
+}
+
+.badge.state-dialing,
+.badge.state-ringing {
+  color: var(--yellow);
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+  animation: blink-badge 1.2s ease-in-out infinite;
+}
+
+.badge.state-in_call {
+  color: var(--green);
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.badge.state-failed {
+  color: #f87171;
+  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.badge.ack-pending {
+  color: var(--yellow);
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}

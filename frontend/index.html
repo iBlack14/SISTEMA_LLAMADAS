@@ -505,12 +505,27 @@
 
   <!-- MODAL ENVIAR MENSAJE -->
   <div id="sendMessageModal" class="edit-modal" style="display:none">
-    <div class="edit-card send-message-card">
+    <div class="edit-card send-message-card" role="dialog" aria-modal="true" aria-labelledby="sendMessageTitle">
       <button id="sendMessageCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
       <div class="send-message-header">
-        <h3>Enviar mensaje</h3>
-        <span id="sendMessageContactName" class="contact-badge">Contacto</span>
+        <div>
+          <span class="send-message-eyebrow">COMUNICACIÓN CON CLIENTE</span>
+          <h3 id="sendMessageTitle">Enviar mensaje</h3>
+          <span id="sendMessageContactName" class="contact-badge">Contacto</span>
+        </div>
       </div>
+
+      <aside class="send-template-panel" aria-labelledby="sendTemplatesTitle">
+        <div class="send-template-heading">
+          <div>
+            <span class="send-message-eyebrow">PLANTILLAS</span>
+            <h4 id="sendTemplatesTitle">Mensajes guardados</h4>
+          </div>
+          <span id="sendTemplateCount" class="send-template-count">0</span>
+        </div>
+        <p>Elige un texto para cargarlo en el mensaje.</p>
+        <div id="sendMessageTemplates" class="send-template-list"></div>
+      </aside>
 
       <!-- Tabs WhatsApp / Correo -->
       <div class="message-tabs">

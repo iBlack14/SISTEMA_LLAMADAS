@@ -1,0 +1,274 @@
+
+
+@media (max-width: 720px) {
+  .campaign-report-card { padding: 13px; border-radius: 15px; }
+  .campaign-report-head { align-items: flex-start; }
+  .campaign-report-count { font-size: 11px; }
+  .campaign-report-table-wrap { max-height: 300px; }
+}
+
+/* Tema violeta VC: sobrio, legible y basado en el morado del logotipo. */
+:root {
+  --bg: #4b1765;
+  --card: rgba(48, 13, 68, 0.92);
+  --card2: rgba(65, 22, 88, 0.82);
+  --surface: #5b2478;
+  --border: rgba(233, 213, 255, 0.20);
+  --border-bright: rgba(233, 213, 255, 0.38);
+  --accent: #a77bd4;
+  --accent2: #7b4aa2;
+  --accent-glow: rgba(196, 151, 232, 0.22);
+  --text: #fffaff;
+  --text2: #eadff0;
+  --muted: #cbb8d4;
+  --green: #75d5ae;
+  --yellow: #e7c77b;
+  --success: #75d5ae;
+  --danger: #dc8ca0;
+}
+
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(223, 186, 247, 0.16), transparent 36%),
+    radial-gradient(circle at 88% 88%, rgba(104, 53, 136, 0.34), transparent 42%),
+    linear-gradient(145deg, #55206f 0%, #42135b 48%, #37104d 100%);
+}
+
+.panel {
+  background: linear-gradient(155deg, rgba(57, 16, 77, 0.94), rgba(43, 11, 61, 0.94));
+  border-color: rgba(239, 220, 255, 0.22);
+  box-shadow: 0 24px 58px rgba(31, 7, 43, 0.42), inset 0 1px rgba(255,255,255,0.06);
+}
+
+.app-logo,
+button:not(.secondary):not(.danger-soft):not(.icon-btn),
+.floating-add-btn {
+  background: linear-gradient(135deg, #b58adb, #8150a6);
+  color: #25102f;
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 8px 20px rgba(28, 7, 39, 0.25);
+}
+
+.app-title h1 {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: #fff7ff;
+}
+
+button.secondary,
+button.icon-btn,
+.import-tab,
+.contacts-tabs button {
+  background: rgba(245, 231, 255, 0.10);
+  color: #f4eafa;
+  border-color: rgba(241, 220, 255, 0.24);
+}
+
+button.secondary:hover,
+button.icon-btn:hover,
+.import-tab:hover,
+.contacts-tabs button:hover {
+  background: rgba(245, 231, 255, 0.17);
+  border-color: rgba(241, 220, 255, 0.38);
+}
+
+button.danger-soft {
+  color: #ffdce5;
+  background: rgba(190, 79, 107, 0.20);
+  border-color: rgba(242, 165, 185, 0.32);
+}
+
+input,
+select,
+textarea {
+  background: rgba(35, 8, 50, 0.68);
+  color: var(--text);
+  border-color: rgba(238, 215, 255, 0.23);
+}
+
+input::placeholder,
+textarea::placeholder { color: #bea9c8; }
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #c59be3;
+  box-shadow: 0 0 0 3px rgba(197, 155, 227, 0.15);
+}
+
+.session-bar,
+.qr-block,
+.campaign-panel,
+.import-panel,
+.worker-card,
+.campaign-counter,
+.campaign-report-card,
+.edit-card,
+.modal-card {
+  background: rgba(66, 20, 88, 0.78) !important;
+  border-color: rgba(235, 211, 251, 0.20);
+}
+
+.apk-bar,
+.campaign-card,
+#contactsSection,
+.import-preview {
+  background: rgba(76, 28, 98, 0.72) !important;
+  border-color: rgba(235, 211, 251, 0.20) !important;
+  color: var(--text2);
+}
+
+.qr-title,
+.campaign-card h3,
+.campaign-report-head h3,
+.section-title,
+.apk-info strong { color: #fff8ff; }
+
+table { color: var(--text2); }
+th {
+  color: #fff8ff !important;
+  background: #54206e !important;
+}
+td { border-color: rgba(235, 211, 251, 0.12); }
+tbody tr:hover { background: rgba(232, 205, 250, 0.08); }
+
+a { color: #e1c3f3; }
+a:hover { color: #fff7ff; }
+
+.status-pill,
+.campaign-report-table-wrap {
+  background: rgba(35, 8, 50, 0.48);
+}
+
+/* Variante clara solicitada: cristal lavanda sobre el morado VC. */
+:root {
+  --bg: #74408c;
+  --card: rgba(247, 238, 251, 0.86);
+  --card2: rgba(235, 217, 244, 0.82);
+  --surface: #ead8f1;
+  --border: rgba(68, 28, 82, 0.18);
+  --border-bright: rgba(68, 28, 82, 0.30);
+  --text: #211425;
+  --text2: #332039;
+  --muted: #604b66;
+}
+
+body {
+  color: var(--text);
+  background-image:
+    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.42), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgba(232, 205, 244, 0.44), transparent 40%),
+    linear-gradient(145deg, #925eaa 0%, #74408c 48%, #5f2d78 100%);
+}
+
+.panel {
+  color: var(--text);
+  background: linear-gradient(150deg, rgba(250, 244, 252, 0.88), rgba(229, 208, 239, 0.82));
+  border-color: rgba(255,255,255,0.48);
+  backdrop-filter: blur(28px) saturate(115%);
+  -webkit-backdrop-filter: blur(28px) saturate(115%);
+  box-shadow: 0 24px 55px rgba(49, 15, 61, 0.25), inset 0 1px rgba(255,255,255,0.62);
+}
+
+body .panel * { color: #211425 !important; }
+
+.session-bar,
+.qr-block,
+.campaign-panel,
+.import-panel,
+.worker-card,
+.campaign-counter,
+.campaign-report-card,
+.edit-card,
+.modal-card,
+.apk-bar,
+.campaign-card,
+#contactsSection,
+.import-preview {
+  background: rgba(255, 251, 255, 0.58) !important;
+  border-color: rgba(68, 28, 82, 0.16) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.status-pill,
+.campaign-report-table-wrap {
+  background: rgba(226, 205, 236, 0.55);
+  border-color: rgba(68, 28, 82, 0.15);
+}
+
+input,
+select,
+textarea {
+  color: #211425 !important;
+  background: rgba(255,255,255,0.68);
+  border-color: rgba(68, 28, 82, 0.22);
+}
+
+input::placeholder,
+textarea::placeholder { color: #6a576f !important; }
+
+button:not(.danger-soft),
+.btn-apk-dl,
+.contacts-tabs button,
+.import-tab {
+  color: #211425 !important;
+  background: linear-gradient(135deg, rgba(208, 174, 225, 0.92), rgba(184, 139, 207, 0.92));
+  border-color: rgba(68, 28, 82, 0.20);
+}
+
+button.secondary,
+button.icon-btn {
+  color: #211425 !important;
+  background: rgba(224, 201, 235, 0.76);
+}
+
+button.danger-soft {
+  color: #32151c !important;
+  background: rgba(226, 170, 184, 0.58);
+  border-color: rgba(112, 43, 60, 0.22);
+}
+
+th {
+  color: #211425 !important;
+  background: rgba(207, 175, 222, 0.88) !important;
+}
+
+td { border-color: rgba(68, 28, 82, 0.12); }
+tbody tr:hover { background: rgba(121, 72, 143, 0.08); }
+
+/* Flujo simplificado: sesión automática y QR como acción principal. */
+.app-logo {
+  overflow: hidden;
+  background: rgba(255,255,255,0.72) !important;
+  padding: 7px;
+}
+
+.app-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qr-block {
+  display: block !important;
+  min-height: 330px;
+}
+
+.qr-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.qr-brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
