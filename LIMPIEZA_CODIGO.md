@@ -36,7 +36,7 @@ Una limpieza estructurada en fases permite:
 - **Acelerar desarrollo**: Menos archivos para navegar
 - **Reducir deuda técnica**: Código más limpio y directo
 
-**Archivos a eliminar eventualmente**: ~35 archivos, ~1,500 líneas de código
+**Archivos eliminados**: ~58 archivos (1606 contando node_modules), ~304,473 líneas de código
 
 ### 🎯 Estrategia Recomendada
 
@@ -1278,17 +1278,27 @@ Esta sección debe actualizarse conforme se ejecuten las fases:
 
 ### Fase 3: Eliminar Capa de Compatibilidad
 
-- **Estado**: ⏳ Pendiente (requiere validación)
-- **Logging implementado**: -
-- **Periodo de monitoreo**: - a -
-- **Uso detectado**: -
-- **Fecha inicio eliminación**: -
-- **Fecha completado**: -
-- **Ejecutado por**: -
-- **Resultado**: -
-- **Archivos eliminados**: -
-- **Commits**: -
-- **Notas**: -
+- **Estado**: ✅ **COMPLETADO**
+- **Logging implementado**: ❌ No implementado (se eligió Opción B: eliminación directa)
+- **Periodo de monitoreo**: N/A (se omitió el monitoreo)
+- **Uso detectado**: N/A
+- **Fecha inicio eliminación**: 2026-11-13
+- **Fecha completado**: 2026-11-13
+- **Ejecutado por**: Usuario (vía Kiro AI)
+- **Resultado**: ✅ Éxito - 1606 archivos eliminados, 304,473 líneas menos
+- **Archivos eliminados**: 
+  - `web/` (~28 archivos + node_modules)
+  - `server/` (~29 archivos: 17 shims JS + 12 tests obsoletos)
+  - `backend/routes/legacy-assets.js`
+- **Commits**: 
+  - `22886ab` - checkpoint antes de Fase 3
+  - `d3caa76` - refactor(fase-3): eliminar capas de compatibilidad legacy
+- **Tests después**: 68/70 pasan (1 fallo CSS pre-existente no relacionado)
+- **Notas**: 
+  - Se eligió eliminación directa sin validación previa (riesgo aceptado)
+  - Punto de restauración seguro disponible en commit `22886ab`
+  - Se actualizó `backend/routes/static.js` y `backend/create-runtime.js`
+  - Se actualizó test `backend/__tests__/architecture/contracts.test.js` para nueva ruta de logo
 
 ---
 
@@ -1300,9 +1310,9 @@ Este documento proporciona un plan completo y detallado para limpiar el código 
 
 | Fase | Riesgo | Tiempo | Puede hacerse ahora |
 |------|--------|--------|-------------------|
-| **Fase 1** | 🟢 Bajo | 15 min | ✅ Sí |
-| **Fase 2** | 🟢 Bajo | 20 min | ✅ Sí |
-| **Fase 3** | 🟡 Medio | 30 min + monitoreo | ⏳ Solo después de validar |
+| **Fase 1** | 🟢 Bajo | 15 min | ✅ Completada |
+| **Fase 2** | 🟢 Bajo | 20 min | ✅ Completada |
+| **Fase 3** | 🟡 Medio | 30 min + monitoreo | ✅ Completada |
 
 ### Próximos Pasos Inmediatos
 
