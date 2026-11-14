@@ -39,7 +39,7 @@ test("HTTP contracts, authentication, shared assets and Android pairing remain c
   for (const resource of [
     "/login", "/features/auth/login-page.js", "/app/dashboard.js",
     "/layouts/dashboard/sidebar.js", "/shared/styles/base.css",
-    "/shared/reports/report-metrics.js", "/logo-vc-color.png"
+    "/shared/reports/report-metrics.js", "/shared/assets/images/logo-vc-color.png"
   ]) assert.equal((await fetch(base + resource)).status, 200, resource);
 
   const response = await fetch(base + "/api/android/pair", {

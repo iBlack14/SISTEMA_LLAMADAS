@@ -36,7 +36,6 @@ import { createImportUrl } from "./services/contacts/import-url.js";
 export function createRuntime(projectRoot) {
 const runtime = { __dirname: path.join(projectRoot, "server"), paths: {
 frontendRoot: path.join(projectRoot, "frontend"),
-legacyAssetsRoot: path.join(projectRoot, "web"),
 sharedRoot: path.join(projectRoot, "shared"),
 dashboardPage: path.join(projectRoot, "frontend/index.html"),
 loginPage: path.join(projectRoot, "frontend/login.html"),
