@@ -17,18 +17,28 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
     const users = rows.map(row => ({ id: row.user_id, username: row.username,
       role: row.role, active: Boolean(Number(row.active)), lists: [] }));
     const usersById = new Map(users.map(user => [String(user.id), user]));
+    const activeCodes = rows.map(row => row.session_code).filter(Boolean);
+    const booksByCode = new Map();
+    if (activeCodes.length) {
+      const [sessionRows] = await runtime.auth.pool.query(
+        `SELECT id,data FROM sessions WHERE id IN (${activeCodes.map(() => "?").join(",")})`, activeCodes);
+      for (const sessionRow of sessionRows) {
+        const activeSession = runtime.sessions.get(sessionRow.id);
+        const stored = typeof sessionRow.data === "string" ? JSON.parse(sessionRow.data) : sessionRow.data;
+        booksByCode.set(sessionRow.id, activeSession?.contactBook || stored?.contactBook || null);
+      }
+    }
     for (const row of rows) {
       if (!row.session_code) continue;
-      const session = runtime.sessions.get(row.session_code);
-      const book = session?.contactBook;
+      const book = booksByCode.get(row.session_code);
       if (!book) continue;
       const user = usersById.get(String(row.user_id));
-      const names = [...new Set([...(book.lists || []), ...(book.contacts || []).map(contact => contact.list || "Principal")])];
       const counts = new Map();
       for (const contact of book.contacts || []) {
         const name = contact.list || "Principal";
         counts.set(name, (counts.get(name) || 0) + 1);
       }
+      const names = [...new Set([...(book.lists || []), ...counts.keys()])];
       user.lists = names.map(name => ({ name, count: counts.get(name) || 0 }));
     }
     res.json({ ok: true, users });
@@ -50,7 +60,12 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     const [rows] = await runtime.auth.pool.query(`SELECT u.username,w.session_code
       FROM auth_users u LEFT JOIN auth_user_workspaces w ON w.user_id=u.id WHERE u.id=?`, [userId]);
     if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
-    const book = runtime.sessions.get(rows[0].session_code)?.contactBook;
+    let book = runtime.sessions.get(rows[0].session_code)?.contactBook;
+    if (!book && rows[0].session_code) {
+      const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [rows[0].session_code]);
+      const stored = sessionRows[0]?.data;
+      book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
+    }
     if (!book) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
     const contacts = (book.contacts || []).filter(contact => (contact.list || "Principal") === listName);
     return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
