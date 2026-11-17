@@ -54,6 +54,14 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
         if (existing) existing.count = Math.max(existing.count, Number(row.contact_count));
         else user.lists.push({ name: row.list_name, count: Number(row.contact_count) });
       }
+      const [campaignLists] = await runtime.auth.pool.query(
+        `SELECT session_code,list_name FROM vc_call_campaigns
+          WHERE session_code IN (${missingCodes.map(() => "?").join(",")})`, missingCodes);
+      for (const row of campaignLists) {
+        const account = rows.find(item => item.session_code === row.session_code);
+        const user = account && usersById.get(String(account.user_id));
+        if (user && !user.lists.some(list => list.name === row.list_name)) user.lists.push({ name: row.list_name, count: 0 });
+      }
     }
     res.json({ ok: true, users });
   } catch {

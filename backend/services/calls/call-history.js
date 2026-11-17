@@ -70,7 +70,8 @@ export const HISTORY_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS vc_call_contacts (
     session_code VARCHAR(50) NOT NULL, contact_id VARCHAR(191) NOT NULL,
     name VARCHAR(255) NOT NULL, phone VARCHAR(64) NOT NULL, list_name VARCHAR(255) NOT NULL,
-    PRIMARY KEY(session_code, contact_id)
+    PRIMARY KEY(session_code, contact_id),
+    INDEX vc_call_contacts_list(session_code, list_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_call_devices (
     session_code VARCHAR(50) NOT NULL, device_id VARCHAR(191) NOT NULL, name VARCHAR(255) NOT NULL,

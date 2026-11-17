@@ -203,7 +203,7 @@ const openView = async view => {
   }
   closeMenu();
 };
-if (!isAdmin) {
+{
   navigation.addEventListener("click", event => {
     const link = event.target.closest("[data-view]");
     if (!link || !Object.hasOwn(panelPaths, link.dataset.view)) return;
@@ -223,7 +223,13 @@ if (!isAdmin) {
 requireLogin().then(async user => {
     accountUser = user;
     window.VOIP_VC_AUTH_USER = user;
-    if (user.role !== "ADMINISTRADOR") return;
+    if (user.role !== "ADMINISTRADOR") {
+      if (!isAdmin) {
+        const view = Object.keys(panelPaths).find(name => panelPaths[name] === location.pathname) || "calls";
+        await openView(view);
+      }
+      return;
+    }
     if (!isAdmin) {
     isAdmin = true;
     const adminLink = navigation.querySelector('[data-view="network"]');
