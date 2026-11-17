@@ -16,14 +16,20 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
       ORDER BY u.username`);
     const users = rows.map(row => ({ id: row.user_id, username: row.username,
       role: row.role, active: Boolean(Number(row.active)), lists: [] }));
+    const usersById = new Map(users.map(user => [String(user.id), user]));
     for (const row of rows) {
       if (!row.session_code) continue;
       const session = runtime.sessions.get(row.session_code);
       const book = session?.contactBook;
       if (!book) continue;
-      const user = users.find(item => String(item.id) === String(row.user_id));
+      const user = usersById.get(String(row.user_id));
       const names = [...new Set([...(book.lists || []), ...(book.contacts || []).map(contact => contact.list || "Principal")])];
-      user.lists = names.map(name => ({ name, count: (book.contacts || []).filter(contact => (contact.list || "Principal") === name).length }));
+      const counts = new Map();
+      for (const contact of book.contacts || []) {
+        const name = contact.list || "Principal";
+        counts.set(name, (counts.get(name) || 0) + 1);
+      }
+      user.lists = names.map(name => ({ name, count: counts.get(name) || 0 }));
     }
     res.json({ ok: true, users });
   } catch {

@@ -27,6 +27,7 @@ function bindUsers() {
   let loading = false;
   let requestNumber = 0;
   let listsRequestNumber = 0;
+  let listsLoaded = false;
 
   function showError(text) {
     if (error) {
@@ -166,9 +167,10 @@ function bindUsers() {
         }
       }
       if (status) { status.textContent = data.users.length ? "" : "No hay usuarios registrados."; status.hidden = Boolean(data.users.length); }
+      listsLoaded = true;
     } catch (cause) {
       if (request !== listsRequestNumber) return;
-      if (status) status.textContent = cause.message || "No se pudieron cargar las listas.";
+      if (status) { status.textContent = cause.message || "No se pudieron cargar las listas."; status.hidden = false; }
     } finally {
       if (request === listsRequestNumber && listsRefresh) listsRefresh.disabled = false;
     }
@@ -205,11 +207,11 @@ function bindUsers() {
       showError("");
       if (message) message.hidden = true;
       document.getElementById("newUsername")?.focus();
-      loadUsers();
-      loadUserLists();
       if (window.location.pathname !== "/usuarios") {
         history.pushState(null, "", "/usuarios");
       }
+      loadUsers();
+      if (!listsLoaded) loadUserLists();
     } else {
       clearPasswords();
       if (window.location.pathname !== "/nucleo-red") {
@@ -253,7 +255,7 @@ function bindUsers() {
       loadUsers();
     });
   }
-  if (listsRefresh) listsRefresh.addEventListener("click", loadUserLists);
+  if (listsRefresh) listsRefresh.addEventListener("click", () => { listsLoaded = false; loadUserLists(); });
 
   if (form) {
     form.addEventListener("submit", async event => {

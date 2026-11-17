@@ -16,6 +16,7 @@ export class NetworkMonitor {
     this.connectionTimestamps = new Map();
     this.registry = [];
     this.chain = Promise.resolve();
+    this.historyCache = new Map();
   }
 
   async initialize() {
@@ -121,10 +122,25 @@ export class NetworkMonitor {
       const turn = session?.shiftManagement?.current;
       sources.set(code, { session, turn, rows: null });
     }
-    try {
-      const histories = await this.persistence.getCallAttemptsForSessions([...sources.keys()]);
-      for (const [code, source] of sources) source.rows = histories.get(code) ?? null;
-    } catch { /* Unconfirmed data remains null, never an invented zero. */ }
+    const missing = [...sources].filter(([code, source]) => {
+      const cached = this.historyCache.get(code);
+      if (cached && cached.turnId === (source.turn?.id || "") && cached.rows) {
+        source.rows = cached.rows;
+        return false;
+      }
+      return true;
+    }).map(([code]) => code);
+    if (missing.length) {
+      try {
+        const histories = await this.persistence.getCallAttemptsForSessions(missing);
+        for (const code of missing) {
+          const source = sources.get(code);
+          const rows = histories.get(code) ?? null;
+          source.rows = rows;
+          if (rows) this.historyCache.set(code, { turnId: source.turn?.id || "", rows });
+        }
+      } catch { /* Keep the last confirmed history snapshot while storage recovers. */ }
+    }
     const equipment = Array.from({ length: 10 }, (_, index) => {
       const row = this.registry.find(item => item.position === index + 1);
       if (!row) return { number: index + 1, name: `Equipo ${index + 1}`, state: "Sin vincular", calling: false,
@@ -178,7 +194,7 @@ export class NetworkMonitor {
 
       const turn = source?.turn?.status === "active" ? source.turn : null;
       const reliableScope = Boolean(turn?.id && turn.startedAt && source?.rows);
-      const rows = reliableScope ? source.rows.filter(item => item.workerId === row.device_id && item.shiftId === turn.id) : null;
+      const rows = reliableScope ? source.rowsByWorker?.get(row.device_id) || [] : null;
       const assignment = device?.session.contactBook?.preferences?.pairingListAssignments?.[device.slot.id];
       const rubro = typeof assignment === "string" && assignment ? assignment : null;
       const contacts = source?.session?.campaign?.contacts;
@@ -187,8 +203,7 @@ export class NetworkMonitor {
       // A list/target is required to attribute pending contacts to a physical phone.
       const pending = reliableScope && assigned && (rubro || assigned.length)
         ? assigned.filter(c => pendingStates.has(c.status)).length : null;
-      const lastAttempt = source?.rows?.filter(r => r.workerId === row.device_id)
-        .reduce((latest, r) => Math.max(latest, timestamp(r.endedAt || r.answeredAt || r.startedAt)), 0) || 0;
+      const lastAttempt = source?.lastAttemptByWorker?.get(row.device_id) || 0;
       return { number: row.position, deviceId: row.device_id, name: row.name, state, calling,
         simulated: isTest(row.device_id), rubro, schedule: turn?.schedule || null,
         connectedAt, disconnectedAt, connectedDurationSeconds, disconnectedDurationSeconds,
@@ -205,6 +220,22 @@ export class NetworkMonitor {
         scopeReason: !turn ? "Sin un turno activo verificable." : !source?.rows ? "Historial no disponible o con escrituras pendientes." : null
       };
     });
+    for (const source of sources.values()) {
+      if (!source.rows) continue;
+      if (!source.rowsByWorker || source.rowsByWorkerTurnId !== (source.turn?.id || "")) {
+        source.rowsByWorker = new Map();
+        source.lastAttemptByWorker = new Map();
+        for (const attempt of source.rows) {
+          const workerId = attempt.workerId;
+          if (!workerId) continue;
+          if (!source.rowsByWorker.has(workerId)) source.rowsByWorker.set(workerId, []);
+          if (!source.turn?.id || attempt.shiftId === source.turn.id) source.rowsByWorker.get(workerId).push(attempt);
+          source.lastAttemptByWorker.set(workerId, Math.max(source.lastAttemptByWorker.get(workerId) || 0,
+            timestamp(attempt.endedAt || attempt.answeredAt || attempt.startedAt)));
+        }
+        source.rowsByWorkerTurnId = source.turn?.id || "";
+      }
+    }
     const allSources = [...sources.values()];
     const common = allSources.length > 0 && allSources.every(s => s.turn?.status === "active" && s.turn.id
       && ["morning", "afternoon"].includes(s.turn.type) && /^\d{4}-\d{2}-\d{2}$/.test(s.turn.date)
