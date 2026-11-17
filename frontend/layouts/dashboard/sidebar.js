@@ -83,7 +83,8 @@ if (!adminLink && isAdmin) {
     closeMenu();
   });
 }
-const users = isAdmin ? document.getElementById("usersButton") : document.createElement("a");
+const users = isAdmin ? document.getElementById("usersButton")
+  : (document.getElementById("sidebarUsers") || document.createElement("a"));
 if (!isAdmin) users.id = "sidebarUsers";
 users.textContent = "USUARIOS";
 users.className = "viavox-nav-item";
@@ -163,10 +164,6 @@ const openView = async view => {
     closeMenu();
     return;
   }
-  if (accountUser?.role === "ADMINISTRADOR" && !isAdmin) {
-    location.href = "/" + (panelPaths[view] || panelPaths.calls).replace(/^\//, "");
-    return;
-  }
   if (isAdmin) return;
   if (view === "reports") {
     showPanelView("reports");
@@ -242,12 +239,16 @@ requireLogin().then(async user => {
       usersLink.href = "/usuarios";
       usersLink.textContent = "USUARIOS";
       usersLink.dataset.view = "users";
+      navigation.append(usersLink);
+    }
+    if (usersLink.dataset.boundAdminNavigation !== "1") {
+      usersLink.dataset.boundAdminNavigation = "1";
       usersLink.addEventListener("click", event => {
         event.preventDefault();
-        window.showAdminView?.("users");
+        if (window.showAdminView) window.showAdminView("users");
+        else location.href = "/usuarios";
         closeMenu();
       });
-      navigation.append(usersLink);
     }
     }
     if (location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios")) {

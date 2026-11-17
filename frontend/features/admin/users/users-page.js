@@ -1,8 +1,11 @@
-import { apiFetch, requireLogin } from "../../auth/auth-session.js";
+import { apiFetch, bindAccountControls, requireLogin } from "../../auth/auth-session.js";
 
 try {
   const user = await requireLogin();
-  if (user.role === "ADMINISTRADOR") bindUsers();
+  if (user.role === "ADMINISTRADOR") {
+    bindAccountControls();
+    bindUsers();
+  }
 } catch (cause) {
   const accountError = document.getElementById("accountError");
   if (accountError) accountError.textContent = cause.message;
