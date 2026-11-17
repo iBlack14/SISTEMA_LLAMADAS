@@ -1,10 +1,12 @@
 **
 !package.json
 !package-lock.json
-!server/
-!server/**
-!web/
-!web/**
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+!shared/
+!shared/**
 !Dockerfile
 server/**/node_modules
 web/**/node_modules
