@@ -23,6 +23,8 @@ form.addEventListener("submit", async event => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "No se pudo iniciar sesión.");
     form.password.value = "";
+    try { sessionStorage.setItem("calls-auth-bootstrap", JSON.stringify({ user: data.user, csrfToken: data.csrfToken })); }
+    catch { /* the dashboard will validate the session through /api/auth/me */ }
     if (typeof BroadcastChannel === "function") {
       const channel = new BroadcastChannel("calls-account");
       channel.postMessage("changed");

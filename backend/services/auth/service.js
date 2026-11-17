@@ -135,13 +135,14 @@ export class AuthService {
         const oldHash = await this.revoke(req);
         if (oldHash) disconnect(oldHash);
         const token = randomBytes(32).toString("hex");
+        const csrfToken = randomBytes(32).toString("hex");
         await this.pool.query(`INSERT INTO auth_sessions
           (token_hash,user_id,auth_version,csrf_token,expires_at,last_seen_at)
           VALUES (?,?,?,?,?,UTC_TIMESTAMP(3))`,
-        [digest(token), user.id, user.auth_version, randomBytes(32).toString("hex"), new Date(Date.now() + lifetimeMs)]);
+        [digest(token), user.id, user.auth_version, csrfToken, new Date(Date.now() + lifetimeMs)]);
         this.cookie(res, token);
         this.attempts.delete(`user:${username}`);
-        res.json({ ok: true, user: this.publicUser(user), redirect: "/llamadas" });
+        res.json({ ok: true, user: this.publicUser(user), csrfToken, redirect: "/llamadas" });
       } catch { res.status(503).json({ ok: false, error: "No se pudo iniciar sesión." }); }
     });
     app.get("/api/auth/me", this.requireUser, (req, res) => {

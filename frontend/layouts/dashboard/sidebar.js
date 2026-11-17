@@ -205,9 +205,9 @@ requireLogin().then(async authenticatedUser => {
   const isAdmin = user.role === "ADMINISTRADOR";
   if (networkLink) networkLink.hidden = !isAdmin;
   if (usersLink) usersLink.hidden = !isAdmin;
+  document.documentElement.classList.remove("auth-pending");
   const initial = sectionForPath(location.pathname);
   await navigate(initial, { history: false, scroll: false });
-  document.documentElement.classList.remove("auth-pending");
 }).catch(error => {
   document.documentElement.classList.remove("auth-pending");
   const status = document.getElementById("accountError");

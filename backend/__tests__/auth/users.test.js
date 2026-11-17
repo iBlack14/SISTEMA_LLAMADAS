@@ -136,7 +136,7 @@ test("user management enforces login, admin role, CSRF and hashes new credential
     await t.test("new sales login redirects to calls and cannot open the core or user APIs",async()=>{
       const response=await request("/api/auth/login",null,{username:valid.username,password:secret});
       assert.equal(response.status,200);
-      assert.equal((await response.json()).redirect,"/");
+      assert.equal((await response.json()).redirect,"/llamadas");
       const token=response.headers.get("set-cookie").match(/calls_local_sid=([a-f0-9]{64})/)[1];
       assert.equal((await request("/nucleo-red",token)).status,403);
       assert.equal((await request("/api/users",token)).status,403);

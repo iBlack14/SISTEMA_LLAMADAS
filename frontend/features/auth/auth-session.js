@@ -1,8 +1,18 @@
-export let currentUser;
-let csrfToken = "";
+const bootstrapKey = "calls-auth-bootstrap";
+const clearBootstrap = () => { try { sessionStorage.removeItem(bootstrapKey); } catch { /* storage may be disabled */ } };
+let bootstrap = null;
+try {
+  bootstrap = JSON.parse(sessionStorage.getItem(bootstrapKey) || "null");
+} catch { /* ignore invalid per-tab bootstrap state */ }
+clearBootstrap();
+export let currentUser = bootstrap?.user && bootstrap?.csrfToken ? bootstrap.user : undefined;
+let csrfToken = bootstrap?.csrfToken || "";
 let loginRequest = null;
 const accountChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("calls-account") : null;
-if (accountChannel) accountChannel.onmessage = () => window.location.replace("/llamadas");
+if (accountChannel) accountChannel.onmessage = () => {
+  clearBootstrap();
+  window.location.replace("/llamadas");
+};
 
 export async function requireLogin() {
   if (currentUser && csrfToken) return currentUser;
@@ -55,6 +65,7 @@ export function bindAccountControls() {
     try {
       const response = await apiFetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("No se pudo cerrar sesión. Intenta de nuevo.");
+      clearBootstrap();
       accountChannel?.postMessage("changed");
       window.location.replace("/login");
     } catch (error) {
