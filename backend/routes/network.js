@@ -8,6 +8,29 @@ import path from "path";
 export function registerNetwork(runtime, services) {
 runtime.app.get("/api/network/access", (req, res) => res.json({ ok: true, role: req.user.role }));
 
+runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const [rows] = await runtime.auth.pool.query(`SELECT u.id AS user_id,u.username,u.role,u.active,w.session_code
+      FROM auth_users u LEFT JOIN auth_user_workspaces w ON w.user_id=u.id
+      ORDER BY u.username`);
+    const users = rows.map(row => ({ id: row.user_id, username: row.username,
+      role: row.role, active: Boolean(Number(row.active)), lists: [] }));
+    for (const row of rows) {
+      if (!row.session_code) continue;
+      const session = runtime.sessions.get(row.session_code);
+      const book = session?.contactBook;
+      if (!book) continue;
+      const user = users.find(item => String(item.id) === String(row.user_id));
+      const names = [...new Set([...(book.lists || []), ...(book.contacts || []).map(contact => contact.list || "Principal")])];
+      user.lists = names.map(name => ({ name, count: (book.contacts || []).filter(contact => (contact.list || "Principal") === name).length }));
+    }
+    res.json({ ok: true, users });
+  } catch {
+    res.status(503).json({ ok: false, error: "No se pudieron cargar las listas de los usuarios." });
+  }
+});
+
 runtime.app.get("/api/network", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try { res.json({ ok: true, ...await runtime.network.snapshot() }); }

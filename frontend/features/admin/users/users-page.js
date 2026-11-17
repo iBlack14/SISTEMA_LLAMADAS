@@ -18,6 +18,7 @@ function bindUsers() {
   const message = document.getElementById("usersMessage");
   const backBtn = document.getElementById("usersBackBtn");
   const refresh = document.getElementById("usersRefresh");
+  const listsRefresh = document.getElementById("userListsRefresh");
   const editDialog = document.getElementById("editUserDialog");
   const editForm = document.getElementById("editUserForm");
   const editError = document.getElementById("editUserError");
@@ -25,6 +26,7 @@ function bindUsers() {
   let saving = false;
   let loading = false;
   let requestNumber = 0;
+  let listsRequestNumber = 0;
 
   function showError(text) {
     if (error) {
@@ -137,6 +139,41 @@ function bindUsers() {
     }
   }
 
+  async function loadUserLists() {
+    const request = ++listsRequestNumber;
+    if (listsRefresh) listsRefresh.disabled = true;
+    const status = document.getElementById("userListsLoading");
+    if (status) { status.hidden = false; status.textContent = "Cargando listas…"; }
+    try {
+      const response = await apiFetch("/api/users/lists", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar las listas.");
+      if (request !== listsRequestNumber) return;
+      const body = document.getElementById("userListsRows");
+      if (body) {
+        body.replaceChildren();
+        for (const account of data.users) {
+          const lists = account.lists.length ? account.lists : [{ name: "Sin listas", count: 0 }];
+          for (const list of lists) {
+            const row = document.createElement("tr");
+            for (const value of [account.username, account.role === "ADMINISTRADOR" ? "Administrador" : "Ventas", account.active ? "Activo" : "Inactivo", list.name, String(list.count)]) {
+              const cell = document.createElement("td");
+              cell.textContent = value;
+              row.appendChild(cell);
+            }
+            body.appendChild(row);
+          }
+        }
+      }
+      if (status) { status.textContent = data.users.length ? "" : "No hay usuarios registrados."; status.hidden = Boolean(data.users.length); }
+    } catch (cause) {
+      if (request !== listsRequestNumber) return;
+      if (status) status.textContent = cause.message || "No se pudieron cargar las listas.";
+    } finally {
+      if (request === listsRequestNumber && listsRefresh) listsRefresh.disabled = false;
+    }
+  }
+
   function openEditUser(account) {
     if (!editDialog || !editForm) return;
     editForm.reset();
@@ -169,6 +206,7 @@ function bindUsers() {
       if (message) message.hidden = true;
       document.getElementById("newUsername")?.focus();
       loadUsers();
+      loadUserLists();
       if (window.location.pathname !== "/usuarios") {
         history.pushState(null, "", "/usuarios");
       }
@@ -215,6 +253,7 @@ function bindUsers() {
       loadUsers();
     });
   }
+  if (listsRefresh) listsRefresh.addEventListener("click", loadUserLists);
 
   if (form) {
     form.addEventListener("submit", async event => {
