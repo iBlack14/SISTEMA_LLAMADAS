@@ -1,11 +1,12 @@
 import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
+import { requireLogin } from "../../features/auth/auth-session.js";
 
-const isAdmin = location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios");
-const sidebar = document.createElement("aside");
+let isAdmin = location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios");
+const sidebar = document.getElementById("viavoxSidebar") || document.createElement("aside");
 sidebar.id = "viavoxSidebar";
 sidebar.className = "viavox-sidebar";
 sidebar.setAttribute("aria-label", "Menú principal");
-sidebar.innerHTML = `
+if (!sidebar.querySelector(".viavox-navigation")) sidebar.innerHTML = `
   <a class="viavox-brand" href="/" aria-label="ViaVox, inicio">
     <img src="/shared/assets/images/logo-vc-color.png" alt="Logo VIAVOX" width="52" height="36">
     <span><strong>VIAVOX</strong><small>GESTIÓN DE LLAMADAS</small></span>
@@ -22,13 +23,14 @@ sidebar.innerHTML = `
     <div class="viavox-downloads"></div>
     <div class="viavox-account"></div>
   </div>`;
-const toggle = document.createElement("button");
+const toggle = document.querySelector(".viavox-menu-toggle") || document.createElement("button");
 toggle.type = "button";
 toggle.className = "viavox-menu-toggle";
 toggle.textContent = "☰ MENÚ";
 toggle.setAttribute("aria-controls", sidebar.id);
 toggle.setAttribute("aria-expanded", "false");
-document.body.prepend(toggle, sidebar);
+if (!sidebar.isConnected) document.body.prepend(toggle, sidebar);
+else if (!toggle.isConnected) sidebar.before(toggle);
 document.body.classList.add("has-viavox-sidebar");
 const navigation = sidebar.querySelector("nav");
 const downloads = sidebar.querySelector(".viavox-downloads");
@@ -159,6 +161,13 @@ if (!isAdmin) {
       if (window.VOIP_VC_AUTH_USER?.role === "ADMINISTRADOR") {
         const adminLists = await import("../../features/admin/admin-contact-lists.js");
         await adminLists.initAdminContactLists();
+      } else {
+        const adminListsView = document.getElementById("adminUserListsView");
+        const contactsSection = document.getElementById("contactsSection");
+        const contactsData = document.getElementById("contactsDataSection");
+        if (adminListsView) adminListsView.hidden = true;
+        if (contactsSection) contactsSection.hidden = false;
+        if (contactsData) contactsData.hidden = false;
       }
     } else if (view === "messages") {
       showPanelView("messages");
@@ -199,3 +208,26 @@ const initialView = isAdmin
   ? (location.pathname === "/usuarios" ? "users" : "network")
   : Object.keys(panelPaths).find(view => panelPaths[view] === location.pathname) || "calls";
 select(initialView);
+
+if (!isAdmin) {
+  requireLogin().then(user => {
+    if (user.role !== "ADMINISTRADOR") return;
+    isAdmin = true;
+    const adminLink = navigation.querySelector('[data-view="network"]');
+    if (adminLink) adminLink.hidden = false;
+    let usersLink = navigation.querySelector("#sidebarUsers");
+    if (usersLink) return;
+    usersLink = document.createElement("a");
+    usersLink.id = "sidebarUsers";
+    usersLink.className = "viavox-nav-item";
+    usersLink.href = "/usuarios";
+    usersLink.textContent = "USUARIOS";
+    usersLink.dataset.view = "users";
+    usersLink.addEventListener("click", event => {
+      event.preventDefault();
+      window.showAdminView?.("users");
+      closeMenu();
+    });
+    navigation.append(usersLink);
+  }).catch(() => {});
+}

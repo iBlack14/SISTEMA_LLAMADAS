@@ -1,5 +1,10 @@
 /* ViaVox navigation, matching the purple brand reference. */
 body.has-viavox-sidebar { padding-left: 224px; }
+html.has-viavox-sidebar body { padding-left: 224px; }
+html.has-viavox-sidebar body > .app-header { display: none; }
+html.has-viavox-sidebar body .panel > .app-header,
+html.has-viavox-sidebar body .panel > .account-bar,
+html.has-viavox-sidebar body .panel > .apk-bar { display: none; }
 .viavox-sidebar {
   position: fixed; inset: 0 auto 0 0; z-index: 100;
   width: 224px; height: 100dvh; padding: 24px 13px 15px;
@@ -157,6 +162,7 @@ button.viavox-menu-toggle { background: #350642 !important; }
   border: 1px solid #ad43ba;
   border-radius: 16px;
 }
+.admin-user-lists-view[hidden] { display: none !important; }
 .admin-user-lists-view h3 { margin: 0 0 6px; }
 .admin-user-lists-view > p { margin: 0 0 16px; }
 .admin-user-lists-view label { display: grid; gap: 6px; min-width: min(260px, 100%); color: #dec6eb; }
@@ -262,6 +268,7 @@ body .panel .messages-contact-list .message-contact-icon:disabled { opacity: .5;
 }
 @media (max-width: 900px) {
   body.has-viavox-sidebar { padding-left: 0; padding-top: 52px; }
+  html.has-viavox-sidebar body { padding-left: 0; padding-top: 52px; }
   .viavox-menu-toggle {
     display: block; position: fixed; z-index: 110; inset: 10px auto auto 14px;
     min-height: 36px; padding: 8px 14px; border: 1px solid #895595; border-radius: 8px;

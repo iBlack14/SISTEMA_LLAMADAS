@@ -22,18 +22,32 @@
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261114-nav-pages" />
+ <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261116-action-contrast" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261114-admin-pages"></script>
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 
 <body>
+  <button type="button" class="viavox-menu-toggle" aria-controls="viavoxSidebar" aria-expanded="false">☰ MENÚ</button>
+  <aside id="viavoxSidebar" class="viavox-sidebar" aria-label="Menú principal">
+    <a class="viavox-brand" href="/" aria-label="ViaVox, inicio"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo VIAVOX" width="52" height="36"><span><strong>VIAVOX</strong><small>GESTIÓN DE LLAMADAS</small></span></a>
+    <nav class="viavox-navigation" aria-label="Navegación">
+      <a class="viavox-nav-item" data-view="calls" href="/llamadas">LLAMADAS</a>
+      <a class="viavox-nav-item" data-view="contacts" href="/contactos">RUBRO Y LISTA</a>
+      <a class="viavox-nav-item" data-view="reports" href="/reportes">CALENDARIO</a>
+      <a class="viavox-nav-item" data-view="reservations" href="/reservas">RESERVA DE CONTACTO</a>
+      <a class="viavox-nav-item" data-view="blocked" href="/bloqueos">PANEL DE BLOQUEOS</a>
+      <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
+    </nav>
+    <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
+  </aside>
   <div class="app-background-overlay" aria-hidden="true"></div>
   <main class="layout">
     <section class="panel">
@@ -864,7 +878,7 @@
     await import("/features/reports/reports-page.js?v=20261114-inline-range");
   </script>
   <script>
-    (function bootstrapDashboard() {
+    function bootstrapDashboard() {
       // Isolated authentication uses one origin for pages, cookies and sockets.
       const apiBase = window.location.origin;
       window.VOIP_VC_API_BASE = apiBase;
@@ -882,7 +896,8 @@
         }
       };
       document.body.appendChild(socketScript);
-    })();
+    }
+    document.addEventListener("DOMContentLoaded", bootstrapDashboard, { once: true });
   </script>
   <div id="appToastContainer" class="app-toast-container" aria-live="polite"></div>
 </body>
