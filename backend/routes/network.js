@@ -37,6 +37,29 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
   }
 });
 
+runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const userId = Number(req.params.id);
+  const listName = String(req.query.list || "").trim();
+  const offset = Number(req.query.offset || 0);
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+  if (!Number.isSafeInteger(userId) || userId < 1 || !listName || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit)) {
+    return res.status(400).json({ ok: false, error: "Usuario, lista o página no válidos." });
+  }
+  try {
+    const [rows] = await runtime.auth.pool.query(`SELECT u.username,w.session_code
+      FROM auth_users u LEFT JOIN auth_user_workspaces w ON w.user_id=u.id WHERE u.id=?`, [userId]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
+    const book = runtime.sessions.get(rows[0].session_code)?.contactBook;
+    if (!book) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
+    const contacts = (book.contacts || []).filter(contact => (contact.list || "Principal") === listName);
+    return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
+      contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+  } catch {
+    return res.status(503).json({ ok: false, error: "No se pudieron cargar los contactos de esta lista." });
+  }
+});
+
 runtime.app.get("/api/network", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try { res.json({ ok: true, ...await runtime.network.snapshot() }); }

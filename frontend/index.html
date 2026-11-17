@@ -170,6 +170,24 @@
           </div>
         </header>
 
+        <section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de todos los usuarios" hidden>
+          <h3>Listas de usuarios</h3>
+          <p class="muted">Consulta las listas y contactos de cada cuenta.</p>
+          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end">
+            <label>Usuario<select id="adminListsUser"><option value="">Cargando usuarios…</option></select></label>
+            <label>Lista<select id="adminListsName" disabled><option value="">Selecciona un usuario</option></select></label>
+          </div>
+          <p id="adminListsStatus" class="muted" role="status"></p>
+          <div class="table-wrap" style="overflow:auto;max-height:60vh">
+            <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Nota</th></tr></thead><tbody id="adminListsContacts"></tbody></table>
+          </div>
+          <div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">
+            <button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button>
+            <span id="adminListsPage" class="muted"></span>
+            <button id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button>
+          </div>
+        </section>
+
         <!-- CONTACTS SECTION -->
         <section id="contactsSection" style="display:none">
           <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>

@@ -149,6 +149,21 @@ button.viavox-menu-toggle { background: #350642 !important; }
   line-height: 1.5;
 }
 
+.admin-user-lists-view {
+  margin-top: 16px;
+  padding: 20px 24px;
+  color: #fff;
+  background: #300744;
+  border: 1px solid #ad43ba;
+  border-radius: 16px;
+}
+.admin-user-lists-view h3 { margin: 0 0 6px; }
+.admin-user-lists-view > p { margin: 0 0 16px; }
+.admin-user-lists-view label { display: grid; gap: 6px; min-width: min(260px, 100%); color: #dec6eb; }
+.admin-user-lists-view select { min-height: 42px; padding: 8px 12px; color: #21112c; background: #fff; border-radius: 8px; }
+.admin-user-lists-view table { width: 100%; }
+.admin-user-lists-view td { overflow-wrap: anywhere; }
+
 #messagesView {
   width: 100%;
   min-width: 0;

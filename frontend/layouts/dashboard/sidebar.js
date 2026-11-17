@@ -156,6 +156,10 @@ if (!isAdmin) {
     } else if (view === "contacts") {
       showPanelView("contacts");
       window.scrollTo({ top: 0 });
+      if (window.VOIP_VC_AUTH_USER?.role === "ADMINISTRADOR") {
+        const adminLists = await import("../../features/admin/admin-contact-lists.js");
+        await adminLists.initAdminContactLists();
+      }
     } else if (view === "messages") {
       showPanelView("messages");
       window.scrollTo({ top: 0 });
