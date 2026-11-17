@@ -10,7 +10,8 @@ const $ = id => document.getElementById(id);
 
 export async function initAdminContactLists() {
   const view = $("adminUserListsView");
-  if (!view || currentUser?.role !== "ADMINISTRADOR") return;
+  const authUser = currentUser || window.VOIP_VC_AUTH_USER;
+  if (!view || authUser?.role !== "ADMINISTRADOR") return;
   view.hidden = false;
   $("contactsSection").hidden = true;
   $("contactsDataSection").hidden = true;

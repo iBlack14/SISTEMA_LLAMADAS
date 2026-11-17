@@ -217,10 +217,19 @@ const openView = async view => {
   window.addEventListener("popstate", () => openView(viewFromPath()));
 }
 
+const initialView = isAdmin
+  ? (location.pathname === "/usuarios" ? "users" : "network")
+  : (Object.keys(panelPaths).find(view => panelPaths[view] === location.pathname) || "calls");
+select(initialView);
+
 requireLogin().then(async user => {
     accountUser = user;
     window.VOIP_VC_AUTH_USER = user;
     if (user.role !== "ADMINISTRADOR") {
+      const adminLink = navigation.querySelector('[data-view="network"]');
+      if (adminLink) adminLink.hidden = true;
+      const usersLink = navigation.querySelector('[data-view="users"]');
+      if (usersLink) usersLink.hidden = true;
       if (!isAdmin) {
         const view = Object.keys(panelPaths).find(name => panelPaths[name] === location.pathname) || "calls";
         await openView(view);
@@ -228,28 +237,30 @@ requireLogin().then(async user => {
       return;
     }
     if (!isAdmin) {
-    isAdmin = true;
-    const adminLink = navigation.querySelector('[data-view="network"]');
-    if (adminLink) adminLink.hidden = false;
-    let usersLink = navigation.querySelector("#sidebarUsers");
-    if (!usersLink) {
-      usersLink = document.createElement("a");
-      usersLink.id = "sidebarUsers";
-      usersLink.className = "viavox-nav-item";
-      usersLink.href = "/usuarios";
-      usersLink.textContent = "USUARIOS";
-      usersLink.dataset.view = "users";
-      navigation.append(usersLink);
-    }
-    if (usersLink.dataset.boundAdminNavigation !== "1") {
-      usersLink.dataset.boundAdminNavigation = "1";
-      usersLink.addEventListener("click", event => {
-        event.preventDefault();
-        if (window.showAdminView) window.showAdminView("users");
-        else location.href = "/usuarios";
-        closeMenu();
-      });
-    }
+      isAdmin = true;
+      const adminLink = navigation.querySelector('[data-view="network"]');
+      if (adminLink) adminLink.hidden = false;
+      let usersLink = navigation.querySelector("#sidebarUsers");
+      if (!usersLink) {
+        usersLink = document.createElement("a");
+        usersLink.id = "sidebarUsers";
+        usersLink.className = "viavox-nav-item";
+        usersLink.href = "/usuarios";
+        usersLink.textContent = "USUARIOS";
+        usersLink.dataset.view = "users";
+        navigation.append(usersLink);
+      } else {
+        usersLink.hidden = false;
+      }
+      if (usersLink.dataset.boundAdminNavigation !== "1") {
+        usersLink.dataset.boundAdminNavigation = "1";
+        usersLink.addEventListener("click", event => {
+          event.preventDefault();
+          if (window.showAdminView) window.showAdminView("users");
+          else location.href = "/usuarios";
+          closeMenu();
+        });
+      }
     }
     if (location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios")) {
       select(location.pathname === "/usuarios" ? "users" : "network");

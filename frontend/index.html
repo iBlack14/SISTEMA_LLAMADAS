@@ -50,18 +50,6 @@
     </nav>
     <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
   </aside>
-  <script>
-    (() => {
-      const paths = { calls: "/llamadas", contacts: "/contactos", reports: "/reportes", reservations: "/reservas", blocked: "/bloqueos", messages: "/mensajes" };
-      document.addEventListener("click", event => {
-        const link = event.target.closest?.("#viavoxSidebar [data-view]");
-        const path = paths[link?.dataset.view];
-        if (!link || !path || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        if (location.pathname !== path) history.pushState(null, "", path);
-      }, true);
-    })();
-  </script>
   <div class="app-background-overlay" aria-hidden="true"></div>
   <main class="layout">
     <section class="panel">
