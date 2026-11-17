@@ -280,3 +280,156 @@ body .panel .messages-contact-list .message-contact-icon:disabled { opacity: .5;
   .has-viavox-sidebar .layout { padding: 12px; }
   .messages-cards-container { grid-template-columns: 1fr; }
 }
+
+/* Refined operations rail */
+body.has-viavox-sidebar,
+html.has-viavox-sidebar body { padding-left: 248px; }
+.viavox-sidebar {
+  width: 248px;
+  padding: 22px 14px 16px;
+  background: linear-gradient(180deg, #25052f 0%, #30063a 58%, #26042f 100%);
+  border-right: 1px solid rgba(231, 111, 236, .24);
+  box-shadow: 10px 0 34px rgba(20, 0, 28, .16);
+}
+.viavox-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #fb55c9, #a72bea 72%, #7130bd);
+}
+.viavox-sidebar .viavox-brand {
+  gap: 11px;
+  min-height: 72px;
+  padding: 5px 5px 18px;
+  margin: 0 0 22px;
+  border-bottom: 1px solid rgba(244, 206, 255, .14);
+}
+.viavox-brand img { width: 46px; height: 42px; }
+.viavox-brand strong { font-size: 23px; letter-spacing: -.5px; }
+.viavox-brand small { color: #d9b8e4 !important; font-size: 9px; letter-spacing: .8px; }
+.viavox-navigation { gap: 5px; }
+.viavox-sidebar .viavox-navigation > a,
+.viavox-sidebar .viavox-navigation > button {
+  position: relative;
+  min-height: 46px;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  border-radius: 9px;
+  color: #d9c3e2;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .35px;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+.viavox-sidebar .viavox-navigation > a::before,
+.viavox-sidebar .viavox-navigation > button::before {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 1px solid rgba(225, 187, 241, .18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+  color: #df9ced;
+  font-size: 13px;
+  line-height: 1;
+  content: "•";
+}
+.viavox-sidebar [data-view="calls"]::before { content: "◉" !important; }
+.viavox-sidebar [data-view="contacts"]::before { content: "▤" !important; }
+.viavox-sidebar [data-view="reports"]::before { content: "▦" !important; }
+.viavox-sidebar [data-view="reservations"]::before { content: "◷" !important; }
+.viavox-sidebar [data-view="blocked"]::before { content: "⊘" !important; }
+.viavox-sidebar [data-view="messages"]::before { content: "◌" !important; }
+.viavox-sidebar [data-view="network"]::before { content: "⌘" !important; }
+.viavox-sidebar [data-view="users"]::before { content: "♙" !important; }
+.viavox-sidebar .viavox-navigation > :hover {
+  border-color: rgba(229, 157, 244, .12);
+  background: rgba(176, 70, 204, .15);
+  color: #fff;
+}
+.viavox-sidebar .viavox-navigation > [aria-current="page"] {
+  border-color: rgba(244, 154, 248, .22);
+  border-left-color: #ff63ce !important;
+  background: linear-gradient(100deg, rgba(188, 56, 203, .36), rgba(112, 38, 139, .34)) !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 18px rgba(255, 105, 222, .055);
+}
+.viavox-sidebar .viavox-navigation > [aria-current="page"]::before {
+  border-color: rgba(255, 171, 241, .38);
+  background: rgba(255, 100, 215, .15);
+  color: #ffb5ee;
+}
+.viavox-sidebar-footer {
+  padding-top: 18px;
+}
+.viavox-downloads {
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 0 5px 14px;
+  border-bottom: 1px solid rgba(244, 206, 255, .14);
+}
+.viavox-sidebar .viavox-downloads a {
+  width: 100%;
+  padding: 7px 5px;
+  border-radius: 6px;
+  color: #d2b8de;
+  font-size: 10px;
+  letter-spacing: .45px;
+  text-decoration: none;
+}
+.viavox-sidebar .viavox-downloads a:hover {
+  background: rgba(255, 255, 255, .055);
+  color: #fff;
+}
+.viavox-account {
+  padding: 12px 11px 10px;
+  border: 1px solid rgba(226, 171, 239, .18);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .018));
+}
+.viavox-account #accountIdentity {
+  margin-bottom: 12px;
+}
+.viavox-account #accountUsername { font-size: 12px; letter-spacing: .35px; }
+.viavox-account .account-role { color: #d9b9e5; font-size: 10px; }
+.viavox-sidebar #logoutButton {
+  min-height: 38px;
+  border-color: rgba(238, 180, 248, .3);
+  background: rgba(255, 255, 255, .035);
+  font-size: 10px;
+  letter-spacing: .7px;
+}
+.viavox-sidebar #logoutButton:hover {
+  border-color: rgba(255, 131, 218, .58);
+  background: rgba(188, 56, 203, .2);
+}
+.viavox-sidebar [hidden] { display: none !important; }
+
+@media (max-width: 900px) {
+  body.has-viavox-sidebar,
+  html.has-viavox-sidebar body { padding-left: 0; padding-top: 58px; }
+  .viavox-menu-toggle {
+    inset: 10px auto auto 12px;
+    min-height: 38px;
+    padding: 8px 13px;
+    border-color: rgba(242, 170, 246, .42) !important;
+    background: #2b0637 !important;
+    box-shadow: 0 6px 20px rgba(24, 0, 31, .24);
+  }
+  .viavox-sidebar {
+    top: 58px;
+    width: min(292px, calc(100vw - 42px));
+    height: calc(100dvh - 58px);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viavox-sidebar .viavox-navigation > a,
+  .viavox-sidebar .viavox-navigation > button { transition: none; }
+}
