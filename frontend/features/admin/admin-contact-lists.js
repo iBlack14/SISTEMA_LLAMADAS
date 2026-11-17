@@ -24,6 +24,17 @@ export async function initAdminContactLists() {
   if (!users.length) await loadUsers();
 }
 
+export function showAdminContactListsError(message) {
+  const view = $("adminUserListsView");
+  const contacts = $("contactsSection");
+  const contactsData = $("contactsDataSection");
+  if (view) view.hidden = false;
+  if (contacts) contacts.hidden = true;
+  if (contactsData) contactsData.hidden = true;
+  const status = $("adminListsStatus");
+  if (status) status.textContent = message || "No se pudieron cargar las listas de usuarios.";
+}
+
 async function loadUsers() {
   const status = $("adminListsStatus");
   status.textContent = "Cargando usuarios y listas…";

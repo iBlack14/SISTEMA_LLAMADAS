@@ -41,6 +41,20 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
       const names = [...new Set([...(book.lists || []), ...counts.keys()])];
       user.lists = names.map(name => ({ name, count: counts.get(name) || 0 }));
     }
+    const missingCodes = activeCodes.filter(code => !booksByCode.get(code)?.contacts?.length);
+    if (missingCodes.length) {
+      const [storedContacts] = await runtime.auth.pool.query(
+        `SELECT session_code,list_name,COUNT(*) AS contact_count FROM vc_call_contacts
+          WHERE session_code IN (${missingCodes.map(() => "?").join(",")}) GROUP BY session_code,list_name`, missingCodes);
+      for (const row of storedContacts) {
+        const account = rows.find(item => item.session_code === row.session_code);
+        const user = account && usersById.get(String(account.user_id));
+        if (!user) continue;
+        const existing = user.lists.find(list => list.name === row.list_name);
+        if (existing) existing.count = Math.max(existing.count, Number(row.contact_count));
+        else user.lists.push({ name: row.list_name, count: Number(row.contact_count) });
+      }
+    }
     res.json({ ok: true, users });
   } catch {
     res.status(503).json({ ok: false, error: "No se pudieron cargar las listas de los usuarios." });
@@ -66,10 +80,17 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
       const stored = sessionRows[0]?.data;
       book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
     }
-    if (!book) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
-    const contacts = (book.contacts || []).filter(contact => (contact.list || "Principal") === listName);
-    return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
-      contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+    if (book?.contacts?.length) {
+      const contacts = book.contacts.filter(contact => (contact.list || "Principal") === listName);
+      return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
+        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+    }
+    const [contacts] = await runtime.auth.pool.query(
+      `SELECT name,phone,'' AS note FROM vc_call_contacts WHERE session_code=? AND list_name=? ORDER BY name LIMIT ? OFFSET ?`,
+      [rows[0].session_code, listName, limit, offset]);
+    const [[{ total }]] = await runtime.auth.pool.query(
+      "SELECT COUNT(*) AS total FROM vc_call_contacts WHERE session_code=? AND list_name=?", [rows[0].session_code, listName]);
+    return res.json({ ok: true, username: rows[0].username, list: listName, total: Number(total), contacts });
   } catch {
     return res.status(503).json({ ok: false, error: "No se pudieron cargar los contactos de esta lista." });
   }

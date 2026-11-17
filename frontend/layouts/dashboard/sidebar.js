@@ -1,5 +1,5 @@
 import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
-import { requireLogin } from "../../features/auth/auth-session.js";
+import { currentUser, requireLogin } from "../../features/auth/auth-session.js";
 
 let isAdmin = location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios");
 const sidebar = document.getElementById("viavoxSidebar") || document.createElement("aside");
@@ -41,7 +41,7 @@ const move = (id, parent) => {
   return element;
 };
 // Reuse the original controls so their existing event handlers stay attached.
-if (!isAdmin) {
+{
   for (const [id, view] of [["reportNavBtn", "reports"], ["blockedNumbersOpen", "blocked"]]) {
     const button = document.getElementById(id);
     const placeholder = navigation.querySelector(`[data-view="${view}"]`);
@@ -142,51 +142,68 @@ function select(view) {
   }
 }
 document.addEventListener("panel:view", event => select(event.detail));
-if (!isAdmin) {
-  const openView = async view => {
-    if (view === "reports") {
-      showPanelView("reports");
-      const reports = await import("../../features/reports/reports-page.js");
-      reports.showCalendar?.();
-    } else if (view === "blocked") {
-      const blockedBtn = document.getElementById("blockedNumbersOpen");
-      if (blockedBtn && !blockedBtn.closest(".viavox-sidebar")) {
-        blockedBtn.click();
-      } else {
-        showPanelView("blocked");
-      }
-    } else if (view === "contacts") {
-      showPanelView("contacts");
-      window.scrollTo({ top: 0 });
-      if (window.VOIP_VC_AUTH_USER?.role === "ADMINISTRADOR") {
-        const adminLists = await import("../../features/admin/admin-contact-lists.js");
-        await adminLists.initAdminContactLists();
-      } else {
-        const adminListsView = document.getElementById("adminUserListsView");
-        const contactsSection = document.getElementById("contactsSection");
-        const contactsData = document.getElementById("contactsDataSection");
-        if (adminListsView) adminListsView.hidden = true;
-        if (contactsSection) contactsSection.hidden = false;
-        if (contactsData) contactsData.hidden = false;
-      }
-    } else if (view === "messages") {
-      showPanelView("messages");
-      window.scrollTo({ top: 0 });
-      const whatsapp = await import("../../features/messaging/whatsapp.js");
-      whatsapp.syncMessagesView?.();
-      const templates = await import("../../features/messaging/message-templates.js");
-      templates.init?.();
-    } else if (view === "reservations") {
-      showPanelView("reservations");
-      window.scrollTo({ top: 0 });
-      const reservations = await import("../../features/reservations/reservations-controller.js");
-      reservations.initReservationsView?.();
-    } else {
-      showPanelView("calls");
-      window.scrollTo({ top: 0 });
+let accountUser = currentUser || null;
+const openView = async view => {
+  if (accountUser?.role === "ADMINISTRADOR" && view === "contacts") {
+    showPanelView("contacts");
+    window.scrollTo({ top: 0 });
+    const viewEl = document.getElementById("adminUserListsView");
+    const contacts = document.getElementById("contactsSection");
+    const contactsData = document.getElementById("contactsDataSection");
+    if (viewEl) viewEl.hidden = false;
+    if (contacts) contacts.hidden = true;
+    if (contactsData) contactsData.hidden = true;
+    try {
+      const lists = await import("../../features/admin/admin-contact-lists.js");
+      await lists.initAdminContactLists();
+    } catch (error) {
+      console.error("No se pudieron abrir las listas de usuarios:", error);
+      document.getElementById("adminListsStatus").textContent = "No se pudo abrir la vista administrativa. Recarga la página.";
     }
     closeMenu();
-  };
+    return;
+  }
+  if (accountUser?.role === "ADMINISTRADOR" && !isAdmin) {
+    location.href = "/" + (panelPaths[view] || panelPaths.calls).replace(/^\//, "");
+    return;
+  }
+  if (isAdmin) return;
+  if (view === "reports") {
+    showPanelView("reports");
+    const reports = await import("../../features/reports/reports-page.js");
+    reports.showCalendar?.();
+  } else if (view === "blocked") {
+    const blockedBtn = document.getElementById("blockedNumbersOpen");
+    if (blockedBtn && !blockedBtn.closest(".viavox-sidebar")) blockedBtn.click();
+    else showPanelView("blocked");
+  } else if (view === "contacts") {
+    showPanelView("contacts");
+    window.scrollTo({ top: 0 });
+    const viewEl = document.getElementById("adminUserListsView");
+    const contacts = document.getElementById("contactsSection");
+    const contactsData = document.getElementById("contactsDataSection");
+    if (viewEl) viewEl.hidden = true;
+    if (contacts) contacts.hidden = false;
+    if (contactsData) contactsData.hidden = false;
+  } else if (view === "messages") {
+    showPanelView("messages");
+    window.scrollTo({ top: 0 });
+    const whatsapp = await import("../../features/messaging/whatsapp.js");
+    whatsapp.syncMessagesView?.();
+    const templates = await import("../../features/messaging/message-templates.js");
+    templates.init?.();
+  } else if (view === "reservations") {
+    showPanelView("reservations");
+    window.scrollTo({ top: 0 });
+    const reservations = await import("../../features/reservations/reservations-controller.js");
+    reservations.initReservationsView?.();
+  } else {
+    showPanelView("calls");
+    window.scrollTo({ top: 0 });
+  }
+  closeMenu();
+};
+if (!isAdmin) {
   navigation.addEventListener("click", event => {
     const link = event.target.closest("[data-view]");
     if (!link || !Object.hasOwn(panelPaths, link.dataset.view)) return;
@@ -201,33 +218,36 @@ if (!isAdmin) {
   const viewFromPath = () => Object.keys(panelPaths).find(view => panelPaths[view] === location.pathname) || "calls";
   // Keep direct links, browser history and the visible panel in sync.
   window.addEventListener("popstate", () => openView(viewFromPath()));
-  window.addEventListener("dashboard:ready", () => openView(viewFromPath()), { once: true });
-  showPanelView(viewFromPath());
 }
-const initialView = isAdmin
-  ? (location.pathname === "/usuarios" ? "users" : "network")
-  : Object.keys(panelPaths).find(view => panelPaths[view] === location.pathname) || "calls";
-select(initialView);
 
-if (!isAdmin) {
-  requireLogin().then(user => {
+requireLogin().then(async user => {
+    accountUser = user;
+    window.VOIP_VC_AUTH_USER = user;
     if (user.role !== "ADMINISTRADOR") return;
+    if (!isAdmin) {
     isAdmin = true;
     const adminLink = navigation.querySelector('[data-view="network"]');
     if (adminLink) adminLink.hidden = false;
     let usersLink = navigation.querySelector("#sidebarUsers");
-    if (usersLink) return;
-    usersLink = document.createElement("a");
-    usersLink.id = "sidebarUsers";
-    usersLink.className = "viavox-nav-item";
-    usersLink.href = "/usuarios";
-    usersLink.textContent = "USUARIOS";
-    usersLink.dataset.view = "users";
-    usersLink.addEventListener("click", event => {
-      event.preventDefault();
-      window.showAdminView?.("users");
-      closeMenu();
-    });
-    navigation.append(usersLink);
+    if (!usersLink) {
+      usersLink = document.createElement("a");
+      usersLink.id = "sidebarUsers";
+      usersLink.className = "viavox-nav-item";
+      usersLink.href = "/usuarios";
+      usersLink.textContent = "USUARIOS";
+      usersLink.dataset.view = "users";
+      usersLink.addEventListener("click", event => {
+        event.preventDefault();
+        window.showAdminView?.("users");
+        closeMenu();
+      });
+      navigation.append(usersLink);
+    }
+    }
+    if (location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios")) {
+      select(location.pathname === "/usuarios" ? "users" : "network");
+    } else {
+      const view = Object.keys(panelPaths).find(name => panelPaths[name] === location.pathname) || "calls";
+      await openView(view);
+    }
   }).catch(() => {});
-}
