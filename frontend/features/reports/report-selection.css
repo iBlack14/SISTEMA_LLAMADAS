@@ -70,10 +70,13 @@
 #annualReport .calendar-nav #calendarTodayBtn { min-width: 0; font-size: 14px; }
 
 #annualReport .months-grid {
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 18px;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 22px;
 }
 #annualReport .report-month {
+  min-width: 0;
+  padding: 18px 16px;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
 #annualReport .report-month:hover {
@@ -86,6 +89,9 @@
   letter-spacing: .05em;
   text-transform: uppercase;
   color: #f5c1ff;
+  margin-top: 0;
+  margin-bottom: 12px;
+  text-align: center;
 }
 
 /* Día actual */
@@ -95,7 +101,12 @@
 }
 
 /* Hover y vista previa del rango (día final aún sin confirmar) */
-#annualReport .report-days button { cursor: pointer; }
+#annualReport .report-days button {
+  cursor: pointer;
+  max-width: 50px;
+  max-height: 44px;
+  margin: 0 auto;
+}
 #annualReport .report-month .report-days button.in-range.is-preview {
   background: rgba(217, 70, 239, .28) !important;
   border-color: #e879f9 !important;
@@ -134,7 +145,11 @@
 }
 #annualReport .report-range-fab button { width: 100%; }
 
-@media (max-width: 600px) {
-  #annualReport .months-grid { grid-template-columns: 1fr; }
+@media (max-width: 1024px) {
+  #annualReport .months-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px; }
+}
+
+@media (max-width: 640px) {
+  #annualReport .months-grid { grid-template-columns: 1fr !important; gap: 14px; }
   #annualReport .calendar-nav strong { min-width: 0; }
 }

@@ -1,6 +1,16 @@
 const form = document.getElementById("loginForm");
 const button = document.getElementById("loginButton");
 const error = document.getElementById("loginError");
+const password = document.getElementById("password");
+const togglePassword = document.getElementById("togglePassword");
+togglePassword.addEventListener("click", () => {
+  const visible = password.type === "password";
+  password.type = visible ? "text" : "password";
+  const label = visible ? "Ocultar contraseña" : "Mostrar contraseña";
+  togglePassword.setAttribute("aria-pressed", String(visible));
+  togglePassword.setAttribute("aria-label", label);
+  togglePassword.title = label;
+});
 form.addEventListener("submit", async event => {
   event.preventDefault();
   button.disabled = true;

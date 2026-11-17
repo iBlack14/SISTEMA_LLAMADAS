@@ -7,13 +7,14 @@ sidebar.className = "viavox-sidebar";
 sidebar.setAttribute("aria-label", "Menú principal");
 sidebar.innerHTML = `
   <a class="viavox-brand" href="/" aria-label="ViaVox, inicio">
-    <img src="/logo-vc-color.png" alt="" width="52" height="36">
+    <img src="/shared/assets/images/logo-vc-color.png" alt="Logo VIAVOX" width="52" height="36">
     <span><strong>VIAVOX</strong><small>GESTIÓN DE LLAMADAS</small></span>
   </a>
   <nav class="viavox-navigation" aria-label="Navegación">
     <a class="viavox-nav-item" data-view="calls" href="/llamadas">LLAMADAS</a>
     <a class="viavox-nav-item" data-view="contacts" href="/contactos">RUBRO Y LISTA</a>
     <a class="viavox-nav-item" data-view="reports" href="/reportes">CALENDARIO</a>
+    <a class="viavox-nav-item" data-view="reservations" href="/reservas">RESERVA DE CONTACTO</a>
     <a class="viavox-nav-item" data-view="blocked" href="/bloqueos">PANEL DE BLOQUEOS</a>
     <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
   </nav>
@@ -162,6 +163,11 @@ if (!isAdmin) {
       whatsapp.syncMessagesView?.();
       const templates = await import("../../features/messaging/message-templates.js");
       templates.init?.();
+    } else if (view === "reservations") {
+      showPanelView("reservations");
+      window.scrollTo({ top: 0 });
+      const reservations = await import("../../features/reservations/reservations-controller.js");
+      reservations.initReservationsView?.();
     } else {
       showPanelView("calls");
       window.scrollTo({ top: 0 });

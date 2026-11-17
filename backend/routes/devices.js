@@ -294,7 +294,9 @@ runtime.app.post("/api/session/:code/workers/:workerId/disconnect", (req, res) =
   return res.json({ ok: true, code, workerId, heldContact: heldContact ? { id: heldContact.id, name: heldContact.name, phone: heldContact.phone } : null, campaign: getCampaignSnapshot(session) });
 });
 
-runtime.app.get("/api/pairing-qr/:code.svg", runtime.pairingRateLimit, async (req, res) => {
+const qrSvgCache = new Map();
+
+runtime.app.get("/api/pairing-qr/:code.svg", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   if (!code) return res.status(400).send("Code requerido");
 
@@ -309,14 +311,20 @@ runtime.app.get("/api/pairing-qr/:code.svg", runtime.pairingRateLimit, async (re
   const link = services.getPairingLink(req, code, slot?.token || session.pairingToken);
 
   try {
-    const svg = await QRCode.toString(link, {
-      type: "svg",
-      errorCorrectionLevel: "L",
-      margin: 1,
-      width: 320
-    });
+    let svg = qrSvgCache.get(link);
+    if (!svg) {
+      svg = await QRCode.toString(link, {
+        type: "svg",
+        errorCorrectionLevel: "L",
+        margin: 1,
+        width: 320
+      });
+      if (qrSvgCache.size > 300) qrSvgCache.clear();
+      qrSvgCache.set(link, svg);
+    }
 
     res.setHeader("Content-Type", "image/svg+xml");
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
     return res.send(svg);
   } catch {
     return res.status(500).send("No se pudo generar QR");

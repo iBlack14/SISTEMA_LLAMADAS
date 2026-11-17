@@ -20,7 +20,7 @@ runtime.app.get("/legacy", (req, res) => {
 });
 
 // Cada sección del panel tiene su propia URL; el cliente elige la vista por ruta.
-runtime.app.get(["/llamadas", "/contactos", "/reportes", "/bloqueos", "/mensajes"], (req, res) => {
+runtime.app.get(["/llamadas", "/contactos", "/reportes", "/bloqueos", "/mensajes", "/reservas"], (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!req.user) return res.redirect("/login");
   res.sendFile(runtime.paths.dashboardPage);

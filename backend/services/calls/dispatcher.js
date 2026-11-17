@@ -166,17 +166,24 @@ function dispatchNextCampaignCall(code) {
 function archiveCurrentCampaign(session) {
   const campaign = ensureCampaign(session);
   const archive = session.reportArchive ||= [];
-  const key = campaign.reportRunId;
 
-  if (!key || !campaign.contacts?.length) return;
+  if (!campaign.contacts?.length && !campaign.history?.length) return;
+
+  const key = campaign.reportRunId ||= nanoid(12);
+  const date = campaign.reportDate ||= (
+    campaign.history?.[0]?.startedAt
+      ? new Date(campaign.history[0].startedAt).toLocaleDateString("en-CA", { timeZone: "America/Lima" })
+      : new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" })
+  );
 
   const record = {
     id: key,
-    date: campaign.reportDate,
+    date,
     rubro: campaign.reportRubro ||
-      campaign.listName || "Principal",
+      campaign.listName ||
+      campaign.contacts?.[0]?.list || "Principal",
 
-    contacts: campaign.contacts.map(c => ({
+    contacts: (campaign.contacts || []).map(c => ({
       id: c.id,
       name: c.name,
       phone: c.phone,
@@ -190,7 +197,7 @@ function archiveCurrentCampaign(session) {
       durationSeconds: c.durationSeconds
     })),
 
-    history: campaign.history.map(h => ({ ...h }))
+    history: (campaign.history || []).map(h => ({ ...h }))
   };
 
   const index = archive.findIndex(x => x.id === key);

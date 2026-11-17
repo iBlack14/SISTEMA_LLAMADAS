@@ -1,87 +1,223 @@
 /**
- * Sistema de plantillas de mensajes
- * Gestiona plantillas, modales y envío de WhatsApp/Email
+ * Sistema de plantillas de mensajes y mensajería
+ * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
 
+import { apiFetch } from '../auth/auth-session.js';
+
 const STORAGE_KEY = 'voip_message_templates';
+const DB_MIGRATION_KEY = 'voip_message_templates_db_migrated';
+const CATEGORY_ORDER = ['Alimentos y hospedaje', 'Comercio y servicios', 'Educación', 'Hogar y construcción', 'Salud y bienestar', 'Tecnología y web', 'Otros'];
 
 // ============================================================================
 // STATE
 // ============================================================================
 let templates = [];
 let currentEditingId = null;
-let initialized = false;
+let currentEditingImage = null; // Base64 o URL para templateModal
+let currentSendImage = null;    // Base64 o URL para sendMessageModal
+let initializationPromise = null;
+let eventsBound = false;
 let currentSendContact = null;
+
+// ============================================================================
+// TOAST NOTIFICATIONS
+// ============================================================================
+export function showToast(message, type = 'info', duration = 3200) {
+  let container = document.getElementById('appToastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'appToastContainer';
+    container.className = 'app-toast-container';
+    container.setAttribute('aria-live', 'polite');
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `app-toast toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${type === 'success' ? '✓' : type === 'warning' ? '⚠' : type === 'error' ? '✕' : 'ℹ'}</span>
+    <span class="toast-text">${escapeHtml(message)}</span>
+  `;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+  setTimeout(() => {
+    toast.classList.remove('is-visible');
+    setTimeout(() => toast.remove(), 260);
+  }, duration);
+}
+
+// ============================================================================
+// IMAGE UTILITIES (Compresión cliente & Copiado al portapapeles)
+// ============================================================================
+
+/**
+ * Procesa y comprime imágenes en el navegador mediante Canvas
+ * Convierte a JPEG/WebP optimizado (< 150KB) para que quepan en localStorage y carguen al instante.
+ */
+export function processImageFile(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return reject(new Error('El archivo seleccionado no es una imagen válida.'));
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convertir a JPEG comprimido para compatibilidad y tamaño óptimo
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('No se pudo decodificar la imagen.'));
+      img.src = event.target.result;
+    };
+    reader.onerror = () => reject(new Error('Error al leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Copia una imagen al portapapeles usando ClipboardItem (image/png)
+ * Permite que el usuario simplemente presione Ctrl+V en WhatsApp Web/Escritorio.
+ */
+export async function copyImageToClipboard(imageSource) {
+  if (!imageSource) return false;
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = imageSource;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!pngBlob) throw new Error('No se pudo generar PNG Blob');
+
+    if (navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlob })
+      ]);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Error copiando imagen al portapapeles:', err);
+    return false;
+  }
+}
 
 // ============================================================================
 // INIT
 // ============================================================================
 export function init() {
-  if (initialized) return;
-  initialized = true;
-  loadTemplates();
-  initializeSampleTemplates();
-  bindEvents();
-  renderTemplates();
+  if (initializationPromise) return initializationPromise;
+  if (!eventsBound) {
+    bindEvents();
+    eventsBound = true;
+  }
+  initializationPromise = (async () => {
+    try {
+      await migrateLegacyTemplates();
+      const data = await requestJson('/api/message-templates');
+      templates = Array.isArray(data.templates) ? data.templates : [];
+    } catch (err) {
+      console.error('Error cargando plantillas desde la base de datos:', err);
+      templates = [];
+      initializationPromise = null;
+      showToast(err.message || 'No se pudieron cargar las plantillas.', 'error');
+    }
+    renderTemplates();
+    renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
+  })();
+  return initializationPromise;
 }
 
-// ============================================================================
-// STORAGE
-// ============================================================================
-function loadTemplates() {
+async function requestJson(url, options = {}) {
+  const response = await apiFetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'No se pudo completar la operación.');
+  return data;
+}
+
+async function migrateLegacyTemplates() {
   try {
+    if (localStorage.getItem(DB_MIGRATION_KEY) === 'true') return;
     const stored = localStorage.getItem(STORAGE_KEY);
-    templates = stored ? JSON.parse(stored) : [];
-  } catch (err) {
-    console.error('Error cargando plantillas:', err);
-    templates = [];
-  }
-}
-
-function saveTemplates() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-  } catch (err) {
-    console.error('Error guardando plantillas:', err);
-    alert('Error al guardar plantillas. Verifica el espacio disponible.');
-  }
-}
-
-function initializeSampleTemplates() {
-  // Add sample templates only if storage is empty
-  if (templates.length === 0) {
-    templates = [
-      {
-        id: generateId(),
-        name: 'Seguimiento de propuesta',
-        type: 'both',
-        message: 'Hola {nombre}, espero que estés muy bien. Te escribo para hacerte seguimiento a la propuesta que te envié para {empresa}. ¿Tienes alguna duda al respecto?',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: generateId(),
-        name: 'Recordatorio de reunión',
-        type: 'whatsapp',
-        message: 'Hola {nombre}! Te recuerdo que tenemos programada una reunión mañana a las 10:00 AM para hablar sobre el proyecto de {empresa}. ¿Sigues disponible?',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: generateId(),
-        name: 'Agradecimiento',
-        type: 'email',
-        message: 'Estimado/a {nombre},\n\nQuiero agradecerte por tu tiempo y confianza en nuestra reunión. Ha sido un placer conocer más sobre {empresa} y cómo podemos colaborar.\n\nQuedo atento a tus comentarios.\n\nSaludos cordiales',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+    const legacy = stored ? JSON.parse(stored) : [];
+    if (Array.isArray(legacy) && legacy.length) {
+      const cleanLegacy = legacy
+        .filter(item => item?.name && item?.message && !['Seguimiento de propuesta', 'Recordatorio de reunión', 'Agradecimiento'].includes(item.name))
+        .map(item => ({
+          ...item,
+          id: /^[a-z0-9_-]{1,120}$/i.test(String(item.id || '')) ? String(item.id) : generateId(),
+          category: item.category || inferCategory(item.name)
+        }));
+      if (cleanLegacy.length) {
+        await requestJson('/api/message-templates/import', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templates: cleanLegacy })
+        });
       }
-    ];
-    saveTemplates();
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    localStorage.removeItem('voip_campaign_flyers_2027_seeded');
+    localStorage.setItem(DB_MIGRATION_KEY, 'true');
+  } catch (err) {
+    console.warn('No se pudo migrar el catálogo local de plantillas:', err);
   }
+}
+
+function inferCategory(name = '') {
+  const value = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const groups = [
+    ['Salud y bienestar', /BIOLOG|FARMAC|LABORATORIO|MEDICINA|ODONTO|OTORRINO|OPTICA|VETERIN|MANICURE|BELLEZA/],
+    ['Educación', /CETPRO|INSTITUTO|UNIVERSIDAD|AULA VIRTUAL/],
+    ['Tecnología y web', /DISENADOR|TECNOLOG|WEB RESPONSIVE|INTERNET|VIRTUAL|SOLUCIONES WEB|VIA COMUNICATIVA/],
+    ['Hogar y construcción', /ARQUITECT|FERRETER|INGENIER|GEOLOG|LADRILL|MAQUINARIA|MECANICA|METAL MECANICA|TIENDAS? DE (MUEBLES|TELA)|CERAMIC|SASTRE/],
+    ['Alimentos y hospedaje', /CHEF|RESTAURANTE|INDUSTRIAS ALIMENTARIAS|HOTEL|AGENCIA DE VIAJES/],
+    ['Comercio y servicios', /ABOGADOS|ADMINISTRACI|AGUA|ASESOR|CALZADO|CALL CENTER|CONTABILIDAD|GRIFOS|IMPRENTA|PUBLICIDAD|TIENDA|VENDE|PRECIOS|NEGOCIO/]
+  ];
+  return groups.find(([, pattern]) => pattern.test(value))?.[0] || 'Otros';
+}
+
+function sortTemplates(items) {
+  return [...items].sort((a, b) => {
+    const categoryDiff = CATEGORY_ORDER.indexOf(a.category || 'Otros') - CATEGORY_ORDER.indexOf(b.category || 'Otros');
+    return categoryDiff || String(a.name).localeCompare(String(b.name), 'es', { sensitivity: 'base' });
+  });
 }
 
 // ============================================================================
-// RENDER
+// RENDER FULL VIEW (messagesView)
 // ============================================================================
 function renderTemplates() {
   const container = document.getElementById('templatesListContainer');
@@ -90,45 +226,50 @@ function renderTemplates() {
   if (templates.length === 0) {
     container.innerHTML = `
       <div class="templates-empty">
-        No hay plantillas guardadas. Crea tu primera plantilla.
+        No hay plantillas guardadas. Haz clic en <strong>+ Crear nueva</strong> para agregar una.
       </div>
     `;
     return;
   }
 
-  container.innerHTML = templates.map(template => {
-    const typeIcon = template.type === 'whatsapp' ? '📱' :
-                     template.type === 'email' ? '📧' : '📱📧';
+  container.innerHTML = sortTemplates(templates).map(template => {
     const typeLabel = template.type === 'whatsapp' ? 'WhatsApp' :
-                      template.type === 'email' ? 'Email' : 'Ambos';
-    
+                      template.type === 'email' ? 'Correo' : 'WhatsApp y Correo';
+    const hasImage = Boolean(template.image);
+
     return `
-      <div class="template-card" data-id="${template.id}">
+      <div class="template-card" data-id="${escapeHtml(template.id)}">
         <div class="template-header">
           <h4>${escapeHtml(template.name)}</h4>
           <div class="template-actions">
-            <button class="edit-template-btn" data-id="${template.id}" title="Editar">
+            <button type="button" class="edit-template-btn" data-id="${escapeHtml(template.id)}" title="Editar plantilla">
               ✏️
             </button>
-            <button class="delete-template-btn" data-id="${template.id}" title="Eliminar">
+            <button type="button" class="delete-template-btn" data-id="${escapeHtml(template.id)}" title="Eliminar plantilla">
               🗑️
             </button>
           </div>
         </div>
         <div class="template-type">
-          <span>${typeIcon} ${typeLabel}</span>
+          <span>${typeLabel}</span><span class="template-category-tag">${escapeHtml(template.category || 'Otros')}</span>
+          ${hasImage ? '<span class="template-img-indicator">🖼️ Con imagen</span>' : ''}
         </div>
+        ${hasImage ? `
+          <div class="template-card-img-preview">
+            <img src="${template.image}" alt="Imagen plantilla" />
+          </div>
+        ` : ''}
         <div class="template-message">
-          ${escapeHtml(template.message).substring(0, 100)}${template.message.length > 100 ? '...' : ''}
+          ${escapeHtml(template.message).substring(0, 110)}${template.message.length > 110 ? '...' : ''}
         </div>
         <div class="template-footer">
           ${template.type !== 'email' ? `
-            <button class="send-whatsapp-btn primary" data-id="${template.id}">
+            <button type="button" class="send-whatsapp-btn primary" data-id="${template.id}">
               📱 Enviar WhatsApp
             </button>
           ` : ''}
           ${template.type !== 'whatsapp' ? `
-            <button class="send-email-btn secondary" data-id="${template.id}">
+            <button type="button" class="send-email-btn secondary" data-id="${template.id}">
               📧 Enviar Email
             </button>
           ` : ''}
@@ -137,26 +278,37 @@ function renderTemplates() {
     `;
   }).join('');
 
-  // Bind events para cada card
   container.querySelectorAll('.edit-template-btn').forEach(btn => {
-    btn.addEventListener('click', () => editTemplate(btn.dataset.id));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editTemplate(btn.dataset.id);
+    });
   });
 
   container.querySelectorAll('.delete-template-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteTemplate(btn.dataset.id));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteTemplate(btn.dataset.id);
+    });
   });
 
   container.querySelectorAll('.send-whatsapp-btn').forEach(btn => {
-    btn.addEventListener('click', () => openSendModal(btn.dataset.id, 'whatsapp'));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSendModal(btn.dataset.id, 'whatsapp');
+    });
   });
 
   container.querySelectorAll('.send-email-btn').forEach(btn => {
-    btn.addEventListener('click', () => openSendModal(btn.dataset.id, 'email'));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSendModal(btn.dataset.id, 'email');
+    });
   });
 }
 
 // ============================================================================
-// TEMPLATE MODAL (Create/Edit)
+// TEMPLATE MODAL (Crear / Actualizar Plantillas con Imagen)
 // ============================================================================
 function openTemplateModal(templateId = null) {
   const modal = document.getElementById('templateModal');
@@ -164,32 +316,47 @@ function openTemplateModal(templateId = null) {
   const nameInput = document.getElementById('templateNameInput');
   const typeSelect = document.getElementById('templateTypeInput');
   const messageInput = document.getElementById('templateMessageInput');
-  const charCount = null; // Not in HTML yet
+  const charCount = document.getElementById('templateCharCount');
+  const emptyWrap = document.getElementById('templateImageEmptyWrap');
+  const previewWrap = document.getElementById('templateImagePreviewWrap');
+  const previewImg = document.getElementById('templateImagePreviewImg');
 
   if (!modal) return;
 
   currentEditingId = templateId;
+  currentEditingImage = null;
 
   if (templateId) {
-    // Edit mode
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    title.textContent = 'Editar plantilla';
-    nameInput.value = template.name;
-    typeSelect.value = template.type;
-    messageInput.value = template.message;
+    if (title) title.textContent = 'Editar plantilla';
+    if (nameInput) nameInput.value = template.name;
+    if (typeSelect) typeSelect.value = template.type || 'both';
+    if (messageInput) messageInput.value = template.message;
+
+    if (template.image) {
+      currentEditingImage = template.image;
+      if (previewImg) previewImg.src = template.image;
+      if (previewWrap) previewWrap.style.display = 'flex';
+      if (emptyWrap) emptyWrap.style.display = 'none';
+    } else {
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (emptyWrap) emptyWrap.style.display = 'flex';
+    }
   } else {
-    // Create mode
-    title.textContent = 'Nueva plantilla';
-    nameInput.value = '';
-    typeSelect.value = 'both';
-    messageInput.value = '';
+    if (title) title.textContent = 'Nueva plantilla';
+    if (nameInput) nameInput.value = '';
+    if (typeSelect) typeSelect.value = 'both';
+    if (messageInput) messageInput.value = '';
+    if (previewWrap) previewWrap.style.display = 'none';
+    if (emptyWrap) emptyWrap.style.display = 'flex';
   }
 
-  if (charCount) {
-    updateCharCount(messageInput, charCount);
+  if (charCount && messageInput) {
+    charCount.textContent = String(messageInput.value.length);
   }
+
   modal.style.display = 'flex';
 }
 
@@ -198,10 +365,45 @@ function closeTemplateModal() {
   if (modal) {
     modal.style.display = 'none';
     currentEditingId = null;
+    currentEditingImage = null;
   }
 }
 
-function saveTemplate() {
+async function handleTemplateImageSelect(file) {
+  if (!file) return;
+  try {
+    const dataUrl = await processImageFile(file);
+    currentEditingImage = dataUrl;
+
+    const emptyWrap = document.getElementById('templateImageEmptyWrap');
+    const previewWrap = document.getElementById('templateImagePreviewWrap');
+    const previewImg = document.getElementById('templateImagePreviewImg');
+
+    if (previewImg) previewImg.src = dataUrl;
+    if (previewWrap) previewWrap.style.display = 'flex';
+    if (emptyWrap) emptyWrap.style.display = 'none';
+
+    showToast('Imagen cargada para la plantilla', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Error al procesar la imagen.', 'error');
+  }
+}
+
+function removeTemplateImage() {
+  currentEditingImage = null;
+  const emptyWrap = document.getElementById('templateImageEmptyWrap');
+  const previewWrap = document.getElementById('templateImagePreviewWrap');
+  const previewImg = document.getElementById('templateImagePreviewImg');
+  const fileInput = document.getElementById('templateImageFileInput');
+
+  if (previewImg) previewImg.src = '';
+  if (previewWrap) previewWrap.style.display = 'none';
+  if (emptyWrap) emptyWrap.style.display = 'flex';
+  if (fileInput) fileInput.value = '';
+}
+
+async function saveTemplate() {
   const nameInput = document.getElementById('templateNameInput');
   const typeSelect = document.getElementById('templateTypeInput');
   const messageInput = document.getElementById('templateMessageInput');
@@ -213,48 +415,50 @@ function saveTemplate() {
   const message = messageInput.value.trim();
 
   if (!name) {
-    alert('Por favor ingresa un nombre para la plantilla.');
+    showToast('Ingresa un nombre para la plantilla.', 'warning');
     nameInput.focus();
     return;
   }
 
   if (!message) {
-    alert('Por favor ingresa el mensaje de la plantilla.');
+    showToast('Ingresa el texto del mensaje para la plantilla.', 'warning');
     messageInput.focus();
     return;
   }
 
-  if (currentEditingId) {
-    // Update existing
-    const template = templates.find(t => t.id === currentEditingId);
-    if (template) {
-      template.name = name;
-      template.type = type;
-      template.message = message;
-      template.updatedAt = new Date().toISOString();
-    }
-  } else {
-    // Create new
-    templates.push({
-      id: generateId(),
-      name,
-      type,
-      message,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+  const isEditing = Boolean(currentEditingId);
+  const template = {
+    id: currentEditingId || generateId(), name, category: inferCategory(name), type, message,
+    image: currentEditingImage || null
+  };
+  const saveButton = document.getElementById('templateSaveBtn');
+  if (saveButton) saveButton.disabled = true;
+  try {
+    const data = await requestJson(isEditing ? `/api/message-templates/${encodeURIComponent(template.id)}` : '/api/message-templates', {
+      method: isEditing ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(template)
     });
+    const saved = data.template || template;
+    if (isEditing) templates = templates.map(item => item.id === saved.id ? saved : item);
+    else templates.push(saved);
+    showToast(isEditing ? 'Plantilla actualizada con éxito' : 'Plantilla creada con éxito', 'success');
+    renderTemplates();
+    const sendModal = document.getElementById('sendMessageModal');
+    if (sendModal && sendModal.style.display !== 'none') renderSendTemplateList(currentEditingId || sendModal.dataset.templateId);
+    closeTemplateModal();
+  } catch (err) {
+    showToast(err.message || 'No se pudo guardar la plantilla en la base de datos.', 'error');
+  } finally {
+    if (saveButton) saveButton.disabled = false;
   }
-
-  saveTemplates();
-  renderTemplates();
-  closeTemplateModal();
 }
 
 function editTemplate(templateId) {
   openTemplateModal(templateId);
 }
 
-function deleteTemplate(templateId) {
+async function deleteTemplate(templateId) {
   const template = templates.find(t => t.id === templateId);
   if (!template) return;
 
@@ -262,26 +466,37 @@ function deleteTemplate(templateId) {
     return;
   }
 
-  templates = templates.filter(t => t.id !== templateId);
-  saveTemplates();
-  renderTemplates();
+  try {
+    await requestJson(`/api/message-templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' });
+    templates = templates.filter(t => t.id !== templateId);
+    renderTemplates();
+    const sendModal = document.getElementById('sendMessageModal');
+    if (sendModal && sendModal.style.display !== 'none') renderSendTemplateList();
+    showToast('Plantilla eliminada', 'info');
+  } catch (err) {
+    showToast(err.message || 'No se pudo eliminar la plantilla.', 'error');
+  }
 }
 
 // ============================================================================
-// SEND MESSAGE MODAL
+// SEND MESSAGE MODAL (Envío, Plantillas laterales e Imagen adjunta)
 // ============================================================================
-function openSendModal(templateId, initialTab = 'whatsapp') {
+async function openSendModal(templateId, initialTab = 'whatsapp') {
+  await init();
   const template = templates.find(t => t.id === templateId);
   if (!template) return;
 
   const modal = document.getElementById('sendMessageModal');
   if (!modal) return;
 
-  // Store current template in modal's dataset
   modal.dataset.templateId = templateId;
 
   const message = replaceVariables(template.message);
-  setSendModalValues({ message, subject: template.name });
+  setSendModalValues({
+    message,
+    subject: template.name,
+    image: template.image || null
+  });
   currentSendContact = null;
   const contactName = document.getElementById('sendMessageContactName');
   if (contactName) contactName.textContent = 'Plantilla guardada';
@@ -290,22 +505,28 @@ function openSendModal(templateId, initialTab = 'whatsapp') {
   modal.style.display = 'grid';
 }
 
-function openContactSendModal(contact, initialTab = 'whatsapp') {
-  init();
+async function openContactSendModal(contact, initialTab = 'whatsapp') {
+  await init();
   const modal = document.getElementById('sendMessageModal');
   if (!modal) return;
 
   const digits = String(contact?.phone || '').replace(/\D/g, '');
   const phone = digits.startsWith('51') || digits.length !== 9 ? digits : `51${digits}`;
   const email = String(contact?.email || contact?.correo || '').trim();
-  const template = templates.find(item => item.type === 'both' || item.type === initialTab);
+  const template = templates.find(item => item.type === 'both' || item.type === initialTab) || templates[0];
   const message = replaceVariables(template?.message || '', contact?.name || '', contact?.company || contact?.empresa || '');
 
-  modal.dataset.templateId = '';
+  modal.dataset.templateId = template?.id || '';
   currentSendContact = contact;
   const contactName = document.getElementById('sendMessageContactName');
   if (contactName) contactName.textContent = contact?.name || phone || email || 'Contacto';
-  setSendModalValues({ phone, email, message, subject: template?.name || '' });
+  setSendModalValues({
+    phone,
+    email,
+    message,
+    subject: template?.name || '',
+    image: template?.image || null
+  });
   renderSendTemplateList(template?.id);
   switchSendTab(initialTab);
   modal.style.display = 'grid';
@@ -314,33 +535,81 @@ function openContactSendModal(contact, initialTab = 'whatsapp') {
 function renderSendTemplateList(selectedId = '') {
   const list = document.getElementById('sendMessageTemplates');
   const count = document.getElementById('sendTemplateCount');
+  const search = document.getElementById('sendTemplateSearch');
+  const categorySelect = document.getElementById('sendTemplateCategory');
+  const resultCount = document.getElementById('sendTemplateResultCount');
   if (!list) return;
 
   if (count) count.textContent = String(templates.length);
   list.replaceChildren();
+
+  if (categorySelect) {
+    const selectedCategory = categorySelect.value;
+    const categories = [...new Set(templates.map(item => item.category || 'Otros'))].sort((a, b) => {
+      const categoryDiff = CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b);
+      return categoryDiff || a.localeCompare(b, 'es');
+    });
+    categorySelect.replaceChildren(new Option('Todas las categorías', ''));
+    categories.forEach(category => categorySelect.add(new Option(category, category)));
+    if (categories.includes(selectedCategory)) categorySelect.value = selectedCategory;
+  }
+
   if (!templates.length) {
     const empty = document.createElement('p');
     empty.className = 'send-template-empty';
-    empty.textContent = 'Aún no tienes plantillas guardadas.';
+    empty.textContent = 'No hay plantillas en la base de datos. Haz clic en “+ Nueva” para crear una.';
+    list.appendChild(empty);
+    if (resultCount) resultCount.textContent = '0 plantillas';
+    return;
+  }
+
+  const query = String(search?.value || '').trim().toLocaleLowerCase('es');
+  const selectedCategory = categorySelect?.value || '';
+  const visibleTemplates = sortTemplates(templates.filter(template => {
+    const matchesCategory = !selectedCategory || (template.category || 'Otros') === selectedCategory;
+    const searchable = `${template.name} ${template.message} ${template.category || ''}`.toLocaleLowerCase('es');
+    return matchesCategory && (!query || searchable.includes(query));
+  }));
+  if (resultCount) resultCount.textContent = `${visibleTemplates.length} de ${templates.length} plantillas`;
+
+  if (!visibleTemplates.length) {
+    const empty = document.createElement('p');
+    empty.className = 'send-template-empty';
+    empty.textContent = 'No hay plantillas que coincidan con esos filtros.';
     list.appendChild(empty);
     return;
   }
 
-  templates.forEach(template => {
+  visibleTemplates.forEach(template => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'send-template-option';
     button.classList.toggle('is-selected', template.id === selectedId);
     button.dataset.sendTemplateId = template.id;
 
-    const name = document.createElement('strong');
-    name.textContent = template.name;
-    const preview = document.createElement('span');
-    preview.textContent = template.message;
-    const type = document.createElement('small');
-    type.textContent = template.type === 'email' ? 'Correo' : template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y correo';
+    const hasImage = Boolean(template.image);
+    const typeLabel = template.type === 'email' ? 'Correo' :
+                      template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
 
-    button.append(name, preview, type);
+    button.innerHTML = `
+      <div class="send-template-option-top">
+        <strong title="${escapeHtml(template.name)}">${escapeHtml(template.name)}</strong>
+        <div class="send-template-actions">
+          <span class="btn-action edit" data-action="edit" data-id="${template.id}" title="Editar plantilla">✏️</span>
+          <span class="btn-action delete" data-action="delete" data-id="${template.id}" title="Eliminar plantilla">🗑️</span>
+        </div>
+      </div>
+      <div class="send-template-option-body">
+        ${hasImage ? `<img src="${template.image}" class="send-template-mini-thumb" alt="" />` : ''}
+        <span class="send-template-snippet">${escapeHtml(template.message)}</span>
+      </div>
+      <div class="send-template-option-bottom">
+        <small class="template-category-tag">${escapeHtml(template.category || 'Otros')}</small>
+        <small class="type-tag">${typeLabel}</small>
+        ${hasImage ? '<span class="has-img-chip">🖼️ Con imagen</span>' : ''}
+      </div>
+    `;
+
     list.appendChild(button);
   });
 }
@@ -348,39 +617,141 @@ function renderSendTemplateList(selectedId = '') {
 function applySendTemplate(templateId) {
   const template = templates.find(item => item.id === templateId);
   if (!template) return;
+
   const message = replaceVariables(
     template.message,
     currentSendContact?.name || '',
     currentSendContact?.company || currentSendContact?.empresa || ''
   );
-  const emailSubject = document.getElementById('sendEmailSubject');
+
   setSendModalValues({
     phone: document.getElementById('sendWhatsAppNumber')?.value || '',
     email: document.getElementById('sendEmailAddress')?.value || '',
     message,
-    subject: template.name
+    subject: template.name,
+    image: template.image || null
   });
-  if (emailSubject) emailSubject.value = template.name;
+
   const modal = document.getElementById('sendMessageModal');
   if (modal) modal.dataset.templateId = template.id;
   renderSendTemplateList(template.id);
 }
 
-function setSendModalValues({ phone = '', email = '', message = '', subject = '' }) {
+function setSendModalValues({ phone = '', email = '', message = '', subject = '', image = null }) {
   const phoneInput = document.getElementById('sendWhatsAppNumber');
   const emailInput = document.getElementById('sendEmailAddress');
   const subjectInput = document.getElementById('sendEmailSubject');
   const waMessage = document.getElementById('sendWhatsAppMessage');
   const emailMessage = document.getElementById('sendEmailMessage');
 
-  if (phoneInput) phoneInput.value = phone;
-  if (emailInput) emailInput.value = email;
-  if (subjectInput) subjectInput.value = subject;
+  if (phoneInput && phone) phoneInput.value = phone;
+  if (emailInput && email) emailInput.value = email;
+  if (subjectInput && subject) subjectInput.value = subject;
   if (waMessage) waMessage.value = message;
   if (emailMessage) emailMessage.value = message;
 
-  updateCharCount(waMessage, document.getElementById('whatsappCharCount'));
-  updateCharCount(emailMessage, document.getElementById('emailCharCount'));
+  updateCharCount(waMessage, document.getElementById('whatsappCharCount'), 1000);
+  updateCharCount(emailMessage, document.getElementById('emailCharCount'), 5000);
+
+  // Cargar imagen en los paneles de WhatsApp y Correo
+  setSendImage(image);
+}
+
+function setSendImage(imageSource) {
+  currentSendImage = imageSource;
+
+  // WhatsApp panel image preview
+  const waPreviewWrap = document.getElementById('sendWhatsAppImagePreviewWrap');
+  const waThumb = document.getElementById('sendWhatsAppImageThumb');
+  if (waPreviewWrap && waThumb) {
+    if (imageSource) {
+      waThumb.src = imageSource;
+      waPreviewWrap.style.display = 'flex';
+    } else {
+      waThumb.src = '';
+      waPreviewWrap.style.display = 'none';
+    }
+  }
+
+  // Email panel image preview
+  const emailPreviewWrap = document.getElementById('sendEmailImagePreviewWrap');
+  const emailThumb = document.getElementById('sendEmailImageThumb');
+  if (emailPreviewWrap && emailThumb) {
+    if (imageSource) {
+      emailThumb.src = imageSource;
+      emailPreviewWrap.style.display = 'flex';
+    } else {
+      emailThumb.src = '';
+      emailPreviewWrap.style.display = 'none';
+    }
+  }
+
+  updateWhatsAppNote();
+}
+
+function removeSendImage() {
+  currentSendImage = null;
+  const waPreviewWrap = document.getElementById('sendWhatsAppImagePreviewWrap');
+  const emailPreviewWrap = document.getElementById('sendEmailImagePreviewWrap');
+  const waThumb = document.getElementById('sendWhatsAppImageThumb');
+  const emailThumb = document.getElementById('sendEmailImageThumb');
+  const waFileInput = document.getElementById('sendWhatsAppImageInput');
+  const emailFileInput = document.getElementById('sendEmailImageInput');
+
+  if (waThumb) waThumb.src = '';
+  if (emailThumb) emailThumb.src = '';
+  if (waPreviewWrap) waPreviewWrap.style.display = 'none';
+  if (emailPreviewWrap) emailPreviewWrap.style.display = 'none';
+  if (waFileInput) waFileInput.value = '';
+  if (emailFileInput) emailFileInput.value = '';
+
+  updateWhatsAppNote();
+  showToast('Imagen quitada del mensaje', 'info');
+}
+
+function updateWhatsAppNote() {
+  const noteText = document.getElementById('whatsappNoteText');
+  if (!noteText) return;
+  if (currentSendImage) {
+    noteText.innerHTML = '<strong>Imagen lista:</strong> Al hacer clic en <em>Continuar en WhatsApp</em>, se copiará automáticamente al portapapeles. Solo pulsa <strong>Ctrl + V</strong> en el chat para pegarla.';
+  } else {
+    noteText.textContent = 'Edita el texto y confirma en WhatsApp. Guardará registrado en la base de datos.';
+  }
+}
+
+async function handleSendImageSelect(file) {
+  if (!file) return;
+  try {
+    const dataUrl = await processImageFile(file);
+    setSendImage(dataUrl);
+    showToast('Imagen lista para enviar', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Error al procesar la imagen.', 'error');
+  }
+}
+
+async function copySendImage() {
+  if (!currentSendImage) {
+    showToast('No hay ninguna imagen adjunta para copiar.', 'warning');
+    return;
+  }
+  const ok = await copyImageToClipboard(currentSendImage);
+  if (ok) {
+    showToast('📋 ¡Imagen copiada al portapapeles! Lista para pegar (Ctrl+V) en WhatsApp.', 'success');
+    const waCopyBtn = document.getElementById('sendWhatsAppCopyImageBtn');
+    if (waCopyBtn) {
+      const orig = waCopyBtn.innerHTML;
+      waCopyBtn.innerHTML = '✓ ¡Copiada!';
+      waCopyBtn.classList.add('is-copied');
+      setTimeout(() => {
+        waCopyBtn.innerHTML = orig;
+        waCopyBtn.classList.remove('is-copied');
+      }, 2000);
+    }
+  } else {
+    showToast('No se pudo copiar directo. Haz clic derecho en la imagen y selecciona "Copiar imagen".', 'warning');
+  }
 }
 
 function closeSendModal() {
@@ -390,10 +761,10 @@ function closeSendModal() {
     modal.dataset.templateId = '';
   }
   currentSendContact = null;
+  currentSendImage = null;
 }
 
 function switchSendTab(tab) {
-  // Update tab buttons
   const waTab = document.getElementById('tabWhatsAppBtn');
   const emailTab = document.getElementById('tabEmailBtn');
   const waContent = document.getElementById('whatsappContent');
@@ -419,9 +790,9 @@ function switchSendTab(tab) {
 }
 
 // ============================================================================
-// SEND WHATSAPP
+// ENVÍO DE MENSAJES (WhatsApp & Correo)
 // ============================================================================
-function sendWhatsApp() {
+async function sendWhatsApp() {
   const phoneInput = document.getElementById('sendWhatsAppNumber');
   const messageInput = document.getElementById('sendWhatsAppMessage');
 
@@ -431,33 +802,36 @@ function sendWhatsApp() {
   const message = messageInput.value.trim();
 
   if (!phone) {
-    alert('Por favor ingresa un número de WhatsApp.');
+    showToast('Ingresa un número de WhatsApp con código de país.', 'warning');
     phoneInput.focus();
     return;
   }
 
   if (!message) {
-    alert('Por favor ingresa un mensaje.');
+    showToast('Ingresa el texto del mensaje.', 'warning');
     messageInput.focus();
     return;
   }
 
-  // Clean phone number (remove spaces, dashes, parentheses)
-  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  // Si hay imagen adjunta, copiarla al portapapeles automáticamente
+  if (currentSendImage) {
+    try {
+      const copied = await copyImageToClipboard(currentSendImage);
+      if (copied) {
+        showToast('📋 ¡Imagen copiada! Pégala con Ctrl + V en el chat de WhatsApp.', 'success', 4000);
+      }
+    } catch {
+      // Ignorar fallo silencioso y continuar abriendo WhatsApp
+    }
+  }
 
-  // Generate WhatsApp link
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-  // Open in new tab
   window.open(waUrl, '_blank');
-
-  // Close modal
   closeSendModal();
 }
 
-// ============================================================================
-// SEND EMAIL
-// ============================================================================
 function sendEmail() {
   const emailInput = document.getElementById('sendEmailAddress');
   const subjectInput = document.getElementById('sendEmailSubject');
@@ -470,30 +844,33 @@ function sendEmail() {
   const message = messageInput.value.trim();
 
   if (!email) {
-    alert('Por favor ingresa una dirección de email.');
+    showToast('Por favor ingresa una dirección de email.', 'warning');
     emailInput.focus();
     return;
   }
 
   if (!isValidEmail(email)) {
-    alert('Por favor ingresa una dirección de email válida.');
+    showToast('Por favor ingresa un email válido.', 'warning');
     emailInput.focus();
     return;
   }
 
   if (!message) {
-    alert('Por favor ingresa un mensaje.');
+    showToast('Por favor ingresa un mensaje.', 'warning');
     messageInput.focus();
     return;
   }
 
-  // Generate mailto link
+  if (currentSendImage) {
+    copyImageToClipboard(currentSendImage).then(copied => {
+      if (copied) {
+        showToast('📋 Imagen copiada al portapapeles para pegarla en tu correo.', 'info');
+      }
+    });
+  }
+
   const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-
-  // Open default email client
   window.location.href = mailtoUrl;
-
-  // Close modal
   closeSendModal();
 }
 
@@ -501,15 +878,20 @@ function sendEmail() {
 // UTILITIES
 // ============================================================================
 function replaceVariables(message, name = '', company = '') {
-  return message
+  return String(message || '')
     .replace(/\{nombre\}/gi, name || '[nombre]')
     .replace(/\{empresa\}/gi, company || '[empresa]');
 }
 
-function updateCharCount(textarea, countElement) {
+function updateCharCount(textarea, countElement, max = 1000) {
   if (!textarea || !countElement) return;
   const length = textarea.value.length;
-  countElement.textContent = `${length} caracteres`;
+  countElement.textContent = `${length}`;
+  if (length > max) {
+    countElement.classList.add('text-danger');
+  } else {
+    countElement.classList.remove('text-danger');
+  }
 }
 
 function generateId() {
@@ -518,7 +900,7 @@ function generateId() {
 
 function escapeHtml(text) {
   const div = document.createElement('div');
-  div.textContent = text;
+  div.textContent = text || '';
   return div.innerHTML;
 }
 
@@ -530,16 +912,36 @@ function isValidEmail(email) {
 // EVENT BINDINGS
 // ============================================================================
 function bindEvents() {
-  // Create new template button
+  const templateSearch = document.getElementById('sendTemplateSearch');
+  const templateCategory = document.getElementById('sendTemplateCategory');
+  const sendModal = document.getElementById('sendMessageModal');
+  const refreshTemplateFilter = () => renderSendTemplateList(sendModal?.dataset.templateId || '');
+  templateSearch?.addEventListener('input', refreshTemplateFilter);
+  templateCategory?.addEventListener('change', refreshTemplateFilter);
+
+  // Crear nueva plantilla desde messagesView
   const createBtn = document.getElementById('createTemplateBtn');
   if (createBtn) {
     createBtn.addEventListener('click', () => openTemplateModal());
   }
 
-  // Template modal close
+  // Crear nueva plantilla desde sendMessageModal (botón + Nueva en el panel izquierdo)
+  const sendModalNewBtn = document.getElementById('sendModalNewTemplateBtn');
+  if (sendModalNewBtn) {
+    sendModalNewBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTemplateModal();
+    });
+  }
+
+  // Template modal close & cancel
   const templateCloseBtn = document.getElementById('templateCloseBtn');
   if (templateCloseBtn) {
     templateCloseBtn.addEventListener('click', closeTemplateModal);
+  }
+  const templateCancelBtn = document.getElementById('templateCancelBtn');
+  if (templateCancelBtn) {
+    templateCancelBtn.addEventListener('click', closeTemplateModal);
   }
 
   // Template modal save
@@ -548,17 +950,71 @@ function bindEvents() {
     templateSaveBtn.addEventListener('click', saveTemplate);
   }
 
-  // Template modal cancel
-  const templateCancelBtn = document.getElementById('templateCancelBtn');
-  if (templateCancelBtn) {
-    templateCancelBtn.addEventListener('click', closeTemplateModal);
-  }
-
   // Template message char count
   const templateMessageInput = document.getElementById('templateMessageInput');
-  if (templateMessageInput) {
+  const templateCharCount = document.getElementById('templateCharCount');
+  if (templateMessageInput && templateCharCount) {
     templateMessageInput.addEventListener('input', () => {
-      // Character count display not in current HTML
+      updateCharCount(templateMessageInput, templateCharCount, 1000);
+    });
+  }
+
+  // Chips para insertar variables {nombre} y {empresa}
+  document.querySelectorAll('.template-vars-row .var-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const variable = chip.dataset.var;
+      if (!variable || !templateMessageInput) return;
+      const start = templateMessageInput.selectionStart || templateMessageInput.value.length;
+      const end = templateMessageInput.selectionEnd || templateMessageInput.value.length;
+      const val = templateMessageInput.value;
+      templateMessageInput.value = val.substring(0, start) + variable + val.substring(end);
+      templateMessageInput.focus();
+      templateMessageInput.selectionStart = templateMessageInput.selectionEnd = start + variable.length;
+      if (templateCharCount) {
+        updateCharCount(templateMessageInput, templateCharCount, 1000);
+      }
+    });
+  });
+
+  // Selector y DropZone de imagen para templateModal
+  const tplImageFileInput = document.getElementById('templateImageFileInput');
+  const tplDropZone = document.getElementById('templateImageDropZone');
+  const tplRemoveImgBtn = document.getElementById('templateImageRemoveBtn');
+
+  if (tplDropZone && tplImageFileInput) {
+    tplDropZone.addEventListener('click', (e) => {
+      if (e.target.closest('#templateImageRemoveBtn')) return;
+      tplImageFileInput.click();
+    });
+
+    tplImageFileInput.addEventListener('change', () => {
+      if (tplImageFileInput.files && tplImageFileInput.files[0]) {
+        handleTemplateImageSelect(tplImageFileInput.files[0]);
+      }
+    });
+
+    tplDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      tplDropZone.classList.add('is-dragover');
+    });
+
+    tplDropZone.addEventListener('dragleave', () => {
+      tplDropZone.classList.remove('is-dragover');
+    });
+
+    tplDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      tplDropZone.classList.remove('is-dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleTemplateImageSelect(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
+  if (tplRemoveImgBtn) {
+    tplRemoveImgBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeTemplateImage();
     });
   }
 
@@ -589,8 +1045,54 @@ function bindEvents() {
   const waCharCount = document.getElementById('whatsappCharCount');
   if (waMessageInput && waCharCount) {
     waMessageInput.addEventListener('input', () => {
-      updateCharCount(waMessageInput, waCharCount);
+      updateCharCount(waMessageInput, waCharCount, 1000);
     });
+  }
+
+  // WhatsApp Image attach/copy/remove buttons
+  const waAttachBtn = document.getElementById('sendWhatsAppAttachBtn');
+  const waImageFileInput = document.getElementById('sendWhatsAppImageInput');
+  const waCopyBtn = document.getElementById('sendWhatsAppCopyImageBtn');
+  const waRemoveBtn = document.getElementById('sendWhatsAppRemoveImageBtn');
+
+  if (waAttachBtn && waImageFileInput) {
+    waAttachBtn.addEventListener('click', () => waImageFileInput.click());
+    waImageFileInput.addEventListener('change', () => {
+      if (waImageFileInput.files && waImageFileInput.files[0]) {
+        handleSendImageSelect(waImageFileInput.files[0]);
+      }
+    });
+  }
+
+  if (waCopyBtn) {
+    waCopyBtn.addEventListener('click', copySendImage);
+  }
+
+  if (waRemoveBtn) {
+    waRemoveBtn.addEventListener('click', removeSendImage);
+  }
+
+  // Email image attach/copy/remove buttons
+  const emailAttachBtn = document.getElementById('sendEmailAttachBtn');
+  const emailImageFileInput = document.getElementById('sendEmailImageInput');
+  const emailCopyBtn = document.getElementById('sendEmailCopyImageBtn');
+  const emailRemoveBtn = document.getElementById('sendEmailRemoveImageBtn');
+
+  if (emailAttachBtn && emailImageFileInput) {
+    emailAttachBtn.addEventListener('click', () => emailImageFileInput.click());
+    emailImageFileInput.addEventListener('change', () => {
+      if (emailImageFileInput.files && emailImageFileInput.files[0]) {
+        handleSendImageSelect(emailImageFileInput.files[0]);
+      }
+    });
+  }
+
+  if (emailCopyBtn) {
+    emailCopyBtn.addEventListener('click', copySendImage);
+  }
+
+  if (emailRemoveBtn) {
+    emailRemoveBtn.addEventListener('click', removeSendImage);
   }
 
   // Email send button
@@ -604,21 +1106,46 @@ function bindEvents() {
   const emailCharCount = document.getElementById('emailCharCount');
   if (emailMessageInput && emailCharCount) {
     emailMessageInput.addEventListener('input', () => {
-      updateCharCount(emailMessageInput, emailCharCount);
+      updateCharCount(emailMessageInput, emailCharCount, 5000);
     });
   }
 
-  // Close modals on outside click
-  const templateModal = document.getElementById('templateModal');
-  const sendModal = document.getElementById('sendMessageModal');
-
+  // Selección y acciones en la lista lateral de plantillas en sendMessageModal
   if (sendModal) {
-    sendModal.addEventListener('click', event => {
+    sendModal.addEventListener('click', (event) => {
+      // 1. Clic en botón editar plantilla en la tarjeta
+      const editBtn = event.target.closest('[data-action="edit"]');
+      if (editBtn) {
+        event.stopPropagation();
+        const id = editBtn.dataset.id;
+        if (id) editTemplate(id);
+        return;
+      }
+
+      // 2. Clic en botón eliminar plantilla en la tarjeta
+      const deleteBtn = event.target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        event.stopPropagation();
+        const id = deleteBtn.dataset.id;
+        if (id) deleteTemplate(id);
+        return;
+      }
+
+      // 3. Clic en la tarjeta de plantilla para seleccionarla
       const option = event.target.closest('[data-send-template-id]');
-      if (option) applySendTemplate(option.dataset.sendTemplateId);
+      if (option) {
+        applySendTemplate(option.dataset.sendTemplateId);
+        return;
+      }
+
+      // 4. Cerrar al hacer clic en el backdrop
+      if (event.target === sendModal) {
+        closeSendModal();
+      }
     });
   }
 
+  const templateModal = document.getElementById('templateModal');
   if (templateModal) {
     templateModal.addEventListener('click', (e) => {
       if (e.target === templateModal) {
@@ -627,16 +1154,46 @@ function bindEvents() {
     });
   }
 
-  if (sendModal) {
-    sendModal.addEventListener('click', (e) => {
-      if (e.target === sendModal) {
-        closeSendModal();
+  // Soporte universal para pegar imágenes con Ctrl+V
+  window.addEventListener('paste', (e) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData || !clipboardData.items) return;
+
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Si el modal de plantilla está abierto, asignar a la plantilla
+        if (templateModal && templateModal.style.display !== 'none') {
+          handleTemplateImageSelect(file);
+          e.preventDefault();
+          break;
+        }
+
+        // Si el modal de enviar mensaje está abierto, asignar al mensaje actual
+        if (sendModal && sendModal.style.display !== 'none') {
+          handleSendImageSelect(file);
+          e.preventDefault();
+          break;
+        }
       }
-    });
-  }
+    }
+  });
 }
 
 // ============================================================================
 // EXPORT
 // ============================================================================
-export { renderTemplates, openTemplateModal, openSendModal, openContactSendModal };
+export {
+  renderTemplates,
+  openTemplateModal,
+  openSendModal,
+  openContactSendModal,
+  editTemplate,
+  deleteTemplate,
+  saveTemplate,
+  closeTemplateModal,
+  closeSendModal
+};

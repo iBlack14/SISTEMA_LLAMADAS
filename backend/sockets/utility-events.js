@@ -124,6 +124,32 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     }
   });
 
+  socket.on("phone:quote:request", (payload = {}) => {
+    const code = socket.data.code;
+    if (!code || socket.data.role !== "phone") return;
+    const session = sessions.get(code);
+    if (!session) return;
+
+    const data = payload && typeof payload === "object" ? payload : {};
+    const phone = String(data.phone || data.phoneNumber || "").trim();
+    const name = String(data.name || data.contactName || "").trim();
+
+    console.info("[PHONE_QUOTE_REQUEST]", { code, phone, name });
+
+    // Enviar evento al panel web para abrir el modal de cotización/reserva
+    io.to(`session:${code}`).emit("quote:open_modal", {
+      phone,
+      name: name || phone,
+      fromPhone: true,
+      timestamp: new Date().toISOString()
+    });
+
+    socket.emit("phone:quote:ack", {
+      ok: true,
+      message: "Cotización enviada al panel web correctamente."
+    });
+  });
+
   socket.on("session:logout", (acknowledge) => {
     const { code, role } = socket.data;
     if (!code || role !== "phone") return;
@@ -149,26 +175,33 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
 
     if (role === "dashboard" && session.dashboardSocketId === socket.id) session.dashboardSocketId = null;
     if (role === "phone") {
-      const removed = removePhoneWorker(session, socket.id);
+      const worker = (session.phoneWorkers || []).find((w) => w.socketId === socket.id);
+      if (worker) {
+        worker.socketId = null;
+        worker.connected = false;
+        if (socket.data.explicitLogout) {
+          removePhoneWorker(session, socket.id);
+        } else if (worker.callState && ["dialing", "ringing", "in_call"].includes(worker.callState)) {
+          // Grace period for micro-cuts: give phone 12s to reconnect before marking call ended
+          const disconnectedWorkerId = worker.id;
+          setTimeout(() => {
+            const currentSession = sessions.get(code);
+            const currentWorker = (currentSession?.phoneWorkers || []).find((w) => w.id === disconnectedWorkerId);
+            if (currentWorker && !currentWorker.connected && ["dialing", "ringing", "in_call"].includes(currentWorker.callState)) {
+              updateActiveCallState(currentSession, "ended", currentWorker);
+              currentWorker.callState = "idle";
+              syncSessionPhoneState(currentSession);
+              saveSoon();
+              emitState(code);
+              emitCampaignState(code);
+            }
+          }, 12000);
+        }
+      }
       if (session.activePhoneSocketId === socket.id) {
         session.activePhoneSocketId = null;
       }
-
-      // If the disconnecting worker was in a call, cleanup campaign
-      if (removed) {
-          updateActiveCallState(session, "ended", removed);
-      }
-
       syncSessionPhoneState(session);
-      // Let the dashboard keep the call window open during micro-cuts.
-      // The user can manually click 'Cortar' if the phone never reconnects.
-      /*
-      if (removed && session.callState !== "idle" && !session.phoneSocketId) {
-        session.callState = "idle";
-        const dash = session.dashboardSocketId;
-        if (dash) io.to(dash).emit("state:changed", { ...session, connected: { dashboard: true, phone: false, phoneCount: 0 } });
-      }
-      */
     }
 
     session.updatedAt = Date.now();

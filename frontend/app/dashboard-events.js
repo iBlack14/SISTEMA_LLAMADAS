@@ -2,6 +2,7 @@ import { socket, API_BASE } from '../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../shared/ui/dom.js';
 import * as Contacts from '../features/contacts/contacts-repository.js';
 import * as WhatsApp from '../features/messaging/whatsapp.js';
+import { openQuoteModal } from '../features/reservations/reservations-controller.js';
 
 /**
  * bindDashboardEvents: conserva los contratos y reglas existentes.
@@ -30,6 +31,8 @@ window.dismissReminder = (id) => {
     dashboardActions.renderReminderFloat();
 };
 
+socket.on("quote:open_modal", data => openQuoteModal(data));
+
 socket.on("call:error", ({message}) => setStatus(message || "No se permite llamar a este número.", true));
 
 socket.on("state:changed", st => {
@@ -38,17 +41,29 @@ socket.on("state:changed", st => {
   dashboardActions.applyState(st.callState, st.lastNumber, st);
   dashboardActions.renderBlockedNumbers();
   dashboardActions.renderContacts();
-  const nextPairingSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
+  const nextDeviceSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
     worker.id,
-    Boolean(worker.connected),
+    Boolean(worker.connected)
+  ]));
+  const nextCallSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
+    worker.id,
     worker.callState || "idle",
     worker.companyName || "",
     worker.phoneNumber || "",
     Boolean(worker.speakerOn)
   ]));
-  if (nextPairingSignature !== dashboardState.pairingStateSignature) {
-    dashboardState.pairingStateSignature = nextPairingSignature;
+
+  if (nextDeviceSignature !== dashboardState.pairingDeviceSignature) {
+    dashboardState.pairingDeviceSignature = nextDeviceSignature;
+    dashboardState.pairingStateSignature = nextCallSignature;
     if (dashboardState.sessionCode) dashboardActions.loadPairingData(dashboardState.sessionCode);
+  } else if (nextCallSignature !== dashboardState.pairingStateSignature) {
+    dashboardState.pairingStateSignature = nextCallSignature;
+    if (dashboardActions.renderPairingSlotsOnly) {
+      dashboardActions.renderPairingSlotsOnly();
+    } else if (dashboardState.sessionCode) {
+      dashboardActions.loadPairingData(dashboardState.sessionCode);
+    }
   }
 });
 

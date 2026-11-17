@@ -8,6 +8,10 @@ import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
 import android.media.*
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.*
 import android.telecom.TelecomManager
@@ -59,6 +63,7 @@ class BridgeService : Service() {
         const val ACTION_UI_TOGGLE_SPEAKER = "com.voipvc.bridge.UI_TOGGLE_SPEAKER"
         const val ACTION_UI_BLOCKLIST_CHANGE = "com.voipvc.bridge.UI_BLOCKLIST_CHANGE"
         const val ACTION_UI_SAVE_MESSAGE_CONTACT = "com.voipvc.bridge.UI_SAVE_MESSAGE_CONTACT"
+        const val ACTION_UI_QUOTE_REQUEST = "com.voipvc.bridge.UI_QUOTE_REQUEST"
         const val ACTION_UI_SYNC = "com.voipvc.bridge.UI_SYNC"
 
         // Extras
@@ -147,8 +152,12 @@ class BridgeService : Service() {
     private var statusSequence = 0L
     private val statusSessionId = UUID.randomUUID().toString()
     private var lastEmittedStatusSignature = ""
+    private var lastBlockedNumbersJson = ""
     private var lastDialCommandId = ""
     private var lastDialAck = DialResult(false, "")
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     private val telecomStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -190,6 +199,36 @@ class BridgeService : Service() {
             filter,
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VoipVcBridge::ServiceWakeLock")?.apply {
+                setReferenceCounted(false)
+                acquire(2 * 60 * 60 * 1000L) // 2h safe window
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo obtener WakeLock: ${e.message}")
+        }
+
+        try {
+            connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    mainHandler.post {
+                        if (socket?.connected() != true && connectionKey.isNotBlank()) {
+                            Log.d(TAG, "Red detectada/restaurada. Reconectando socket inmediatamente…")
+                            socket?.connect()
+                        }
+                    }
+                }
+            }
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            networkCallback?.let { connectivityManager?.registerNetworkCallback(request, it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo registrar NetworkCallback: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -210,6 +249,7 @@ class BridgeService : Service() {
             ACTION_UI_TOGGLE_SPEAKER -> setSpeakerOn(!isSpeakerOn)
             ACTION_UI_BLOCKLIST_CHANGE -> sendBlockedNumberChange(intent)
             ACTION_UI_SAVE_MESSAGE_CONTACT -> sendMessageContactToWeb(intent)
+            ACTION_UI_QUOTE_REQUEST -> sendQuoteRequestToWeb(intent)
             ACTION_UI_SYNC -> {
                 emitCallUiState()
                 emitPhoneStatus(lastCallState, "ui_sync", correlateCampaign = activeCommandId.isNotBlank())
@@ -238,6 +278,14 @@ class BridgeService : Service() {
         stopAudio()
         unregisterCallMonitor()
         unregisterReceiver(telecomStateReceiver)
+        try {
+            networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
+        } catch (_: Exception) {}
+        networkCallback = null
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (_: Exception) {}
+        wakeLock = null
         socket?.disconnect()
         socket?.off()
         socket = null
@@ -272,11 +320,12 @@ class BridgeService : Service() {
         val client: Socket
         try {
             val options = IO.Options().apply {
+                transports = arrayOf("websocket", "polling")
                 reconnection = true
                 reconnectionAttempts = Int.MAX_VALUE
                 reconnectionDelay = 1_000L
-                reconnectionDelayMax = 10_000L
-                timeout = 20_000L
+                reconnectionDelayMax = 5_000L
+                timeout = 15_000L
                 forceNew = true
             }
             client = IO.socket(url, options)
@@ -288,6 +337,9 @@ class BridgeService : Service() {
 
         client.on(Socket.EVENT_CONNECT) {
             if (client !== socket) return@on
+            try {
+                if (wakeLock?.isHeld == false) wakeLock?.acquire(2 * 60 * 60 * 1000L)
+            } catch (_: Exception) {}
             val payload = JSONObject()
                 .put("code", code).put("role", "phone")
                 .put("protocolVersion", 2)
@@ -344,15 +396,19 @@ class BridgeService : Service() {
             val data = args.firstOrNull() as? JSONObject ?: return@on
             val blockedNumbers = data.optJSONArray("blockedNumbers")
             if (blockedNumbers != null) {
-                val entries = BlockedNumberStore.fromJsonArray(blockedNumbers)
-                mainHandler.post {
-                    if (client !== socket) return@post
-                    BlockedNumberStore.replace(this@BridgeService, entries)
-                    sendBroadcast(
-                        Intent(ACTION_BLOCKLIST_STATE)
-                            .setPackage(packageName)
-                            .putExtra(EXTRA_BLOCKLIST_JSON, BlockedNumberStore.toJsonArray(entries).toString())
-                    )
+                val blockedJson = blockedNumbers.toString()
+                if (blockedJson != lastBlockedNumbersJson) {
+                    lastBlockedNumbersJson = blockedJson
+                    val entries = BlockedNumberStore.fromJsonArray(blockedNumbers)
+                    mainHandler.post {
+                        if (client !== socket) return@post
+                        BlockedNumberStore.replace(this@BridgeService, entries)
+                        sendBroadcast(
+                            Intent(ACTION_BLOCKLIST_STATE)
+                                .setPackage(packageName)
+                                .putExtra(EXTRA_BLOCKLIST_JSON, BlockedNumberStore.toJsonArray(entries).toString())
+                        )
+                    }
                 }
             }
             val workers = data.optJSONArray("phoneWorkers") ?: return@on
@@ -378,6 +434,22 @@ class BridgeService : Service() {
 
         client.on("session:force_logout") {
             if (client === socket) mainHandler.post { logoutAndStop() }
+        }
+
+        client.on("phone:reconnect_request") {
+            if (client === socket) {
+                mainHandler.post {
+                    emitPhoneStatus(lastCallState, "reconnect", correlateCampaign = activeCommandId.isNotBlank())
+                }
+            }
+        }
+
+        client.on("session:reconnect_request") {
+            if (client === socket) {
+                mainHandler.post {
+                    emitPhoneStatus(lastCallState, "reconnect", correlateCampaign = activeCommandId.isNotBlank())
+                }
+            }
         }
 
         client.on("blocked-numbers:error") { args ->
@@ -1375,6 +1447,27 @@ class BridgeService : Service() {
                 .put("name", name.ifBlank { number })
                 .put("phone", number)
         )
+    }
+
+    private fun sendQuoteRequestToWeb(intent: Intent) {
+        val name = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty().trim().take(120)
+        val number = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
+        if (number.isBlank()) {
+            setStatus("No se pudo enviar cotización: falta el número de teléfono.")
+            return
+        }
+        val client = socket
+        if (client?.connected() != true) {
+            setStatus("No se pudo enviar: el celular no está conectado al panel web.")
+            return
+        }
+        client.emit(
+            "phone:quote:request",
+            JSONObject()
+                .put("name", name.ifBlank { number })
+                .put("phone", number)
+        )
+        setStatus("📋 Cotización enviada al panel web: $number")
     }
 
     private fun setStatus(msg: String) {

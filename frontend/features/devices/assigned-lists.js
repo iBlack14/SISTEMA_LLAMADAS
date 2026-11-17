@@ -25,9 +25,6 @@ function renderAssignedListsPanel() {
     )
   );
 
-  console.log('Listas disponibles:', availableLists);
-  console.log('Slots en pairingSlotsSnapshot:', dashboardState.pairingSlotsSnapshot);
-
   const history = Array.isArray(dashboardState.campaignState?.history) ? dashboardState.campaignState.history : [];
   const latestHistoryByContact = new Map();
   for (const entry of history) {
@@ -42,8 +39,6 @@ function renderAssignedListsPanel() {
   // Si no hay asignaciones, mostrar los slots vinculados para permitir asignar listas
   const linkedSlots = dashboardState.pairingSlotsSnapshot.map((slot, slotIndex) => ({ slot, slotIndex }))
     .filter(({ slot }) => Boolean(slot?.deviceId));
-
-  console.log('Slots vinculados:', linkedSlots);
 
   if (!linkedSlots.length) {
     container.innerHTML = `<div class="assigned-lists-empty">Vincula teléfonos usando los códigos QR de arriba para asignar listas.</div>`;

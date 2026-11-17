@@ -81,15 +81,15 @@ function renderDay() {
       ${reportState.reports.length ? `
         <div id="reportDetails"></div>
       ` : `
-        <p>No existen campañas registradas para ${reportState.viewedPeriod ? "este rango de fechas" : "esta fecha"}.</p>
+        <p>No existen campañas registradas para ${reportState.viewedPeriod && reportState.viewedPeriod.from !== reportState.viewedPeriod.to ? "este rango de fechas" : "esta fecha"}.</p>
       `}
-      <nav class="report-date-navigation" aria-label="Navegar por fecha" ${reportState.viewedPeriod ? "hidden" : ""}>
+      <nav class="report-date-navigation" aria-label="Navegar por fecha" ${reportState.viewedPeriod && reportState.viewedPeriod.from !== reportState.viewedPeriod.to ? "hidden" : ""}>
         <button id="reportPreviousDay" class="secondary" type="button"
-          ${reportActions.shiftReportDate(reportState.selectedDate, -1) ? "" : "disabled"}>
+          ${reportActions.shiftReportDate(reportState.selectedDate || reportState.viewedPeriod?.from, -1) ? "" : "disabled"}>
           ← ANTERIOR
         </button>
         <button id="reportNextDay" class="secondary" type="button"
-          ${reportActions.shiftReportDate(reportState.selectedDate, 1) ? "" : "disabled"}>
+          ${reportActions.shiftReportDate(reportState.selectedDate || reportState.viewedPeriod?.from, 1) ? "" : "disabled"}>
           SIGUIENTE →
         </button>
       </nav>
@@ -98,11 +98,13 @@ function renderDay() {
     renderDayNavigation();
 
     reportState.$("reportPreviousDay").onclick = () => {
-      const previousDate = reportActions.shiftReportDate(reportState.selectedDate, -1);
+      const currentDate = reportState.selectedDate || reportState.viewedPeriod?.from;
+      const previousDate = reportActions.shiftReportDate(currentDate, -1);
       if (previousDate) reportActions.showDay(previousDate);
     };
     reportState.$("reportNextDay").onclick = () => {
-      const nextDate = reportActions.shiftReportDate(reportState.selectedDate, 1);
+      const currentDate = reportState.selectedDate || reportState.viewedPeriod?.from;
+      const nextDate = reportActions.shiftReportDate(currentDate, 1);
       if (nextDate) reportActions.showDay(nextDate);
     };
 

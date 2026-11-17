@@ -11,6 +11,8 @@ import { registerApk } from "./apk.js";
 import { registerProxy } from "./proxy.js";
 import { registerTwilio } from "./twilio.js";
 import { registerStatic } from "./static.js";
+import { registerReservations } from "./reservations.js";
+import { registerMessageTemplates } from "./message-templates.js";
 
 // El orden mantiene autenticación y autorización antes de las rutas protegidas.
 export function registerRoutes(runtime, services) {
@@ -21,6 +23,8 @@ export function registerRoutes(runtime, services) {
   registerDevices(runtime, services);
   registerSessions(runtime, services);
   registerReports(runtime, services);
+  registerReservations(runtime, services);
+  registerMessageTemplates(runtime);
   registerCampaigns(runtime, services);
   registerServerInfo(runtime, services);
   registerApk(runtime, services);

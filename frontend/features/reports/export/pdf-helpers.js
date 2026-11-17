@@ -29,7 +29,7 @@ function loadPdfLogoData() {
       }
     };
     image.onerror = () => resolve("");
-    image.src = `/logo-vc-color.png?v=pdf-${Date.now()}`;
+    image.src = `/shared/assets/images/logo-vc-color.png?v=pdf-${Date.now()}`;
   });
   return dashboardState.pdfLogoDataPromise;
 }

@@ -17,6 +17,14 @@
       "path": "/api/network/equipment/:number"
     },
     {
+      "method": "POST",
+      "path": "/api/network/equipment/:number/reconnect"
+    },
+    {
+      "method": "POST",
+      "path": "/api/network/reconnect"
+    },
+    {
       "method": "GET",
       "path": "/nucleo-red"
     },

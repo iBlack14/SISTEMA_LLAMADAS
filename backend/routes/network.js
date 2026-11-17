@@ -37,6 +37,97 @@ runtime.app.get("/api/network/equipment/:number", runtime.auth.requireAdmin, asy
   } catch { res.status(503).json({ ok: false, error: "No se pudo consultar el equipo." }); }
 });
 
+async function attemptReconnectEquipment(number) {
+  const row = runtime.network.registry.find(item => item.position === number);
+  let deviceId = row?.device_id || null;
+  let sessionCode = row?.session_code || null;
+
+  if (!deviceId) {
+    const candidates = [...runtime.network.candidates().values()];
+    const candidate = candidates[number - 1];
+    if (candidate) {
+      deviceId = candidate.slot?.deviceId;
+      sessionCode = candidate.code;
+    }
+  }
+
+  const session = sessionCode ? runtime.sessions.get(sessionCode) : null;
+  const worker = (session?.phoneWorkers || []).find(w => w.id === deviceId);
+
+  if (sessionCode) {
+    runtime.io.to(sessionCode).emit("phone:reconnect_request", {
+      number,
+      deviceId,
+      code: sessionCode,
+      timestamp: Date.now()
+    });
+  }
+
+  runtime.io.emit("phone:reconnect", {
+    number,
+    deviceId,
+    code: sessionCode,
+    timestamp: Date.now()
+  });
+
+  if (worker?.socketId && runtime.network.isSocketConnected(worker.socketId)) {
+    runtime.io.to(worker.socketId).emit("session:reconnect_request", {
+      number,
+      deviceId,
+      code: sessionCode
+    });
+    worker.connected = true;
+    services.syncSessionPhoneState?.(session);
+  }
+
+  if (deviceId && /^(android-test-|TEST-|SIM-)/.test(deviceId)) {
+    runtime.network.observe(sessionCode || "TEST01", worker || { id: deviceId, socketId: "sim-" + number }, { callState: "available" });
+  }
+
+  try {
+    const updated = await runtime.network.snapshot();
+    runtime.network.broadcast(updated);
+  } catch { /* ignore */ }
+
+  return { number, deviceId, sessionCode, success: true };
+}
+
+runtime.app.post("/api/network/equipment/:number/reconnect", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const number = Number(req.params.number);
+  if (!Number.isInteger(number) || number < 1 || number > 10) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
+  try {
+    const result = await attemptReconnectEquipment(number);
+    const snapshot = await runtime.network.snapshot();
+    res.json({ ok: true, result, equipment: snapshot.equipment[number - 1] });
+  } catch {
+    res.status(500).json({ ok: false, error: "No se pudo solicitar la reconexión del equipo." });
+  }
+});
+
+runtime.app.post("/api/network/reconnect", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    let numbers = [];
+    if (Array.isArray(req.body?.equipment) && req.body.equipment.length > 0) {
+      numbers = [...new Set(req.body.equipment.map(Number))].filter(n => Number.isInteger(n) && n >= 1 && n <= 10);
+    } else {
+      const snapshot = await runtime.network.snapshot();
+      numbers = snapshot.equipment.filter(e => e.state === "Desconectado").map(e => e.number);
+    }
+
+    const results = [];
+    for (const num of numbers) {
+      results.push(await attemptReconnectEquipment(num));
+    }
+
+    const snapshot = await runtime.network.snapshot();
+    res.json({ ok: true, reconnectedCount: results.length, numbers, results, snapshot });
+  } catch {
+    res.status(500).json({ ok: false, error: "No se pudo solicitar la reconexión de los equipos." });
+  }
+});
+
 runtime.app.get("/nucleo-red", runtime.auth.requireAdmin, (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.sendFile(runtime.paths.adminPage);

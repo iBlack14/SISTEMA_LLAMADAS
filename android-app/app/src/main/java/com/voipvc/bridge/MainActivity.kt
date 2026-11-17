@@ -1,14 +1,23 @@
 package com.voipvc.bridge
 
 import android.Manifest
-import android.app.AlertDialog
+import android.app.Dialog
 import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.view.Gravity
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.Toast
 import android.os.Build
 import android.os.Bundle
@@ -44,7 +53,10 @@ class MainActivity : AppCompatActivity() {
 
     private val defaultBaseUrl = BuildConfig.DEFAULT_BASE_URL
     private val client = OkHttpClient.Builder()
-        .callTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     private lateinit var onboardingSection: View
@@ -90,6 +102,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var messageBtn: MaterialButton
     private lateinit var blockBtn: MaterialButton
     private lateinit var blockedNumbersText: TextView
+    private lateinit var blockedRowsContainer: LinearLayout
 
     private var bridgeMode = BridgeMode.ONBOARDING
     private var transientStatusMessage = "Escanea el QR del dashboard para vincular."
@@ -107,7 +120,7 @@ class MainActivity : AppCompatActivity() {
     private var autoReconnectAttempted = false
     private var voicemailReminderChecked = false
     private var returningFromVoicemailSetup = false
-    private var voicemailReminderDialog: AlertDialog? = null
+    private var voicemailReminderDialog: Dialog? = null
     private var pendingPairFromConnectedMode: Boolean? = null
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
@@ -300,15 +313,15 @@ class MainActivity : AppCompatActivity() {
         }
         val issue = VoicemailDetector.authorizationIssue() ?: return
         voicemailReminderChecked = true
-        voicemailReminderDialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Autoriza la detección de buzón")
-            .setMessage(issue + "\n\nPermite el acceso al audio para reconocer las locuciones y solicitar el corte. No se guardan grabaciones.")
-            .setPositiveButton("Configurar y autorizar") { _, _ -> openVoicemailSetup(true) }
-            .setNegativeButton("Ahora no", null)
-            .create().also { dialog ->
-                dialog.setOnDismissListener { voicemailReminderDialog = null }
-                dialog.show()
-            }
+        voicemailReminderDialog = showBrandedConfirmationDialog(
+            title = "Autoriza la detección de buzón",
+            message = issue + "\n\nPermite el acceso al audio para reconocer las locuciones y solicitar el corte. No se guardan grabaciones.",
+            negativeLabel = "Ahora no",
+            positiveLabel = "Configurar y autorizar",
+            onPositive = { openVoicemailSetup(true) }
+        ).also { dialog ->
+            dialog.setOnDismissListener { voicemailReminderDialog = null }
+        }
     }
 
     private fun setManualSetupExpanded(expanded: Boolean) {
@@ -383,10 +396,17 @@ class MainActivity : AppCompatActivity() {
         messageBtn = findViewById(R.id.messageBtn)
         blockBtn = findViewById(R.id.blockBtn)
         blockedNumbersText = findViewById(R.id.blockedNumbersText)
+        blockedRowsContainer = findViewById(R.id.blockedRowsContainer)
     }
 
     private fun bindActions() {
-        findViewById<MaterialButton>(R.id.preparePermissionsBtn).setOnClickListener { requestAllPermissions() }
+        findViewById<MaterialButton>(R.id.preparePermissionsBtn).setOnClickListener {
+            val guide = findViewById<View>(R.id.permissionGuide)
+            val show = guide.visibility != View.VISIBLE
+            guide.visibility = if (show) View.VISIBLE else View.GONE
+            (it as MaterialButton).text = if (show) "Ocultar permisos" else "Preparar permisos"
+        }
+        findViewById<MaterialButton>(R.id.grantPermissionsBtn).setOnClickListener { requestAllPermissions() }
         findViewById<MaterialButton>(R.id.toggleManualSetupBtn).setOnClickListener {
             setManualSetupExpanded(findViewById<View>(R.id.manualSetupSection).visibility != View.VISIBLE)
         }
@@ -573,7 +593,7 @@ class MainActivity : AppCompatActivity() {
         showTransientStatus("Vinculando equipo…", Tone.NEUTRAL)
         updatePersistentStatus("Conectando al bridge…", "Conectando", Tone.WARNING)
         sessionValueText.text = code
-        serverValueText.text = "Servidor ${sanitizeBaseForLabel(baseUrl)}"
+        serverValueText.text = "Servidor conectado"
         deviceNameText.text = deviceName
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -696,7 +716,7 @@ class MainActivity : AppCompatActivity() {
         setBridgeMode(BridgeMode.CONNECTED)
         deviceNameText.text = devName
         sessionValueText.text = code
-        serverValueText.text = "Servidor ${sanitizeBaseForLabel(url)}"
+        serverValueText.text = "Servidor conectado"
         updatePersistentStatus("Restaurando sesión guardada…", "Conectando", Tone.WARNING)
         showTransientStatus("Reconectando sesión guardada…", Tone.NEUTRAL)
         startBridgeService(url, code, token, devId, devName)
@@ -723,6 +743,9 @@ class MainActivity : AppCompatActivity() {
         bridgeMode = mode
         onboardingSection.visibility = if (mode == BridgeMode.ONBOARDING) View.VISIBLE else View.GONE
         connectedSection.visibility = if (mode == BridgeMode.CONNECTED) View.VISIBLE else View.GONE
+        connectionBadgeText.visibility = if (mode == BridgeMode.CONNECTED) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.brandSubtitleText).text =
+            if (mode == BridgeMode.CONNECTED) "Teléfono vinculado" else "Configura tu teléfono"
     }
 
     private fun activeBaseUrlInput(): TextInputEditText =
@@ -775,17 +798,24 @@ class MainActivity : AppCompatActivity() {
             currentContactName.isNotBlank() -> currentContactName
             currentCompanyName.isNotBlank() -> currentCompanyName
             currentPhoneNumber.isNotBlank() -> currentPhoneNumber
-            else -> "Listo para llamar"
+            else -> "Sin llamada activa"
         }
 
         currentCallNameText.text = primaryName
-        currentCallNumberText.text = if (currentPhoneNumber.isBlank()) "-" else currentPhoneNumber
+        currentCallNumberText.text = if (currentPhoneNumber.isBlank()) {
+            "Las llamadas que llegan al teléfono aparecen aquí."
+        } else currentPhoneNumber
+        currentCallNumberText.visibility = View.VISIBLE
+        val initials = primaryName.trim().split(Regex("\\s+")).take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }.joinToString("")
+        findViewById<TextView>(R.id.currentCallAvatar).text =
+            if (lastCallState == "idle") "VC" else initials.ifBlank { "VC" }.uppercase(Locale.getDefault())
         currentCallLabelText.text = when (lastCallState) {
             "ringing" -> "Llamada entrante"
             "dialing" -> "Marcando desde el bridge"
             "in_call" -> "Llamada en curso"
             "ended" -> "Llamada finalizada"
-            else -> "Sin llamada activa"
+            else -> "ESTADO DE LLAMADA"
         }
         callStateText.text = when (lastCallState) {
             "ringing" -> "SONANDO"
@@ -804,7 +834,8 @@ class MainActivity : AppCompatActivity() {
         callTimerText.text = formatElapsed()
         answerBtn.visibility = if (lastCallState == "ringing") View.VISIBLE else View.GONE
         val liveCall = lastCallState in setOf("dialing", "ringing", "in_call")
-        currentCallNumberText.visibility = if (currentPhoneNumber.isNotBlank()) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.currentCallCard).visibility = if (liveCall) View.GONE else View.VISIBLE
+        hangupBtn.text = if (lastCallState == "ringing") "Rechazar" else "Colgar"
         callTimerText.visibility = if (liveCall) View.VISIBLE else View.GONE
         hangupBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
         muteBtn.visibility = if (liveCall) View.VISIBLE else View.GONE
@@ -841,10 +872,10 @@ class MainActivity : AppCompatActivity() {
         )
         blockBtn.background = ContextCompat.getDrawable(
             this,
-            if (blocked) R.drawable.bg_secondary_button else R.drawable.bg_danger_button
+            if (blocked) R.drawable.bg_secondary_button else R.drawable.bg_danger_soft
         )
         blockBtn.setTextColor(
-            ContextCompat.getColor(this, if (blocked) R.color.vc_text_primary else R.color.vc_text_inverse)
+            ContextCompat.getColor(this, if (blocked) R.color.vc_text_primary else R.color.vc_error)
         )
     }
 
@@ -859,12 +890,82 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateBlockedNumbersUi() {
         val blocked = BlockedNumberStore.read(this).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        blockedRowsContainer.removeAllViews()
         blockedNumbersText.text = if (blocked.isEmpty()) {
-            "Lista de bloqueos: sin números"
+            "Sin números bloqueados\nLos números se guardan en este teléfono."
         } else {
-            "Lista de bloqueos:\n" + blocked.joinToString("\n") { "${it.name} — ${it.number}" }
+            "Los cambios se guardan en este teléfono."
+        }
+        blocked.forEach { entry ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(9), dp(8), dp(9))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(14).toFloat()
+                    setStroke(dp(1), ContextCompat.getColor(this@MainActivity, R.color.vc_border))
+                }
+            }
+            val avatar = TextView(this).apply {
+                val initials = entry.name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull()?.toString() }
+                text = initials.joinToString("").uppercase(Locale.getDefault()).ifBlank { "?" }
+                gravity = Gravity.CENTER
+                textSize = 12f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_accent))
+                background = GradientDrawable().apply {
+                    setColor(ContextCompat.getColor(this@MainActivity, R.color.vc_muted_chip))
+                    shape = GradientDrawable.OVAL
+                }
+            }
+            row.addView(avatar, LinearLayout.LayoutParams(dp(40), dp(40)))
+            val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            val name = TextView(this).apply {
+                text = entry.name
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_primary))
+                maxLines = 1
+            }
+            val number = TextView(this).apply {
+                text = "${entry.number} · En este teléfono"
+                textSize = 11f
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_secondary))
+                maxLines = 1
+            }
+            details.addView(name)
+            details.addView(number)
+            row.addView(details, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(10)
+                marginEnd = dp(4)
+            })
+            val remove = MaterialButton(this).apply {
+                text = "Quitar"
+                isAllCaps = false
+                textSize = 11f
+                minHeight = dp(38)
+                minimumWidth = dp(66)
+                insetTop = 0
+                insetBottom = 0
+                cornerRadius = dp(12)
+                backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.vc_muted_chip))
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_accent))
+                setOnClickListener {
+                    BlockedNumberStore.setBlocked(this@MainActivity, entry.name, entry.number, false)
+                    sendBlockedNumberChange("remove", entry.name, entry.number)
+                    updateBlockedNumbersUi()
+                    Toast.makeText(this@MainActivity, "Número quitado de la lista", Toast.LENGTH_SHORT).show()
+                }
+            }
+            row.addView(remove)
+            blockedRowsContainer.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(8)
+            })
         }
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun consumeServiceStatusMessage(msg: String) {
         val normalized = msg.lowercase(Locale.US)
@@ -899,30 +1000,48 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderPersistentStatus() {
         persistentStatusText.text = currentPersistentStatus
-        connectionBadgeText.text = currentConnectionBadge
+        connectionBadgeText.text = currentConnectionBadge.uppercase(Locale.getDefault())
         applyToneToChip(connectionBadgeText, currentConnectionTone)
     }
 
     private fun renderTransientStatus() {
         transientStatusText.text = transientStatusMessage
         onboardingStatusText.text = transientStatusMessage
+        val isInitialHint = transientStatusMessage == "Escanea el QR del dashboard para vincular."
+        transientStatusText.visibility = if (bridgeMode == BridgeMode.CONNECTED || isInitialHint) View.GONE else View.VISIBLE
+        onboardingStatusText.visibility = if (isInitialHint) View.GONE else View.VISIBLE
     }
 
     private fun refreshReadinessChips() {
         val ready = hasCallingAccess()
+        val phoneReady = listOf(
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        ).all(::hasPermission)
+        val micReady = hasPermission(Manifest.permission.RECORD_AUDIO)
+        val notificationsReady = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+        val dialerReady = isDefaultDialer()
+        updateGuideStatus(R.id.permissionPhoneStatus, phoneReady, if (phoneReady) "Concedido" else "Pendiente")
+        updateGuideStatus(R.id.permissionMicStatus, micReady, if (micReady) "Concedido" else "Pendiente")
+        updateGuideStatus(R.id.permissionNotificationsStatus, notificationsReady, if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) "Incluido" else if (notificationsReady) "Concedido" else "Pendiente")
+        updateGuideStatus(R.id.permissionDialerStatus, dialerReady, if (dialerReady) "Configurado" else "Por elegir")
         findViewById<TextView>(R.id.permissionSummaryText).apply {
             text = if (ready) "Permisos listos. Ya puedes escanear tu QR."
                 else "Se necesitan permisos de llamadas, micrófono y marcador predeterminado."
             setTextColor(ContextCompat.getColor(this@MainActivity, if (ready) R.color.vc_success else R.color.vc_text_secondary))
         }
-        findViewById<MaterialButton>(R.id.preparePermissionsBtn).text =
-            if (ready) "Revisar permisos" else "Preparar permisos"
+        val prepareText = findViewById<MaterialButton>(R.id.preparePermissionsBtn)
+        if (findViewById<View>(R.id.permissionGuide).visibility != View.VISIBLE) {
+            prepareText.text = if (ready) "Revisar permisos" else "Preparar permisos"
+        }
         updateReadinessChip(
             permMicChip,
-            "Mic",
+            "Micrófono",
             hasPermission(Manifest.permission.RECORD_AUDIO),
-            "Mic OK",
-            "Sin mic"
+            "Micrófono ✓",
+            "Micrófono pendiente"
         )
         val notificationsOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             hasPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -931,18 +1050,25 @@ class MainActivity : AppCompatActivity() {
         }
         updateReadinessChip(
             permNotifChip,
-            "Notif",
+            "Notif.",
             notificationsOk,
-            "Notif OK",
-            "Sin notif"
+            "Notif. ✓",
+            "Notif. pendiente"
         )
         updateReadinessChip(
             permDialerChip,
-            "Dialer",
+            "Teléfono",
             isDefaultDialer(),
-            "Dialer OK",
-            "Sin default"
+            "Teléfono ✓",
+            "Sin predet."
         )
+    }
+
+    private fun updateGuideStatus(viewId: Int, ready: Boolean, value: String) {
+        findViewById<TextView>(viewId).apply {
+            text = value
+            setTextColor(ContextCompat.getColor(this@MainActivity, if (ready) R.color.vc_success else R.color.vc_warning))
+        }
     }
 
     private fun updateReadinessChip(
@@ -1005,6 +1131,8 @@ class MainActivity : AppCompatActivity() {
         transientStatusMessage = message
         transientStatusText.text = message
         onboardingStatusText.text = message
+        transientStatusText.visibility = if (bridgeMode == BridgeMode.CONNECTED) View.GONE else View.VISIBLE
+        onboardingStatusText.visibility = View.VISIBLE
         transientStatusText.background = ContextCompat.getDrawable(
             this,
             when (tone) {
@@ -1030,11 +1158,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmLogoutAndStop() {
-        AlertDialog.Builder(this)
-            .setTitle("Cerrar sesión")
-            .setMessage("Se detendrá el bridge y volverás al modo de vinculación.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Cerrar") { _, _ ->
+        showBrandedConfirmationDialog(
+            title = "Cerrar sesión",
+            message = "Se detendrá el bridge y volverás al modo de vinculación.",
+            negativeLabel = "Cancelar",
+            positiveLabel = "Cerrar sesión",
+            destructive = true
+        ) {
                 sendServiceAction(BridgeService.ACTION_LOGOUT)
                 setBridgeMode(BridgeMode.ONBOARDING)
                 settingsSection.visibility = View.GONE
@@ -1046,7 +1176,101 @@ class MainActivity : AppCompatActivity() {
                 renderCallPresentation()
                 updatePersistentStatus("Bridge no vinculado.", "Sin conexión", Tone.WARNING)
                 showTransientStatus("Sesión cerrada. Escanea un QR para volver a conectar.", Tone.NEUTRAL)
+        }
+    }
+
+    private fun showBrandedConfirmationDialog(
+        title: String,
+        message: String,
+        negativeLabel: String,
+        positiveLabel: String,
+        destructive: Boolean = false,
+        onPositive: () -> Unit
+    ): Dialog {
+        fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+        val dialog = Dialog(this)
+        val card = com.google.android.material.card.MaterialCardView(this).apply {
+            radius = dp(18).toFloat()
+            cardElevation = dp(12).toFloat()
+            setCardBackgroundColor(Color.WHITE)
+            useCompatPadding = false
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(16))
+        }
+        val titleView = TextView(this).apply {
+            text = title
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_primary))
+            textSize = 18f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        }
+        val messageView = TextView(this).apply {
+            text = message
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_secondary))
+            textSize = 13f
+            setLineSpacing(dp(2).toFloat(), 1f)
+        }
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }
+        val cancel = TextView(this).apply {
+            text = negativeLabel
+            gravity = Gravity.CENTER
+            minWidth = dp(if (destructive) 94 else 84)
+            minHeight = dp(48)
+            setPadding(dp(10), 0, dp(10), 0)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_accent))
+            textSize = 13f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { dialog.dismiss() }
+        }
+        val positive = MaterialButton(this).apply {
+            text = positiveLabel
+            isAllCaps = false
+            textSize = 13f
+            minHeight = dp(42)
+            minimumWidth = dp(if (destructive) 188 else 170)
+            insetTop = 0
+            insetBottom = 0
+            cornerRadius = dp(12)
+            backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this@MainActivity, if (destructive) R.color.vc_error else R.color.vc_accent)
+            )
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                dialog.dismiss()
+                onPositive()
             }
-            .show()
+        }
+
+        content.addView(titleView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        content.addView(messageView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(12)
+        })
+        content.addView(android.widget.Space(this), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        actions.addView(cancel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)))
+        actions.addView(positive, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)).apply {
+            leftMargin = dp(8)
+        })
+        content.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(16)
+        })
+        card.addView(content, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236)))
+        dialog.setContentView(card)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setLayout(resources.displayMetrics.widthPixels - dp(48), ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(Gravity.CENTER)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0.56f)
+        }
+        return dialog
     }
 }

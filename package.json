@@ -21,6 +21,7 @@
     "start:web": "node backend/index.js",
     "dev:web": "node --watch backend/index.js",
     "start:calls": "node backend/index.js",
+    "build:figma-plugin": "tsc -p figma-plugin/tsconfig.json",
     "test": "node --experimental-vm-modules --test backend/__tests__/*/*.test.js frontend/app/navigation/*.test.js",
     "test:web": "node --experimental-vm-modules --test backend/__tests__/architecture/frontend.test.js frontend/app/navigation/*.test.js",
     "test:contracts": "node --test backend/__tests__/architecture/contracts.test.js"
@@ -29,10 +30,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "figma-js": "^1.16.1-0",
     "mysql2": "^3.12.0",
     "nanoid": "^5.1.5",
     "node-fetch": "^3.3.2",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.142.0",
+    "typescript": "^7.0.2"
   }
 }

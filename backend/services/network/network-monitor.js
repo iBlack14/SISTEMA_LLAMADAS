@@ -13,11 +13,13 @@ export class NetworkMonitor {
   constructor({ pool, persistence, getSessions, isSocketConnected, broadcast, now = () => Date.now() }) {
     Object.assign(this, { pool, persistence, getSessions, isSocketConnected, broadcast, now });
     this.observations = new Map();
+    this.connectionTimestamps = new Map();
     this.registry = [];
     this.chain = Promise.resolve();
   }
 
   async initialize() {
+    if (!this.pool) return;
     await this.pool.query(`CREATE TABLE IF NOT EXISTS admin_network_devices (
       position TINYINT UNSIGNED PRIMARY KEY,
       device_id VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
@@ -25,8 +27,20 @@ export class NetworkMonitor {
       name VARCHAR(255) NOT NULL,
       last_activity_at DATETIME(3) NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    try {
+      await this.pool.query("ALTER TABLE admin_network_devices ADD COLUMN connected_at DATETIME(3) NULL, ADD COLUMN disconnected_at DATETIME(3) NULL");
+    } catch { /* columnas ya existentes */ }
     const [rows] = await this.pool.query("SELECT * FROM admin_network_devices ORDER BY position");
     this.registry = rows;
+    for (const r of rows) {
+      if (r.device_id && (r.connected_at || r.disconnected_at)) {
+        this.connectionTimestamps.set(r.device_id, {
+          isConnected: Boolean(r.connected_at && !r.disconnected_at),
+          connectedAt: timestamp(r.connected_at) || null,
+          disconnectedAt: timestamp(r.disconnected_at) || null
+        });
+      }
+    }
   }
 
   observe(code, worker, payload) {
@@ -76,6 +90,17 @@ export class NetworkMonitor {
           [device.code, device.name, lastActivity ? new Date(lastActivity) : null, row.position]);
         Object.assign(row, { session_code: device.code, name: device.name, last_activity_at: lastActivity });
       }
+      if (this.pool && row.device_id) {
+        const connRecord = this.connectionTimestamps.get(row.device_id);
+        if (connRecord && (timestamp(row.connected_at) !== (connRecord.connectedAt || 0) || timestamp(row.disconnected_at) !== (connRecord.disconnectedAt || 0))) {
+          try {
+            await this.pool.query("UPDATE admin_network_devices SET connected_at=?,disconnected_at=? WHERE position=?",
+              [connRecord.connectedAt ? new Date(connRecord.connectedAt) : null, connRecord.disconnectedAt ? new Date(connRecord.disconnectedAt) : null, row.position]);
+            row.connected_at = connRecord.connectedAt ? iso(connRecord.connectedAt) : null;
+            row.disconnected_at = connRecord.disconnectedAt ? iso(connRecord.disconnectedAt) : null;
+          } catch { /* ignorar columnas inexistentes */ }
+        }
+      }
     }
   }
 
@@ -104,6 +129,7 @@ export class NetworkMonitor {
       const row = this.registry.find(item => item.position === index + 1);
       if (!row) return { number: index + 1, name: `Equipo ${index + 1}`, state: "Sin vincular", calling: false,
         deviceId: null, metrics: null, pending: null, historyVersion: "unknown",
+        connectedAt: null, disconnectedAt: null, connectedDurationSeconds: null, disconnectedDurationSeconds: null,
         ...(detailNumbers.has(index + 1) ? { activity: [] } : {}), rubro: null, schedule: null, lastActivityAt: null };
       const device = devices.get(row.device_id);
       const source = sources.get(device?.code || row.session_code);
@@ -111,7 +137,45 @@ export class NetworkMonitor {
       const currentObservation = device?.connected && observed?.socketId === device.worker?.socketId
         && observed.code === device.code ? observed : null;
       const calling = Boolean(currentObservation && activeStates.has(currentObservation.state));
-      const state = !device ? "Sin vincular" : !device.connected ? "Desconectado" : calling ? labels[currentObservation.state] : "Disponible";
+      const isConnected = Boolean(device?.connected);
+      const state = !device ? "Sin vincular" : !isConnected ? "Desconectado" : calling ? labels[currentObservation.state] : "Disponible";
+
+      let connRecord = this.connectionTimestamps.get(row.device_id);
+      if (!connRecord) {
+        const linked = timestamp(device?.slot?.linkedAt);
+        connRecord = {
+          isConnected,
+          connectedAt: isConnected ? (linked || this.now()) : null,
+          disconnectedAt: !isConnected && device ? (linked || this.now()) : null
+        };
+        this.connectionTimestamps.set(row.device_id, connRecord);
+      } else {
+        if (isConnected) {
+          if (!connRecord.isConnected) {
+            connRecord.isConnected = true;
+            connRecord.connectedAt = this.now();
+            connRecord.disconnectedAt = null;
+          } else if (!connRecord.connectedAt) {
+            connRecord.connectedAt = this.now();
+          }
+        } else {
+          if (connRecord.isConnected) {
+            connRecord.isConnected = false;
+            connRecord.disconnectedAt = this.now();
+            connRecord.connectedAt = null;
+          } else if (device && !connRecord.disconnectedAt) {
+            connRecord.disconnectedAt = this.now();
+          }
+        }
+      }
+
+      const connectedAt = isConnected && connRecord.connectedAt ? iso(connRecord.connectedAt) : null;
+      const disconnectedAt = !isConnected && device && connRecord.disconnectedAt ? iso(connRecord.disconnectedAt) : null;
+      const connectedDurationSeconds = isConnected && connRecord.connectedAt
+        ? Math.max(0, Math.floor((this.now() - connRecord.connectedAt) / 1000)) : null;
+      const disconnectedDurationSeconds = !isConnected && device && connRecord.disconnectedAt
+        ? Math.max(0, Math.floor((this.now() - connRecord.disconnectedAt) / 1000)) : null;
+
       const turn = source?.turn?.status === "active" ? source.turn : null;
       const reliableScope = Boolean(turn?.id && turn.startedAt && source?.rows);
       const rows = reliableScope ? source.rows.filter(item => item.workerId === row.device_id && item.shiftId === turn.id) : null;
@@ -127,6 +191,7 @@ export class NetworkMonitor {
         .reduce((latest, r) => Math.max(latest, timestamp(r.endedAt || r.answeredAt || r.startedAt)), 0) || 0;
       return { number: row.position, deviceId: row.device_id, name: row.name, state, calling,
         simulated: isTest(row.device_id), rubro, schedule: turn?.schedule || null,
+        connectedAt, disconnectedAt, connectedDurationSeconds, disconnectedDurationSeconds,
         turn: turn ? { id: turn.id, label: turn.label, date: turn.date, startedAt: turn.startedAt } : null,
         source: currentObservation ? "phone:status" : null, reportedAt: iso(currentObservation?.reportedAt),
         lastActivityAt: iso(Math.max(timestamp(row.last_activity_at), observed?.lastActivity || 0, lastAttempt)),

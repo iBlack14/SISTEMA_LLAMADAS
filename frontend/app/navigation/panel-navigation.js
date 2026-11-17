@@ -3,6 +3,7 @@ export const panelPaths = {
   calls: "/llamadas",
   contacts: "/contactos",
   reports: "/reportes",
+  reservations: "/reservas",
   blocked: "/bloqueos",
   messages: "/mensajes"
 };
@@ -12,6 +13,7 @@ export function showPanelView(view) {
     calls: "callsContent",
     contacts: "contactsContent",
     reports: "annualReport",
+    reservations: "reservationsView",
     blocked: "blockedNumbersView",
     messages: "messagesView"
   };

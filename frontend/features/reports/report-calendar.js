@@ -18,7 +18,12 @@ async function showCalendar() {
 }
 
 function renderCalendar() {
-    const dates = new Set(reportState.reports.map(r => r.date));
+    // Filtrar reportes por el año actual del calendario
+    const yearReports = reportState.reports.filter(r => {
+      const reportYear = r.date ? parseInt(r.date.split('-')[0]) : 0;
+      return reportYear === reportState.year;
+    });
+    const dates = new Set(yearReports.map(r => r.date));
     const year = reportState.year;
     const todayValue = dateToValue(new Date());
     const selected = reportState.calendarRange;
@@ -237,6 +242,9 @@ function countRangeDays(from, to) {
 async function showRange() {
     if (!reportState.calendarRange.from || !reportState.calendarRange.to) return;
     const period = { ...reportState.calendarRange };
+    if (period.from === period.to) {
+      return showDay(period.from);
+    }
     reportState.$("reportRangeOpen").disabled = true;
     try {
       const allReports = await reportActions.fetchReports();

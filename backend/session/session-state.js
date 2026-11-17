@@ -36,10 +36,23 @@ import {
  * Se construye una vez por proceso.
  */
 export function createSessionState(runtime, services) {
+let saveSoonTimer = null;
+let saveSoonPromise = null;
+
 function saveSoon() {
-  return runtime.persistence.save(runtime.sessions).catch(error => {
-    console.error("[PERSISTENCE] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
+  if (saveSoonTimer) return saveSoonPromise;
+  saveSoonPromise = new Promise((resolve) => {
+    saveSoonTimer = setTimeout(() => {
+      saveSoonTimer = null;
+      runtime.persistence.save(runtime.sessions)
+        .then(resolve)
+        .catch(error => {
+          console.error("[PERSISTENCE] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
+          resolve();
+        });
+    }, 150);
   });
+  return saveSoonPromise;
 }
 
 function getOrCreateSession(code) {

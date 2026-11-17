@@ -75,7 +75,7 @@ class VoicemailSetupActivity : AppCompatActivity() {
         pendingEnable = savedInstanceState?.getBoolean("pending_enable") == true
         VoicemailDetector.initialize(this)
         VoicemailModelInstaller.install(this)
-        val padding = dp(20)
+        val padding = dp(24)
         val root = ScrollView(this).apply {
             setBackgroundColor(color(R.color.vc_bg))
             isFillViewport = true
@@ -96,23 +96,64 @@ class VoicemailSetupActivity : AppCompatActivity() {
             setTextColor(color(if (primary) R.color.vc_text_primary else R.color.vc_text_secondary))
             setLineSpacing(dp(3).toFloat(), 1f)
         }
-        column.addView(text("Detección automática de buzón", 24f, true).apply {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val logo = TextView(this).apply {
+            text = "VC"
+            gravity = android.view.Gravity.CENTER
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(color(R.color.vc_text_inverse))
+            background = GradientDrawable().apply {
+                setColor(color(R.color.vc_accent))
+                cornerRadius = dp(12).toFloat()
+            }
+        }
+        header.addView(logo, LinearLayout.LayoutParams(dp(40), dp(40)))
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        brand.addView(text("VOIP VC", 15f, true).apply { setTypeface(typeface, Typeface.BOLD) })
+        brand.addView(text("Configuración de llamadas", 11f))
+        header.addView(brand, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            marginStart = dp(12)
+        })
+        column.addView(header)
+
+        column.addView(text("Detección de buzón", 23f, true).apply {
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, dp(30), 0, dp(4))
+        })
+        column.addView(text("Analiza locuciones en llamadas salientes y solicita colgar al detectar un buzón.", 13f).apply {
+            setPadding(0, dp(2), 0, dp(16))
+        })
+
+        val stepsCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = ContextCompat.getDrawable(this@VoicemailSetupActivity, R.drawable.bg_main_card)
+        }
+        stepsCard.addView(text("Antes de activar", 15f, true).apply {
             setTypeface(typeface, Typeface.BOLD)
         })
-        column.addView(text("Reconoce las locuciones configuradas y solicita colgar para pasar al siguiente número. Solo analiza llamadas salientes.", 16f).apply {
-            setPadding(0, dp(14), 0, dp(20))
+        stepsCard.addView(text(
+            "Requiere Android 12 o superior.\n\n1. Elige VOIP VC como teléfono predeterminado.\n2. Inicia Shizuku y autoriza VOIP VC.\n3. Activa la detección.",
+            13f
+        ).apply { setPadding(0, dp(8), 0, 0) })
+        column.addView(stepsCard, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(12)
         })
         statusText = text("", 17f, true).apply {
             setPadding(dp(16), dp(16), dp(16), dp(16))
             background = GradientDrawable().apply {
                 setColor(color(R.color.vc_surface))
-                cornerRadius = dp(12).toFloat()
+                cornerRadius = dp(18).toFloat()
                 setStroke(dp(1), color(R.color.vc_border))
             }
         }
         column.addView(statusText)
-        column.addView(text("Para autorizar: inicia Shizuku y permite el acceso a VOIP VC. Si ya rechazaste el permiso, abre Shizuku y entra en Aplicaciones autorizadas.", 14f).apply {
-            setPadding(0, dp(16), 0, dp(8))
+        column.addView(text("El audio se analiza solo durante llamadas salientes para reconocer las locuciones. No se guardan grabaciones.", 12f).apply {
+            setPadding(dp(2), dp(10), dp(2), dp(4))
         })
         fun button(label: String, primary: Boolean = false, action: () -> Unit): MaterialButton {
             val control = MaterialButton(this).apply {
@@ -120,6 +161,10 @@ class VoicemailSetupActivity : AppCompatActivity() {
                 isAllCaps = false
                 textSize = 16f
                 minHeight = dp(52)
+                cornerRadius = dp(14)
+                insetTop = 0
+                insetBottom = 0
+                elevation = 0f
                 setTextColor(color(if (primary) R.color.vc_text_inverse else R.color.vc_text_primary))
                 backgroundTintList = ColorStateList.valueOf(color(if (primary) R.color.vc_accent else R.color.vc_surface))
                 strokeWidth = if (primary) 0 else dp(1)

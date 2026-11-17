@@ -114,6 +114,18 @@ button, .panel-link {
 }
 button:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 14px 32px rgba(219, 0, 179, 0.45); }
 form button { width: 100%; margin-top: 26px; }
+#password { padding-right: 48px; }
+#password::-ms-reveal { display: none; }
+.input-wrap .password-toggle {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 42px; height: 42px;
+  margin: 0; padding: 10px; border-radius: 7px;
+  background: transparent; color: #cdb5d5; box-shadow: none;
+}
+.input-wrap .password-toggle:hover { background: rgba(255, 255, 255, .08); color: #fff; box-shadow: none; filter: none; }
+.password-toggle svg { width: 20px; height: 20px; }
+.password-eye-slash { display: none; }
+.password-toggle[aria-pressed="true"] .password-eye-slash { display: block; }
 button:disabled { opacity: .6; cursor: wait; transform: none; }
 
 :focus-visible { outline: 3px solid #ff8dda; outline-offset: 3px; }

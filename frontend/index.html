@@ -14,14 +14,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
- <link rel="stylesheet" href="/shared/styles/base.css?v=20261112-centered-modals" />
+ <link rel="stylesheet" href="/shared/styles/base.css?v=20261114-white-pearl-popups" />
  <link rel="stylesheet" href="/features/contacts/contact-tabs.css?v=20261111-compact-lists" />
  <link rel="stylesheet" href="/features/calls/call-outcomes.css?v=20261111-voicemail" />
- <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261114-inline-range" />
+ <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261116-3cols" />
  <link rel="stylesheet" href="/features/reports/report-details.css?v=20261111-device-details" />
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261114-nav-pages" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261116-action-contrast" />
+ <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261114-admin-pages"></script>
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
@@ -333,8 +335,8 @@
     </div>
     
     <div class="messages-content-wrap">
-      <!-- Plantillas de mensajes -->
-      <section class="messages-section-card messages-templates-section">
+      <!-- Plantillas de mensajes (oculto según solicitud) -->
+      <section class="messages-section-card messages-templates-section" style="display: none;">
         <div class="messages-card-header">
           <div>
             <span class="section-eyebrow">PLANTILLAS</span>
@@ -364,6 +366,46 @@
         </div>
       </section>
     </div>
+  </section>
+
+  <!-- RESERVA DE CONTACTO VIEW (AGENDAS / COTIZACIONES) -->
+  <section id="reservationsView" class="reservations-view" aria-labelledby="reservationsTitle" hidden>
+    <div class="reservations-nav">
+      <button id="reservationsBackBtn" class="secondary" type="button">← Volver a llamadas</button>
+    </div>
+    <header class="reservations-window-header">
+      <div class="reservations-title-wrap">
+        <h2 id="reservationsTitle">Reservas de contacto</h2>
+        <p>Tus cotizaciones y próximas llamadas, en un solo lugar.</p>
+      </div>
+      <div class="reservations-header-actions">
+        <button id="newReservationBtn" class="primary" type="button"><span aria-hidden="true">＋</span> Nueva reserva</button>
+      </div>
+    </header>
+
+    <div class="reservations-toolbar">
+      <div class="reservations-search-wrap">
+        <label for="reservationsSearchInput">Buscar reserva</label>
+        <div class="res-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="reservationsSearchInput" type="search" placeholder="Número, empresa o cotización…" autocomplete="off" /></div>
+      </div>
+      <div class="reservations-filters-wrap">
+        <button type="button" class="res-filter-btn active" data-status="all" aria-pressed="true">Todas <span id="resCountAll">0</span></button>
+        <button type="button" class="res-filter-btn" data-status="scheduled" aria-pressed="false">Programadas <span id="resCountScheduled">0</span></button>
+        <button type="button" class="res-filter-btn" data-status="paused" aria-pressed="false">Pausadas <span id="resCountPaused">0</span></button>
+        <button type="button" class="res-filter-btn" data-status="completed" aria-pressed="false">Completadas <span id="resCountCompleted">0</span></button>
+      </div>
+    </div>
+
+    <div class="res-results-heading"><h3>Agenda de seguimiento</h3><span id="reservationsResultCount" role="status" aria-live="polite">Cargando reservas…</span></div>
+    <div id="reservationsEmptyState" class="reservations-empty" style="display:none;">
+      <div class="res-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="12" width="30" height="29" rx="5"/><path d="M9 22h30M17 7v10M31 7v10M18 30h5M27 30h4M18 35h5"/></svg></div>
+      <h3 id="reservationsEmptyTitle">Tu próxima llamada empieza aquí</h3>
+      <p id="reservationsEmptyDescription">Crea una reserva para dar seguimiento a una cotización. También puedes agendarla desde tu celular durante una llamada.</p>
+      <button id="reservationsEmptyAction" type="button" class="secondary">＋ Crear mi primera reserva</button>
+    </div>
+
+    <!-- Contenedor de tarjetas (Formato según boceto: Nº, EMPRESA, COTIZACIÓN, PRECIO, FECHA DE LLAMADA, HORARIO, [PAUSAR/DETENER], [LLAMAR]) -->
+    <div id="reservationsCardsGrid" class="reservations-cards-grid"></div>
   </section>
 
     </section>
@@ -478,9 +520,12 @@
 
   <!-- MODAL CREAR/EDITAR PLANTILLA -->
   <div id="templateModal" class="edit-modal" style="display:none">
-    <div class="edit-card">
+    <div class="edit-card template-editor-card">
       <button id="templateCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
-      <h3 id="templateModalTitle">Nueva plantilla</h3>
+      <div class="template-modal-header">
+        <span class="send-message-eyebrow">CONFIGURACIÓN DE MENSAJES</span>
+        <h3 id="templateModalTitle">Nueva plantilla</h3>
+      </div>
       <div class="edit-form">
         <label for="templateNameInput">Nombre de la plantilla</label>
         <input id="templateNameInput" type="text" placeholder="Ej: Propuesta de mejora" maxlength="100" required />
@@ -492,9 +537,37 @@
           <option value="email">Solo Correo</option>
         </select>
 
-        <label for="templateMessageInput">Mensaje</label>
-        <textarea id="templateMessageInput" rows="6" placeholder="Escribe tu mensaje aquí..." maxlength="1000" required></textarea>
-        <small class="muted">Usa {nombre} para el nombre del contacto, {empresa} para la empresa</small>
+        <div class="template-field-header">
+          <label for="templateMessageInput">Mensaje</label>
+          <span class="template-char-count"><span id="templateCharCount">0</span> / 1000</span>
+        </div>
+        <textarea id="templateMessageInput" rows="5" placeholder="Escribe tu mensaje aquí..." maxlength="1000" required></textarea>
+
+        <div class="template-vars-row">
+          <span class="vars-title">Insertar variable:</span>
+          <button type="button" class="var-chip" data-var="{nombre}">+ {nombre}</button>
+          <button type="button" class="var-chip" data-var="{empresa}">+ {empresa}</button>
+        </div>
+
+        <!-- Zona de imagen adjunta de la plantilla -->
+        <label>Imagen de la plantilla (opcional)</label>
+        <div id="templateImageDropZone" class="template-image-dropzone">
+          <input type="file" id="templateImageFileInput" accept="image/*" style="display:none" />
+          <div id="templateImageEmptyWrap" class="template-dropzone-empty">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p>Arrastra una imagen aquí o <strong>haz clic para buscar</strong></p>
+            <small class="muted">PNG, JPG, WebP. También puedes pegar con <strong>Ctrl + V</strong></small>
+          </div>
+          <div id="templateImagePreviewWrap" class="template-dropzone-preview" style="display:none">
+            <div class="template-preview-img-box">
+              <img id="templateImagePreviewImg" src="" alt="Vista previa de plantilla" />
+            </div>
+            <div class="template-preview-info">
+              <span class="template-preview-tag">✓ Imagen seleccionada</span>
+              <button type="button" id="templateImageRemoveBtn" class="template-remove-img-btn">✕ Quitar imagen</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
         <button id="templateCancelBtn" type="button" class="secondary">Cancelar</button>
@@ -521,9 +594,17 @@
             <span class="send-message-eyebrow">PLANTILLAS</span>
             <h4 id="sendTemplatesTitle">Mensajes guardados</h4>
           </div>
-          <span id="sendTemplateCount" class="send-template-count">0</span>
+          <div class="send-template-heading-controls">
+            <span id="sendTemplateCount" class="send-template-count">0</span>
+            <button id="sendModalNewTemplateBtn" type="button" class="send-modal-new-template-btn" title="Crear nueva plantilla">+ Nueva</button>
+          </div>
         </div>
         <p>Elige un texto para cargarlo en el mensaje.</p>
+        <div class="send-template-filter-tools">
+          <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
+          <label for="sendTemplateCategory">Categoría<select id="sendTemplateCategory"><option value="">Todas las categorías</option></select></label>
+          <span id="sendTemplateResultCount" aria-live="polite"></span>
+        </div>
         <div id="sendMessageTemplates" class="send-template-list"></div>
       </aside>
 
@@ -545,12 +626,44 @@
         <input id="sendWhatsAppNumber" type="tel" placeholder="51987654321" inputmode="tel" maxlength="24" />
 
         <label for="sendWhatsAppMessage">Mensaje</label>
-        <textarea id="sendWhatsAppMessage" rows="6" placeholder="Escribe tu mensaje..."></textarea>
+        <textarea id="sendWhatsAppMessage" rows="5" placeholder="Escribe tu mensaje..."></textarea>
         <div class="message-char-count"><span id="whatsappCharCount">0</span> / 1000 caracteres</div>
 
-        <div class="message-note">
+        <!-- Sección Imagen Adjunta para WhatsApp -->
+        <div class="send-message-image-area">
+          <div class="send-message-image-header">
+            <span class="send-message-image-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Imagen adjunta (opcional)
+            </span>
+            <input type="file" id="sendWhatsAppImageInput" accept="image/*" style="display:none;" />
+            <button type="button" id="sendWhatsAppAttachBtn" class="sm-image-action-btn">
+              📷 Adjuntar / Cambiar imagen
+            </button>
+          </div>
+
+          <div id="sendWhatsAppImagePreviewWrap" class="sm-image-preview-wrap" style="display:none;">
+            <div class="sm-image-thumb-container">
+              <img id="sendWhatsAppImageThumb" src="" alt="Vista previa adjunto" />
+            </div>
+            <div class="sm-image-meta">
+              <span class="sm-image-badge">✓ Imagen lista</span>
+              <span class="sm-image-tip">Al hacer clic en Enviar o en "Copiar", se copiará al portapapeles para pegarla en WhatsApp con <strong>Ctrl + V</strong>.</span>
+              <div class="sm-image-controls">
+                <button type="button" id="sendWhatsAppCopyImageBtn" class="sm-btn-copy" title="Copiar imagen al portapapeles">
+                  📋 Copiar imagen
+                </button>
+                <button type="button" id="sendWhatsAppRemoveImageBtn" class="sm-btn-remove" title="Quitar imagen">
+                  ✕ Quitar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-note" id="whatsappMessageNote">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          Edita el texto y confirma en WhatsApp. Guardará registrado en la base de datos.
+          <span id="whatsappNoteText">Edita el texto y confirma en WhatsApp. Guardará registrado en la base de datos.</span>
         </div>
 
         <button id="continueWhatsAppBtn" type="button" class="button primary full-width">
@@ -568,8 +681,40 @@
         <input id="sendEmailSubject" type="text" placeholder="Asunto del correo" maxlength="200" />
 
         <label for="sendEmailMessage">Mensaje</label>
-        <textarea id="sendEmailMessage" rows="8" placeholder="Escribe tu mensaje..."></textarea>
+        <textarea id="sendEmailMessage" rows="6" placeholder="Escribe tu mensaje..."></textarea>
         <div class="message-char-count"><span id="emailCharCount">0</span> / 5000 caracteres</div>
+
+        <!-- Sección Imagen Adjunta para Correo -->
+        <div class="send-message-image-area">
+          <div class="send-message-image-header">
+            <span class="send-message-image-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Imagen adjunta (opcional)
+            </span>
+            <input type="file" id="sendEmailImageInput" accept="image/*" style="display:none;" />
+            <button type="button" id="sendEmailAttachBtn" class="sm-image-action-btn">
+              📷 Adjuntar / Cambiar imagen
+            </button>
+          </div>
+
+          <div id="sendEmailImagePreviewWrap" class="sm-image-preview-wrap" style="display:none;">
+            <div class="sm-image-thumb-container">
+              <img id="sendEmailImageThumb" src="" alt="Vista previa adjunto" />
+            </div>
+            <div class="sm-image-meta">
+              <span class="sm-image-badge">✓ Imagen lista</span>
+              <span class="sm-image-tip">Puedes copiar la imagen para pegarla en tu cliente de correo.</span>
+              <div class="sm-image-controls">
+                <button type="button" id="sendEmailCopyImageBtn" class="sm-btn-copy" title="Copiar imagen al portapapeles">
+                  📋 Copiar imagen
+                </button>
+                <button type="button" id="sendEmailRemoveImageBtn" class="sm-btn-remove" title="Quitar imagen">
+                  ✕ Quitar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <button id="sendEmailBtn" type="button" class="button primary full-width">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>
@@ -609,6 +754,7 @@
 
         <div class="call-controls">
           <button id="modalMuteBtn" class="secondary" title="Silenciar micrófono">🎙️ Micrófono</button>
+          <button id="modalQuoteBtn" class="secondary" title="Crear Cotización / Reserva de Contacto">📋 Cotización</button>
         </div>
 
         <div class="call-controls call-controls-main">
@@ -617,6 +763,68 @@
 
         <small id="callHint" class="muted" style="display:block;margin-top:12px;font-size:12px;"></small>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL RESERVA DE COTIZACIÓN -->
+  <div id="quoteModal" class="edit-modal" style="display:none">
+    <div class="edit-card reservation-card-modal" role="dialog" aria-modal="true" aria-labelledby="quoteModalTitle">
+      <button id="quoteCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
+      <div class="quote-modal-header">
+        <h3 id="quoteModalTitle">Nueva reserva</h3>
+        <p class="muted">Completa la cotización y agenda tu próxima llamada.</p>
+      </div>
+      <form id="quoteForm" class="edit-form" onsubmit="return false;">
+        <input type="hidden" id="quoteId" />
+
+        <div class="form-row-dual">
+          <div>
+            <label for="quotePhoneInput">Teléfono *</label>
+            <input id="quotePhoneInput" type="tel" placeholder="Ej: 987654321" required autocomplete="off" />
+          </div>
+          <div>
+            <label for="quoteNameInput">Empresa o contacto</label>
+            <input id="quoteNameInput" type="text" placeholder="Ej: Distribuidora SAC" autocomplete="off" />
+          </div>
+        </div>
+
+        <label for="quoteDescInput">Detalle de la cotización *</label>
+        <textarea id="quoteDescInput" rows="3" placeholder="Ej: Solicita cotización de 50 sacos de alimento y flete..." required></textarea>
+
+        <div class="form-row-dual">
+          <div>
+            <label for="quotePriceInput">Precio (S/)</label>
+            <input id="quotePriceInput" type="text" placeholder="Ej: 1500" autocomplete="off" />
+          </div>
+          <div>
+            <label for="quoteStatusSelect">Estado</label>
+            <select id="quoteStatusSelect">
+              <option value="scheduled">Programada</option>
+              <option value="paused">Pausada</option>
+              <option value="completed">Completada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-dual">
+          <div>
+            <label for="quoteDateInput">Fecha de llamada *</label>
+            <input id="quoteDateInput" type="date" required />
+          </div>
+          <div>
+            <label for="quoteTimeInput">Hora *</label>
+            <input id="quoteTimeInput" type="time" required />
+          </div>
+        </div>
+
+        <label for="quoteNotesInput">Notas adicionales (opcional)</label>
+        <input id="quoteNotesInput" type="text" placeholder="Ej: Preguntar por el encargado de compras" />
+
+        <div class="modal-actions" style="margin-top:16px;">
+          <button id="quoteCancelBtn" type="button" class="secondary">Cancelar</button>
+          <button id="quoteSaveBtn" type="submit" class="primary">Guardar reserva</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -658,6 +866,7 @@
       document.body.appendChild(socketScript);
     })();
   </script>
+  <div id="appToastContainer" class="app-toast-container" aria-live="polite"></div>
 </body>
 
 </html>

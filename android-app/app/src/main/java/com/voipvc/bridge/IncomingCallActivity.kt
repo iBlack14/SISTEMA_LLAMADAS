@@ -26,13 +26,23 @@ class IncomingCallActivity : AppCompatActivity() {
     private lateinit var companyName: TextView
     private lateinit var phoneNumber: TextView
     private lateinit var callState: TextView
+    private lateinit var screenTitle: TextView
+    private lateinit var screenHint: TextView
+    private lateinit var headerSubtitle: TextView
+    private lateinit var callTopSpacer: View
     private lateinit var callTimer: TextView
+    private lateinit var audioControlsRow: View
+    private lateinit var contactActionsRow: View
+    private lateinit var ringingActionsRow: View
+    private lateinit var callActionsRow: View
     private lateinit var micBtn: MaterialButton
     private lateinit var speakerBtn: MaterialButton
     private lateinit var messageBtn: MaterialButton
     private lateinit var blockBtn: MaterialButton
     private lateinit var answerBtn: MaterialButton
     private lateinit var hangupBtn: MaterialButton
+    private lateinit var endCallBtn: MaterialButton
+    private lateinit var quoteBtn: MaterialButton
 
     private var telecomUi = false
     private var imageUrl: String = ""
@@ -44,7 +54,7 @@ class IncomingCallActivity : AppCompatActivity() {
             val sec = ((System.currentTimeMillis() - started) / 1000L).toInt().coerceAtLeast(0)
             val mm = sec / 60
             val ss = sec % 60
-            callTimer.text = String.format(Locale.US, "%02d:%02d", mm, ss)
+            callTimer.text = String.format(Locale.US, "%02d:%02d · EN LLAMADA", mm, ss)
             timerHandler.postDelayed(this, 1000L)
         }
     }
@@ -80,13 +90,23 @@ class IncomingCallActivity : AppCompatActivity() {
         companyName = findViewById(R.id.companyNameText)
         phoneNumber = findViewById(R.id.phoneNumberText)
         callState = findViewById(R.id.callStateText)
+        screenTitle = findViewById(R.id.callScreenTitle)
+        screenHint = findViewById(R.id.callScreenHint)
+        headerSubtitle = findViewById(R.id.headerCallSubtitle)
+        callTopSpacer = findViewById(R.id.callTopSpacer)
         callTimer = findViewById(R.id.callTimerText)
+        audioControlsRow = findViewById(R.id.audioControlsRow)
+        contactActionsRow = findViewById(R.id.contactActionsRow)
+        ringingActionsRow = findViewById(R.id.ringingActionsRow)
+        callActionsRow = findViewById(R.id.callActionsRow)
         micBtn = findViewById(R.id.micButton)
         speakerBtn = findViewById(R.id.speakerButton)
         messageBtn = findViewById(R.id.messageButton)
         blockBtn = findViewById(R.id.blockButton)
         answerBtn = findViewById(R.id.answerButton)
         hangupBtn = findViewById(R.id.hangupButton)
+        endCallBtn = findViewById(R.id.endCallButton)
+        quoteBtn = findViewById(R.id.quoteButton)
 
         answerBtn.setOnClickListener {
             if (VoipVcInCallService.answerRingingCall()) {
@@ -115,6 +135,16 @@ class IncomingCallActivity : AppCompatActivity() {
                 .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
             ContextCompat.startForegroundService(this, intent)
         }
+        quoteBtn.setOnClickListener {
+            val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
+            val name = companyName.text.toString().ifBlank { number }
+            val intent = Intent(this, BridgeService::class.java)
+                .setAction(BridgeService.ACTION_UI_QUOTE_REQUEST)
+                .putExtra(BridgeService.EXTRA_CONTACT_NAME, name)
+                .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+            ContextCompat.startForegroundService(this, intent)
+            Toast.makeText(this, "Cotización enviada al panel web", Toast.LENGTH_SHORT).show()
+        }
         blockBtn.setOnClickListener {
             val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
             val shouldBlock = !BlockedNumberStore.contains(this, number)
@@ -131,10 +161,12 @@ class IncomingCallActivity : AppCompatActivity() {
             updateBlockButtonState(number)
             Toast.makeText(this, if (shouldBlock) "Agregado a la lista de bloqueos" else "Número quitado de la lista", Toast.LENGTH_SHORT).show()
         }
-        hangupBtn.setOnClickListener {
+        val hangupCurrentCall = {
             if (telecomUi) VoipVcInCallService.disconnectCall(phoneNumber.text.toString().let { if (it == "-") "" else it })
             else sendServiceAction(BridgeService.ACTION_UI_HANGUP)
         }
+        hangupBtn.setOnClickListener { hangupCurrentCall() }
+        endCallBtn.setOnClickListener { hangupCurrentCall() }
 
         telecomUi = intent.getBooleanExtra("telecom_ui", false)
         renderFromIntent(intent)
@@ -199,25 +231,77 @@ class IncomingCallActivity : AppCompatActivity() {
             number.isNotBlank() -> number
             else -> "Contacto"
         }
+        val initials = companyName.text.toString().trim().split(Regex("\\s+")).take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }.joinToString("")
+        findViewById<TextView>(R.id.companyInitials).apply {
+            text = initials.ifBlank { "VC" }.uppercase(Locale.getDefault())
+            visibility = View.VISIBLE
+        }
         phoneNumber.text = if (number.isBlank()) "-" else number
         callState.text = when (state) {
             "dialing" -> "LLAMANDO..."
             "in_call" -> "EN LLAMADA"
-            "ringing" -> "SONANDO"
+            "ringing" -> "LLAMADA ENTRANTE"
             "ended" -> "FINALIZADA"
             "idle" -> "ESPERA"
             else -> "LLAMANDO..."
         }
+        findViewById<TextView>(R.id.headerCallStatus).apply {
+            text = when (state) {
+                "ringing" -> "SONANDO"
+                "dialing" -> "LLAMANDO"
+                "in_call" -> "CONECTADA"
+                else -> "VOIP VC"
+            }
+            val tint = when (state) {
+                "ringing", "dialing" -> R.color.vc_warning
+                "in_call" -> R.color.vc_success
+                else -> R.color.vc_text_secondary
+            }
+            setTextColor(ContextCompat.getColor(this@IncomingCallActivity, tint))
+            setBackgroundResource(when (state) {
+                "ringing", "dialing" -> R.drawable.bg_status_warning
+                "in_call" -> R.drawable.bg_status_success
+                else -> R.drawable.bg_state_chip
+            })
+        }
         applyStateChipStyle(state)
-        answerBtn.visibility = if (state == "ringing") View.VISIBLE else View.GONE
+        val ringing = state == "ringing"
+        callTopSpacer.layoutParams = callTopSpacer.layoutParams.apply {
+            height = dp(if (ringing) 0 else if (state == "in_call") 112 else 80)
+        }
+        companyImage.layoutParams = (companyImage.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+            topMargin = dp(if (ringing) 42 else 0)
+        }
+        screenTitle.visibility = if (ringing) View.VISIBLE else View.GONE
+        screenHint.visibility = if (ringing) View.VISIBLE else View.GONE
+        headerSubtitle.text = if (ringing) "Llamada entrante" else "Controles de llamada"
+        val callControlsAvailable = state in setOf("dialing", "in_call")
+        val liveCall = ringing || callControlsAvailable
+        answerBtn.visibility = if (ringing) View.VISIBLE else View.GONE
         answerBtn.isEnabled = state == "ringing"
         hangupBtn.text = if (state == "ringing") "Rechazar" else "Colgar"
+        hangupBtn.visibility = if (ringing) View.VISIBLE else View.GONE
+        audioControlsRow.visibility = if (ringing || !liveCall) View.GONE else View.VISIBLE
+        contactActionsRow.visibility = if (callControlsAvailable) View.VISIBLE else View.GONE
+        ringingActionsRow.visibility = if (ringing) View.VISIBLE else View.GONE
+        callActionsRow.visibility = if (callControlsAvailable) View.VISIBLE else View.GONE
+        callTimer.visibility = if (state == "in_call") View.VISIBLE else View.GONE
+        callState.visibility = if (state == "in_call") View.GONE else View.VISIBLE
+        callTimer.text = if (state == "in_call") "00:00 · EN LLAMADA" else "00:00"
+        callTimer.setBackgroundResource(if (state == "in_call") R.drawable.bg_status_success else 0)
+        callTimer.setTextColor(ContextCompat.getColor(
+            this,
+            if (state == "in_call") R.color.vc_success else R.color.vc_text_primary
+        ))
+        if (state == "in_call") callTimer.setPadding(dp(12), dp(8), dp(12), dp(8))
+        else callTimer.setPadding(0, 0, 0, 0)
+        endCallBtn.isEnabled = callControlsAvailable
+        quoteBtn.visibility = if (state == "in_call") View.VISIBLE else View.GONE
         micBtn.isEnabled = state == "in_call"
-        speakerBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
-        messageBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
-        blockBtn.isEnabled = state in setOf("dialing", "ringing", "in_call")
-        messageBtn.visibility = if (state in setOf("dialing", "ringing", "in_call")) View.VISIBLE else View.GONE
-        blockBtn.visibility = if (state in setOf("dialing", "ringing", "in_call")) View.VISIBLE else View.GONE
+        speakerBtn.isEnabled = liveCall
+        messageBtn.isEnabled = callControlsAvailable
+        blockBtn.isEnabled = callControlsAvailable
         updateBlockButtonState(number)
 
         if (state == "in_call") {
@@ -234,20 +318,31 @@ class IncomingCallActivity : AppCompatActivity() {
         speakerBtn.text = if (speakerOn) "Quitar altavoz" else "Altavoz"
         applyToggleStyles(micMuted, speakerOn)
 
-        if (img.isNotBlank() && img != imageUrl) {
+        if (img.isBlank()) {
+            companyImage.visibility = View.GONE
+        } else if (img != imageUrl) {
             imageUrl = img
+            companyImage.visibility = View.GONE
             loadImage(img)
+        } else if (companyImage.drawable != null) {
+            companyImage.visibility = View.VISIBLE
+            findViewById<TextView>(R.id.companyInitials).visibility = View.GONE
         }
 
         if (state == "idle" || state == "ended") finish()
     }
 
     private fun updateBlockButtonState(number: String) {
-        if (number.isBlank()) {
-            blockBtn.text = "Bloquear"
-            return
-        }
-        blockBtn.text = if (BlockedNumberStore.contains(this, number)) "Bloqueado" else "Bloquear"
+        val blocked = number.isNotBlank() && BlockedNumberStore.contains(this, number)
+        blockBtn.text = if (blocked) "Desbloquear" else "Bloquear"
+        blockBtn.background = ContextCompat.getDrawable(
+            this,
+            if (blocked) R.drawable.bg_secondary_button else R.drawable.bg_danger_soft
+        )
+        blockBtn.setTextColor(ContextCompat.getColor(
+            this,
+            if (blocked) R.color.vc_text_primary else R.color.vc_error
+        ))
     }
 
     private fun applyToggleStyles(micMuted: Boolean, speakerOn: Boolean) {
@@ -295,7 +390,11 @@ class IncomingCallActivity : AppCompatActivity() {
                 }
                 conn.inputStream.use { stream ->
                     val bmp = BitmapFactory.decodeStream(stream)
-                    if (bmp != null) runOnUiThread { companyImage.setImageBitmap(bmp) }
+                    if (bmp != null) runOnUiThread {
+                        companyImage.setImageBitmap(bmp)
+                        companyImage.visibility = View.VISIBLE
+                        findViewById<TextView>(R.id.companyInitials).visibility = View.GONE
+                    }
                 }
                 conn.disconnect()
             } catch (_: Exception) {
@@ -303,4 +402,6 @@ class IncomingCallActivity : AppCompatActivity() {
             }
         }.start()
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

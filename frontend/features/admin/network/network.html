@@ -9,12 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/features/admin/network/network.css?v=20261114-editusers">
+  <link rel="stylesheet" href="/features/admin/network/network.css?v=20261116-orbpoint">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261114-nav-pages">
   <script type="module" src="/layouts/dashboard/sidebar.js?v=20261114-admin-pages"></script>
   <script src="/socket.io/socket.io.js" defer></script>
-  <script type="module" src="/features/admin/network/network-page.js?v=20261114-cards"></script>
+  <script type="module" src="/features/admin/network/network-page.js?v=20261116-orbpoint"></script>
 </head>
 <body>
   <header class="app-header">
@@ -35,6 +35,7 @@
       <div class="page-heading">
         <div><h1>Núcleo de Red</h1><p>Estado de los equipos y actividad del turno.</p></div>
         <div class="actions">
+          <button id="reconnectAllTopButton" class="button secondary reconnect-all-btn" type="button" hidden>🔄 Reconectar desconectados</button>
           <button id="usersButton" class="button secondary" type="button">Usuarios</button>
           <button id="refreshButton" class="button secondary" type="button">Actualizar</button>
           <button id="downloadLog" class="button primary" type="button" disabled>Descargar registro</button>
@@ -63,7 +64,15 @@
         </div>
         <p id="overflowNotice" class="notice" hidden></p>
       </section>
-      <div id="alertBanner" class="notice error" role="status" hidden><strong id="alertTitle"></strong><p id="alertText"></p></div>
+      <div id="alertBanner" class="notice error alert-banner" role="status" hidden>
+        <div class="alert-info">
+          <strong id="alertTitle"></strong>
+          <p id="alertText"></p>
+        </div>
+        <div class="alert-actions">
+          <button id="reconnectAllAlertBtn" class="button secondary reconnect-all-btn" type="button">🔄 Reconectar todos</button>
+        </div>
+      </div>
       <section aria-label="Detalle de equipos">
         <div class="filters">
           <label class="search" for="searchInput">Buscar equipo<input id="searchInput" type="search" placeholder="Equipo, nombre o rubro…"></label>

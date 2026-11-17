@@ -1,14 +1,72 @@
-.idea/
+# Dependencies
+node_modules/
 frontend/node_modules/
-frontend/dist/
+.pnp
+.pnp.js
+
+# Environment variables & local credentials
 .env
+.env.local
+.env.*.local
+*.env
+!.env.example
+!easypanel.env.example
+!mysql-history.env.example
+android-app/local.properties
+android-app/.env
+.auth-local/
+
+# Build outputs & caches
+dist/
+frontend/dist/
+build/
+**/build/
+**/.gradle/
+output/
+.screenshots/
+*.apk
+*.aab
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Test & Automation
+.playwright-cli/
+.playwright-mcp/
+.local-test/
+
+# Runtime data & backups
 server/backups/
 server/sessions.json
 server/*.call-history.json
 
-**/build/
-**/.gradle/
-android-app/local.properties
-android-app/.env
-.auth-local/
-.playwright-mcp/
+# Editor & IDE directories
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Editor backup & temporary files
+*~
+*.bak
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+

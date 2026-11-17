@@ -61,6 +61,7 @@ function normalizeSessionShape(session = {}) {
     phoneWorkers: [],
     pairingSlots: [],
     blockedNumbers: [],
+    contactReservations: [],
     micMuted: true,
     isSpeakerOn: false,
     pbx: {

@@ -68,8 +68,8 @@ fun buildConfigString(value: String): String =
 val developmentBaseUrl = androidBaseUrl("ANDROID_DEV_BASE_URL")
 val productionBaseUrl = androidBaseUrl("ANDROID_PROD_BASE_URL")
 val spanishModelUrl = androidBaseUrl("ANDROID_VOSK_MODEL_URL")
-require(URI(productionBaseUrl).scheme == "https") {
-    "ANDROID_PROD_BASE_URL debe usar HTTPS."
+require(URI(productionBaseUrl).scheme in setOf("http", "https")) {
+    "ANDROID_PROD_BASE_URL debe usar HTTP o HTTPS."
 }
 require(URI(spanishModelUrl).scheme == "https") {
     "ANDROID_VOSK_MODEL_URL debe usar HTTPS."

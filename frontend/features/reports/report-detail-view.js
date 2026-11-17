@@ -304,7 +304,7 @@ function renderDetails() {
         const button = reportState.$("detailedPdf");
         button.disabled = true;
         try {
-          const logoResponse = await fetch("/logo-vc-color.png");
+          const logoResponse = await fetch("/shared/assets/images/logo-vc-color.png");
           if (!logoResponse.ok) {
             throw Error("No se pudo cargar el logotipo del reporte.");
           }
