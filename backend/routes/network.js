@@ -11,13 +11,23 @@ runtime.app.get("/api/network/access", (req, res) => res.json({ ok: true, role: 
 runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
-    const [rows] = await runtime.auth.pool.query(`SELECT u.id AS user_id,u.username,u.role,u.active,w.session_code
-      FROM auth_users u LEFT JOIN auth_user_workspaces w ON w.user_id=u.id
-      ORDER BY u.username`);
-    const users = rows.map(row => ({ id: row.user_id, username: row.username,
-      role: row.role, active: Boolean(Number(row.active)), lists: [] }));
-    const usersById = new Map(users.map(user => [String(user.id), user]));
-    const activeCodes = rows.map(row => row.session_code).filter(Boolean);
+    const [rows] = await runtime.auth.pool.query(`SELECT u.id AS user_id,u.username,u.role,u.active,access.session_code
+      FROM auth_users u
+      LEFT JOIN (
+        SELECT user_id,session_code FROM auth_user_workspaces
+        UNION
+        SELECT a.user_id,a.session_code FROM auth_session_access a
+        WHERE NOT EXISTS (SELECT 1 FROM auth_user_workspaces w WHERE w.user_id=a.user_id)
+      ) access ON access.user_id=u.id
+      ORDER BY u.username,access.session_code`);
+    const usersById = new Map();
+    for (const row of rows) {
+      const key = String(row.user_id);
+      if (!usersById.has(key)) usersById.set(key, { id: row.user_id, username: row.username,
+        role: row.role, active: Boolean(Number(row.active)), lists: [] });
+    }
+    const users = [...usersById.values()];
+    const activeCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
     const booksByCode = new Map();
     if (activeCodes.length) {
       const [sessionRows] = await runtime.auth.pool.query(
@@ -38,8 +48,11 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
         const name = contact.list || "Principal";
         counts.set(name, (counts.get(name) || 0) + 1);
       }
-      const names = [...new Set([...(book.lists || []), ...counts.keys()])];
-      user.lists = names.map(name => ({ name, count: counts.get(name) || 0 }));
+      for (const name of new Set([...(book.lists || []), ...counts.keys()])) {
+        const existing = user.lists.find(list => list.name === name);
+        if (existing) existing.count += counts.get(name) || 0;
+        else user.lists.push({ name, count: counts.get(name) || 0 });
+      }
     }
     const missingCodes = activeCodes.filter(code => !booksByCode.get(code)?.contacts?.length);
     if (missingCodes.length) {
@@ -55,7 +68,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
         else user.lists.push({ name: row.list_name, count: Number(row.contact_count) });
       }
       const [campaignLists] = await runtime.auth.pool.query(
-        `SELECT session_code,list_name FROM vc_call_campaigns
+        `SELECT DISTINCT session_code,list_name FROM vc_call_campaigns
           WHERE session_code IN (${missingCodes.map(() => "?").join(",")})`, missingCodes);
       for (const row of campaignLists) {
         const account = rows.find(item => item.session_code === row.session_code);
@@ -79,25 +92,38 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     return res.status(400).json({ ok: false, error: "Usuario, lista o página no válidos." });
   }
   try {
-    const [rows] = await runtime.auth.pool.query(`SELECT u.username,w.session_code
-      FROM auth_users u LEFT JOIN auth_user_workspaces w ON w.user_id=u.id WHERE u.id=?`, [userId]);
+    const [rows] = await runtime.auth.pool.query(`SELECT u.username,access.session_code
+      FROM auth_users u LEFT JOIN (
+        SELECT user_id,session_code FROM auth_user_workspaces WHERE user_id=?
+        UNION
+        SELECT a.user_id,a.session_code FROM auth_session_access a
+        WHERE a.user_id=? AND NOT EXISTS (SELECT 1 FROM auth_user_workspaces w WHERE w.user_id=a.user_id)
+      ) access ON access.user_id=u.id WHERE u.id=?`, [userId, userId, userId]);
     if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
-    let book = runtime.sessions.get(rows[0].session_code)?.contactBook;
-    if (!book && rows[0].session_code) {
-      const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [rows[0].session_code]);
-      const stored = sessionRows[0]?.data;
-      book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
+    const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
+    const books = new Map();
+    for (const code of sessionCodes) {
+      let book = runtime.sessions.get(code)?.contactBook;
+      if (!book) {
+        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
+        const stored = sessionRows[0]?.data;
+        book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
+      }
+      if (book) books.set(code, book);
     }
-    if (book?.contacts?.length) {
-      const contacts = book.contacts.filter(contact => (contact.list || "Principal") === listName);
+    const contactsFromBooks = sessionCodes.flatMap(code => (books.get(code)?.contacts || [])
+      .filter(contact => (contact.list || "Principal") === listName));
+    if (contactsFromBooks.length) {
+      const contacts = contactsFromBooks;
       return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
         contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
     }
+    if (!sessionCodes.length) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
     const [contacts] = await runtime.auth.pool.query(
-      `SELECT name,phone,'' AS note FROM vc_call_contacts WHERE session_code=? AND list_name=? ORDER BY name LIMIT ? OFFSET ?`,
-      [rows[0].session_code, listName, limit, offset]);
+      `SELECT name,phone,'' AS note FROM vc_call_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=? ORDER BY name LIMIT ? OFFSET ?`,
+      [...sessionCodes, listName, limit, offset]);
     const [[{ total }]] = await runtime.auth.pool.query(
-      "SELECT COUNT(*) AS total FROM vc_call_contacts WHERE session_code=? AND list_name=?", [rows[0].session_code, listName]);
+      `SELECT COUNT(*) AS total FROM vc_call_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=?`, [...sessionCodes, listName]);
     return res.json({ ok: true, username: rows[0].username, list: listName, total: Number(total), contacts });
   } catch {
     return res.status(503).json({ ok: false, error: "No se pudieron cargar los contactos de esta lista." });
