@@ -1,20 +1,27 @@
 export let currentUser;
 let csrfToken = "";
+let loginRequest = null;
 const accountChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("calls-account") : null;
 if (accountChannel) accountChannel.onmessage = () => window.location.replace("/");
 
 export async function requireLogin() {
-  const response = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin" });
-  if (response.status === 401) {
-    window.location.replace("/login");
-    throw new Error("Inicia sesión.");
+  if (currentUser && csrfToken) return currentUser;
+  if (!loginRequest) {
+    loginRequest = (async () => {
+      const response = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin" });
+      if (response.status === 401) {
+        window.location.replace("/login");
+        throw new Error("Inicia sesión.");
+      }
+      if (!response.ok) throw new Error("No se pudo verificar tu acceso. Recarga la página.");
+      const data = await response.json();
+      currentUser = data.user;
+      csrfToken = data.csrfToken;
+      window.VOIP_VC_AUTH_USER = currentUser;
+      return currentUser;
+    })().finally(() => { loginRequest = null; });
   }
-  if (!response.ok) throw new Error("No se pudo verificar tu acceso. Recarga la página.");
-  const data = await response.json();
-  currentUser = data.user;
-  csrfToken = data.csrfToken;
-  window.VOIP_VC_AUTH_USER = currentUser;
-  return currentUser;
+  return loginRequest;
 }
 
 export async function apiFetch(input, options = {}) {

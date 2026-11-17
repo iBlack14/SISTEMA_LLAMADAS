@@ -241,7 +241,7 @@ export class SessionPersistence {
     return Boolean(row?.endedAt && row.contactId === contactId);
   }
 
-  async getCallAttemptsForSessions(codes) {
+  async getCallAttemptsForSessions(codes, shiftIds = null) {
     await this.saveChain;
     if (this.storageFailed || (this.databaseConfigured && (!this.usingDb || this.pendingDatabase))) {
       throw new Error("No se puede confirmar el historial mientras hay guardados pendientes.");
@@ -250,11 +250,20 @@ export class SessionPersistence {
     const grouped = new Map(unique.map(code => [code, []]));
     if (!unique.length) return grouped;
     if (this.databaseConfigured) {
+      const scoped = shiftIds instanceof Map && unique.every(code => shiftIds.has(code));
+      const where = scoped
+        ? unique.map(() => "(session_code=? AND shift_id=?)").join(" OR ")
+        : `session_code IN (${unique.map(() => "?").join(",")})`;
+      const values = scoped ? unique.flatMap(code => [code, shiftIds.get(code)]) : unique;
       const [rows] = await this.pool.query(
-        `SELECT session_code,row_data FROM vc_call_attempts WHERE session_code IN (${unique.map(() => "?").join(",")}) ORDER BY started_at,attempt_id`, unique);
+        `SELECT session_code,row_data FROM vc_call_attempts WHERE ${where} ORDER BY started_at,attempt_id`, values);
       for (const entry of rows) grouped.get(entry.session_code)?.push(parseJson(entry.row_data));
     } else {
-      for (const entry of this.records.values()) grouped.get(entry.code)?.push({ ...entry.row });
+      for (const entry of this.records.values()) {
+        if (!grouped.has(entry.code)) continue;
+        if (shiftIds instanceof Map && shiftIds.has(entry.code) && entry.row.shiftId !== shiftIds.get(entry.code)) continue;
+        grouped.get(entry.code).push({ ...entry.row });
+      }
     }
     return grouped;
   }

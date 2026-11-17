@@ -3,8 +3,6 @@ import { requireLogin, bindAccountControls, apiFetch } from "../../auth/auth-ses
 let snapshot;
 let socket;
 let lastReceived = 0;
-let historyTimer;
-let historyKeyLoaded = "";
 const cards = new Map();
 const orbs = new Map();
 const histories = new Map();
@@ -205,28 +203,22 @@ function renderCardHistory(card, item) {
 
 const historyKey = item => JSON.stringify([item.deviceId, item.turn?.id, item.historyVersion]);
 
-async function loadAllHistories() {
-  if (!snapshot) return;
-  const key = snapshot.equipment.map(historyKey).join("|");
-  if (key === historyKeyLoaded) return;
-  historyKeyLoaded = key;
-  const numbers = snapshot.equipment.map(e => e.number).join(",");
+async function loadEquipmentHistory(item) {
+  const key = historyKey(item);
+  if (histories.get(item.number)?.key === key) return;
+  const numbers = item.number;
   try {
     const response = await apiFetch(`/api/network/activity?equipment=${numbers}`, { cache: "no-store" });
     if (!response.ok) throw new Error("error");
     const data = await response.json();
-    for (const item of data.equipment) {
-      histories.set(item.number, { key: historyKey(item), activity: item.activity });
-      const card = cards.get(item.number);
-      const current = snapshot.equipment.find(e => e.number === item.number);
-      if (card && current && historyKey(current) === historyKey(item)) renderCardHistory(card, current);
-    }
+    const activity = data.equipment?.[0]?.activity || [];
+    histories.set(item.number, { key, activity });
+    const card = cards.get(item.number);
+    const current = snapshot?.equipment.find(e => e.number === item.number);
+    if (card && current && historyKey(current) === key) renderCardHistory(card, current);
   } catch {
-    historyKeyLoaded = "";
-    for (const item of snapshot.equipment) {
-      const card = cards.get(item.number);
-      if (card) card.querySelector(".card-rows").innerHTML = `<tr><td colspan="4" class="muted">No se pudo cargar la actividad.</td></tr>`;
-    }
+    const card = cards.get(item.number);
+    if (card) card.querySelector(".card-rows").innerHTML = '<tr><td colspan="4" class="muted">No se pudo cargar la actividad.</td></tr>';
   }
 }
 
@@ -287,9 +279,15 @@ function render() {
   $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) fuera de las 10 posiciones.` : "";
   updateFilterCounts();
   applyFilters();
-  clearTimeout(historyTimer);
-  historyTimer = setTimeout(loadAllHistories, 400);
 }
+
+$("equipmentGrid").addEventListener("toggle", event => {
+  const details = event.target.closest("details.card-history");
+  if (!details?.open) return;
+  const card = details.closest(".net-card");
+  const item = snapshot?.equipment.find(e => e.number === Number(card?.id.replace("equip-", "")));
+  if (item) loadEquipmentHistory(item);
+}, true);
 
 async function reconnectSingleEquipment(number, btn, msgEl) {
   if (btn.disabled) return;
@@ -422,7 +420,7 @@ setInterval(tickLiveDurations, 1000);
 try {
   const user = await requireLogin();
   if (user.role !== "ADMINISTRADOR") window.location.replace("/");
-  else {
+  else if (window.location.pathname !== "/usuarios") {
     bindAccountControls();
     const response = await apiFetch("/api/network", { cache: "no-store" });
     if (!response.ok) throw new Error("No se pudo cargar Núcleo de Red.");

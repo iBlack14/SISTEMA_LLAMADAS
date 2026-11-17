@@ -8,6 +8,8 @@ const labels = { dialing: "Marcando", ringing: "Marcando", in_call: "En llamada"
 const timestamp = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : 0;
 const iso = value => value ? new Date(value).toISOString() : null;
 const isTest = id => /^(android-test-|TEST-|SIM-)/.test(id);
+const EMPTY_METRICS = summarizeAttempts([]);
+const EMPTY_HISTORY_VERSION = createHash("sha256").update("[]").digest("hex").slice(0, 24);
 
 export class NetworkMonitor {
   constructor({ pool, persistence, getSessions, isSocketConnected, broadcast, now = () => Date.now() }) {
@@ -17,6 +19,7 @@ export class NetworkMonitor {
     this.registry = [];
     this.chain = Promise.resolve();
     this.historyCache = new Map();
+    this.historyRetryAfter = 0;
   }
 
   async initialize() {
@@ -126,20 +129,55 @@ export class NetworkMonitor {
       const cached = this.historyCache.get(code);
       if (cached && cached.turnId === (source.turn?.id || "") && cached.rows) {
         source.rows = cached.rows;
-        return false;
+        source.rowsByWorker = cached.rowsByWorker;
+        source.lastAttemptByWorker = cached.lastAttemptByWorker;
+        source.metricsByWorker = cached.metricsByWorker;
+        source.historyVersionByWorker = cached.historyVersionByWorker;
+        source.rollupTurnId = cached.rollupTurnId;
+        return this.now() - cached.loadedAt >= 5000;
       }
       return true;
     }).map(([code]) => code);
-    if (missing.length) {
+    if (missing.length && this.now() >= this.historyRetryAfter) {
       try {
-        const histories = await this.persistence.getCallAttemptsForSessions(missing);
+        const shiftIds = new Map(missing.map(code => [code, sources.get(code).turn?.id || ""]));
+        const histories = await this.persistence.getCallAttemptsForSessions(missing, shiftIds);
         for (const code of missing) {
           const source = sources.get(code);
           const rows = histories.get(code) ?? null;
           source.rows = rows;
-          if (rows) this.historyCache.set(code, { turnId: source.turn?.id || "", rows });
+          if (rows) {
+            const rowsByWorker = new Map();
+            const lastAttemptByWorker = new Map();
+            for (const attempt of rows) {
+              const workerId = attempt.workerId;
+              if (!workerId) continue;
+              if (attempt.shiftId === source.turn?.id) {
+                if (!rowsByWorker.has(workerId)) rowsByWorker.set(workerId, []);
+                rowsByWorker.get(workerId).push(attempt);
+              }
+              lastAttemptByWorker.set(workerId, Math.max(lastAttemptByWorker.get(workerId) || 0,
+                timestamp(attempt.endedAt || attempt.answeredAt || attempt.startedAt)));
+            }
+            source.rowsByWorker = rowsByWorker;
+            source.lastAttemptByWorker = lastAttemptByWorker;
+            source.metricsByWorker = new Map();
+            source.historyVersionByWorker = new Map();
+            for (const [workerId, workerRows] of rowsByWorker) {
+              source.metricsByWorker.set(workerId, summarizeAttempts(workerRows));
+              source.historyVersionByWorker.set(workerId,
+                createHash("sha256").update(JSON.stringify(workerRows)).digest("hex").slice(0, 24));
+            }
+            source.rollupTurnId = source.turn?.id || "";
+            this.historyCache.set(code, { turnId: source.turn?.id || "", rows, rowsByWorker, lastAttemptByWorker,
+              metricsByWorker: source.metricsByWorker, historyVersionByWorker: source.historyVersionByWorker,
+              rollupTurnId: source.rollupTurnId, loadedAt: this.now() });
+          }
         }
-      } catch { /* Keep the last confirmed history snapshot while storage recovers. */ }
+      } catch {
+        this.historyRetryAfter = this.now() + 5000;
+        /* Keep the last confirmed history snapshot while storage recovers. */
+      }
     }
     const equipment = Array.from({ length: 10 }, (_, index) => {
       const row = this.registry.find(item => item.position === index + 1);
@@ -210,8 +248,8 @@ export class NetworkMonitor {
         turn: turn ? { id: turn.id, label: turn.label, date: turn.date, startedAt: turn.startedAt } : null,
         source: currentObservation ? "phone:status" : null, reportedAt: iso(currentObservation?.reportedAt),
         lastActivityAt: iso(Math.max(timestamp(row.last_activity_at), observed?.lastActivity || 0, lastAttempt)),
-        metrics: rows ? summarizeAttempts(rows) : null, pending,
-        historyVersion: rows ? createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 24) : "unknown",
+        metrics: rows ? source.metricsByWorker?.get(row.device_id) || EMPTY_METRICS : null, pending,
+        historyVersion: rows ? source.historyVersionByWorker?.get(row.device_id) || EMPTY_HISTORY_VERSION : "unknown",
         ...(detailNumbers.has(row.position) ? { activity: rows ? rows.sort((a, b) => timestamp(b.startedAt) - timestamp(a.startedAt)).slice(0, 30).map(r => ({
           attemptId: r.attemptId, name: r.name || "Sin nombre", list: r.list || null,
           startedAt: r.startedAt || null, endedAt: r.endedAt || null,
@@ -220,22 +258,6 @@ export class NetworkMonitor {
         scopeReason: !turn ? "Sin un turno activo verificable." : !source?.rows ? "Historial no disponible o con escrituras pendientes." : null
       };
     });
-    for (const source of sources.values()) {
-      if (!source.rows) continue;
-      if (!source.rowsByWorker || source.rowsByWorkerTurnId !== (source.turn?.id || "")) {
-        source.rowsByWorker = new Map();
-        source.lastAttemptByWorker = new Map();
-        for (const attempt of source.rows) {
-          const workerId = attempt.workerId;
-          if (!workerId) continue;
-          if (!source.rowsByWorker.has(workerId)) source.rowsByWorker.set(workerId, []);
-          if (!source.turn?.id || attempt.shiftId === source.turn.id) source.rowsByWorker.get(workerId).push(attempt);
-          source.lastAttemptByWorker.set(workerId, Math.max(source.lastAttemptByWorker.get(workerId) || 0,
-            timestamp(attempt.endedAt || attempt.answeredAt || attempt.startedAt)));
-        }
-        source.rowsByWorkerTurnId = source.turn?.id || "";
-      }
-    }
     const allSources = [...sources.values()];
     const common = allSources.length > 0 && allSources.every(s => s.turn?.status === "active" && s.turn.id
       && ["morning", "afternoon"].includes(s.turn.type) && /^\d{4}-\d{2}-\d{2}$/.test(s.turn.date)
@@ -259,7 +281,7 @@ export class NetworkMonitor {
       this.publishing = true;
       this.snapshot().then(data => this.broadcast(data)).catch(() => this.broadcast({ unavailable: true }))
         .finally(() => { this.publishing = false; });
-    }, 1000);
+    }, 2000);
     this.timer.unref();
   }
 }

@@ -108,6 +108,8 @@ function renderPairingSlotsUi(slots) {
   dashboardActions.renderAssignedListsPanel();
 }
 
+const pairingLoads = new Map();
+
 function renderPairingSlotsOnly() {
   if (Array.isArray(dashboardState.pairingSlotsSnapshot) && dashboardState.pairingSlotsSnapshot.length) {
     renderPairingSlotsUi(dashboardState.pairingSlotsSnapshot);
@@ -115,6 +117,13 @@ function renderPairingSlotsOnly() {
 }
 
 async function loadPairingData(code) {
+  if (pairingLoads.has(code)) return pairingLoads.get(code);
+  const pending = loadPairingDataOnce(code).finally(() => pairingLoads.delete(code));
+  pairingLoads.set(code, pending);
+  return pending;
+}
+
+async function loadPairingDataOnce(code) {
   try {
     const res = await fetch(`${API_BASE}/api/pairing/${code}`, {
       headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
