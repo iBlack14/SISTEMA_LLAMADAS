@@ -1,16 +1,14 @@
 import { apiFetch, bindAccountControls, requireLogin } from "../../auth/auth-session.js";
 
-try {
+let usersInitialized = false;
+export async function initUsersPage() {
+  if (usersInitialized) return;
   const user = await requireLogin();
   if (user.role === "ADMINISTRADOR") {
     bindAccountControls();
     bindUsers();
+    usersInitialized = true;
   }
-} catch (cause) {
-  const accountError = document.getElementById("accountError");
-  if (accountError) accountError.textContent = cause.message;
-  const usersBtn = document.getElementById("usersButton");
-  if (usersBtn) usersBtn.disabled = true;
 }
 
 function bindUsers() {
@@ -201,56 +199,26 @@ function bindUsers() {
     if (submitBtn) submitBtn.textContent = value ? "Guardando…" : "Guardar cambios";
   }
 
-  function showAdminView(view) {
-    const isUsers = view === "users";
-    if (networkView) networkView.hidden = isUsers;
-    if (usersView) usersView.hidden = !isUsers;
-
-    if (isUsers) {
-      showError("");
-      if (message) message.hidden = true;
-      document.getElementById("newUsername")?.focus();
-      if (window.location.pathname !== "/usuarios") {
-        history.pushState(null, "", "/usuarios");
-      }
-      loadUsers();
-      if (!listsLoaded) loadUserLists();
-    } else {
-      clearPasswords();
-      if (window.location.pathname !== "/nucleo-red") {
-        history.pushState(null, "", "/nucleo-red");
-      }
-    }
-
-    document.dispatchEvent(new CustomEvent("panel:view", { detail: isUsers ? "users" : "network" }));
-  }
-
-  window.showAdminView = showAdminView;
+  window.showUsersPage = () => {
+    showError("");
+    if (message) message.hidden = true;
+    loadUsers();
+    if (!listsLoaded) loadUserLists();
+  };
   bindPasswordToggles(document);
 
   const usersButton = document.getElementById("usersButton");
   if (usersButton) {
     usersButton.addEventListener("click", () => {
-      showAdminView("users");
+      window.navigatePanel?.("users");
     });
   }
 
   if (backBtn) {
     backBtn.addEventListener("click", () => {
-      showAdminView("network");
+      window.navigatePanel?.("network");
     });
   }
-
-  const syncFromPath = () => {
-    if (window.location.pathname === "/usuarios") {
-      showAdminView("users");
-    } else {
-      showAdminView("network");
-    }
-  };
-
-  window.addEventListener("popstate", syncFromPath);
-  syncFromPath();
 
   if (refresh) {
     refresh.addEventListener("click", () => {

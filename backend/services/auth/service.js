@@ -141,7 +141,7 @@ export class AuthService {
         [digest(token), user.id, user.auth_version, randomBytes(32).toString("hex"), new Date(Date.now() + lifetimeMs)]);
         this.cookie(res, token);
         this.attempts.delete(`user:${username}`);
-        res.json({ ok: true, user: this.publicUser(user), redirect: user.role === "ADMINISTRADOR" ? "/nucleo-red" : "/" });
+        res.json({ ok: true, user: this.publicUser(user), redirect: "/llamadas" });
       } catch { res.status(503).json({ ok: false, error: "No se pudo iniciar sesión." }); }
     });
     app.get("/api/auth/me", this.requireUser, (req, res) => {

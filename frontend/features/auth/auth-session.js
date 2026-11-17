@@ -2,7 +2,7 @@ export let currentUser;
 let csrfToken = "";
 let loginRequest = null;
 const accountChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("calls-account") : null;
-if (accountChannel) accountChannel.onmessage = () => window.location.replace("/");
+if (accountChannel) accountChannel.onmessage = () => window.location.replace("/llamadas");
 
 export async function requireLogin() {
   if (currentUser && csrfToken) return currentUser;

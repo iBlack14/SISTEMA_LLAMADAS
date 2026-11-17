@@ -414,9 +414,18 @@ function tickLiveDurations() {
     }
   }
 }
+let networkInitialization;
+export function initNetworkPage() {
+  if (networkInitialization) return networkInitialization;
+  networkInitialization = initializeNetworkPage().catch(error => {
+    networkInitialization = null;
+    throw error;
+  });
+  return networkInitialization;
+}
+
+async function initializeNetworkPage() {
 setInterval(tickLiveDurations, 1000);
-
-
 try {
   const user = await requireLogin();
   if (user.role !== "ADMINISTRADOR") window.location.replace("/");
@@ -465,4 +474,5 @@ try {
     socket.on("session:error", data => { unavailable(); $("accountError").textContent = data.message; if (data.reason === "AUTH_REQUIRED") window.location.replace("/login"); });
     setInterval(() => { if (lastReceived && Date.now() - lastReceived >= 6000) unavailable(); }, 1000);
   }
-} catch (error) { $("accountError").textContent = error.message; unavailable(); }
+} catch (error) { $("accountError").textContent = error.message; unavailable(); throw error; }
+}

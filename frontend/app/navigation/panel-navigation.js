@@ -8,7 +8,7 @@ export const panelPaths = {
   messages: "/mensajes"
 };
 
-export function showPanelView(view) {
+export function showPanelView(view, { history: updateHistory = true } = {}) {
   const sections = {
     calls: "callsContent",
     contacts: "contactsContent",
@@ -32,7 +32,7 @@ export function showPanelView(view) {
   if (blockedButton) blockedButton.hidden = !blockedButton.closest(".viavox-sidebar") && view === "blocked";
   if (reportBack) reportBack.hidden = view !== "reports";
   const path = panelPaths[view];
-  if (window.location.pathname !== path) {
+  if (updateHistory && window.location.pathname !== path) {
     history.pushState(null, "", path);
   }
   document.dispatchEvent(new CustomEvent("panel:view", { detail: view }));

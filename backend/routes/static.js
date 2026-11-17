@@ -6,7 +6,10 @@ export function registerStatic(runtime) {
     res.setHeader("Cache-Control", "no-store");
     return res.redirect(req.user ? "/" : "/login");
   });
-  app.get("/features/admin/network/network.html", auth.requireAdmin, (_, res) => res.redirect("/nucleo-red"));
+  app.get("/features/admin/network/network.html", auth.requireAdmin, (_, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(paths.adminPage);
+  });
   const staticOptions = { setHeaders(res, filePath) {
     if (/\.(?:html|js|css)$/.test(filePath)) res.setHeader("Cache-Control", "no-cache, must-revalidate");
   } };

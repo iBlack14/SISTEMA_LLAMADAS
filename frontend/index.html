@@ -25,7 +25,9 @@
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261116-action-contrast" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
+  <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261117-sidebar-flow"></script>
+ <script>document.documentElement.classList.add("auth-pending");</script>
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -53,7 +55,6 @@
   <div class="app-background-overlay" aria-hidden="true"></div>
   <main class="layout">
     <section class="panel">
-
       <!-- HEADER -->
       <div class="app-header">
         <div class="app-logo app-logo-wide"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo ViaVox VC" /></div>
@@ -443,6 +444,8 @@
 
     </section>
   </main>
+
+  <main id="adminWorkspace" hidden aria-live="polite"></main>
 
   <div id="reminderFloatContainer" class="reminder-float-container" style="display:none" aria-live="polite"></div>
 
@@ -875,30 +878,38 @@
       </div>
     </div>
   </div>
-  <script type="module">
-    await import("/features/reports/reports-page.js?v=20261114-inline-range");
-  </script>
   <script>
-    function bootstrapDashboard() {
+    let socketLibrary;
+    window.loadSocketLibrary = function loadSocketLibrary() {
+      if (window.io) return Promise.resolve();
+      if (!socketLibrary) socketLibrary = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `${window.location.origin}/socket.io/socket.io.js`;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("No se pudo cargar Socket.IO."));
+        document.head.append(script);
+      });
+      return socketLibrary;
+    };
+    let dashboardStart;
+    window.startOperationalDashboard = function startOperationalDashboard() {
+      if (dashboardStart) return dashboardStart;
+      dashboardStart = new Promise((resolve, reject) => {
       // Isolated authentication uses one origin for pages, cookies and sockets.
       const apiBase = window.location.origin;
       window.VOIP_VC_API_BASE = apiBase;
 
-      const socketScript = document.createElement("script");
-      socketScript.src = `${apiBase}/socket.io/socket.io.js`;
-      socketScript.onload = () => {
-        import("/app/bootstrap.js");
-      };
-      socketScript.onerror = () => {
-        console.error("No se pudo cargar Socket.IO desde", socketScript.src);
+      window.loadSocketLibrary().then(() => import("/app/bootstrap.js")).then(resolve, error => {
+        console.error("No se pudo cargar Socket.IO desde", `${apiBase}/socket.io/socket.io.js`);
         const statusText = document.getElementById("statusText");
         if (statusText) {
           statusText.textContent = `No se pudo conectar al backend en ${apiBase}.`;
         }
-      };
-      document.body.appendChild(socketScript);
-    }
-    document.addEventListener("DOMContentLoaded", bootstrapDashboard, { once: true });
+        reject(error || new Error("No se pudo conectar al servidor de llamadas."));
+      });
+      });
+      return dashboardStart;
+    };
   </script>
   <div id="appToastContainer" class="app-toast-container" aria-live="polite"></div>
 </body>

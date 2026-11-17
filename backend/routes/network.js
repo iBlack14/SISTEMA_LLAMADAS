@@ -250,11 +250,11 @@ runtime.app.post("/api/network/reconnect", runtime.auth.requireAdmin, async (req
 
 runtime.app.get("/nucleo-red", runtime.auth.requireAdmin, (_, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.sendFile(runtime.paths.adminPage);
+  res.sendFile(runtime.paths.dashboardPage);
 });
 
 runtime.app.get("/usuarios", runtime.auth.requireAdmin, (_, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.sendFile(runtime.paths.adminPage);
+  res.sendFile(runtime.paths.dashboardPage);
 });
 }
