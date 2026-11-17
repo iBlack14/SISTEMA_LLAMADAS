@@ -1,7 +1,8 @@
 import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser, requireLogin } from "../../features/auth/auth-session.js";
 
-let isAdmin = location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios");
+const adminPage = location.pathname.startsWith("/nucleo-red") || location.pathname.startsWith("/usuarios");
+let isAdmin = adminPage;
 const sidebar = document.getElementById("viavoxSidebar") || document.createElement("aside");
 sidebar.id = "viavoxSidebar";
 sidebar.className = "viavox-sidebar";
@@ -145,6 +146,15 @@ function select(view) {
 document.addEventListener("panel:view", event => select(event.detail));
 let accountUser = currentUser || null;
 const openView = async view => {
+  // Núcleo and the operational dashboard are separate documents. Their menu
+  // links must cross that boundary explicitly; admin role alone does not mean
+  // every menu item should be handled as a Núcleo subview.
+  if (adminPage) {
+    const target = panelPaths[view];
+    if (target) location.assign(target);
+    closeMenu();
+    return;
+  }
   if (accountUser?.role === "ADMINISTRADOR" && view === "contacts") {
     showPanelView("contacts");
     window.scrollTo({ top: 0 });
@@ -164,7 +174,6 @@ const openView = async view => {
     closeMenu();
     return;
   }
-  if (isAdmin) return;
   if (view === "reports") {
     showPanelView("reports");
     const reports = await import("../../features/reports/reports-page.js");
@@ -268,4 +277,7 @@ requireLogin().then(async user => {
       const view = Object.keys(panelPaths).find(name => panelPaths[name] === location.pathname) || "calls";
       await openView(view);
     }
-  }).catch(() => {});
+  }).catch(error => {
+    const status = document.getElementById("accountError");
+    if (status) status.textContent = error?.message || "No se pudo validar la sesión. Recarga la página.";
+  });

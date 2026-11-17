@@ -34,7 +34,7 @@ function restoreSavedSession() {
 function requestAutomaticSession() {
   if (dashboardState.autoSessionRequested || !socket.connected) return;
   dashboardState.autoSessionRequested = true;
-  setStatus("Cargando tu espacio de trabajo...");
+  setStatus("Conectando con tu espacio de trabajo...");
   // MySQL selects the same account workspace on every browser. The old code
   // is only a migration hint; the server checks ownership before using it.
   socket.emit("workspace:open", { dashboardClientId: dashboardState.dashboardClientId, previousCode: getSavedSessionCode() });
@@ -131,7 +131,7 @@ function updateSessionUi(st = {}) {
     setStatus(phoneConnected ? `${phoneCount} teléfono(s) vinculado(s). Cada dispositivo utiliza su propio QR.` : "Tu espacio está listo. Escanea un QR diferente en cada teléfono.", true);
     dashboardActions.renderCampaignPanel();
   } else {
-    setStatus("Cargando tu espacio de trabajo...");
+    setStatus("Conectando con tu espacio de trabajo...");
   }
 }
 return { saveSessionCode, getSavedSessionCode, getSavedDashboardToken, restoreSavedSession, requestAutomaticSession, updatePairingHint, updateSessionUi };

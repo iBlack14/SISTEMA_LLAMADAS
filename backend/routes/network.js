@@ -16,8 +16,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
       LEFT JOIN (
         SELECT user_id,session_code FROM auth_user_workspaces
         UNION
-        SELECT a.user_id,a.session_code FROM auth_session_access a
-        WHERE NOT EXISTS (SELECT 1 FROM auth_user_workspaces w WHERE w.user_id=a.user_id)
+        SELECT user_id,session_code FROM auth_session_access
       ) access ON access.user_id=u.id
       ORDER BY u.username,access.session_code`);
     const usersById = new Map();
@@ -96,8 +95,7 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
       FROM auth_users u LEFT JOIN (
         SELECT user_id,session_code FROM auth_user_workspaces WHERE user_id=?
         UNION
-        SELECT a.user_id,a.session_code FROM auth_session_access a
-        WHERE a.user_id=? AND NOT EXISTS (SELECT 1 FROM auth_user_workspaces w WHERE w.user_id=a.user_id)
+        SELECT user_id,session_code FROM auth_session_access WHERE user_id=?
       ) access ON access.user_id=u.id WHERE u.id=?`, [userId, userId, userId]);
     if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
     const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];

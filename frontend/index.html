@@ -21,11 +21,11 @@
  <link rel="stylesheet" href="/features/reports/report-details.css?v=20261111-device-details" />
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
- <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261114-nav-pages" />
+ <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261117-sidebar-flow" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261116-action-contrast" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
- <script type="module" src="/layouts/dashboard/sidebar.js?v=20261114-admin-pages"></script>
+ <script type="module" src="/layouts/dashboard/sidebar.js?v=20261117-sidebar-flow"></script>
 
   <!-- Libraries (Loaded dynamically at bottom for multi-domain support) -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -45,8 +45,8 @@
       <a class="viavox-nav-item" data-view="reservations" href="/reservas">RESERVA DE CONTACTO</a>
       <a class="viavox-nav-item" data-view="blocked" href="/bloqueos">PANEL DE BLOQUEOS</a>
       <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
-      <a id="adminLink" class="viavox-nav-item" data-view="network" href="/nucleo-red">NÚCLEO DE RED</a>
-      <a id="sidebarUsers" class="viavox-nav-item" data-view="users" href="/usuarios">USUARIOS</a>
+      <a id="adminLink" class="viavox-nav-item" data-view="network" href="/nucleo-red" hidden>NÚCLEO DE RED</a>
+      <a id="sidebarUsers" class="viavox-nav-item" data-view="users" href="/usuarios" hidden>USUARIOS</a>
     </nav>
     <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
   </aside>
