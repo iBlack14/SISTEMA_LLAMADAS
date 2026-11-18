@@ -204,86 +204,6 @@
                     android:textAllCaps="false"
                     android:textColor="@color/vc_accent"
                     android:textSize="11sp" />
-
-            <LinearLayout
-            android:id="@+id/permissionGuide"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_secondary_card"
-                android:orientation="vertical"
-                android:padding="14dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Configuración del teléfono"
-                    android:textColor="@color/vc_text_primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Android puede mostrar avisos del sistema durante este proceso."
-                    android:textColor="@color/vc_text_secondary"
-                    android:textSize="12sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Telefonía\nPermite detectar, responder y controlar llamadas." android:textColor="@color/vc_text_primary" android:textSize="13sp" />
-                    <TextView android:id="@+id/permissionPhoneStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pendiente" android:textColor="@color/vc_warning" android:textSize="11sp" android:textStyle="bold" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Micrófono\nNecesario para el audio y el control de silencio." android:textColor="@color/vc_text_primary" android:textSize="13sp" />
-                    <TextView android:id="@+id/permissionMicStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pendiente" android:textColor="@color/vc_warning" android:textSize="11sp" android:textStyle="bold" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Notificaciones\nMantiene visible el servicio. Se solicita en Android 13+." android:textColor="@color/vc_text_primary" android:textSize="13sp" />
-                    <TextView android:id="@+id/permissionNotificationsStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pendiente" android:textColor="@color/vc_warning" android:textSize="11sp" android:textStyle="bold" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="App de teléfono\nSelecciona VOIP VC para contestar y colgar." android:textColor="@color/vc_text_primary" android:textSize="13sp" />
-                    <TextView android:id="@+id/permissionDialerStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Por elegir" android:textColor="@color/vc_warning" android:textSize="11sp" android:textStyle="bold" />
-                </LinearLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/grantPermissionsBtn"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_primary_button"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Preparar permisos"
-                    android:textAllCaps="false"
-                    android:textColor="@color/vc_text_inverse" />
-            </LinearLayout>
-
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -406,42 +326,6 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
-                android:background="@drawable/bg_voicemail_card"
-                android:orientation="vertical"
-                android:padding="14dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Detección automática de buzón"
-                    android:textColor="@color/vc_teal"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:text="Solo llamadas salientes. Requiere Android 12+, VOIP VC como teléfono predeterminado y autorización de Shizuku."
-                    android:textColor="@color/vc_text_secondary"
-                    android:textSize="12sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/voicemailSetupBtn"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_secondary_button"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Configurar detección"
-                    android:textAllCaps="false"
-                    android:textColor="@color/vc_teal" />
-            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
@@ -1003,6 +887,53 @@
                     android:textAllCaps="false"
                     android:textColor="@color/vc_text_inverse" />
             </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_voicemail_card"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Detección automática de buzón"
+                android:textColor="@color/vc_teal"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="Solo escucha llamadas salientes. Requiere Shizuku activo y VOIP VC como teléfono predeterminado."
+                android:textColor="@color/vc_text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/voicemailStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:text="Comprobando detección…"
+                android:textColor="@color/vc_text_secondary"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/voicemailSetupBtn"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_secondary_button"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Configurar detección"
+                android:textAllCaps="false"
+                android:textColor="@color/vc_teal" />
         </LinearLayout>
 
     </LinearLayout>

@@ -38,8 +38,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.VoipVcBridge"
-        android:usesCleartextTraffic="${cleartextTraffic}"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:usesCleartextTraffic="${cleartextTraffic}">
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

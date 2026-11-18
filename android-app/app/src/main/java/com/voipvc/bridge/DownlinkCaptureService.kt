@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Keep
 class DownlinkCaptureService @Keep constructor(private val context: Context) : Binder() {
     init {
-        Log.i("BuzonCapture", "UserService constructed with Shizuku context")
+        Log.i("BuzonCapture", "UserService constructed with Shizuku context uid=${Process.myUid()}")
     }
 
     @Keep

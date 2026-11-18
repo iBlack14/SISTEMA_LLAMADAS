@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permMicChip: TextView
     private lateinit var permNotifChip: TextView
     private lateinit var permDialerChip: TextView
+    private lateinit var voicemailStatusText: TextView
 
     private lateinit var baseUrlIn: TextInputEditText
     private lateinit var codeIn: TextInputEditText
@@ -123,6 +124,12 @@ class MainActivity : AppCompatActivity() {
     private var voicemailReminderDialog: Dialog? = null
     private var pendingPairFromConnectedMode: Boolean? = null
     private val timerHandler = Handler(Looper.getMainLooper())
+    private val voicemailUiRefresh = object : Runnable {
+        override fun run() {
+            if (::voicemailStatusText.isInitialized) renderVoicemailStatus()
+            if (!isFinishing) timerHandler.postDelayed(this, 700L)
+        }
+    }
     private val timerRunnable = object : Runnable {
         override fun run() {
             callTimerText.text = formatElapsed()
@@ -252,7 +259,7 @@ class MainActivity : AppCompatActivity() {
         bindViews()
         bindActions()
         findViewById<View>(R.id.voicemailSetupBtn).setOnClickListener {
-            openVoicemailSetup(false)
+            openVoicemailSetup(!VoicemailDetector.enabled())
         }
         VoicemailDetector.initialize(this)
         voicemailReminderChecked = savedInstanceState?.getBoolean("voicemail_reminder_checked") == true
@@ -334,6 +341,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        timerHandler.post(voicemailUiRefresh)
         val filter = IntentFilter().apply {
             addAction(BridgeService.ACTION_STATUS)
             addAction(BridgeService.ACTION_CALL_UI_STATE)
@@ -350,6 +358,7 @@ class MainActivity : AppCompatActivity() {
         if (!returningFromVoicemailSetup && !isChangingConfigurations) voicemailReminderChecked = false
         unregisterReceiver(statusReceiver)
         timerHandler.removeCallbacks(timerRunnable)
+        timerHandler.removeCallbacks(voicemailUiRefresh)
     }
 
     private fun bindViews() {
@@ -374,6 +383,7 @@ class MainActivity : AppCompatActivity() {
         permMicChip = findViewById(R.id.permMicChip)
         permNotifChip = findViewById(R.id.permNotifChip)
         permDialerChip = findViewById(R.id.permDialerChip)
+        voicemailStatusText = findViewById(R.id.voicemailStatusText)
 
         baseUrlIn = findViewById(R.id.baseUrlInput)
         codeIn = findViewById(R.id.codeInput)
@@ -400,13 +410,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindActions() {
-        findViewById<MaterialButton>(R.id.preparePermissionsBtn).setOnClickListener {
-            val guide = findViewById<View>(R.id.permissionGuide)
-            val show = guide.visibility != View.VISIBLE
-            guide.visibility = if (show) View.VISIBLE else View.GONE
-            (it as MaterialButton).text = if (show) "Ocultar permisos" else "Preparar permisos"
-        }
-        findViewById<MaterialButton>(R.id.grantPermissionsBtn).setOnClickListener { requestAllPermissions() }
+        findViewById<MaterialButton>(R.id.preparePermissionsBtn).setOnClickListener { requestAllPermissions() }
         findViewById<MaterialButton>(R.id.toggleManualSetupBtn).setOnClickListener {
             setManualSetupExpanded(findViewById<View>(R.id.manualSetupSection).visibility != View.VISIBLE)
         }
@@ -603,8 +607,18 @@ class MainActivity : AppCompatActivity() {
                     val payload = response.body?.string().orEmpty()
                     withContext(Dispatchers.Main) {
                         if (!response.isSuccessful) {
-                            updatePersistentStatus("No se pudo vincular el equipo.", "Error", Tone.ERROR)
-                            showTransientStatus("Error HTTP ${response.code}", Tone.ERROR)
+                            val serverError = runCatching { JSONObject(payload).optString("error") }.getOrDefault("")
+                            val message = when {
+                                response.code == 401 && serverError.contains("token", ignoreCase = true) ->
+                                    "El QR venció o no corresponde a esta sesión. Genera un QR nuevo en el panel y vuelve a escanearlo."
+                                response.code == 404 ->
+                                    "La sesión del QR ya no existe. Genera un QR nuevo en el panel."
+                                response.code == 409 ->
+                                    "Este QR ya está vinculado a otro teléfono. Genera uno nuevo para este equipo."
+                                else -> "No se pudo vincular (HTTP ${response.code})."
+                            }
+                            updatePersistentStatus(message, "Error", Tone.ERROR)
+                            showTransientStatus(message, Tone.ERROR)
                             return@withContext
                         }
                         try {
@@ -1014,27 +1028,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshReadinessChips() {
         val ready = hasCallingAccess()
-        val phoneReady = listOf(
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.CALL_PHONE,
-            Manifest.permission.ANSWER_PHONE_CALLS
-        ).all(::hasPermission)
-        val micReady = hasPermission(Manifest.permission.RECORD_AUDIO)
-        val notificationsReady = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            hasPermission(Manifest.permission.POST_NOTIFICATIONS)
-        val dialerReady = isDefaultDialer()
-        updateGuideStatus(R.id.permissionPhoneStatus, phoneReady, if (phoneReady) "Concedido" else "Pendiente")
-        updateGuideStatus(R.id.permissionMicStatus, micReady, if (micReady) "Concedido" else "Pendiente")
-        updateGuideStatus(R.id.permissionNotificationsStatus, notificationsReady, if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) "Incluido" else if (notificationsReady) "Concedido" else "Pendiente")
-        updateGuideStatus(R.id.permissionDialerStatus, dialerReady, if (dialerReady) "Configurado" else "Por elegir")
         findViewById<TextView>(R.id.permissionSummaryText).apply {
             text = if (ready) "Permisos listos. Ya puedes escanear tu QR."
                 else "Se necesitan permisos de llamadas, micrófono y marcador predeterminado."
             setTextColor(ContextCompat.getColor(this@MainActivity, if (ready) R.color.vc_success else R.color.vc_text_secondary))
         }
-        val prepareText = findViewById<MaterialButton>(R.id.preparePermissionsBtn)
-        if (findViewById<View>(R.id.permissionGuide).visibility != View.VISIBLE) {
-            prepareText.text = if (ready) "Revisar permisos" else "Preparar permisos"
+        findViewById<MaterialButton>(R.id.preparePermissionsBtn).apply {
+            visibility = if (ready) View.GONE else View.VISIBLE
+            text = "Completar permisos"
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_inverse))
         }
         updateReadinessChip(
             permMicChip,
@@ -1064,11 +1066,31 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun updateGuideStatus(viewId: Int, ready: Boolean, value: String) {
-        findViewById<TextView>(viewId).apply {
-            text = value
-            setTextColor(ContextCompat.getColor(this@MainActivity, if (ready) R.color.vc_success else R.color.vc_warning))
+    private fun renderVoicemailStatus() {
+        val enabled = VoicemailDetector.enabled()
+        val connecting = VoicemailDetector.isConnecting
+        val connected = VoicemailDetector.isConnected
+        val detectorStatus = VoicemailDetector.status
+        val summary = when {
+            !enabled -> "Desactivada. Actívala para analizar llamadas salientes."
+            connecting -> "Conectando con Shizuku…"
+            connected && detectorStatus.startsWith("Escuchando", ignoreCase = true) -> detectorStatus
+            connected -> "Conectada y lista. La prueba se realiza durante una llamada saliente."
+            else -> detectorStatus
         }
+        val lastMatch = VoicemailDetector.lastMatch
+        voicemailStatusText.text = if (lastMatch.isBlank()) summary else "$summary\nÚltima locución: $lastMatch"
+        voicemailStatusText.setTextColor(ContextCompat.getColor(
+            this,
+            when {
+                connected -> R.color.vc_success
+                connecting -> R.color.vc_warning
+                enabled -> R.color.vc_error
+                else -> R.color.vc_text_secondary
+            }
+        ))
+        findViewById<MaterialButton>(R.id.voicemailSetupBtn).text =
+            if (enabled) "Ver estado de detección" else "Configurar detección"
     }
 
     private fun updateReadinessChip(

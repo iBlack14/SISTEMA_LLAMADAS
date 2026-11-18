@@ -184,6 +184,7 @@ class VoipVcInCallService : InCallService() {
         val live = calls.filter { it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING }
         if (live.size != 1) return
         analyzedCall = call
+        Log.i(TAG, "[VOICEMAIL_TEST] outgoing call eligible state=${call.state} shizukuConnected=${VoicemailDetector.isConnected}")
         VoicemailDetector.start { _, resultCode ->
             if (analyzedCall !== call || call.state !in setOf(Call.STATE_ACTIVE, Call.STATE_DIALING) ||
                 !calls.contains(call) || calls.count {

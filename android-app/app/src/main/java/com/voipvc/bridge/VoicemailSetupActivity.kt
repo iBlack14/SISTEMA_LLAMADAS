@@ -24,7 +24,9 @@ import com.google.android.material.button.MaterialButton
 class VoicemailSetupActivity : AppCompatActivity() {
     companion object { const val EXTRA_REQUEST_AUTHORIZATION = "request_voicemail_authorization" }
     private lateinit var statusText: TextView
+    private lateinit var activateButton: MaterialButton
     private lateinit var reconnectButton: com.google.android.material.button.MaterialButton
+    private lateinit var disableButton: MaterialButton
     private val handler = Handler(Looper.getMainLooper())
     private var pendingEnable = false
     private var initialRequestHandled = false
@@ -38,17 +40,27 @@ class VoicemailSetupActivity : AppCompatActivity() {
                 VoicemailDetector.enable()
             }
             val missingModel = VoicemailModelInstaller.findModel(this@VoicemailSetupActivity) == null
+            val enabled = VoicemailDetector.enabled()
+            val connecting = VoicemailDetector.isConnecting
+            val connected = VoicemailDetector.isConnected
             val stateText = guidanceMessage.ifBlank {
-                VoicemailModelInstaller.message.ifBlank {
-                    if (missingModel) "Preparando el español incluido en la APK…"
-                    else VoicemailDetector.authorizationIssue() ?: VoicemailDetector.status
+                when {
+                    !enabled -> VoicemailDetector.authorizationIssue()
+                        ?: "Detección desactivada. Actívala para analizar llamadas salientes."
+                    connecting -> "Conectando con Shizuku…"
+                    connected && missingModel -> "Shizuku conectado. Preparando el modelo de español…"
+                    connected -> VoicemailDetector.status
+                    VoicemailDetector.authorizationIssue() != null -> VoicemailDetector.authorizationIssue()!!
+                    missingModel -> "Preparando el modelo español incluido en la APK…"
+                    else -> VoicemailDetector.status
                 }
             }
             val matchText = if (VoicemailDetector.lastMatch.isNotBlank())
                 "\n\nÚltima locución detectada:\n" + VoicemailDetector.lastMatch else ""
-            val connecting = VoicemailDetector.isConnecting
-            val connected = VoicemailDetector.isConnected
-            statusText.text = stateText + matchText
+            val testHint = if (enabled && connected && !stateText.startsWith("Escuchando", ignoreCase = true) && matchText.isBlank())
+                "\n\nPara probarla, inicia una llamada saliente. El detector escucha solo durante esa llamada y no guarda grabaciones."
+                else ""
+            statusText.text = stateText + testHint + matchText
             // Highlight status box: green=connected, yellow=connecting, default=idle/error
             val borderColor = when {
                 connected -> android.graphics.Color.parseColor("#22a86a")
@@ -57,7 +69,11 @@ class VoicemailSetupActivity : AppCompatActivity() {
             }
             (statusText.background as? android.graphics.drawable.GradientDrawable)
                 ?.setStroke(dp(2), borderColor)
+            activateButton.visibility = if (!enabled) android.view.View.VISIBLE else android.view.View.GONE
+            activateButton.isEnabled = !connecting
+            reconnectButton.visibility = if (enabled && !connected && !connecting) android.view.View.VISIBLE else android.view.View.GONE
             reconnectButton.isEnabled = !connecting
+            disableButton.visibility = if (enabled) android.view.View.VISIBLE else android.view.View.GONE
             handler.postDelayed(this, 500)
         }
     }
@@ -176,21 +192,21 @@ class VoicemailSetupActivity : AppCompatActivity() {
             })
             return control
         }
-        button("Autorizar y activar detección", true) { requestActivation() }
-        reconnectButton = button("Reiniciar conexión Shizuku") {
+        activateButton = button("Autorizar y activar detección", true) { requestActivation() }
+        reconnectButton = button("Reintentar conexión") {
             guidanceMessage = ""
-            VoicemailDetector.reconnect()
+            if (!rikka.shizuku.Shizuku.pingBinder()) {
+                pendingEnable = true
+                guidanceMessage = "Inicia Shizuku y vuelve aquí; la conexión se reanudará automáticamente."
+                openShizuku()
+            } else VoicemailDetector.reconnect()
         }
-        button("Abrir Shizuku") { pendingEnable = true; openShizuku() }
-        button("Desactivar detección") {
+        disableButton = button("Desactivar detección") {
             pendingEnable = false
             guidanceMessage = ""
             VoicemailDetector.disable()
         }
         button("Volver") { finish() }
-        column.addView(text("El modo rápido puede confundir saludos de centrales. Puedes desactivarlo cuando lo necesites.", 13f).apply {
-            setPadding(0, dp(16), 0, 0)
-        })
         setContentView(root)
         ViewCompat.requestApplyInsets(root)
     }
@@ -219,16 +235,24 @@ class VoicemailSetupActivity : AppCompatActivity() {
     }
 
     private fun authorizeWithShizuku() {
-        if (VoicemailDetector.authorizationRequiresManager()) {
-            guidanceMessage = "El permiso fue rechazado. En Shizuku, abre Aplicaciones autorizadas y permite VOIP VC."
-            openShizuku()
-        } else VoicemailDetector.enable()
+        when {
+            !rikka.shizuku.Shizuku.pingBinder() -> {
+                guidanceMessage = "Inicia Shizuku y vuelve aquí; la detección se activará automáticamente."
+                openShizuku()
+            }
+            VoicemailDetector.authorizationRequiresManager() -> {
+                guidanceMessage = "Autoriza VOIP VC en Shizuku y vuelve aquí."
+                openShizuku()
+            }
+            else -> VoicemailDetector.enable()
+        }
     }
 
     private fun openShizuku() {
         try {
             startActivity(Intent().setClassName("moe.shizuku.privileged.api", "moe.shizuku.manager.MainActivity"))
         } catch (_: ActivityNotFoundException) {
+            pendingEnable = false
             guidanceMessage = "Instala Shizuku para autorizar la detección automática."
         } catch (_: SecurityException) {
             guidanceMessage = "Abre Shizuku manualmente y autoriza VOIP VC."
