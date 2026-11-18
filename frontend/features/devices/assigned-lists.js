@@ -19,10 +19,8 @@ function renderAssignedListsPanel() {
     .filter(({ listName }) => !hiddenRecords.has(String(listName)));
 
   // Obtener todas las listas disponibles
-  const availableLists = Contacts.lists.filter((name) =>
-    Contacts.contacts.some((contact) =>
-      (contact.list || "Principal") === name && dashboardActions.normalizeValidPeruPhone(contact.phone)
-    )
+  const availableLists = (Contacts.lists || []).filter((name) =>
+    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
   );
 
   const history = Array.isArray(dashboardState.campaignState?.history) ? dashboardState.campaignState.history : [];

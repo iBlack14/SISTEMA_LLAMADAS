@@ -129,6 +129,7 @@ class BridgeService : Service() {
     @Suppress("DEPRECATION")
     private var phoneStateListener: PhoneStateListener? = null
     private var lastCallState = "idle"
+    private var activeDialStartedAtElapsedMs = 0L
     private var currentPhoneNumber = ""
     private var currentCompanyName = ""
     private var currentContactName = ""
@@ -337,6 +338,7 @@ class BridgeService : Service() {
 
         client.on(Socket.EVENT_CONNECT) {
             if (client !== socket) return@on
+            Log.i(TAG, "[SOCKET] connected; joining phone session=${code.takeLast(2)} device=${devId.takeLast(6)}")
             try {
                 if (wakeLock?.isHeld == false) wakeLock?.acquire(2 * 60 * 60 * 1000L)
             } catch (_: Exception) {}
@@ -351,6 +353,7 @@ class BridgeService : Service() {
         client.on("session:joined") { args ->
             if (client !== socket) return@on
             val rotatedToken = (args.firstOrNull() as? JSONObject)?.optString("token").orEmpty()
+            Log.i(TAG, "[SOCKET] joined phone session=${code.takeLast(2)} device=${devId.takeLast(6)}")
             mainHandler.post {
                 if (client !== socket) return@post
                 if (rotatedToken.isNotBlank()) currentPairingToken = rotatedToken
@@ -487,11 +490,13 @@ class BridgeService : Service() {
         client.on("call:action") { args ->
             if (client !== socket) return@on
             val data = args.firstOrNull() as? JSONObject ?: return@on
+            val receivedAtElapsedMs = SystemClock.elapsedRealtime()
             mainHandler.post {
               if (client !== socket) return@post
               val commandId = data.optString("commandId")
               val action = data.optString("action")
-              Log.i(TAG, "[CALL_ACTION] received action=$action command=${commandId.takeLast(8)}")
+              val callId = data.optString("callId")
+              Log.i(TAG, "[CALL_ACTION] received action=$action command=${commandId.takeLast(8)} call=${callId.takeLast(8)} mainQueueMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
               when (action) {
                 "dial"   -> {
                     val phoneNumber = data.optString("phoneNumber")
@@ -510,7 +515,8 @@ class BridgeService : Service() {
                             imageUrl,
                             commandId,
                             contactId,
-                            data.optString("callId")
+                            callId,
+                            receivedAtElapsedMs
                         ).also {
                             lastDialCommandId = commandId
                             lastDialAck = it
@@ -559,9 +565,14 @@ class BridgeService : Service() {
         }
 
         client.on(Socket.EVENT_DISCONNECT) {
+            val reason = it.firstOrNull()?.toString().orEmpty()
+            Log.w(TAG, "[SOCKET] disconnected session=${code.takeLast(2)} reason=${reason.take(120)}")
             if (client === socket) mainHandler.post { setStatus("🔄 Reconectando…") }
         }
-        client.on(Socket.EVENT_CONNECT_ERROR) {
+        client.on(Socket.EVENT_CONNECT_ERROR) { args ->
+            val error = args.firstOrNull()
+            val cause = error as? Throwable
+            Log.e(TAG, "[SOCKET] connect-error session=${code.takeLast(2)} error=${cause?.javaClass?.simpleName ?: error?.javaClass?.simpleName}: ${cause?.message ?: error}")
             if (client === socket) mainHandler.post { setStatus("🔄 Sin servidor — reintentando…") }
         }
 
@@ -579,9 +590,10 @@ class BridgeService : Service() {
         imageUrl: String,
         commandId: String,
         contactId: String,
-        callId: String
+        callId: String,
+        receivedAtElapsedMs: Long
     ): DialResult {
-        Log.i(TAG, "[DIAL] start command=${commandId.takeLast(8)} contactPresent=${contactId.isNotBlank()} callPresent=${callId.isNotBlank()}")
+        Log.i(TAG, "[DIAL] start command=${commandId.takeLast(8)} call=${callId.takeLast(8)} contactPresent=${contactId.isNotBlank()} receivedToStartMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
         if (number.isBlank() || commandId.isBlank()) {
             Log.w(TAG, "[DIAL] rejected: number or command id is empty")
             return DialResult(false, "Número o identificador de llamada inválido")
@@ -616,6 +628,7 @@ class BridgeService : Service() {
         detectedAnnouncement = ""
         activeCommandId = commandId
         activeCallId = callId
+        activeDialStartedAtElapsedMs = SystemClock.elapsedRealtime()
         activeContactId = contactId
         campaignPhoneNumber = number
         campaignStateObserved = false
@@ -639,7 +652,7 @@ class BridgeService : Service() {
             val tm = getSystemService(TELECOM_SERVICE) as? TelecomManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && tm != null) {
                 tm.placeCall(Uri.parse("tel:$number"), Bundle())
-                Log.i(TAG, "[DIAL] TelecomManager.placeCall accepted command=${commandId.takeLast(8)}")
+                Log.i(TAG, "[DIAL] TelecomManager.placeCall accepted command=${commandId.takeLast(8)} call=${callId.takeLast(8)} receivedToPlaceCallMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
                 emitPhoneStatus("dialing", "command", correlateCampaign = true)
                 setStatus("📞 Intentando llamada a $number")
 
@@ -649,6 +662,7 @@ class BridgeService : Service() {
                 mainHandler.postDelayed({
                     if (thisAttempt != dialAttemptToken) return@postDelayed
                     if (!isActuallyInCall()) {
+                        Log.e(TAG, "[DIAL] no Telecom call state within timeout command=${commandId.takeLast(8)} call=${callId.takeLast(8)} elapsedMs=${SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs}")
                         handleObservedCallState(
                             "failed",
                             number,
@@ -662,7 +676,7 @@ class BridgeService : Service() {
                 return DialResult(true, "Comando recibido e inicio de llamada solicitado")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "[DIAL] TelecomManager.placeCall failed command=${commandId.takeLast(8)}", e)
+            Log.e(TAG, "[DIAL] TelecomManager.placeCall failed command=${commandId.takeLast(8)} call=${callId.takeLast(8)}", e)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -680,6 +694,7 @@ class BridgeService : Service() {
     }
 
     private fun abortDial(reason: String): DialResult {
+        Log.e(TAG, "[DIAL] aborted command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)} reason=$reason")
         dialAttemptToken += 1
         lastCallState = "failed"
         emitPhoneStatus("failed", "dial_error", correlateCampaign = true)
@@ -1007,7 +1022,9 @@ class BridgeService : Service() {
             return
         }
 
+        val previousState = lastCallState
         lastCallState = state
+        Log.i(TAG, "[CALL_STATE] $previousState->$state source=$source command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)} elapsedMs=${if (activeDialStartedAtElapsedMs > 0) SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs else -1}")
         if (belongsToCampaign) persistCampaignTracking(state)
         emitPhoneStatus(state, source, correlateCampaign = belongsToCampaign)
         emitCallUiState()
@@ -1047,6 +1064,7 @@ class BridgeService : Service() {
         detectedAnnouncement = ""
         activeCallId = ""
         activeCommandId = ""
+        activeDialStartedAtElapsedMs = 0L
         activeContactId = ""
         campaignPhoneNumber = ""
         campaignStateObserved = false
@@ -1390,6 +1408,7 @@ class BridgeService : Service() {
         if (signature == lastEmittedStatusSignature && source != "reconnect") return
         lastEmittedStatusSignature = signature
         statusSequence += 1
+        Log.i(TAG, "[PHONE_STATUS] emit state=$state source=$source command=${commandId.takeLast(8)} call=${if (correlateCampaign) activeCallId.takeLast(8) else ""} sequence=$statusSequence terminalConfirmed=$noLiveCalls")
 
         socket?.emit(
             "phone:status",

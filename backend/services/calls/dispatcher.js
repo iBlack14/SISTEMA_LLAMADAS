@@ -31,20 +31,26 @@ import {
  */
 export function createDispatcher(runtime, services) {
 async function sendPersistedDial(code, socketId, payload) {
+  const startedAt = Date.now();
+  const sessionId = String(code).slice(-2);
+  const commandId = String(payload.commandId || "").slice(-8);
+  const callId = String(payload.callId || "").slice(-8);
   try {
-    console.info(`[CALL_DISPATCH] persist-before-dial session=${String(code).slice(-2)} worker=${socketId ? "connected" : "missing"} command=${String(payload.commandId || "").slice(-8)}`);
+    console.info(`[CALL_DISPATCH] persist-before-dial session=${sessionId} worker=${socketId ? "connected" : "missing"} command=${commandId} call=${callId}`);
     await runtime.persistence.save(runtime.sessions);
+    const persistedMs = Date.now() - startedAt;
     const session = runtime.sessions.get(code);
     const assignment = Object.values(session?.campaign?.assignments || {})
       .find(item => item.attemptId === payload.callId);
     if (!assignment || assignment.workerSocketId !== socketId) {
-      console.warn(`[CALL_DISPATCH] not sent session=${String(code).slice(-2)} reason=assignment_changed command=${String(payload.commandId || "").slice(-8)}`);
+      console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=assignment_changed command=${commandId} call=${callId} persistMs=${persistedMs}`);
       return;
     }
+    const targetConnected = Boolean(runtime.io.sockets?.sockets?.get(socketId)?.connected);
     runtime.io.to(socketId).emit("call:action",payload);
-    console.info(`[CALL_DISPATCH] sent session=${String(code).slice(-2)} command=${String(payload.commandId || "").slice(-8)}`);
+    console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} persistMs=${persistedMs} targetConnected=${targetConnected}`);
   } catch (error) {
-    console.error(`[CALL_DISPATCH] not sent session=${String(code).slice(-2)} reason=persistence error=${error.code || "STORAGE_UNAVAILABLE"}`);
+    console.error(`[CALL_DISPATCH] not sent session=${sessionId} reason=persistence command=${commandId} call=${callId} elapsedMs=${Date.now() - startedAt} error=${error.code || error.message || "STORAGE_UNAVAILABLE"}`);
     runtime.io.to(code).emit("call:error",{message:"No se confirmó el guardado en MySQL. No se envió la llamada."});
   }
 }

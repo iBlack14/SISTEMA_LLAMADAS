@@ -163,7 +163,9 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     const code = socket.data.code;
     const role = socket.data.role;
     if (!code || role !== "phone") return;
+    const statusReceivedAt = Date.now();
     historyGate.serialize(code, async () => {
+    const statusStartedAt = Date.now();
     const { callState, phoneNumber, contactName, companyName, contactId, callId, commandId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed, detectedVoicemail, detectedAnnouncement } = payload;
     const session = sessions.get(code);
     if (!session) return;
@@ -226,6 +228,8 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     console.info("[PHONE_STATUS] persisting-session-snapshot", {
       session: String(code).slice(-2),
       callState: callState || "unknown",
+      command: String(commandId || "").slice(-8),
+      call: String(callId || "").slice(-8),
       terminal: Boolean(terminal),
       accepted: Boolean(updatedContact || alreadyFinalized),
       contactLists: contactBook?.lists?.length || 0,
@@ -245,8 +249,20 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
       contactId: contactId || "",
       callId: callId || ""
     });
-    console.info("[PHONE_STATUS]", { code, workerId: worker?.id, callState, callId,
-      accepted: Boolean(updatedContact || alreadyFinalized), terminal: Boolean(terminal) });
+    console.info("[PHONE_STATUS] committed", {
+      session: String(code).slice(-2),
+      workerId: worker?.id,
+      callState: callState || "unknown",
+      source: payload.source || "unknown",
+      command: String(commandId || "").slice(-8),
+      call: String(callId || "").slice(-8),
+      accepted: Boolean(updatedContact || alreadyFinalized),
+      terminal: Boolean(terminal),
+      terminalConfirmed: Boolean(terminalConfirmed),
+      lastError: String(lastError || "").slice(0, 120),
+      queueMs: statusStartedAt - statusReceivedAt,
+      persistMs: Date.now() - statusStartedAt
+    });
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
     }
@@ -256,7 +272,14 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
         accepted: false, terminal: false, persisted: false,
         commandId: payload.commandId || "", contactId: payload.contactId || "", callId: payload.callId || ""
       });
-      console.error("[PHONE_STATUS] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
+      console.error("[PHONE_STATUS] persistence-failed", {
+        session: String(code).slice(-2),
+        callState: payload.callState || "unknown",
+        command: String(payload.commandId || "").slice(-8),
+        call: String(payload.callId || "").slice(-8),
+        elapsedMs: Date.now() - statusReceivedAt,
+        error: error.code || error.message || "STORAGE_UNAVAILABLE"
+      });
       emitState(code);
     });
   });
@@ -269,7 +292,8 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     const session = sessions.get(code);
     if (!session) return;
 
-    console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} message=${String(message || "").slice(0,120)}`);
+    const log = ok ? console.info : console.warn;
+    log(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} message=${String(message || "").slice(0,120)}`);
 
     const peerId = getPeer(session, "phone");
     if (!peerId) return;

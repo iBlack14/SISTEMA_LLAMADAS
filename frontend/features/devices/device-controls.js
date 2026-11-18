@@ -188,10 +188,8 @@ async function skipWorkerList(slotId, workerId, currentList) {
 }
 
 function getPairingListAssignments() {
-  const listNames = Contacts.lists.filter((name) =>
-    Contacts.contacts.some((contact) =>
-      (contact.list || "Principal") === name && dashboardActions.normalizeValidPeruPhone(contact.phone)
-    )
+  const listNames = (Contacts.lists || []).filter((name) =>
+    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
   );
   const linkedSlots = dashboardState.pairingSlotsSnapshot.map((slot, slotIndex) => ({ slot, slotIndex }))
     .filter(({ slot }) => Boolean(slot?.deviceId));

@@ -20,10 +20,8 @@ function pairingQrCacheKey(slot) {
 function renderPairingSlotsUi(slots) {
   const listAssignmentBySlotId = new Map(dashboardActions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
   const workers = Array.isArray(dashboardState.latestSessionState?.phoneWorkers) ? dashboardState.latestSessionState.phoneWorkers : [];
-  const selectableListNames = Contacts.lists.filter((name) =>
-    Contacts.contacts.some((contact) =>
-      (contact.list || "Principal") === name && dashboardActions.normalizeValidPeruPhone(contact.phone)
-    )
+  const selectableListNames = (Contacts.lists || []).filter((name) =>
+    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
   );
 
   const renderedSlots = slots.map((slot, index) => {
