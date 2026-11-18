@@ -1,4 +1,5 @@
 import { showPanelView } from "../../app/navigation/panel-navigation.js";
+import { currentUser } from "../auth/auth-session.js";
 import { createReportData } from "./report-data.js";
 import { createReportCalendar } from "./report-calendar.js";
 import { createReportDay } from "./report-day.js";
@@ -39,6 +40,8 @@ reportState.formatDetailedDate = value => {
     const weekdays = ["DOM", "LUN", "MAR", "MIERC", "JUEV", "VIE", "SAB"];
     return `${weekdays[date.getDay()]} ${day}/${month}/${year}`;
   };
+reportState.isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
+reportState.reportScope = reportState.isAdmin ? "all" : "mine";
 reportState.year = new Date().getFullYear();
 reportState.hoverDate = "";
 reportState.selectedDate = "";

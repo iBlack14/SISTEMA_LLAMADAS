@@ -25,24 +25,27 @@ function endpoint(path) {
 }
 
 async function fetchReports(date = "") {
-    const context = reportSession();
-    if (!context.code || !context.token) {
-      throw Error("Tu espacio de llamadas aún se está conectando. Espera unos segundos y pulsa Reintentar.");
-    }
-
     const query = date
       ? `?date=${encodeURIComponent(date)}`
       : "";
+    const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
+    const viewAll = isAdmin && reportState.reportScope !== "mine";
 
-    const response = await fetch(
-      endpoint("/reports/daily" + query),
-      {
-        method: "GET",
-        headers: {
-          "X-Dashboard-Token": dashboardToken()
-        }
+    // El administrador puede consultar todas las cuentas; el empleado solo la suya.
+    const url = viewAll
+      ? `/api/reports/all${query}`
+      : endpoint("/reports/daily" + query);
+    if (!viewAll) {
+      const context = reportSession();
+      if (!context.code || !context.token) {
+        throw Error("Tu espacio de llamadas aún se está conectando. Espera unos segundos y pulsa Reintentar.");
       }
-    );
+    }
+
+    const response = await fetch(url, {
+        method: "GET",
+        headers: viewAll ? {} : { "X-Dashboard-Token": dashboardToken() }
+    });
     const data = await response.json();
 
     if (!response.ok) {

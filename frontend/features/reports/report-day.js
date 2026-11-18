@@ -30,6 +30,13 @@ function renderDay() {
       <div class="report-day-title">
         <h2>REPORTE DE LLAMADAS</h2>
         <p id="reportPeriodSummary">${reportState.esc(reportPeriodLabel(reportState.viewedPeriod || {from: reportState.selectedDate, to: reportState.selectedDate}))}</p>
+        ${reportState.isAdmin ? `
+          <label class="report-scope-select" for="reportScope">Ver
+            <select id="reportScope">
+              <option value="all" ${reportState.reportScope === "all" ? "selected" : ""}>Todos los usuarios</option>
+              <option value="mine" ${reportState.reportScope === "mine" ? "selected" : ""}>Solo mis reportes</option>
+            </select>
+          </label>` : ""}
         ${reportState.viewedPeriod && reportState.reports.length ? `
           <label for="reportRangeRecord">Fecha y rubro</label>
           <select id="reportRangeRecord">
@@ -72,6 +79,7 @@ function renderDay() {
                 >
                   <span class="report-rubro-number">${reportState.visibleRubrosStart + index + 1}</span>
                   <span>${reportState.esc(report.rubro)}${reportState.viewedPeriod ? ` · ${reportState.esc(reportState.formatDetailedDate(report.date))}` : ""}</span>
+                  ${report.owner ? `<small class="report-rubro-owner">${reportState.esc(report.owner)}</small>` : ""}
                 </button>
               `).join("")}
             </div>`}
@@ -109,6 +117,8 @@ function renderDay() {
     };
 
     reportState.$("backCalendar").onclick = reportActions.showCalendar;
+    const scopeSelect = reportState.$("reportScope");
+    if (scopeSelect) scopeSelect.onchange = event => reportActions.setReportScope(event.target.value);
     if (reportState.$("reportRangeRecord")) reportState.$("reportRangeRecord").onchange = event => {
       reportState.selectedReport = event.currentTarget.value;
       renderDay();

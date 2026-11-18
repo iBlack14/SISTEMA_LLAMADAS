@@ -78,6 +78,40 @@ runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
   });
 });
 
+// Vista de administrador: consolida los reportes de todas las cuentas.
+runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const date = String(req.query.date || "");
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ ok: false, error: "Fecha invalida" });
+  }
+  try {
+    const [users] = await runtime.auth.pool.query(
+      "SELECT id,username FROM auth_users ORDER BY username");
+    const names = new Map(users.map(user => [String(user.id), user.username]));
+    const reports = [];
+    for (const [code, session] of runtime.sessions) {
+      const ownerId = String(session.ownerUserId || "");
+      if (!ownerId) continue;
+      for (const report of services.reportData(session, date)) {
+        reports.push({
+          ...report,
+          id: `${code}-${report.id}`,
+          sessionCode: code,
+          ownerUserId: ownerId,
+          owner: names.get(ownerId) || `Usuario ${ownerId}`
+        });
+      }
+    }
+    reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) ||
+      String(a.owner).localeCompare(String(b.owner), "es") ||
+      String(a.rubro).localeCompare(String(b.rubro), "es"));
+    return res.json({ ok: true, reports, storage: runtime.persistence.status() });
+  } catch {
+    return res.status(503).json({ ok: false, error: "No se pudieron cargar los reportes de todos los usuarios." });
+  }
+});
+
 runtime.app.post(
   "/api/session/:code/reports/:id/continue",
   async (req, res) => {

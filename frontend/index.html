@@ -182,34 +182,48 @@
           </div>
         </header>
 
-        <section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de todos los usuarios" hidden>
-          <h3>Listas de usuarios</h3>
-          <p class="muted">Consulta las listas y contactos de cada cuenta. Importa contactos masivamente (CSV, Excel, HTML).</p>
-          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end">
-            <label>Usuario<select id="adminListsUser"><option value="">Cargando usuarios…</option></select></label>
-            <label>Lista<select id="adminListsName" disabled><option value="">Selecciona un usuario</option></select></label>
+<section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de todos los usuarios" hidden>
+          <h3>Contactos de vendedores</h3>
+          <p class="muted" style="margin-bottom:12px">Gestiona las listas de contactos de tu equipo. Importa desde CSV, Excel, HTML.</p>
+          
+          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+            <label style="flex:1;min-width:200px">
+              Ver contactos de:
+              <select id="adminListsUser"><option value="">Cargando…</option></select>
+            </label>
+            <label style="flex:1;min-width:200px">
+              Lista:
+              <select id="adminListsName" disabled><option value="">Primero elige vendedor</option></select>
+            </label>
           </div>
-          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-top:8px">
-            <label class="file-upload-label" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:8px 12px;border:2px dashed var(--border);border-radius:8px;background:var(--card);">
+
+          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:12px;border:2px dashed var(--border);border-radius:8px;background:var(--card)">
+            <label class="file-upload-label" style="cursor:pointer;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:10px 12px;justify-content:center">
               <input type="file" id="adminListsImportFile" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none" aria-label="Seleccionar archivo de contactos">
               <span>📁 Seleccionar archivo (CSV, Excel, HTML, TXT)</span>
             </label>
-            <button id="adminListsImportBtn" class="secondary" type="button" disabled style="padding:8px 16px">⬆️ Importar contactos</button>
+            <button id="adminListsImportBtn" type="button" disabled style="padding:10px 20px;font-weight:600">⬆️ Importar a esta lista</button>
           </div>
-          <p id="adminListsStatus" class="muted" role="status"></p>
-          <div id="adminListsImportPreview" style="display:none;max-height:30vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--card);margin-top:12px">
-            <h4 style="margin-top:0">Vista previa</h4>
+
+          <p id="adminListsStatus" class="muted" role="status" style="min-height:20px"></p>
+          
+          <div id="adminListsImportPreview" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);max-height:30vh;overflow:auto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h4 style="margin:0">Vista previa (primeros 200)</h4>
+              <button id="adminListsImportCancel" class="secondary" type="button" style="padding:6px 12px">Cancelar</button>
+            </div>
             <div class="table-wrap" style="overflow:auto">
               <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Nota</th><th>Lista</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table>
             </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+              <button id="adminListsImportConfirm" type="button" style="padding:10px 20px;font-weight:600">✅ Confirmar importación</button>
+            </div>
           </div>
-          <div class="row" style="justify-content:flex-end;margin-top:8px">
-            <button id="adminListsImportCancel" class="secondary" type="button">Cancelar</button>
-            <button id="adminListsImportConfirm" type="button">Confirmar importación</button>
-          </div>
-          <div class="table-wrap" style="overflow:auto;max-height:60vh">
+
+          <div class="table-wrap" style="overflow:auto;max-height:60vh;margin-top:12px">
             <table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Nota</th></tr></thead><tbody id="adminListsContacts"></tbody></table>
           </div>
+          
           <div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">
             <button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button>
             <span id="adminListsPage" class="muted"></span>

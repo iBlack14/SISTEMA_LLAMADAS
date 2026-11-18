@@ -110,12 +110,12 @@ export function showAdminContactListsError(message) {
   if (contacts) contacts.hidden = true;
   if (contactsData) contactsData.hidden = true;
   const status = $("adminListsStatus");
-  if (status) status.textContent = message || "No se pudieron cargar las listas de usuarios.";
+  if (status) status.textContent = message || "No se pudieron cargar las listas de vendedores.";
 }
 
 async function loadUsers() {
   const status = $("adminListsStatus");
-  status.textContent = "Cargando usuarios y listas…";
+  status.textContent = "Cargando vendedores…";
   try {
     // Ensure currentUser is populated (sidebar may call us before auth completes)
     if (!currentUser) {
@@ -123,40 +123,51 @@ async function loadUsers() {
     }
     const response = await apiFetch("/api/users/lists", { cache: "no-store" });
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los usuarios.");
+    if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los vendedores.");
     users = data.users;
     const select = $("adminListsUser");
-    select.replaceChildren(new Option("Selecciona un usuario", ""));
+    select.replaceChildren(new Option("— Mis listas —", "mine"));
     const myId = currentUser?.id || window.VOIP_VC_AUTH_USER?.id;
     for (const user of users) {
       const isMe = myId && String(user.id) === String(myId);
-      select.add(new Option(`${user.username}${isMe ? " (YO)" : ""} · ${user.role === "ADMINISTRADOR" ? "Administrador" : "Ventas"}`, String(user.id)));
+      select.add(new Option(`${user.username}${isMe ? " (tú)" : ""} · ${user.role === "ADMINISTRADOR" ? "Admin" : "Vendedor"}`, String(user.id)));
     }
-    // Auto-select current user
-    if (myId && users.some(u => String(u.id) === String(myId))) {
-      select.value = String(myId);
-      onUserChange();
-    }
-    status.textContent = users.length ? "Selecciona un usuario para ver sus listas." : "No hay usuarios registrados.";
+    // Auto-select "Mis listas" by default
+    select.value = "mine";
+    onUserChange();
+    status.textContent = users.length ? "Elige un vendedor para ver sus listas." : "Solo tú tienes acceso.";
   } catch (error) {
-    status.textContent = error.message || "No se pudieron cargar los usuarios.";
+    status.textContent = error.message || "No se pudieron cargar los vendedores.";
   }
 }
 
 function onUserChange() {
   contactRequest++;
-  const user = users.find(item => String(item.id) === $("adminListsUser").value);
+  const userId = $("adminListsUser").value;
+  const user = users.find(item => String(item.id) === userId);
   const select = $("adminListsName");
+  const status = $("adminListsStatus");
+  
+  if (userId === "mine" || !userId) {
+    // Show current user's lists
+    status.textContent = "Tus listas de contactos.";
+    select.replaceChildren(new Option("Principal (tus contactos)", "Principal"));
+    select.disabled = false;
+    pageOffset = 0;
+    loadContacts();
+    return;
+  }
+  
   if (!user?.lists?.length) {
     // Auto-create "Principal" list via backend on first import
     select.replaceChildren(new Option("Principal (nueva)", "Principal"));
     select.disabled = false;
-    $("adminListsStatus").textContent = "Sin listas. Se creará 'Principal' al importar.";
+    status.textContent = `Sin listas. Se creará 'Principal' al importar en ${user.username}.`;
   } else {
-    select.replaceChildren(new Option("Selecciona una lista", ""));
+    select.replaceChildren(new Option("Selecciona lista", ""));
     for (const list of user.lists) select.add(new Option(`${list.name} (${list.count})`, list.name));
     select.disabled = false;
-    $("adminListsStatus").textContent = "Selecciona una lista.";
+    status.textContent = `Listas de ${user.username}. Elige una.`;
   }
   $("adminListsContacts").replaceChildren();
   $("adminListsPage").textContent = "";
@@ -176,7 +187,9 @@ async function loadContacts() {
   $("adminListsNext").disabled = true;
   try {
     const query = new URLSearchParams({ list, offset: String(pageOffset), limit: String(pageSize) });
-    const response = await apiFetch(`/api/users/${encodeURIComponent(userId)}/contact-book?${query}`, { cache: "no-store" });
+    // Use "me" for current user's session
+    const apiUserId = userId === "mine" ? "me" : userId;
+    const response = await apiFetch(`/api/users/${encodeURIComponent(apiUserId)}/contact-book?${query}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los contactos.");
     if (request !== contactRequest) return;
@@ -202,7 +215,7 @@ async function loadContacts() {
     status.textContent = totalContacts ? "" : "Esta lista no tiene contactos.";
   } catch (error) {
     if (request !== contactRequest) return;
-    status.textContent = error.message || "No se pudieron cargar los contactos.";
+    status.textContent = error.message || "No se pudieron cargar los contactos."
   }
 }
 

@@ -128,6 +128,54 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
   }
 });
 
+// Current user's contact book (for admin viewing their own lists)
+runtime.app.get("/api/users/me/contact-book", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const listName = String(req.query.list || "").trim();
+  const offset = Number(req.query.offset || 0);
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+  if (!listName || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit)) {
+    return res.status(400).json({ ok: false, error: "Lista o página no válidos." });
+  }
+  const userId = req.user.id;
+  try {
+    const [rows] = await runtime.auth.pool.query(`SELECT u.username,access.session_code
+      FROM auth_users u LEFT JOIN (
+        SELECT user_id,session_code FROM auth_user_workspaces WHERE user_id=?
+        UNION
+        SELECT user_id,session_code FROM auth_session_access WHERE user_id=?
+      ) access ON access.user_id=u.id WHERE u.id=?`, [userId, userId, userId]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
+    const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
+    const books = new Map();
+    for (const code of sessionCodes) {
+      let book = runtime.sessions.get(code)?.contactBook;
+      if (!book) {
+        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
+        const stored = sessionRows[0]?.data;
+        book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
+      }
+      if (book) books.set(code, book);
+    }
+    const contactsFromBooks = sessionCodes.flatMap(code => (books.get(code)?.contacts || [])
+      .filter(contact => (contact.list || "Principal") === listName));
+    if (contactsFromBooks.length) {
+      const contacts = contactsFromBooks;
+      return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
+        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+    }
+    if (!sessionCodes.length) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
+    const [contacts] = await runtime.auth.pool.query(
+      `SELECT name,phone,'' AS note FROM vc_call_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=? ORDER BY name LIMIT ? OFFSET ?`,
+      [...sessionCodes, listName, limit, offset]);
+    const [[{ total }]] = await runtime.auth.pool.query(
+      `SELECT COUNT(*) AS total FROM vc_call_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=?`, [...sessionCodes, listName]);
+    return res.json({ ok: true, username: rows[0].username, list: listName, total: Number(total), contacts });
+  } catch {
+    return res.status(503).json({ ok: false, error: "No se pudieron cargar los contactos de esta lista." });
+  }
+});
+
 // Admin bulk import contacts to a user's list
 runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin, async (req, res) => {
   const userId = Number(req.params.id);
