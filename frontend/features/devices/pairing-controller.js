@@ -61,7 +61,7 @@ function renderPairingSlotsUi(slots) {
           : null;
 
     return `
-      <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}">
+      <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}" data-slot-id="${dashboardActions.escHtml(slot.id)}">
         <div class="pairing-slot-top">
           <strong>${slotDisplayLabel}</strong>
           <span class="pairing-slot-state">${assigned ? (connected ? "Conectado" : "Desconectado") : "Disponible"}</span>
@@ -114,6 +114,7 @@ function renderPairingSlotsUi(slots) {
       ? renderedSlots.join("")
       : `<div class="campaign-list-empty">No hay códigos QR disponibles.</div>`;
   }
+  dashboardState.pairingSlotsSnapshot = slots;
   dashboardActions.renderAssignedListsPanel();
 }
 
@@ -147,9 +148,8 @@ async function updatePairingSlotsFromState(slots) {
       await loadPairingData(dashboardState.sessionCode);
       return;
     }
-    // Re-renderizar con los QR ya disponibles en cache
-    // Resetear snapshot para que el próximo diff granular parta limpio
-    dashboardState.pairingSlotsSnapshot = [];
+    // Re-renderizar con los QR ya disponibles en cache sin perder el snapshot:
+    // dejarlo vacío hacia que el diff granular insertara las tarjetas de nuevo.
     renderPairingSlotsGranular(slots);
     return;
   }
@@ -166,6 +166,17 @@ function renderPairingSlotsOnly() {
 function renderPairingSlotsGranular(newSlots) {
   const container = refs.pairingSlotsEl;
   if (!container) return;
+
+  // El placeholder inicial o un diff desincronizado deja tarjetas duplicadas.
+  // Si el DOM no coincide con los slots esperados, se regenera el contenedor completo.
+  const domIds = [...container.querySelectorAll("[data-slot-id]")].map((el) => el.dataset.slotId);
+  const expectedIds = newSlots.map((slot) => slot.id);
+  if (container.querySelector(".campaign-list-empty") ||
+      domIds.length !== expectedIds.length ||
+      domIds.some((id, index) => id !== expectedIds[index])) {
+    renderPairingSlotsUi(newSlots);
+    return;
+  }
 
   const oldSlots = dashboardState.pairingSlotsSnapshot || [];
   const oldSlotMap = new Map(oldSlots.map((slot, idx) => [slot.id, { slot, idx }]));

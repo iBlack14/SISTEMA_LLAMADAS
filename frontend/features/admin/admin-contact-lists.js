@@ -191,9 +191,13 @@ function onImportFileChange(event) {
 function showImportPreview() {
   const file = $("adminListsImportFile").files?.[0];
   const list = $("adminListsName").value;
-  if (!file || !list) return;
+  if (!file || !list) {
+    console.warn("[IMPORT] Missing file or list", { file: !!file, list });
+    return;
+  }
   const status = $("adminListsStatus");
   status.textContent = "Procesando archivo…";
+  console.log("[IMPORT] Reading file", file.name, file.type, file.size);
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
@@ -207,8 +211,9 @@ function showImportPreview() {
         const text = new TextDecoder("utf-8").decode(content);
         contacts = parseDelimitedText(text);
       }
+      console.log("[IMPORT] Parsed contacts:", contacts.length);
       if (!contacts.length) {
-        status.textContent = "No se detectaron contactos válidos en el archivo.";
+        status.textContent = "No se detectaron contactos válidos. Verifica que el CSV/HTML tenga columnas nombre y teléfono.";
         return;
       }
       importPreviewData = contacts.map(c => ({ ...c, list }));
@@ -216,8 +221,13 @@ function showImportPreview() {
       $("adminListsImportPreview").style.display = "block";
       status.textContent = `${contacts.length} contactos detectados. Revisa y confirma.`;
     } catch (error) {
+      console.error("[IMPORT] Parse error:", error);
       status.textContent = "Error al leer archivo: " + error.message;
     }
+  };
+  reader.onerror = () => {
+    console.error("[IMPORT] FileReader error");
+    status.textContent = "Error leyendo el archivo.";
   };
   reader.readAsArrayBuffer(file);
 }
@@ -257,12 +267,16 @@ function hideImportPreview() {
 async function confirmImport() {
   const userId = $("adminListsUser").value;
   const list = $("adminListsName").value;
-  if (!userId || !list || !importPreviewData.length) return;
+  if (!userId || !list || !importPreviewData.length) {
+    console.warn("[IMPORT] Missing data for confirm", { userId, list, count: importPreviewData.length });
+    return;
+  }
   const status = $("adminListsStatus");
   const btn = $("adminListsImportConfirm");
   btn.disabled = true;
   btn.textContent = "Importando…";
   status.textContent = "Importando contactos…";
+  console.log("[IMPORT] Sending to backend", { userId, list, count: importPreviewData.length });
   try {
     const response = await apiFetch(`/api/users/${encodeURIComponent(userId)}/contact-book/import`, {
       method: "POST",
@@ -270,11 +284,13 @@ async function confirmImport() {
       body: JSON.stringify({ list, contacts: importPreviewData })
     });
     const data = await response.json();
+    console.log("[IMPORT] Backend response:", data);
     if (!response.ok || !data.ok) throw new Error(data.error || "Error al importar");
     status.textContent = `✅ ${data.added} contactos importados a la lista "${list}".`;
     hideImportPreview();
     loadContacts();
   } catch (error) {
+    console.error("[IMPORT] Error:", error);
     status.textContent = "Error: " + error.message;
     btn.disabled = false;
     btn.textContent = "Confirmar importación";
