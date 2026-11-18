@@ -1,6 +1,42 @@
 import { nanoid } from "nanoid";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 const ACTIVE_STATES = new Set(["dialing", "ringing", "in_call"]);
+
+// Load excluded numbers config (prefixes and exact numbers to skip in campaigns)
+let EXCLUDED_PREFIXES = [];
+let EXCLUDED_NUMBERS = new Set();
+
+async function loadExcludedNumbers() {
+  try {
+    const projectRoot = path.resolve(process.cwd(), "backend");
+    const configPath = path.join(projectRoot, "config", "excluded-numbers.json");
+    const content = await fs.readFile(configPath, "utf-8");
+    const config = JSON.parse(content);
+    EXCLUDED_PREFIXES = config.excludedPrefixes || [];
+    EXCLUDED_NUMBERS = new Set(config.excludedNumbers || []);
+    console.info("[EXCLUDED_NUMBERS] Loaded", { prefixes: EXCLUDED_PREFIXES.length, numbers: EXCLUDED_NUMBERS.size });
+  } catch (error) {
+    console.warn("[EXCLUDED_NUMBERS] Config not found, using defaults:", error.message);
+    // Defaults for Peru emergency numbers
+    EXCLUDED_PREFIXES = ["116", "105", "115", "114", "106", "111", "113", "0800", "0801", "911"];
+    EXCLUDED_NUMBERS = new Set(["116", "105", "115", "114"]);
+  }
+}
+
+// Call on module load
+loadExcludedNumbers();
+
+function cleanPhone(phone) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+function isExcludedNumber(phone) {
+  const clean = cleanPhone(phone);
+  if (EXCLUDED_NUMBERS.has(clean)) return true;
+  return EXCLUDED_PREFIXES.some(prefix => clean.startsWith(prefix));
+}
 const ALLOWED_RESULTS = new Set([
   "numero_inexistente",
   "buzon_de_voz",
@@ -382,21 +418,23 @@ export function pickNextContact(session, workerId = "") {
   const eligible = (contact) => !normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId;
   // Filter by campaign listName if set
   const listFilter = campaign.listName ? (contact) => (contact.list || "Principal") === campaign.listName : () => true;
+  // Skip excluded numbers (emergencies, hospitals, police, etc.)
+  const notExcluded = (contact) => !isExcludedNumber(contact.phone);
   // Complete the first round before retrying unanswered contacts.
-  let next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "pending")
-    || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "retry_pending")
+  let next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "pending")
+    || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "retry_pending")
     || null;
   if (!next && normalizedWorkerId && targetedMode) {
     const unclaimed = campaign.contacts.find((contact) =>
-      !contact.targetWorkerId && listFilter(contact) && ["pending", "retry_pending"].includes(contact.status)
+      !contact.targetWorkerId && listFilter(contact) && notExcluded(contact) && ["pending", "retry_pending"].includes(contact.status)
     );
     if (unclaimed) {
       const nextList = unclaimed.list;
       campaign.contacts.forEach((contact) => {
         if (!contact.targetWorkerId && contact.list === nextList) contact.targetWorkerId = normalizedWorkerId;
       });
-      next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "pending")
-        || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "retry_pending")
+      next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "pending")
+        || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "retry_pending")
         || null;
     }
   }

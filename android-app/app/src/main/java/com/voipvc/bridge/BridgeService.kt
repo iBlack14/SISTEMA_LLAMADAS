@@ -1067,19 +1067,22 @@ class BridgeService : Service() {
         when (state) {
             "dialing" -> {
                 launchCallUi()
-                setStatus("📞 Llamando...")
+                val elapsedSec = if (activeDialStartedAtElapsedMs > 0) (SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs) / 1000 else 0
+                setStatus("📞 Llamando... ${elapsedSec}s")
                 if (hasCampaignCall && belongsToCampaign && activeDialStartedAtElapsedMs > 0) {
                     val dialElapsedMs = SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs
-                    if (dialElapsedMs > 30_000) {
-                        Log.w(TAG, "[DIAL_TIMEOUT] dialing exceeded 30s command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)} elapsedMs=$dialElapsedMs")
-                        handleObservedCallState(
-                            "failed",
-                            campaignPhoneNumber,
-                            "",
-                            "outgoing",
-                            "dial_timeout_max"
-                        )
-                        return
+                    // Escalating timeout: 20s for likely busy/voicemail, 40s for no-answer
+                    when {
+                        dialElapsedMs > 20_000 && dialElapsedMs <= 25_000 -> {
+                            Log.w(TAG, "[DIAL_TIMEOUT] 20s exceeded - likely busy/voicemail command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)}")
+                            handleObservedCallState("failed", campaignPhoneNumber, "", "outgoing", "dial_timeout_busy")
+                            return
+                        }
+                        dialElapsedMs > 40_000 -> {
+                            Log.w(TAG, "[DIAL_TIMEOUT] 40s exceeded - no answer command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)}")
+                            handleObservedCallState("failed", campaignPhoneNumber, "", "outgoing", "dial_timeout_no_answer")
+                            return
+                        }
                     }
                 }
             }

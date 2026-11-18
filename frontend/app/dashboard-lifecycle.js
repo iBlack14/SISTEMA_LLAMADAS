@@ -4,27 +4,34 @@ import { apiFetch as fetch, currentUser, bindAccountControls } from '../features
 
 /**
  * createDashboardLifecycle: conserva los contratos y reglas existentes.
- * Dependencias: dashboardActions.bindEvents, dashboardActions.loadApkInfo, dashboardActions.renderCampaignPanel, dashboardActions.renderContacts, dashboardActions.restoreSavedSession, dashboardActions.syncAudioButtons.
+ * Dependencias: dashboardActions.bindEvents, dashboardActions.loadApkInfo, dashboardActions.renderCampaignPanel, dashboardActions.renderContacts, dashboardActions.restoreSavedSession, dashboardActions.syncAudioButtons, dashboardActions.initMessageContactsAdmin.
  * Se construye una vez por dashboard.
  */
 export function createDashboardLifecycle(dashboardState, dashboardActions) {
-async function init() {
-  console.log("Dashboard init starting...");
-  // Authenticated accounts only load data from their authorized MySQL session.
-  // The anonymous legacy browser database is deliberately left untouched.
-  bindAccountControls();
-  WhatsApp.loadWhatsAppPresetMessages();
+  async function init() {
+    console.log("Dashboard init starting...");
+    // Authenticated accounts only load data from their authorized MySQL session.
+    // The anonymous legacy browser database is deliberately left untouched.
+    bindAccountControls();
+    WhatsApp.loadWhatsAppPresetMessages();
 
-  dashboardActions.renderContacts();
-  dashboardActions.loadApkInfo().catch(e => console.error("Error loading APK info:", e));
-  dashboardActions.bindEvents();
-  dashboardActions.syncAudioButtons();
-  dashboardActions.renderCampaignPanel();
-  dashboardActions.restoreSavedSession();
+    dashboardActions.renderContacts();
+    dashboardActions.loadApkInfo().catch(e => console.error("Error loading APK info:", e));
+    dashboardActions.bindEvents();
+    dashboardActions.syncAudioButtons();
+    dashboardActions.renderCampaignPanel();
+    dashboardActions.restoreSavedSession();
 
-  setStatus("Listo.");
-  console.log("Dashboard init complete.");
-  window.dispatchEvent(new Event("dashboard:ready"));
-}
-return { init };
+    // Initialize admin message contacts when messages view is shown
+    document.addEventListener("panel:view", (e) => {
+      if (e.detail === "messages" && dashboardActions.initMessageContactsAdmin) {
+        dashboardActions.initMessageContactsAdmin();
+      }
+    });
+
+    setStatus("Listo.");
+    console.log("Dashboard init complete.");
+    window.dispatchEvent(new Event("dashboard:ready"));
+  }
+  return { init };
 }

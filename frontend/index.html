@@ -402,14 +402,18 @@
       <!-- Contactos del celular -->
       <section class="messages-section-card messages-contact-list" aria-labelledby="messageContactsTitle">
         <div class="messages-card-header">
-          <h3 id="messageContactsTitle">Contactos recibidos del celular</h3>
+          <h3 id="messageContactsTitle">Contactos para WhatsApp</h3>
           <span id="messageContactsCount" class="muted">0 contactos</span>
         </div>
-        <p id="messageContactsStatus" class="muted" role="status">Los contactos guardados desde la APK aparecerán aquí.</p>
+        <div id="messageContactsUserSelector" class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:8px;display:none">
+          <label>Ver contactos de:<select id="messageContactsUser"><option value="">Cargando…</option></select></label>
+          <span id="messageContactsHint" class="muted" style="font-size:0.85rem;align-self:flex-end">Selecciona un vendedor para ver sus contactos guardados en el celular</span>
+        </div>
+        <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Contacto</th><th scope="col">Número/Correo</th><th scope="col">Acciones</th></tr></thead>
-            <tbody id="messageContactsBody"><tr><td colspan="3">Todavía no hay contactos guardados.</td></tr></tbody>
+            <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Acción</th></tr></thead>
+            <tbody id="messageContactsBody"><tr><td colspan="3" class="muted">Sin contactos</td></tr></tbody>
           </table>
         </div>
       </section>

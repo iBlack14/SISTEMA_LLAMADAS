@@ -173,6 +173,42 @@ runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin
   }
 });
 
+// Admin get message contacts for a user
+runtime.app.get("/api/users/:id/message-contacts", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const userId = Number(req.params.id);
+  if (!Number.isSafeInteger(userId) || userId < 1) {
+    return res.status(400).json({ ok: false, error: "Usuario inválido." });
+  }
+  try {
+    const [rows] = await runtime.auth.pool.query(`SELECT u.username,access.session_code
+      FROM auth_users u LEFT JOIN (
+        SELECT user_id,session_code FROM auth_user_workspaces WHERE user_id=?
+        UNION
+        SELECT user_id,session_code FROM auth_session_access WHERE user_id=?
+      ) access ON access.user_id=u.id WHERE u.id=?`, [userId, userId, userId]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
+    const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
+    const allContacts = [];
+    for (const code of sessionCodes) {
+      const session = runtime.sessions.get(code);
+      if (session?.messageContacts?.length) {
+        allContacts.push(...session.messageContacts.map(c => ({ ...c, sessionCode: code })));
+      } else {
+        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
+        const stored = sessionRows[0]?.data;
+        const book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored) : null;
+        if (book?.messageContacts?.length) {
+          allContacts.push(...book.messageContacts.map(c => ({ ...c, sessionCode: code })));
+        }
+      }
+    }
+    return res.json({ ok: true, username: rows[0].username, contacts: allContacts });
+  } catch {
+    return res.status(503).json({ ok: false, error: "No se pudieron cargar los contactos de mensajes." });
+  }
+});
+
 runtime.app.get("/api/network", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try { res.json({ ok: true, ...await runtime.network.snapshot() }); }
