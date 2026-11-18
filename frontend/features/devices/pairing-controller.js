@@ -114,7 +114,6 @@ const pairingLoads = new Map();
 
 function updatePairingSlotsFromState(slots) {
   if (!Array.isArray(slots)) return;
-  dashboardState.pairingSlotsSnapshot = slots;
 
   // Limpiar URLs cacheadas de slots eliminados
   const activeSlotIds = new Set(slots.map(pairingQrCacheKey));
@@ -144,13 +143,153 @@ function updatePairingSlotsFromState(slots) {
     }));
   }
 
-  renderPairingSlotsUi(slots);
+  renderPairingSlotsGranular(slots);
 }
 
 function renderPairingSlotsOnly() {
   if (Array.isArray(dashboardState.pairingSlotsSnapshot) && dashboardState.pairingSlotsSnapshot.length) {
     renderPairingSlotsUi(dashboardState.pairingSlotsSnapshot);
   }
+}
+
+function renderPairingSlotsGranular(newSlots) {
+  const container = refs.pairingSlotsEl;
+  if (!container) return;
+
+  const oldSlots = dashboardState.pairingSlotsSnapshot || [];
+  const oldSlotMap = new Map(oldSlots.map((slot, idx) => [slot.id, { slot, idx }]));
+  const newSlotMap = new Map(newSlots.map((slot, idx) => [slot.id, { slot, idx }]));
+
+  // Determine which slots need updates
+  const allSlotIds = new Set([...oldSlotMap.keys(), ...newSlotMap.keys()]);
+
+  for (const slotId of allSlotIds) {
+    const oldEntry = oldSlotMap.get(slotId);
+    const newEntry = newSlotMap.get(slotId);
+
+    if (!oldEntry) {
+      // New slot added - insert at correct position
+      const newSlotHtml = renderSingleSlot(newEntry.slot, newEntry.idx, dashboardState, dashboardActions);
+      if (newEntry.idx === 0) {
+        container.insertAdjacentHTML('afterbegin', newSlotHtml);
+      } else {
+        const prevSlot = newSlots[newEntry.idx - 1];
+        const prevEl = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(prevSlot.id)}"]`);
+        if (prevEl) {
+          prevEl.insertAdjacentHTML('afterend', newSlotHtml);
+        } else {
+          container.insertAdjacentHTML('beforeend', newSlotHtml);
+        }
+      }
+    } else if (!newEntry) {
+      // Slot removed
+      const el = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(slotId)}"]`);
+      if (el) el.remove();
+    } else {
+      // Slot exists - check if content changed
+      const oldSlot = oldEntry.slot;
+      const newSlot = newEntry.slot;
+      if (slotsChanged(oldSlot, newSlot)) {
+        const newSlotHtml = renderSingleSlot(newSlot, newEntry.idx, dashboardState, dashboardActions);
+        const el = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(slotId)}"]`);
+        if (el) el.outerHTML = newSlotHtml;
+      }
+    }
+  }
+
+  dashboardState.pairingSlotsSnapshot = newSlots;
+  dashboardActions.renderAssignedListsPanel();
+}
+
+function slotsChanged(oldSlot, newSlot) {
+  return oldSlot.deviceId !== newSlot.deviceId ||
+    oldSlot.deviceName !== newSlot.deviceName ||
+    oldSlot.token !== newSlot.token ||
+    oldSlot.linkedAt !== newSlot.linkedAt;
+}
+
+function renderSingleSlot(slot, index, state, actions) {
+  const listAssignmentBySlotId = new Map(actions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
+  const workers = Array.isArray(state.latestSessionState?.phoneWorkers) ? state.latestSessionState.phoneWorkers : [];
+  const selectableListNames = (Contacts.lists || []).filter((name) =>
+    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
+  );
+
+  const slotDisplayLabel = `EQUIPO ${index + 1}`;
+  const assigned = Boolean(slot.deviceId);
+  const qrUrl = assigned ? "" : (state.pairQrCache?.get(pairingQrCacheKey(slot)) || "");
+  const activeWorkerList = slot.deviceId
+    ? (state.campaignState?.contacts || []).find((contact) =>
+        contact.targetWorkerId === slot.deviceId && !["completed", "failed", "awaiting_callback"].includes(contact.status)
+      )?.list
+    : "";
+  const assignedList = activeWorkerList || listAssignmentBySlotId.get(slot.id)?.listName || "";
+  const optionList = Array.from(new Set([...selectableListNames, ...(assignedList ? [assignedList] : [])]));
+  const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
+  const connected = Boolean(worker?.connected);
+  const callState = String(worker?.callState || "idle");
+  const calling = Boolean(connected && ["dialing", "ringing", "in_call"].includes(callState));
+  const ringing = ["dialing", "ringing"].includes(callState);
+  const answered = callState === "in_call";
+  const ended = Boolean(worker && ["ended", "failed"].includes(callState));
+  const heldContact = (state.campaignState?.contacts || []).find((contact) =>
+    contact.targetWorkerId === slot.deviceId && contact.status === "held"
+  );
+  const statusIcon = ringing
+    ? { src: "/features/calls/assets/call-status/timbrando.png", label: "Timbrando", effect: "is-vibrating" }
+    : answered
+      ? { src: "/features/calls/assets/call-status/contesto.png", label: "Llamada contestada", effect: "is-pulsing" }
+      : ended || heldContact
+        ? { src: "/features/calls/assets/call-status/rechazado.png", label: "Llamada rechazada o finalizada", effect: "is-rejected" }
+        : null;
+
+  return `
+    <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}" data-slot-id="${actions.escHtml(slot.id)}">
+      <div class="pairing-slot-top">
+        <strong>${slotDisplayLabel}</strong>
+        <span class="pairing-slot-state">${assigned ? (connected ? "Conectado" : "Desconectado") : "Disponible"}</span>
+      </div>
+      ${assigned
+        ? `<div class="pairing-slot-linked-box">
+             <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
+             <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
+             <small class="pairing-slot-linked-sub">${actions.escHtml(slot.deviceName || "Vinculado")}</small>
+           </div>`
+        : (qrUrl
+            ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
+            : `<div class="pairing-slot-qr-loading">Cargando código QR...</div>`
+          )
+      }
+      <div class="pairing-slot-details">
+        <span>Teléfono</span>
+        <strong>${assigned ? actions.escHtml(slot.deviceName || "Teléfono vinculado") : "Sin vincular"}</strong>
+      </div>
+      ${assigned
+        ? `<label class="pairing-slot-list-field">
+             <span>Lista asignada</span>
+             <select class="pairing-slot-list-select" data-slot-list-select="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-current-list="${actions.escHtml(assignedList)}" aria-label="Lista asignada a ${slotDisplayLabel}">
+               <option value="">Sin lista</option>
+               ${optionList.map((name) => `<option value="${actions.escHtml(name)}"${name === assignedList ? " selected" : ""}>${actions.escHtml(name)}</option>`).join("")}
+             </select>
+           </label>`
+        : `<div class="pairing-slot-list-field"><span>Lista asignada</span><strong class="pairing-slot-list-empty">Sin vincular</strong></div>`}
+      <div class="pairing-slot-current-call ${ringing ? "is-ringing" : answered ? "is-answered" : ended || heldContact ? "is-ended" : ""}">
+        <span>${ringing ? "Teléfono timbrando" : answered ? "Llamada contestada" : heldContact ? "Llamada detenida" : ended ? "Llamada finalizada" : "Estado de llamada"}</span>
+        <div class="pairing-call-number-row">
+          <strong class="pairing-call-number">${calling || ended ? actions.escHtml(worker.phoneNumber || "Sin número") : heldContact ? actions.escHtml(heldContact.phone || "") : "Esperando llamada"}</strong>
+          ${statusIcon ? `<img class="pairing-call-status-icon ${statusIcon.effect}" src="${statusIcon.src}" alt="${statusIcon.label}" />` : ""}
+        </div>
+        <small class="pairing-call-company">${calling || ended ? actions.escHtml(worker.companyName || "Empresa") : heldContact ? actions.escHtml(heldContact.name || "Empresa") : ""}</small>
+      </div>
+      <div class="pairing-slot-call-actions">
+        <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${connected && assignedList && !calling ? "" : "disabled"}>▶ Iniciar llamada</button>
+        <button type="button" class="pairing-slot-stop" data-stop-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>■ Detener</button>
+        <button type="button" class="pairing-slot-hangup" data-hangup-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>☎ Colgar</button>
+      </div>
+      <button type="button" class="pairing-slot-skip-list" data-skip-list-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-current-list="${actions.escHtml(assignedList)}" ${connected && assignedList ? "" : "disabled"}>SALTAR LISTA</button>
+      ${assigned ? `<button type="button" class="pairing-slot-disconnect" data-disconnect-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-worker-name="${actions.escHtml(slot.deviceName || "Teléfono vinculado")}">Desvincular teléfono</button>` : ""}
+      ${assigned ? "" : `<button type="button" class="pairing-slot-delete" data-delete-pairing-slot="${actions.escHtml(slot.id)}" data-slot-label="${slotDisplayLabel}">Eliminar QR</button>`}
+    </article>`;
 }
 
 async function loadPairingData(code) {
@@ -198,7 +337,7 @@ async function loadPairingDataOnce(code) {
       }));
     }
 
-    renderPairingSlotsUi(slots);
+    renderPairingSlotsGranular(slots);
   } catch (error) {
     if (refs.pairingSlotsEl) refs.pairingSlotsEl.innerHTML = `<div class="campaign-list-empty">${dashboardActions.escHtml(error.message || "No se pudieron cargar los códigos QR.")}</div>`;
   }
@@ -239,5 +378,5 @@ async function deletePairingQr(slotId) {
     setStatus(error.message || "No se pudo eliminar el QR.", true);
   }
 }
-return { loadPairingData, createPairingQr, deletePairingQr, renderPairingSlotsOnly, updatePairingSlotsFromState };
+return { loadPairingData, createPairingQr, deletePairingQr, renderPairingSlotsOnly, updatePairingSlotsFromState, renderPairingSlotsGranular };
 }

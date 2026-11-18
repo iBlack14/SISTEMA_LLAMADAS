@@ -19,8 +19,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 const io = new Server(server, {
   cors: corsOptions,
-  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT_MS || 20000),
-  pingInterval: Number(process.env.SOCKET_PING_INTERVAL_MS || 25000),
+  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT_MS || 60000),
+  pingInterval: Number(process.env.SOCKET_PING_INTERVAL_MS || 30000),
   connectTimeout: 45000,
   maxHttpBufferSize: Number(process.env.SOCKET_MAX_HTTP_BUFFER_SIZE || 1048576)
 });

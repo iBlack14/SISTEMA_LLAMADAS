@@ -83,7 +83,9 @@ socket.on("state:changed", st => {
     dashboardState.pairingDeviceSignature = nextDeviceSignature;
     dashboardState.pairingStateSignature = nextCallSignature;
     // pairing data already in st.phoneWorkers and st.pairingSlots from state:changed
-    if (dashboardActions.renderPairingSlotsOnly) {
+    if (dashboardActions.updatePairingSlotsFromState && st.pairingSlots) {
+      dashboardActions.updatePairingSlotsFromState(st.pairingSlots);
+    } else if (dashboardActions.renderPairingSlotsOnly) {
       dashboardActions.renderPairingSlotsOnly();
     }
   } else if (nextCallSignature !== dashboardState.pairingStateSignature) {
