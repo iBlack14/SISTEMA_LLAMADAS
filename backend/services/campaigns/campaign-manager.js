@@ -380,21 +380,23 @@ export function pickNextContact(session, workerId = "") {
   const normalizedWorkerId = String(workerId || "").trim();
   const targetedMode = campaign.contacts.some((contact) => Boolean(contact.targetWorkerId));
   const eligible = (contact) => !normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId;
+  // Filter by campaign listName if set
+  const listFilter = campaign.listName ? (contact) => (contact.list || "Principal") === campaign.listName : () => true;
   // Complete the first round before retrying unanswered contacts.
-  let next = campaign.contacts.find((contact) => eligible(contact) && contact.status === "pending")
-    || campaign.contacts.find((contact) => eligible(contact) && contact.status === "retry_pending")
+  let next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "pending")
+    || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "retry_pending")
     || null;
   if (!next && normalizedWorkerId && targetedMode) {
     const unclaimed = campaign.contacts.find((contact) =>
-      !contact.targetWorkerId && ["pending", "retry_pending"].includes(contact.status)
+      !contact.targetWorkerId && listFilter(contact) && ["pending", "retry_pending"].includes(contact.status)
     );
     if (unclaimed) {
       const nextList = unclaimed.list;
       campaign.contacts.forEach((contact) => {
         if (!contact.targetWorkerId && contact.list === nextList) contact.targetWorkerId = normalizedWorkerId;
       });
-      next = campaign.contacts.find((contact) => eligible(contact) && contact.status === "pending")
-        || campaign.contacts.find((contact) => eligible(contact) && contact.status === "retry_pending")
+      next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "pending")
+        || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && contact.status === "retry_pending")
         || null;
     }
   }
