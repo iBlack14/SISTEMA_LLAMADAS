@@ -1393,6 +1393,7 @@ class BridgeService : Service() {
         val reportedDirection = directionOverride ?: currentCallDirection
         val commandId = if (correlateCampaign) activeCommandId else ""
         val contactId = if (correlateCampaign) activeContactId else ""
+        val callId = if (correlateCampaign) activeCallId else ""
         val noLiveCalls = state in setOf("idle", "ended", "failed") &&
             hasPermission(Manifest.permission.READ_PHONE_STATE) &&
             !VoipVcInCallService.isTrackingCalls() &&
@@ -1402,6 +1403,7 @@ class BridgeService : Service() {
             normalizedNumber(reportedNumber),
             commandId,
             contactId,
+            callId,
             reportedDirection,
             source,
             campaignStateObserved.toString(),

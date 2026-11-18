@@ -12,10 +12,24 @@ export function clearDeviceFromPairingSlots(session, deviceId, exceptSlotId = ""
   return cleared;
 }
 
-export function bindDeviceToPairingSlot(session, slot, { deviceId, deviceName, linkedAt } = {}) {
+export function bindDeviceToPairingSlot(session, slot, { deviceId, deviceName, linkedAt } = {}, io = null) {
   if (!slot) return null;
   const normalizedDeviceId = String(deviceId || "").trim();
   if (!normalizedDeviceId) throw new Error("deviceId requerido");
+  // Invalidate previous session using this slot: disconnect old worker's socket
+  if (io && session.phoneWorkers) {
+    const oldWorker = session.phoneWorkers.find((w) => w.pairingSlotId === slot.id && w.id !== normalizedDeviceId && w.connected && w.socketId);
+    if (oldWorker) {
+      const oldSocket = io.sockets.sockets.get(oldWorker.socketId);
+      if (oldSocket?.connected) {
+        oldSocket.emit("session:error", { message: "Sesion invalida: nuevo dispositivo vinculado a este slot", reason: "slot_reassigned" });
+        oldSocket.disconnect(true);
+      }
+      oldWorker.connected = false;
+      oldWorker.socketId = null;
+      oldWorker.pairingSlotId = null;
+    }
+  }
   clearDeviceFromPairingSlots(session, normalizedDeviceId, slot.id);
   slot.deviceId = normalizedDeviceId;
   slot.deviceName = String(deviceName || "Android bridge");

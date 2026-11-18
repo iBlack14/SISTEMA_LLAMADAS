@@ -378,7 +378,15 @@ async function deletePairingQr(slotId) {
       headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo eliminar el QR.");
+    if (!res.ok || !data.ok) {
+      // Si el slot no se encuentra (IDs desincronizados), refresca la lista
+      // desde el servidor para corregir el estado stale del frontend.
+      if (res.status === 404) {
+        await loadPairingData(dashboardState.sessionCode);
+        throw new Error("El código QR ya no existe en el servidor. La lista fue actualizada.");
+      }
+      throw new Error(data.error || "No se pudo eliminar el QR.");
+    }
     await loadPairingData(dashboardState.sessionCode);
     setStatus("Código QR eliminado.", true);
   } catch (error) {

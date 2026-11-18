@@ -170,6 +170,16 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     const session = sessions.get(code);
     if (!session) return;
 
+    // Idempotency: track processed callId+state to avoid duplicate processing
+    if (!session.processedCallIds) session.processedCallIds = new Set();
+    const idempotencyKey = `${callId}:${callState}`;
+    if (session.processedCallIds.has(idempotencyKey)) {
+      console.info("[PHONE_STATUS] duplicate-ignored", { session: String(code).slice(-2), callId: String(callId || "").slice(-8), callState });
+      socket.emit("phone:status_ack", { persisted: true, accepted: false, duplicate: true, callId: callId || "" });
+      return;
+    }
+    session.processedCallIds.add(idempotencyKey);
+
     const worker = getPhoneWorkerBySocketId(session, socket.id);
     const isExternalIncoming = Boolean(externalIncoming);
     // Independent of commands/optimistic campaign state: only an Android event is evidence.
@@ -271,6 +281,13 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     });
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
+    }
+    // Cleanup processedCallIds for finished calls to prevent memory leak
+    if (terminal && callId && session.processedCallIds) {
+      const prefix = `${callId}:`;
+      for (const key of session.processedCallIds) {
+        if (key.startsWith(prefix)) session.processedCallIds.delete(key);
+      }
     }
     });
     }).catch(error => {

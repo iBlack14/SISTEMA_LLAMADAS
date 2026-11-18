@@ -190,7 +190,13 @@ runtime.app.post("/api/session/:code/session/finalize", async (req, res) => {
   const finalizedSession = finalizeCurrentSession(session);
   resetCampaignOperation(session);
   services.disconnectAllSessionPhones(session, "session_restarted");
-  session.pairingSlots = Array.from({ length: 3 }, (_, index) => services.createPairingSlot(index));
+  // Rotate tokens on existing slots so old QR codes stop working, but
+  // preserve the slot IDs so the dashboard does not need a page reload.
+  const existingSlots = Array.isArray(session.pairingSlots) ? session.pairingSlots : [];
+  while (existingSlots.length < 3) existingSlots.push(services.createPairingSlot(existingSlots.length));
+  session.pairingSlots = existingSlots.slice(0, Math.max(existingSlots.length, 3)).map((slot, index) =>
+    services.createPairingSlot(index, { ...slot, deviceId: "", deviceName: "", linkedAt: null, token: nanoid(20) })
+  );
   session.pairingToken = nanoid(20);
   session.updatedAt = Date.now();
   try { await runtime.persistence.save(runtime.sessions); }
