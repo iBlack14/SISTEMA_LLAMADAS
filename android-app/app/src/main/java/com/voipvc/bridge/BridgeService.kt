@@ -118,10 +118,30 @@ class BridgeService : Service() {
     private var captureJob: Job? = null
     private var playbackJob: Job? = null
     private val audioPlaybackQueue = Channel<ByteArray>(
-        capacity = 4,
+        capacity = 50,  // Jitter buffer: ~4s at 80ms/chunk (was 4)
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    // Backpressure for capture: channel to decouple AudioRecord read from socket emit
+    private val audioCaptureQueue = Channel<ByteArray>(
+        capacity = 20,  // ~1.6s buffer
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // App-level heartbeat (10s) - faster than Socket.IO ping (30s) for mobile
+    private var heartbeatJob: Job? = null
+    private val HEARTBEAT_INTERVAL_MS = 10_000L
+    private val HEARTBEAT_TIMEOUT_MS = 5_000L
+
+    // Buffer pool for audio chunks to reduce GC pressure
+    private val audioBufferPool = Channel<ByteArray>(
+        capacity = 30,  // Pool size: 30 buffers
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    private val CHUNK_BYTES = CHUNK_FRAMES * 2
+    // Pre-fill pool
+    init {
+        repeat(30) { audioBufferPool.trySend(ByteArray(CHUNK_BYTES)) }
+    }
 
     private val minBufIn  by lazy { AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,  AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(CHUNK_FRAMES * 2) }
     private val minBufOut by lazy { AudioTrack.getMinBufferSize(SAMPLE_RATE,  AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(CHUNK_FRAMES * 2) }
@@ -394,6 +414,14 @@ class BridgeService : Service() {
             mainHandler.post { setStatus("❌ $msg") }
         }
 
+        // App-level heartbeat: send ping every 10s, expect pong within 5s
+        client.on("app:heartbeat_pong") { args ->
+            if (client !== socket) return@on
+            // Heartbeat acknowledged, connection is alive
+        }
+        // Start heartbeat after successful join
+        startHeartbeat(client)
+
         // Keep APK UI in sync with the authoritative session state from server.
         client.on("state:changed") { args ->
             if (client !== socket) return@on
@@ -573,6 +601,7 @@ class BridgeService : Service() {
         client.on(Socket.EVENT_DISCONNECT) {
             val reason = it.firstOrNull()?.toString().orEmpty()
             Log.w(TAG, "[SOCKET] disconnected session=${code.takeLast(2)} reason=${reason.take(120)}")
+            stopHeartbeat()
             if (client === socket) mainHandler.post { setStatus("🔄 Reconectando…") }
         }
         client.on(Socket.EVENT_CONNECT_ERROR) { args ->
@@ -1201,6 +1230,19 @@ class BridgeService : Service() {
             audioTrack!!.play()
             isPlaying.set(true)
             playbackJob = serviceScope.launch(Dispatchers.IO) {
+                // Jitter buffer: pre-fill with 3 chunks (~240ms) before starting playback
+                val preBuffer = mutableListOf<ByteArray>()
+                for (bytes in audioPlaybackQueue) {
+                    if (!isPlaying.get()) break
+                    preBuffer.add(bytes)
+                    if (preBuffer.size >= 3) {
+                        // Pre-buffer full, start playback
+                        for (buf in preBuffer) playAudio(buf)
+                        preBuffer.clear()
+                        break
+                    }
+                }
+                // Continue normal playback
                 for (bytes in audioPlaybackQueue) {
                     if (isPlaying.get()) playAudio(bytes)
                 }
@@ -1240,12 +1282,28 @@ class BridgeService : Service() {
         }
 
         val chunkBytes = CHUNK_FRAMES * 2
+        // Capture: read from AudioRecord -> captureQueue (backpressure)
         captureJob = serviceScope.launch(Dispatchers.IO) {
-            val buf = ByteArray(chunkBytes)
             while (isActive && isStreaming.get()) {
-                val read = audioRecord?.read(buf, 0, chunkBytes) ?: -1
-                if (read > 0 && socket?.connected() == true) {
-                    socket!!.emit("audio:phone", buf.copyOf(read))
+                // Get buffer from pool
+                val buf = audioBufferPool.receiveOrNull() ?: ByteArray(CHUNK_BYTES)
+                val read = audioRecord?.read(buf, 0, CHUNK_BYTES) ?: -1
+                if (read > 0) {
+                    // Copy only the used portion for the queue (pool buffer will be reused)
+                    val chunk = buf.copyOf(read)
+                    audioCaptureQueue.trySend(chunk)
+                }
+                // Return buffer to pool for reuse
+                audioBufferPool.trySend(buf)
+            }
+        }
+        // Emit from captureQueue -> socket (separate coroutine for backpressure)
+        serviceScope.launch(Dispatchers.IO) {
+            for (chunk in audioCaptureQueue) {
+                if (socket?.connected() == true) {
+                    socket!!.emit("audio:phone", chunk)
+                } else {
+                    // Socket disconnected, drop chunk to avoid buildup
                 }
             }
         }
@@ -1261,6 +1319,8 @@ class BridgeService : Service() {
         playbackJob?.cancel()
         playbackJob = null
         while (audioPlaybackQueue.tryReceive().isSuccess) { /* discard stale audio */ }
+        while (audioCaptureQueue.tryReceive().isSuccess) { /* discard stale capture */ }
+        while (audioBufferPool.tryReceive().isSuccess) { /* discard pool buffers */ }
         try { audioRecord?.stop(); audioRecord?.release() } catch (_: Exception) {}
         try { audioTrack?.stop(); audioTrack?.release()  } catch (_: Exception) {}
         audioRecord = null
@@ -1276,6 +1336,34 @@ class BridgeService : Service() {
         } catch (_: Exception) {}
         isMicMuted = false
         isSpeakerOn = false
+    }
+
+    // App-level heartbeat (10s interval, 5s timeout) - faster than Socket.IO ping for mobile
+    private fun startHeartbeat(client: Socket) {
+        stopHeartbeat()
+        heartbeatJob = serviceScope.launch {
+            while (isActive && client.connected()) {
+                delay(HEARTBEAT_INTERVAL_MS)
+                if (!isActive || !client.connected()) break
+                val sentAt = System.currentTimeMillis()
+                client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt)) { ackArgs ->
+                    val latencyMs = System.currentTimeMillis() - sentAt
+                    if (latencyMs > HEARTBEAT_TIMEOUT_MS) {
+                        Log.w(TAG, "[HEARTBEAT] pong timeout latency=${latencyMs}ms")
+                        if (client === socket) {
+                            mainHandler.post { client.disconnect() } // Force reconnect
+                        }
+                    } else {
+                        Log.d(TAG, "[HEARTBEAT] pong ok latency=${latencyMs}ms")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
     }
 
     private fun buildRestartIntentFromPrefs(): Intent? {

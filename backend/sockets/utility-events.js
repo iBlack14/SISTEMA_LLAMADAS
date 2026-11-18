@@ -159,6 +159,10 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     if (typeof acknowledge === "function") acknowledge({ ok: true });
   });
 
+  // App-level heartbeat: respond to ping with pong
+  socket.on("app:heartbeat_ping", (ack) => {
+    if (typeof ack === "function") ack({ ok: true, t: Date.now() });
+  });
 
   socket.on("disconnect", () => {
     const { code, role } = socket.data;

@@ -153,7 +153,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
         bindDeviceToPairingSlot(session, pairingSlot, {
           deviceId: deviceId || worker.id,
           deviceName: deviceName || worker.name
-        });
+        }, io);
         worker.pairingSlotId = pairingSlot.id;
         socket.data.pairingSlotId = pairingSlot.id;
         pairingSlot.token = nanoid(20);

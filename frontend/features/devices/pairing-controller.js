@@ -129,20 +129,13 @@ async function updatePairingSlotsFromState(slots) {
   if (unassignedToFetch.length > 0) {
     // Renderizar primero con "Cargando..." y luego de nuevo cuando lleguen los QR
     renderPairingSlotsGranular(slots);
-    await Promise.all(unassignedToFetch.map(async (slot) => {
-      try {
-        const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${dashboardState.sessionCode}.svg?slot=${encodeURIComponent(slot.id)}&v=${encodeURIComponent(slot.token || slot.id)}`, {
-          headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
-        });
-        if (qrResponse.ok) {
-          const url = URL.createObjectURL(await qrResponse.blob());
-          dashboardState.pairQrCache.set(pairingQrCacheKey(slot), url);
-          dashboardState.pairQrObjectUrls.push(url);
-        }
-      } catch {
-        // Ignorar fallas temporales
-      }
-    }));
+    const results = await fetchQrBatch(dashboardState.sessionCode, unassignedToFetch);
+    const hadStaleIds = results.some((r) => r === "not_found");
+    if (hadStaleIds) {
+      // Los IDs del estado local son stale — recargar datos frescos del servidor
+      await loadPairingData(dashboardState.sessionCode);
+      return;
+    }
     // Re-renderizar con los QR ya disponibles en cache
     // Resetear snapshot para que el próximo diff granular parta limpio
     dashboardState.pairingSlotsSnapshot = [];
@@ -306,6 +299,29 @@ async function loadPairingData(code) {
   return pending;
 }
 
+async function fetchQrForSlot(code, slot) {
+  const qrResponse = await fetch(
+    `${API_BASE}/api/pairing-qr/${code}.svg?slot=${encodeURIComponent(slot.id)}&v=${encodeURIComponent(slot.token || slot.id)}`,
+    { headers: { "X-Dashboard-Token": dashboardState.dashboardToken } }
+  );
+  if (qrResponse.status === 404) return "not_found";
+  if (!qrResponse.ok) return "error";
+  const url = URL.createObjectURL(await qrResponse.blob());
+  dashboardState.pairQrCache.set(pairingQrCacheKey(slot), url);
+  dashboardState.pairQrObjectUrls.push(url);
+  return "ok";
+}
+
+async function fetchQrBatch(code, slots) {
+  const results = await Promise.all(
+    slots.map(async (slot) => {
+      try { return await fetchQrForSlot(code, slot); }
+      catch { return "error"; }
+    })
+  );
+  return results;
+}
+
 async function loadPairingDataOnce(code) {
   try {
     const res = await fetch(`${API_BASE}/api/pairing/${code}`, {
@@ -328,20 +344,12 @@ async function loadPairingDataOnce(code) {
     // Solo consultar QR para slots NO vinculados y que NO estén cacheados
     const unassignedToFetch = slots.filter((slot) => !slot.deviceId && !dashboardState.pairQrCache.has(pairingQrCacheKey(slot)));
     if (unassignedToFetch.length > 0) {
-      await Promise.all(unassignedToFetch.map(async (slot) => {
-        try {
-          const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${code}.svg?slot=${encodeURIComponent(slot.id)}&v=${encodeURIComponent(slot.token || slot.id)}`, {
-            headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
-          });
-          if (qrResponse.ok) {
-            const url = URL.createObjectURL(await qrResponse.blob());
-            dashboardState.pairQrCache.set(pairingQrCacheKey(slot), url);
-            dashboardState.pairQrObjectUrls.push(url);
-          }
-        } catch {
-          // Ignorar fallas temporales
-        }
-      }));
+      const results = await fetchQrBatch(code, unassignedToFetch);
+      const hadStaleIds = results.some((r) => r === "not_found");
+      if (hadStaleIds) {
+        // Los IDs del servidor cambiaron — recargar desde cero con los IDs frescos
+        return loadPairingDataOnce(code);
+      }
     }
 
     renderPairingSlotsGranular(slots);

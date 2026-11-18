@@ -83,6 +83,19 @@ runtime.app.post("/api/session/:code/pairing-slots", (req, res) => {
   return res.json({ ok: true, code, slotId: slot.id });
 });
 
+runtime.app.post("/api/pairing/token/:code", runtime.pairingRateLimit, (req, res) => {
+  const code = String(req.params.code || "").toUpperCase().trim();
+  const session = runtime.sessions.has(code) ? services.getOrCreateSession(code) : null;
+  if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
+  if (!services.hasDashboardAccess(req, session)) return res.status(401).json({ ok: false, error: "Acceso no autorizado" });
+  // Generate fresh pairing token (rotated)
+  session.pairingToken = nanoid(20);
+  session.updatedAt = Date.now();
+  services.saveSoon();
+  services.emitState(code);
+  return res.json({ ok: true, code, token: session.pairingToken });
+});
+
 runtime.app.delete("/api/session/:code/pairing-slots/:slotId", (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   const slotId = String(req.params.slotId || "").trim();
@@ -378,7 +391,7 @@ runtime.app.post("/api/android/pair", runtime.pairingRateLimit, (req, res) => {
     deviceName
   });
   if (pairingSlot) {
-    bindDeviceToPairingSlot(session, pairingSlot, { deviceId, deviceName });
+    bindDeviceToPairingSlot(session, pairingSlot, { deviceId, deviceName }, runtime.io);
     worker.pairingSlotId = pairingSlot.id;
   }
   services.syncSessionPhoneState(session);
