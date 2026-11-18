@@ -36,6 +36,12 @@ window.dismissReminder = (id) => {
 
 socket.on("quote:open_modal", data => openQuoteModal(data));
 
+socket.on("contact-book:changed", async () => {
+  if (Contacts && typeof Contacts.refreshDatabase === "function") {
+    await Contacts.refreshDatabase().catch(() => {});
+  }
+});
+
 socket.on("call:error", ({message}) => setStatus(message || "No se permite llamar a este número.", true));
 
 socket.on("state:changed", st => {

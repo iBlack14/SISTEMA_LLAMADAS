@@ -149,7 +149,19 @@ async function postCampaignAction(path, body = {}) {
   }
 
   try {
-    if (/\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(path)) await Contacts.flushDatabase();
+    if (/\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(path)) {
+      try {
+        await Contacts.flushDatabase();
+      } catch (flushErr) {
+        if (flushErr?.conflict || flushErr?.status === 409 || String(flushErr?.message || "").includes("La base cambió")) {
+          if (typeof Contacts.refreshDatabase === "function") {
+            await Contacts.refreshDatabase(true).catch(() => {});
+          }
+        } else {
+          throw flushErr;
+        }
+      }
+    }
     const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(dashboardState.sessionCode)}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardState.dashboardToken },

@@ -143,7 +143,14 @@ runtime.app.post("/api/session/:code/workers/:workerId/start-independent", (req,
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
   const worker = (session.phoneWorkers || []).find((item) => item.id === workerId && item.connected && item.socketId);
   if (!worker) return res.status(404).json({ ok: false, error: "Telefono no conectado" });
-  const submittedContacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  let submittedContacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  if (!submittedContacts.length && session.contactBook?.contacts?.length) {
+    const slot = (session.pairingSlots || []).find((s) => s.deviceId === workerId);
+    const assignedList = session.contactBook?.preferences?.pairingListAssignments?.[slot?.id] || "";
+    if (assignedList) {
+      submittedContacts = session.contactBook.contacts.filter((c) => (c.list || "Principal") === assignedList);
+    }
+  }
   console.info(`[CALL_REQUEST] start-independent session=${code.slice(-2)} worker=${worker.id} contacts=${submittedContacts.length}`);
   const campaign = ensureCampaign(session);
   // Preparar la lista del equipo sin reiniciar intentos ni otras campañas.

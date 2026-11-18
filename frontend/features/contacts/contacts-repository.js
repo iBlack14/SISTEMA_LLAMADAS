@@ -26,6 +26,16 @@ function snapshot() {
   return structuredClone({contacts,lists,activeList,calledCounts,contactRowStatus,callDurations,dismissedReminderIds,preferences});
 }
 
+function isConflictError(error) {
+  if (!error) return false;
+  return Boolean(
+    error.conflict ||
+    error.status === 409 ||
+    String(error.message || "").includes("La base cambió") ||
+    String(error.message || "").includes("conflict")
+  );
+}
+
 function apply(book) {
   contacts = book.contacts || [];
   lists = book.lists || ["Principal"];
@@ -46,13 +56,44 @@ function persist() {
     const key = connectionKey;
     const request = transport;
     saveQueue = saveQueue.then(async () => {
-      if (saveError || connectionKey !== key) return;
+      if (connectionKey !== key) return;
       try {
         const result = await request("PUT",{book,revision});
         if (connectionKey !== key) return;
         revision = result.revision;
+        saveError = null;
         window.dispatchEvent(new Event("contact-book:saved"));
       } catch (error) {
+        if (isConflictError(error)) {
+          try {
+            const refreshed = await request("GET");
+            if (connectionKey !== key) return;
+            if (refreshed && typeof refreshed.revision === "number") {
+              revision = refreshed.revision;
+              if (refreshed.book) {
+                const currentPrefs = preferences;
+                apply(refreshed.book);
+                if (currentPrefs && typeof currentPrefs === "object") {
+                  preferences = { ...preferences, ...currentPrefs };
+                }
+                saveError = null;
+                window.dispatchEvent(new Event("contact-book:loaded"));
+              }
+              const retryResult = await request("PUT",{book:snapshot(),revision});
+              if (connectionKey !== key) return;
+              revision = retryResult.revision;
+              saveError = null;
+              window.dispatchEvent(new Event("contact-book:saved"));
+              return;
+            }
+          } catch (retryError) {
+            if (!isConflictError(retryError)) {
+              saveError = retryError;
+              window.dispatchEvent(new CustomEvent("contact-book:error",{detail:retryError.message}));
+              return;
+            }
+          }
+        }
         saveError = error;
         window.dispatchEvent(new CustomEvent("contact-book:error",{detail:error.message}));
       }
@@ -115,12 +156,40 @@ export function setPreference(key, value) {
   persist();
 }
 
+export async function refreshDatabase(force = false) {
+  if (!transport || (!ready && !force)) return;
+  const key = connectionKey;
+  try {
+    const refreshed = await transport("GET");
+    if (connectionKey !== key) return;
+    if (refreshed && typeof refreshed.revision === "number") {
+      revision = refreshed.revision;
+      if (refreshed.book) {
+        apply(refreshed.book);
+      }
+      saveError = null;
+      window.dispatchEvent(new Event("contact-book:loaded"));
+    }
+  } catch (error) {
+    console.warn("[CONTACT_BOOK] auto-refresh failed:", error);
+  }
+}
+
 export async function flushDatabase() {
   if (!loading) throw new Error("Espera a que la base se conecte con MySQL.");
   await loading;
   await Promise.resolve();
   await saveQueue;
-  if (saveError) throw saveError;
+  if (saveError) {
+    if (isConflictError(saveError)) {
+      try {
+        await refreshDatabase(true);
+        saveError = null;
+        return;
+      } catch {}
+    }
+    throw saveError;
+  }
 }
 
 

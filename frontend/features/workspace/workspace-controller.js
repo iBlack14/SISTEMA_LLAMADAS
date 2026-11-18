@@ -75,8 +75,13 @@ function updateSessionUi(st = {}) {
         method, headers:{"Content-Type":"application/json","X-Dashboard-Token":bookToken},
         ...(body ? {body:JSON.stringify(body)} : {})
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo guardar la base en MySQL.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        const error = new Error(data.error || "No se pudo guardar la base en MySQL.");
+        error.status = response.status;
+        error.conflict = response.status === 409 || data.conflict === true;
+        throw error;
+      }
       return data;
     }).catch(() => {});
   }

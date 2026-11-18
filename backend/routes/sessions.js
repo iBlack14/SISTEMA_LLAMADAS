@@ -95,6 +95,7 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
       console.info(`[CONTACT_BOOK] PUT session=${code.slice(-2)} revision=${session.contactBookRevision} contacts=${previousContacts}->${book.contacts.length} lists=${previousLists}->${book.lists.length} persisted=mysql`);
       return session.contactBookRevision;
     });
+    if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision });
     res.json({ok:true,revision});
   } catch (error) {
     res.status(error.conflict ? 409 : 503).json({ok:false,error:error.conflict ? error.message : "No se confirmó el guardado en MySQL. Recarga antes de continuar."});
