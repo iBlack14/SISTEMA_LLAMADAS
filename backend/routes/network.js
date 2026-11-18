@@ -200,13 +200,15 @@ runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin
     let book = session.contactBook ? { ...session.contactBook, contacts: [...session.contactBook.contacts], lists: [...session.contactBook.lists] } : { contacts: [], lists: ["Principal"] };
     if (!book.lists.includes(listName)) book.lists.push(listName);
     let added = 0;
+    const now = new Date();
+    const createdAt = now.toISOString();
     for (const c of contacts) {
       const phone = String(c.phone || "").replace(/\D/g, "");
       const name = String(c.name || "").trim();
       if (!phone || !name) continue;
       const exists = book.contacts.some(contact => contact.phone === phone && (contact.list || "Principal") === listName);
       if (!exists) {
-        book.contacts.push({ id: crypto.randomUUID(), name, phone, list: listName, note: c.note || "" });
+        book.contacts.push({ id: crypto.randomUUID(), name: "", phone, list: listName, note: c.note || "", company: name, createdAt });
         added++;
       }
     }

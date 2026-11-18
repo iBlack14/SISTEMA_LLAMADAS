@@ -1,5 +1,14 @@
 import { apiFetch, bindAccountControls, requireLogin } from "../../auth/auth-session.js";
 
+const MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 let usersInitialized = false;
 export async function initUsersPage() {
   if (usersInitialized) return;
@@ -19,7 +28,6 @@ function bindUsers() {
   const message = document.getElementById("usersMessage");
   const backBtn = document.getElementById("usersBackBtn");
   const refresh = document.getElementById("usersRefresh");
-  const listsRefresh = document.getElementById("userListsRefresh");
   const editDialog = document.getElementById("editUserDialog");
   const editForm = document.getElementById("editUserForm");
   const editError = document.getElementById("editUserError");
@@ -27,8 +35,6 @@ function bindUsers() {
   let saving = false;
   let loading = false;
   let requestNumber = 0;
-  let listsRequestNumber = 0;
-  let listsLoaded = false;
 
   function showError(text) {
     if (error) {
@@ -96,19 +102,25 @@ function bindUsers() {
     const status = document.getElementById("usersLoading");
     if (status) {
       status.hidden = false;
-      status.textContent = "Cargando usuarios…";
+      status.textContent = "Cargando…";
     }
     try {
       const response = await apiFetch("/api/users", { cache: "no-store" });
       const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los usuarios.");
+      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los vendedores.");
       if (request !== requestNumber) return;
       const body = document.getElementById("usersRows");
       if (body) {
         body.replaceChildren();
         for (const account of data.users) {
           const row = document.createElement("tr");
-          for (const value of [account.username, account.role === "ADMINISTRADOR" ? "Administrador" : "Ventas", account.active ? "Activo" : "Inactivo"]) {
+          for (const value of [
+            account.username,
+            account.company || "—",
+            account.role === "ADMINISTRADOR" ? "Administrador" : "Vendedor",
+            account.active ? "Activo" : "Inactivo",
+            formatDate(account.createdAt)
+          ]) {
             const cell = document.createElement("td");
             cell.textContent = value;
             row.appendChild(cell);
@@ -126,12 +138,12 @@ function bindUsers() {
         }
       }
       if (status) {
-        status.textContent = data.users.length ? "" : "Todavía no hay cuentas registradas.";
+        status.textContent = data.users.length ? "" : "No hay vendedores registrados.";
         status.hidden = Boolean(data.users.length);
       }
     } catch (cause) {
       if (request !== requestNumber) return;
-      if (status) status.textContent = "No se pudo actualizar la lista.";
+      if (status) status.textContent = "No se pudo cargar la lista.";
       showError(cause.message);
     } finally {
       if (request === requestNumber) {
@@ -141,48 +153,13 @@ function bindUsers() {
     }
   }
 
-  async function loadUserLists() {
-    const request = ++listsRequestNumber;
-    if (listsRefresh) listsRefresh.disabled = true;
-    const status = document.getElementById("userListsLoading");
-    if (status) { status.hidden = false; status.textContent = "Cargando listas…"; }
-    try {
-      const response = await apiFetch("/api/users/lists", { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar las listas.");
-      if (request !== listsRequestNumber) return;
-      const body = document.getElementById("userListsRows");
-      if (body) {
-        body.replaceChildren();
-        for (const account of data.users) {
-          const lists = account.lists.length ? account.lists : [{ name: "Sin listas", count: 0 }];
-          for (const list of lists) {
-            const row = document.createElement("tr");
-            for (const value of [account.username, account.role === "ADMINISTRADOR" ? "Administrador" : "Ventas", account.active ? "Activo" : "Inactivo", list.name, String(list.count)]) {
-              const cell = document.createElement("td");
-              cell.textContent = value;
-              row.appendChild(cell);
-            }
-            body.appendChild(row);
-          }
-        }
-      }
-      if (status) { status.textContent = data.users.length ? "" : "No hay usuarios registrados."; status.hidden = Boolean(data.users.length); }
-      listsLoaded = true;
-    } catch (cause) {
-      if (request !== listsRequestNumber) return;
-      if (status) { status.textContent = cause.message || "No se pudieron cargar las listas."; status.hidden = false; }
-    } finally {
-      if (request === listsRequestNumber && listsRefresh) listsRefresh.disabled = false;
-    }
-  }
-
   function openEditUser(account) {
     if (!editDialog || !editForm) return;
     editForm.reset();
     showEditError("");
     editForm.elements.id.value = account.id;
     editForm.elements.username.value = account.username;
+    editForm.elements.company.value = account.company || "";
     editForm.elements.role.value = account.role;
     editForm.elements.active.value = account.active ? "1" : "0";
     hidePasswords(editForm);
@@ -203,7 +180,6 @@ function bindUsers() {
     showError("");
     if (message) message.hidden = true;
     loadUsers();
-    if (!listsLoaded) loadUserLists();
   };
   bindPasswordToggles(document);
 
@@ -219,7 +195,6 @@ function bindUsers() {
       loadUsers();
     });
   }
-  if (listsRefresh) listsRefresh.addEventListener("click", () => { listsLoaded = false; loadUserLists(); });
 
   if (form) {
     form.addEventListener("submit", async event => {
@@ -235,6 +210,7 @@ function bindUsers() {
       }
       const payload = {
         username: values.username.value.trim(),
+        company: values.company.value.trim() || null,
         role: values.role.value,
         password: values.password.value,
         passwordConfirmation: values.passwordConfirmation.value
@@ -247,11 +223,11 @@ function bindUsers() {
           body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo crear el usuario.");
+        if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo crear el vendedor.");
         form.reset();
         hidePasswords(form);
         if (message) {
-          message.textContent = "Usuario " + data.user.username + " creado con acceso de " + (data.user.role === "ADMINISTRADOR" ? "administrador." : "ventas.");
+          message.textContent = "Vendedor " + data.user.username + " creado" + (data.user.company ? " en " + data.user.company : "") + " con acceso de " + (data.user.role === "ADMINISTRADOR" ? "administrador." : "ventas.");
           message.hidden = false;
         }
         await loadUsers();
@@ -288,6 +264,7 @@ function bindUsers() {
       }
       const payload = {
         username: values.username.value.trim(),
+        company: values.company.value.trim() || null,
         role: values.role.value,
         active: values.active.value === "1",
         password,
@@ -301,10 +278,10 @@ function bindUsers() {
           body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo actualizar el usuario.");
+        if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo actualizar el vendedor.");
         if (editDialog) editDialog.close();
         if (message) {
-          message.textContent = "Usuario " + data.user.username + " actualizado." + (data.sessionsClosed ? " Se cerraron sus sesiones activas." : "");
+          message.textContent = "Vendedor " + data.user.username + " actualizado." + (data.sessionsClosed ? " Se cerraron sus sesiones activas." : "");
           message.hidden = false;
         }
         await loadUsers();

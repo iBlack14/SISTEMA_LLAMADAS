@@ -4,6 +4,7 @@ export const AUTH_SCHEMA = [
     username VARCHAR(80) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('EMPLEADO','ADMINISTRADOR') NOT NULL,
+    company VARCHAR(120) NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     auth_version INT UNSIGNED NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -36,7 +37,9 @@ export const AUTH_SCHEMA = [
 // Additive migrations for databases created before these columns existed.
 export const AUTH_MIGRATIONS = [
   { table: "auth_users", column: "updated_at",
-    definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+    definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+  { table: "auth_users", column: "company",
+    definition: "VARCHAR(120) NULL" }
 ];
 
 export async function ensureAuthSchema(pool) {

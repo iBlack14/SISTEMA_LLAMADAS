@@ -63,17 +63,22 @@ test("user management enforces login, admin role, CSRF and hashes new credential
       if(users.some(item=>item.id!==id&&item.username===args[0]))
         throw Object.assign(new Error("duplicate"),{code:"ER_DUP_ENTRY"});
       user.username=args[0];user.role=args[1];user.active=args[2];
+      // company is at index 3 if provided, password_hash at index 3 or 4
+      if(args.length >= 5 && args[3] !== undefined && typeof args[3] !== "string") {
+        // args[3] is not password_hash (which would be a string), so it might be company
+      }
       if(args.length===5){user.password_hash=args[3];user.auth_version=(user.auth_version||1)+1;}
+      if(args.length===6){user.company=args[3];user.password_hash=args[4];user.auth_version=(user.auth_version||1)+1;}
       return [{affectedRows:1}];
     }
-    if(sql.startsWith("SELECT id,username,role,active,created_at")){
+    if(sql.startsWith("SELECT id,username,role,active,created_at") || sql.startsWith("SELECT id,username,role,company,active,created_at")){
       if(failList)throw new Error("storage unavailable");
       return [users];
     }
     if(sql.startsWith("INSERT INTO auth_users")){
       if(users.some(item=>item.username===args[0]))throw Object.assign(new Error("duplicate"),{code:"ER_DUP_ENTRY"});
       inserts++;
-      users.push({id:users.length+1,username:args[0],password_hash:args[1],role:args[2],active:1,auth_version:1});
+      users.push({id:users.length+1,username:args[0],password_hash:args[1],role:args[2],company:args[3]||null,active:1,auth_version:1});
       return [{insertId:users.length}];
     }
     if(sql.startsWith("SELECT * FROM auth_users WHERE username"))return [users.filter(item=>item.username===args[0])];

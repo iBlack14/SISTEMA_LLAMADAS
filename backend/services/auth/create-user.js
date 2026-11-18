@@ -39,11 +39,12 @@ async function readSecret(prompt) {
 }
 
 async function main() {
-  const [rawUsername, role, ...extra] = process.argv.slice(2);
+  const [rawUsername, role, company, ...extra] = process.argv.slice(2);
   const username = String(rawUsername || "").trim().toLowerCase();
+  const cleanCompany = company ? String(company).trim() : null;
   if (extra.length || !/^[a-z0-9._-]{3,80}$/.test(username)
       || !["EMPLEADO", "ADMINISTRADOR"].includes(role)) {
-    throw new Error("Uso: npm run auth:user:add -- <usuario> <EMPLEADO|ADMINISTRADOR>");
+    throw new Error("Uso: npm run auth:user:add -- <usuario> <EMPLEADO|ADMINISTRADOR> [empresa]");
   }
   const easypanel = process.env.APP_ENV === "easypanel";
   if (easypanel) assertEasypanelConfig();
@@ -71,9 +72,9 @@ async function main() {
     await ensureAuthSchema(connection);
     const [existing] = await connection.query("SELECT id FROM auth_users WHERE username=?", [username]);
     if (existing.length) throw new Error(`El usuario ${username} ya existe.`);
-    await connection.query("INSERT INTO auth_users(username,password_hash,role) VALUES (?,?,?)",
-      [username, await hashPassword(password), role]);
-    console.log(`Usuario ${username} creado con rol ${role}.`);
+    await connection.query("INSERT INTO auth_users(username,password_hash,role,company) VALUES (?,?,?,?)",
+      [username, await hashPassword(password), role, cleanCompany]);
+    console.log(`Usuario ${username} creado con rol ${role}${cleanCompany ? `, empresa ${cleanCompany}` : ""}.`);
   } finally {
     await connection.end();
   }

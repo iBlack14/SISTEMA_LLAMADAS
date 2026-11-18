@@ -196,10 +196,17 @@ async function loadContacts() {
     totalContacts = Number(data.total || 0);
     const body = $("adminListsContacts");
     body.replaceChildren();
+    const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "";
+      return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
+    }
     if (data.contacts.length) {
       for (const contact of data.contacts) {
         const row = document.createElement("tr");
-        for (const value of [contact.name, contact.phone, contact.note]) {
+        for (const value of [contact.company || contact.name, contact.phone, formatDate(contact.createdAt)]) {
           const cell = document.createElement("td");
           cell.textContent = value || "";
           row.appendChild(cell);
@@ -300,9 +307,16 @@ function loadSheetJS() {
 function renderImportPreview() {
   const body = $("adminListsImportPreviewBody");
   body.replaceChildren();
+  const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  function formatDate(dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
+  }
   for (const c of importPreviewData.slice(0, 200)) {
     const row = document.createElement("tr");
-    for (const value of [c.name, c.phone, c.note || "", c.list]) {
+    for (const value of [c.company || c.name, c.phone, formatDate(c.createdAt), c.list]) {
       const cell = document.createElement("td");
       cell.textContent = value || "";
       row.appendChild(cell);

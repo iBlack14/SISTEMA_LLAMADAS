@@ -4,6 +4,7 @@ export function validateNewUser(body = {}) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Introduce los datos del usuario.");
   const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
   const role = body.role ?? "EMPLEADO";
+  const company = body.company ? String(body.company).trim().slice(0, 120) : null;
   if (!/^[a-z0-9._-]{3,80}$/.test(username))
     throw new Error("El usuario debe tener entre 3 y 80 caracteres: letras, números, punto, guion o guion bajo.");
   if (!["EMPLEADO", "ADMINISTRADOR"].includes(role))
@@ -12,13 +13,14 @@ export function validateNewUser(body = {}) {
     throw new Error("La contraseña debe tener entre 12 y 256 caracteres.");
   if (body.password !== body.passwordConfirmation)
     throw new Error("Las contraseñas no coinciden.");
-  return { username, role, password: body.password };
+  return { username, role, company, password: body.password };
 }
 
 export function validateUserUpdate(body = {}) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Introduce los datos del usuario.");
   const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
   const role = body.role ?? "EMPLEADO";
+  const company = body.company !== undefined ? (body.company ? String(body.company).trim().slice(0, 120) : null) : undefined;
   if (!/^[a-z0-9._-]{3,80}$/.test(username))
     throw new Error("El usuario debe tener entre 3 y 80 caracteres: letras, números, punto, guion o guion bajo.");
   if (!["EMPLEADO", "ADMINISTRADOR"].includes(role))
@@ -27,13 +29,14 @@ export function validateUserUpdate(body = {}) {
   const password = typeof body.password === "string" ? body.password : "";
   const passwordConfirmation = typeof body.passwordConfirmation === "string" ? body.passwordConfirmation : "";
   if (password || passwordConfirmation) {
-    // Only a provided password is rewritten; an empty pair keeps the current one.
     if (password.length < 12 || password.length > 256)
       throw new Error("La contraseña debe tener entre 12 y 256 caracteres.");
     if (password !== passwordConfirmation)
       throw new Error("Las contraseñas no coinciden.");
   }
-  return { username, role, active, password: password || null };
+  const result = { username, role, active, password: password || null };
+  if (company !== undefined) result.company = company;
+  return result;
 }
 
 export function registerUserRoutes(app, auth) {
@@ -41,9 +44,9 @@ export function registerUserRoutes(app, auth) {
     res.setHeader("Cache-Control", "no-store");
     try {
       const [rows] = await auth.pool.query(
-        "SELECT id,username,role,active,created_at FROM auth_users ORDER BY username");
+        "SELECT id,username,role,company,active,created_at FROM auth_users ORDER BY username");
       res.json({ ok: true, users: rows.map(row => ({
-        id: row.id, username: row.username, role: row.role,
+        id: row.id, username: row.username, role: row.role, company: row.company,
         active: Boolean(Number(row.active)), createdAt: row.created_at
       })) });
     } catch {
@@ -62,10 +65,10 @@ export function registerUserRoutes(app, auth) {
     try {
       const encoded = await hashPassword(input.password);
       const [result] = await auth.pool.query(
-        "INSERT INTO auth_users(username,password_hash,role) VALUES (?,?,?)",
-        [input.username, encoded, input.role]);
+        "INSERT INTO auth_users(username,password_hash,role,company) VALUES (?,?,?,?)",
+        [input.username, encoded, input.role, input.company]);
       res.status(201).json({ ok: true, user: {
-        id: result.insertId, username: input.username, role: input.role, active: true
+        id: result.insertId, username: input.username, role: input.role, company: input.company, active: true
       } });
     } catch (error) {
       if (error.code === "ER_DUP_ENTRY")
@@ -92,8 +95,11 @@ export function registerUserRoutes(app, auth) {
       if (!existing.length) return res.status(404).json({ ok: false, error: "El usuario ya no existe." });
       const fields = ["username=?", "role=?", "active=?"];
       const args = [input.username, input.role, input.active ? 1 : 0];
+      if (input.company !== undefined) {
+        fields.push("company=?");
+        args.push(input.company);
+      }
       if (input.password) {
-        // A new password ends every open session for that account.
         fields.push("password_hash=?", "auth_version=auth_version+1");
         args.push(await hashPassword(input.password));
       }
@@ -101,7 +107,7 @@ export function registerUserRoutes(app, auth) {
       await auth.pool.query(`UPDATE auth_users SET ${fields.join(",")} WHERE id=?`, args);
       if (input.password) await auth.pool.query("DELETE FROM auth_sessions WHERE user_id=?", [id]);
       res.json({ ok: true, sessionsClosed: Boolean(input.password), user: {
-        id, username: input.username, role: input.role, active: input.active
+        id, username: input.username, role: input.role, company: input.company, active: input.active
       } });
     } catch (error) {
       if (error.code === "ER_DUP_ENTRY")
