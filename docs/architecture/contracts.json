@@ -226,8 +226,10 @@
     "call:action",
     "phone:status",
     "phone:command_ack",
+    "phone:quote:request",
     "audio:phone",
     "audio:dashboard",
+    "app:heartbeat_ping",
     "session:logout",
     "disconnect"
   ],

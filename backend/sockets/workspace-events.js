@@ -62,6 +62,12 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     try {
       const { code, session } = await workspaces.open(user, String(previousCode || "").toUpperCase());
       if (!socket.connected) return;
+      // Reset pairing slots only on fresh workspace open (no previousCode = logout + new login)
+      // This prevents stale QR slots from persisting after dashboard logout
+      if (!previousCode) {
+        session.pairingSlots = [];
+        session.pairingToken = nanoid(20);
+      }
       session.blockedNumbers = services.globalBlockedNumbers();
       saveSoon();
       detachSocketFromCurrentSession(socket);
