@@ -1,5 +1,15 @@
 import { apiFetch, currentUser } from "../auth/auth-session.js";
 
+// Spinner animation for import feedback
+if (!document.getElementById("admin-import-spinner-style")) {
+  const style = document.createElement("style");
+  style.id = "admin-import-spinner-style";
+  style.textContent = `
+@keyframes spin { to { transform: rotate(360deg); } }
+`;
+  document.head.appendChild(style);
+}
+
 function normalizeHeader(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
@@ -311,9 +321,11 @@ async function confirmImport() {
   }
   const status = $("adminListsStatus");
   const btn = $("adminListsImportConfirm");
+  const cancelBtn = $("adminListsImportCancel");
   btn.disabled = true;
-  btn.textContent = "Importando…";
-  status.textContent = "Importando contactos…";
+  cancelBtn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px"></span> Guardando en servidor…';
+  status.innerHTML = '<span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--primary);border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px"></span> Importando contactos…';
   console.log("[IMPORT] Sending to backend", { userId, list, count: importPreviewData.length });
   try {
     const response = await apiFetch(`/api/users/${encodeURIComponent(userId)}/contact-book/import`, {
@@ -331,6 +343,7 @@ async function confirmImport() {
     console.error("[IMPORT] Error:", error);
     status.textContent = "Error: " + error.message;
     btn.disabled = false;
+    cancelBtn.disabled = false;
     btn.textContent = "Confirmar importación";
   }
 }
