@@ -27,8 +27,13 @@ de audio; no debe tomar las llamadas mientras se prueba el detector de VOIP VC.
   La captura durante marcación permite intentar reconocer avisos de red previos a la conexión;
   su disponibilidad depende del equipo y operador.
 - Procesa PCM16 mono a 16 kHz del downlink celular, sin guardar grabaciones.
+- Mantiene la captura durante el cambio de marcación a llamada activa y escucha hasta 90 s.
+- Revisa bloques de 100 ms. Detecta cadencia de ocupado repetido aparte de voz; un tono
+  aislado, tono largo o voz normal no deben provocar el corte.
 - Reconoce combinaciones de buzón/casilla/correo de voz con instrucciones para
   dejar un mensaje, o instrucciones para dejar mensaje después del tono/señal.
+- También reconoce anuncios comunes de apagado, fuera de cobertura, no disponible,
+  ocupado y llamada restringida como estados temporales. No deben bloquear el número.
 - Modo rápido solicitado: revisa cada bloque de audio y corta con el primer parcial
   que coincida con las primeras cuatro palabras, sin esperar resultado final ni silencio.
   Prefijos: «te has comunicado con», «el número que has», «hola deja tu mensaje»,
@@ -38,7 +43,7 @@ de audio; no debe tomar las llamadas mientras se prueba el detector de VOIP VC.
   inferida por el prefijo, no una comprobación de que el número sea inexistente.
   La latencia depende de cuándo Vosk entregue esas palabras; no garantiza corte
   exactamente al pronunciar la cuarta palabra.
-- La ventana de análisis dura hasta 45 segundos después de conectar. Al agotarse,
+- La ventana de análisis dura hasta 90 segundos desde que inicia la captura. Al agotarse,
   deja de analizar pero NO cuelga por tiempo.
 - Una coincidencia solicita desconectar exactamente el objeto Call que se analizó.
 - El servidor conserva buzon_de_voz, sin_servicio o no_disponible y solo libera el equipo
@@ -68,6 +73,7 @@ Estas locuciones se clasifican como `numero_inexistente`:
 2. «[Operador] te informa que el número que usted ha marcado no existe».
 3. «Este es un mensaje de Claro: el número que usted ha marcado es incorrecto».
 4. «Hola, la cantidad de dígitos que marcaste es incorrecta, volver a llamar».
+5. Variantes explícitas de «el número marcado no existe / no es válido / es incorrecto».
 
 El detector espera las palabras que distinguen «no existe» o «incorrecto/incorrecta»;
 no bloquea permanentemente solo por escuchar «el número que ha marcado».

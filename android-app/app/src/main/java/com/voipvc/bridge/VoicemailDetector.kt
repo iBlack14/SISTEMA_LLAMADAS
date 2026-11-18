@@ -251,12 +251,21 @@ object VoicemailDetector {
                     input = stream
                     recognizer = Recognizer(speechModel, 16000f)
                     val rec = recognizer!!
-                    val buffer = ByteArray(3200)
-                    val deadline = SystemClock.elapsedRealtime() + 45000
+                    val buffer = ByteArray(1600)
+                    val deadline = SystemClock.elapsedRealtime() + 90000
+                    val toneDetector = BusyToneDetector(16000)
                     say("Escuchando audio remoto para detectar buzón…")
                     while (ticket == generation.get() && SystemClock.elapsedRealtime() < deadline) {
                         val count = stream.read(buffer)
                         if (count <= 0) break
+                        if (toneDetector.accept(buffer, count)) {
+                            lastMatch = "Tono de ocupado repetido"
+                            say("Tono de ocupado repetido detectado; solicitando corte")
+                            main.post {
+                                if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, "tono_ocupado")
+                            }
+                            break
+                        }
                         val final = rec.acceptWaveForm(buffer, count)
                         val result = JSONObject(if (final) rec.result else rec.partialResult)
                         val text = result.optString(if (final) "text" else "partial").trim()

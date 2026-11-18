@@ -137,11 +137,8 @@ class VoipVcInCallService : InCallService() {
                 val mapped = mapCallState(state)
                 if (state == Call.STATE_ACTIVE || state == Call.STATE_DIALING) {
                     setSpeaker(true)
-                    // Some networks expose no downlink during dialing. Retry once connected.
-                    if (state == Call.STATE_ACTIVE && analyzedCall === call) {
-                        VoicemailDetector.stop()
-                        analyzedCall = null
-                    }
+                    // Keep the same listener through DIALING -> ACTIVE: the remote
+                    // announcement or busy cadence often starts after that transition.
                     analyzeOutgoingCall(call)
                 } else if (analyzedCall === call) {
                     VoicemailDetector.stop()
@@ -196,11 +193,11 @@ class VoipVcInCallService : InCallService() {
                 .putExtra(BridgeService.EXTRA_CALL_STATE, mapCallState(call.state))
                 .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
                 .putExtra(BridgeService.EXTRA_CALL_DIRECTION, "outgoing")
-                .putExtra("detected_voicemail", resultCode == "buzon_de_voz")
+                .putExtra("detected_voicemail", resultCode in setOf("buzon_de_voz", "tono_ocupado"))
                 .putExtra("detected_announcement", resultCode))
             try {
                 call.disconnect()
-                Log.i(TAG, "Voicemail phrase matched; disconnect requested for current outgoing call")
+                Log.i(TAG, "Automated call-end signal '$resultCode'; disconnect requested for current outgoing call")
             } catch (e: SecurityException) {
                 Log.e(TAG, "Voicemail detected but Android denied disconnect", e)
             }
