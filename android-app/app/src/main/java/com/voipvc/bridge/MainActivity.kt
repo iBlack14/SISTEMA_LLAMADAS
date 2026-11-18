@@ -608,14 +608,26 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (!response.isSuccessful) {
                             val serverError = runCatching { JSONObject(payload).optString("error") }.getOrDefault("")
+                            val pairingTokenRejected = response.code == 401 &&
+                                serverError.contains("token", ignoreCase = true)
                             val message = when {
-                                response.code == 401 && serverError.contains("token", ignoreCase = true) ->
-                                    "El QR venció o no corresponde a esta sesión. Genera un QR nuevo en el panel y vuelve a escanearlo."
+                                pairingTokenRejected ->
+                                    "Este QR ya no corresponde a la sesión. Genera un QR nuevo en el panel y escanéalo otra vez."
                                 response.code == 404 ->
                                     "La sesión del QR ya no existe. Genera un QR nuevo en el panel."
                                 response.code == 409 ->
                                     "Este QR ya está vinculado a otro teléfono. Genera uno nuevo para este equipo."
                                 else -> "No se pudo vincular (HTTP ${response.code})."
+                            }
+                            if (pairingTokenRejected) {
+                                getSharedPreferences(BridgeService.PREFS_NAME, Context.MODE_PRIVATE).edit()
+                                    .remove(BridgeService.PREF_SOCKET_URL)
+                                    .remove(BridgeService.PREF_CODE)
+                                    .remove(BridgeService.PREF_TOKEN)
+                                    .remove(BridgeService.PREF_DEVICE_ID)
+                                    .remove(BridgeService.PREF_DEVICE_NAME)
+                                    .apply()
+                                setBridgeMode(BridgeMode.ONBOARDING)
                             }
                             updatePersistentStatus(message, "Error", Tone.ERROR)
                             showTransientStatus(message, Tone.ERROR)

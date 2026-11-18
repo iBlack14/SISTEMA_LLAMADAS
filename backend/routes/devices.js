@@ -333,7 +333,11 @@ runtime.app.get("/api/pairing-qr/:code.svg", async (req, res) => {
     }
 
     res.setHeader("Content-Type", "image/svg+xml");
-    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    // Pairing links contain rotating per-slot tokens. Do not let browsers or
+    // reverse proxies keep a QR image after the session token has changed.
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     return res.send(svg);
   } catch {
     return res.status(500).send("No se pudo generar QR");

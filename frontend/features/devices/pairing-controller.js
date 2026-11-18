@@ -13,6 +13,10 @@ if (!dashboardState.pairQrCache) {
   dashboardState.pairQrCache = new Map();
 }
 
+function pairingQrCacheKey(slot) {
+  return `${slot.id}:${slot.token || ""}`;
+}
+
 function renderPairingSlotsUi(slots) {
   const listAssignmentBySlotId = new Map(dashboardActions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
   const workers = Array.isArray(dashboardState.latestSessionState?.phoneWorkers) ? dashboardState.latestSessionState.phoneWorkers : [];
@@ -25,7 +29,7 @@ function renderPairingSlotsUi(slots) {
   const renderedSlots = slots.map((slot, index) => {
     const slotDisplayLabel = `EQUIPO ${index + 1}`;
     const assigned = Boolean(slot.deviceId);
-    const qrUrl = assigned ? "" : (dashboardState.pairQrCache?.get(slot.id) || "");
+    const qrUrl = assigned ? "" : (dashboardState.pairQrCache?.get(pairingQrCacheKey(slot)) || "");
     const activeWorkerList = slot.deviceId
       ? (dashboardState.campaignState?.contacts || []).find((contact) =>
           contact.targetWorkerId === slot.deviceId && !["completed", "failed", "awaiting_callback"].includes(contact.status)
@@ -134,7 +138,7 @@ async function loadPairingDataOnce(code) {
     dashboardState.pairingSlotsSnapshot = slots;
 
     // Limpiar URLs cacheadas de slots eliminados
-    const activeSlotIds = new Set(slots.map((s) => s.id));
+    const activeSlotIds = new Set(slots.map(pairingQrCacheKey));
     for (const [cachedSlotId, url] of dashboardState.pairQrCache.entries()) {
       if (!activeSlotIds.has(cachedSlotId)) {
         URL.revokeObjectURL(url);
@@ -143,16 +147,16 @@ async function loadPairingDataOnce(code) {
     }
 
     // Solo consultar QR para slots NO vinculados y que NO estén cacheados
-    const unassignedToFetch = slots.filter((slot) => !slot.deviceId && !dashboardState.pairQrCache.has(slot.id));
+    const unassignedToFetch = slots.filter((slot) => !slot.deviceId && !dashboardState.pairQrCache.has(pairingQrCacheKey(slot)));
     if (unassignedToFetch.length > 0) {
       await Promise.all(unassignedToFetch.map(async (slot) => {
         try {
-          const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${code}.svg?slot=${encodeURIComponent(slot.id)}`, {
+          const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${code}.svg?slot=${encodeURIComponent(slot.id)}&v=${encodeURIComponent(slot.token || slot.id)}`, {
             headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
           });
           if (qrResponse.ok) {
             const url = URL.createObjectURL(await qrResponse.blob());
-            dashboardState.pairQrCache.set(slot.id, url);
+            dashboardState.pairQrCache.set(pairingQrCacheKey(slot), url);
             dashboardState.pairQrObjectUrls.push(url);
           }
         } catch {
