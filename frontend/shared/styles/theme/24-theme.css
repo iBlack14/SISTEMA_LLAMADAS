@@ -1585,6 +1585,16 @@
   overflow: hidden;
 }
 
+/* Some global device styles force small text to white; keep linked-device
+   details readable on the light lavender card in both connection states. */
+.pairing-slot-card .pairing-slot-linked-box .pairing-slot-linked-title {
+  color: #30103f !important;
+}
+
+.pairing-slot-card .pairing-slot-linked-box .pairing-slot-linked-sub {
+  color: #5a3c68 !important;
+}
+
 .pairing-slot-qr-loading {
   width: min(210px, 82%);
   aspect-ratio: 1;
