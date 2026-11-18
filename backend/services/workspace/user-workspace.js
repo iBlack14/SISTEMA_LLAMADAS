@@ -30,6 +30,9 @@ export class UserWorkspaces {
         if (session.ownerUserId && String(session.ownerUserId) !== String(user.id))
           throw new Error("El espacio de trabajo pertenece a otra cuenta.");
         session.ownerUserId = user.id;
+        // Heal missing grants: a mapped workspace without an auth_session_access
+        // row would otherwise 403 every operational request for this account.
+        await this.grant(user, code);
         return { code, session };
       }
     }
