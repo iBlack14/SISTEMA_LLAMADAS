@@ -17,6 +17,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
 import java.net.HttpURLConnection
 import java.net.URL
@@ -49,6 +51,7 @@ class IncomingCallActivity : AppCompatActivity() {
     private lateinit var hangupBtn: MaterialButton
     private lateinit var endCallBtn: MaterialButton
     private lateinit var quoteBtn: MaterialButton
+    private lateinit var scheduleBtn: MaterialButton
 
     private var telecomUi = false
     private var imageUrl: String = ""
@@ -88,6 +91,25 @@ class IncomingCallActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_incoming_call)
 
+        val root = findViewById<View>(R.id.callScreenRoot)
+        val baseLeft = root.paddingLeft
+        val baseTop = root.paddingTop
+        val baseRight = root.paddingRight
+        val baseBottom = root.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val safe = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(
+                baseLeft + safe.left,
+                baseTop + safe.top,
+                baseRight + safe.right,
+                baseBottom + safe.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -114,6 +136,7 @@ class IncomingCallActivity : AppCompatActivity() {
         hangupBtn = findViewById(R.id.hangupButton)
         endCallBtn = findViewById(R.id.endCallButton)
         quoteBtn = findViewById(R.id.quoteButton)
+        scheduleBtn = findViewById(R.id.scheduleButton)
 
         answerBtn.setOnClickListener {
             if (VoipVcInCallService.answerRingingCall()) {
@@ -142,16 +165,19 @@ class IncomingCallActivity : AppCompatActivity() {
                 .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
             ContextCompat.startForegroundService(this, intent)
         }
-        quoteBtn.setOnClickListener {
-            val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
+        val openReservation: (String) -> Unit = open@{ requestType ->
+            val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@open
             val name = companyName.text.toString().ifBlank { number }
             val intent = Intent(this, BridgeService::class.java)
                 .setAction(BridgeService.ACTION_UI_QUOTE_REQUEST)
                 .putExtra(BridgeService.EXTRA_CONTACT_NAME, name)
                 .putExtra(BridgeService.EXTRA_PHONE_NUMBER, number)
+                .putExtra("reservation_type", requestType)
             ContextCompat.startForegroundService(this, intent)
-            Toast.makeText(this, "Cotización enviada al panel web", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, if (requestType == "appointment") "Agenda abierta en el panel web" else "Cotización abierta en el panel web", Toast.LENGTH_SHORT).show()
         }
+        quoteBtn.setOnClickListener { openReservation("quote") }
+        scheduleBtn.setOnClickListener { openReservation("appointment") }
         blockBtn.setOnClickListener {
             val number = phoneNumber.text.toString().takeIf { it != "-" } ?: return@setOnClickListener
             val shouldBlock = !BlockedNumberStore.contains(this, number)
@@ -310,6 +336,7 @@ class IncomingCallActivity : AppCompatActivity() {
         else callTimer.setPadding(0, 0, 0, 0)
         endCallBtn.isEnabled = callControlsAvailable
         quoteBtn.visibility = if (state == "in_call") View.VISIBLE else View.GONE
+        scheduleBtn.visibility = if (state == "in_call") View.VISIBLE else View.GONE
         micBtn.isEnabled = state == "in_call"
         speakerBtn.isEnabled = liveCall
         messageBtn.isEnabled = callControlsAvailable

@@ -804,7 +804,7 @@
       <button id="quoteCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
       <div class="quote-modal-header">
         <h3 id="quoteModalTitle">Nueva reserva</h3>
-        <p class="muted">Completa la cotización y agenda tu próxima llamada.</p>
+        <p id="quoteModalDescription" class="muted">Completa la cotización y agenda tu próxima llamada.</p>
       </div>
       <form id="quoteForm" class="edit-form" onsubmit="return false;">
         <input type="hidden" id="quoteId" />
@@ -820,11 +820,11 @@
           </div>
         </div>
 
-        <label for="quoteDescInput">Detalle de la cotización *</label>
+        <label id="quoteDetailLabel" for="quoteDescInput">Detalle de la cotización *</label>
         <textarea id="quoteDescInput" rows="3" placeholder="Ej: Solicita cotización de 50 sacos de alimento y flete..." required></textarea>
 
         <div class="form-row-dual">
-          <div>
+          <div id="quotePriceField">
             <label for="quotePriceInput">Precio (S/)</label>
             <input id="quotePriceInput" type="text" placeholder="Ej: 1500" autocomplete="off" />
           </div>

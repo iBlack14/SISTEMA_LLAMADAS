@@ -125,6 +125,7 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     const data = payload && typeof payload === "object" ? payload : {};
     const phone = String(data.phone || data.phoneNumber || "").trim();
     const name = String(data.name || data.contactName || "").trim();
+    const reservationType = data.reservationType === "appointment" ? "appointment" : "quote";
 
     console.info("[PHONE_QUOTE_REQUEST]", { code, phone, name });
 
@@ -132,6 +133,7 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     io.to(`session:${code}`).emit("quote:open_modal", {
       phone,
       name: name || phone,
+      reservationType,
       fromPhone: true,
       timestamp: new Date().toISOString()
     });

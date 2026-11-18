@@ -8,6 +8,7 @@ let reservationsState = {
   initialized: false
 };
 let quoteReturnFocus = null;
+let activeReservationType = "quote";
 
 function getSessionCode() {
   const input = document.getElementById("sessionCode");
@@ -69,6 +70,11 @@ export function openQuoteModal(initialData = {}) {
   const statusSelect = document.getElementById("quoteStatusSelect");
   const notesInput = document.getElementById("quoteNotesInput");
   const modalTitle = document.getElementById("quoteModalTitle");
+  const modalDescription = document.getElementById("quoteModalDescription");
+  const detailLabel = document.getElementById("quoteDetailLabel");
+  const priceField = document.getElementById("quotePriceField");
+  const saveButton = document.getElementById("quoteSaveBtn");
+  activeReservationType = initialData.reservationType === "appointment" ? "appointment" : "quote";
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -83,7 +89,16 @@ export function openQuoteModal(initialData = {}) {
   if (timeInput) timeInput.value = initialData.time || nextHour;
   if (statusSelect) statusSelect.value = initialData.status || "scheduled";
   if (notesInput) notesInput.value = initialData.notes || "";
-  if (modalTitle) modalTitle.textContent = initialData.id ? "Editar reserva" : "Nueva reserva";
+  if (modalTitle) modalTitle.textContent = initialData.id ? "Editar reserva" : activeReservationType === "appointment" ? "Agendar llamada" : "Nueva reserva";
+  if (modalDescription) modalDescription.textContent = activeReservationType === "appointment"
+    ? "Programa el seguimiento de este contacto."
+    : "Completa la cotización y agenda tu próxima llamada.";
+  if (detailLabel) detailLabel.textContent = activeReservationType === "appointment" ? "Motivo del seguimiento *" : "Detalle de la cotización *";
+  if (descInput) descInput.placeholder = activeReservationType === "appointment"
+    ? "Ej: Volver a llamar para confirmar disponibilidad..."
+    : "Ej: Solicita cotización de 50 sacos de alimento y flete...";
+  if (priceField) priceField.style.display = activeReservationType === "appointment" ? "none" : "";
+  if (saveButton) saveButton.textContent = activeReservationType === "appointment" ? "Guardar llamada" : "Guardar reserva";
 
   if (modal.style.display === 'none') quoteReturnFocus = document.activeElement;
   modal.style.display = "grid";

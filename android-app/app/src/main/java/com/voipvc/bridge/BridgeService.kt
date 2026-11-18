@@ -1463,6 +1463,8 @@ class BridgeService : Service() {
     private fun sendQuoteRequestToWeb(intent: Intent) {
         val name = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty().trim().take(120)
         val number = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
+        val reservationType = intent.getStringExtra("reservation_type")
+            ?.takeIf { it == "appointment" } ?: "quote"
         if (number.isBlank()) {
             setStatus("No se pudo enviar cotización: falta el número de teléfono.")
             return
@@ -1477,8 +1479,9 @@ class BridgeService : Service() {
             JSONObject()
                 .put("name", name.ifBlank { number })
                 .put("phone", number)
+                .put("reservationType", reservationType)
         )
-        setStatus("📋 Cotización enviada al panel web: $number")
+        setStatus(if (reservationType == "appointment") "📅 Agenda enviada al panel web: $number" else "📋 Cotización enviada al panel web: $number")
     }
 
     private fun setStatus(msg: String) {
