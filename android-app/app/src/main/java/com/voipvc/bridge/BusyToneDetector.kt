@@ -30,9 +30,10 @@ internal class BusyToneDetector(private val sampleRate: Int) {
                     silenceSinceTone = 0
                 } else {
                     silenceWindows++
-                    if (cycleHadTone && silenceWindows >= 1) {
+                    if (cycleHadTone && silenceWindows >= 2) {
                         val toneDuration = toneWindows
-                        if (toneDuration in 1..6) confirmedCycles++ else confirmedCycles = 0
+                        // Requiere ráfagas reales de ocupado (300ms a 700ms). Ignora pitidos cortos (100-200ms).
+                        if (toneDuration in 3..7) confirmedCycles++ else confirmedCycles = 0
                         cycleHadTone = false
                         toneWindows = 0
                         silenceSinceTone = 1
@@ -45,7 +46,8 @@ internal class BusyToneDetector(private val sampleRate: Int) {
                     silenceSinceTone = 0
                 }
                 filled = 0
-                if (confirmedCycles >= 2) return true
+                // Exige al menos 5 ciclos confirmados (~5 segundos de tono repetido continuo) antes de cortar
+                if (confirmedCycles >= 5) return true
             }
         }
         return false

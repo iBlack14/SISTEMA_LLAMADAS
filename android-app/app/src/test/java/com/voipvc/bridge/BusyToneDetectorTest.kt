@@ -11,8 +11,20 @@ class BusyToneDetectorTest {
         val detector = BusyToneDetector(16000)
         val busy = pcm(480, 0.35)
         val silence = pcm(0, 0.25)
+        // 1 o 2 ciclos cortos ya NO deben provocar el corte
         assertFalse(detector.accept(busy + silence, busy.size + silence.size))
-        assertTrue(detector.accept(busy + silence + busy, busy.size * 2 + silence.size))
+        assertFalse(detector.accept(busy + silence + busy + silence, busy.size * 2 + silence.size * 2))
+
+        // Requiere 5 ciclos continuos (~5 segundos) para confirmar ocupado real
+        val cycle = busy + silence
+        var triggered = false
+        for (i in 0 until 5) {
+            if (detector.accept(cycle, cycle.size)) {
+                triggered = true
+                break
+            }
+        }
+        assertTrue(triggered)
     }
 
     @Test fun ignoresSpeechBandAndLongContinuousTone() {

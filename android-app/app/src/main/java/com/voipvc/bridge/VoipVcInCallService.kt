@@ -188,6 +188,11 @@ class VoipVcInCallService : InCallService() {
                     it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING
                 } != 1) return@start
             val number = call.details.handle?.schemeSpecificPart.orEmpty()
+            // Si la llamada ya está activa (descolgada por una persona), un tono no debe colgarla
+            if (call.state == Call.STATE_ACTIVE && resultCode == "tono_ocupado") {
+                Log.i(TAG, "Ignorado tono_ocupado en llamada activa para evitar corte falso")
+                return@start
+            }
             // This exact Call object is checked again before requesting the cut.
             sendBroadcast(Intent(BridgeService.ACTION_TELECOM_CALL_STATE).setPackage(packageName)
                 .putExtra(BridgeService.EXTRA_CALL_STATE, mapCallState(call.state))
