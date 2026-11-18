@@ -1284,17 +1284,13 @@ class BridgeService : Service() {
         val chunkBytes = CHUNK_FRAMES * 2
         // Capture: read from AudioRecord -> captureQueue (backpressure)
         captureJob = serviceScope.launch(Dispatchers.IO) {
+            val buf = ByteArray(CHUNK_BYTES)
             while (isActive && isStreaming.get()) {
-                // Get buffer from pool
-                val buf = audioBufferPool.receiveOrNull() ?: ByteArray(CHUNK_BYTES)
                 val read = audioRecord?.read(buf, 0, CHUNK_BYTES) ?: -1
                 if (read > 0) {
-                    // Copy only the used portion for the queue (pool buffer will be reused)
                     val chunk = buf.copyOf(read)
                     audioCaptureQueue.trySend(chunk)
                 }
-                // Return buffer to pool for reuse
-                audioBufferPool.trySend(buf)
             }
         }
         // Emit from captureQueue -> socket (separate coroutine for backpressure)
@@ -1346,17 +1342,17 @@ class BridgeService : Service() {
                 delay(HEARTBEAT_INTERVAL_MS)
                 if (!isActive || !client.connected()) break
                 val sentAt = System.currentTimeMillis()
-                client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt)) { ackArgs ->
+                client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { ackArgs ->
                     val latencyMs = System.currentTimeMillis() - sentAt
                     if (latencyMs > HEARTBEAT_TIMEOUT_MS) {
                         Log.w(TAG, "[HEARTBEAT] pong timeout latency=${latencyMs}ms")
                         if (client === socket) {
-                            mainHandler.post { client.disconnect() } // Force reconnect
+                            mainHandler.post { client.disconnect() }
                         }
                     } else {
                         Log.d(TAG, "[HEARTBEAT] pong ok latency=${latencyMs}ms")
                     }
-                }
+                })
             }
         }
     }
