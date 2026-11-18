@@ -1,6 +1,7 @@
 import { apiFetch as fetch, currentUser } from "../auth/auth-session.js";
 import { buildDetailedReport } from "./detailed-report.js";
 import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel } from "../../../shared/reports/report-metrics.js";
+import { loadBrowserLibrary } from "../../shared/utils/browser-libraries.js";
 
 // report-detail-view: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportDetailView(reportState, reportActions) {
@@ -296,14 +297,10 @@ function renderDetails() {
         reportActions.renderDay();
       };
       reportState.$("detailedPdf").onclick = async () => {
-        const JsPDF = window.jspdf?.jsPDF;
-        if (!JsPDF) {
-          alert("Librería PDF no disponible");
-          return;
-        }
         const button = reportState.$("detailedPdf");
         button.disabled = true;
         try {
+          const JsPDF = await loadBrowserLibrary("jspdf");
           const logoResponse = await fetch("/shared/assets/images/logo-vc-color.png");
           if (!logoResponse.ok) {
             throw Error("No se pudo cargar el logotipo del reporte.");
@@ -712,15 +709,9 @@ function renderDetails() {
     updateSelection();
 
     const exportReportsToPdf = async (reportsForExport, clickedButton) => {
-      const JsPDF = window.jspdf?.jsPDF;
-
-      if (!JsPDF) {
-        alert("Librería PDF no disponible");
-        return;
-      }
-
       clickedButton.disabled = true;
       try {
+        const JsPDF = await loadBrowserLibrary("jspdf");
         const calledReports = reportsForExport.filter(reportItem =>
           Number(reportItem.totalCalls || 0) > 0 ||
           (Array.isArray(reportItem.calls) && reportItem.calls.length > 0) ||

@@ -10,6 +10,9 @@ import { openQuoteModal } from '../features/reservations/reservations-controller
  * Se construye una vez por dashboard.
  */
 export function bindDashboardEvents(dashboardState, dashboardActions) {
+let previousBlockedSignature = "";
+let previousContactSignature = "";
+let previousShiftSignature = "";
 window.addEventListener("contact-book:loaded", () => {
   WhatsApp.loadWhatsAppPresetMessages();
   WhatsApp.saveWhatsAppPresetMessages();
@@ -37,10 +40,27 @@ socket.on("call:error", ({message}) => setStatus(message || "No se permite llama
 
 socket.on("state:changed", st => {
   dashboardActions.updateSessionUi(st);
-  dashboardActions.renderShiftManagement();
   dashboardActions.applyState(st.callState, st.lastNumber, st);
-  dashboardActions.renderBlockedNumbers();
-  dashboardActions.renderContacts();
+  const blockedSignature = JSON.stringify(st.blockedNumbers || []);
+  if (blockedSignature !== previousBlockedSignature) {
+    previousBlockedSignature = blockedSignature;
+    dashboardActions.renderBlockedNumbers();
+  }
+  const contactSignature = JSON.stringify([
+    st.callRestrictions || {},
+    st.callState || "idle",
+    st.lastNumber || "",
+    (st.phoneWorkers || []).map((worker) => [worker.id, worker.callState || "idle", worker.activeContactId || ""])
+  ]);
+  if (contactSignature !== previousContactSignature) {
+    previousContactSignature = contactSignature;
+    dashboardActions.renderContacts();
+  }
+  const shiftSignature = JSON.stringify(st.shiftManagement || {});
+  if (shiftSignature !== previousShiftSignature) {
+    previousShiftSignature = shiftSignature;
+    dashboardActions.renderShiftManagement();
+  }
   const nextDeviceSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
     worker.id,
     Boolean(worker.connected)

@@ -1,4 +1,5 @@
 import { isAnsweredAttempt } from '../../../../shared/reports/report-metrics.js';
+import { loadBrowserLibrary } from '../../../shared/utils/browser-libraries.js';
 
 /**
  * createLegacyCallReportPdf: conserva los contratos y reglas existentes.
@@ -7,8 +8,7 @@ import { isAnsweredAttempt } from '../../../../shared/reports/report-metrics.js'
  */
 export function createLegacyCallReportPdf(dashboardState, dashboardActions) {
 async function legacyBuildCallReportPdf(listName, sourceRows) {
-  const JsPdf = window.jspdf?.jsPDF;
-  if (!JsPdf) throw new Error("No se pudo cargar el generador PDF.");
+  const JsPdf = await loadBrowserLibrary("jspdf");
 
   const rows = [...(sourceRows || [])].sort((left, right) => {
     const workerOrder = String(left.worker || "Sin equipo").localeCompare(String(right.worker || "Sin equipo"), "es", {

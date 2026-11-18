@@ -9,6 +9,7 @@ import { apiFetch as fetch, currentUser, bindAccountControls } from '../auth/aut
  * Se construye una vez por dashboard.
  */
 export function createWorkspaceController(dashboardState, dashboardActions) {
+let lastCampaignPanelSignature = "";
 function saveSessionCode(code, token = dashboardState.dashboardToken) {
   const normalized = String(code || "").trim().toUpperCase();
   if (!normalized) return;
@@ -129,8 +130,18 @@ function updateSessionUi(st = {}) {
 
   if (dashboardConnected) {
     setStatus(phoneConnected ? `${phoneCount} teléfono(s) vinculado(s). Cada dispositivo utiliza su propio QR.` : "Tu espacio está listo. Escanea un QR diferente en cada teléfono.", true);
-    dashboardActions.renderCampaignPanel();
+    const panelSignature = JSON.stringify([
+      dashboardConnected,
+      phoneConnected,
+      phoneCount,
+      (st.phoneWorkers || []).map((worker) => [worker.id, Boolean(worker.connected), worker.callState || "idle", Boolean(worker.paused)])
+    ]);
+    if (panelSignature !== lastCampaignPanelSignature) {
+      lastCampaignPanelSignature = panelSignature;
+      dashboardActions.renderCampaignPanel();
+    }
   } else {
+    lastCampaignPanelSignature = "";
     setStatus("Conectando con tu espacio de trabajo...");
   }
 }

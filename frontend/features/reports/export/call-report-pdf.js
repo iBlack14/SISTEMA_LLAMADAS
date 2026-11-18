@@ -1,5 +1,7 @@
 
 
+import { loadBrowserLibrary } from '../../../shared/utils/browser-libraries.js';
+
 /**
  * createCallReportPdf: conserva los contratos y reglas existentes.
  * Dependencias: dashboardActions.formatCallDuration, dashboardActions.formatLimaReportDate, dashboardActions.loadPdfLogoData, dashboardActions.reportResult, dashboardActions.reportWorkerKey, dashboardActions.reportWorkerLabel.
@@ -7,8 +9,7 @@
  */
 export function createCallReportPdf(dashboardState, dashboardActions) {
 async function buildCallReportPdf(listName, sourceRows, shift = {}) {
-  const JsPdf = window.jspdf?.jsPDF;
-  if (!JsPdf) throw new Error("No se pudo cargar el generador PDF.");
+  const JsPdf = await loadBrowserLibrary("jspdf");
   const rows = [...(sourceRows || [])].sort((left, right) => {
     const worker = dashboardActions.reportWorkerKey(left).localeCompare(dashboardActions.reportWorkerKey(right), "es", { numeric: true });
     if (worker) return worker;

@@ -2,6 +2,7 @@ import { socket, API_BASE } from '../../../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../../../shared/ui/dom.js';
 import * as Contacts from '../contacts-repository.js';
 import { apiFetch as fetch, currentUser, bindAccountControls } from '../../auth/auth-session.js';
+import { loadBrowserLibrary } from '../../../shared/utils/browser-libraries.js';
 
 /**
  * createImportActions: conserva los contratos y reglas existentes.
@@ -60,18 +61,20 @@ async function parseContactsFromFile(file) {
   if (lowerName.endsWith(".csv") || lowerName.endsWith(".txt")) {
     contacts = dashboardActions.parseDelimitedText(await file.text());
   } else if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+    const XLSX = await loadBrowserLibrary("xlsx");
     const data = await file.arrayBuffer();
-    const wb = window.XLSX.read(data, { type: "array" });
+    const wb = XLSX.read(data, { type: "array" });
     const firstSheet = wb.SheetNames[0];
-    const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1 });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1 });
     contacts = dashboardActions.extractContactsFromRows(rows);
   } else if (lowerName.endsWith(".docx")) {
+    const mammoth = await loadBrowserLibrary("mammoth");
     const data = await file.arrayBuffer();
-    const htmlResult = await window.mammoth.convertToHtml({ arrayBuffer: data });
+    const htmlResult = await mammoth.convertToHtml({ arrayBuffer: data });
     const doc = new DOMParser().parseFromString(htmlResult.value || "", "text/html");
     contacts = dashboardActions.extractContactsFromHtmlTable(doc);
     if (!contacts.length) {
-      const textResult = await window.mammoth.extractRawText({ arrayBuffer: data });
+      const textResult = await mammoth.extractRawText({ arrayBuffer: data });
       contacts = dashboardActions.parseDelimitedText(textResult.value);
     }
   } else {
