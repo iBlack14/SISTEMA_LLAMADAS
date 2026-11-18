@@ -93,7 +93,7 @@ function setViewVisibility(view) {
 async function loadAdminWorkspace() {
   if (adminPromise) return adminPromise;
   adminPromise = (async () => {
-    const response = await fetch("/features/admin/network/network.html", { credentials: "same-origin", cache: "force-cache" });
+    const response = await fetch("/features/admin/network/network.html", { credentials: "same-origin", cache: "no-cache" });
     if (response.status === 401) return window.location.replace("/login");
     if (response.status === 403) throw new Error("Esta sección requiere permisos de administrador.");
     if (!response.ok) throw new Error("No se pudo cargar la sección administrativa.");
@@ -113,7 +113,8 @@ async function loadAdminWorkspace() {
     adminUsers = candidates[1];
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "/features/admin/network/network.css?v=20261116-orbpoint";
+    const networkCss = source.querySelector('link[rel="stylesheet"][href*="network.css"]');
+    stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261118-ui-call";
     stylesheet.dataset.adminStyles = "1";
     document.head.append(stylesheet);
   })().catch(error => {
