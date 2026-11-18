@@ -17,6 +17,13 @@ function pairingQrCacheKey(slot) {
   return `${slot.id}:${slot.token || ""}`;
 }
 
+/** Los eventos de estado pueden traer el slot sin token: conservamos el último conocido. */
+function preserveSlotToken(slot) {
+  if (slot.token) return slot;
+  const known = (dashboardState.pairingSlotsSnapshot || []).find((item) => item.id === slot.id);
+  return known?.token ? { ...slot, token: known.token } : slot;
+}
+
 function renderPairingSlotsUi(slots) {
   const listAssignmentBySlotId = new Map(dashboardActions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
   const workers = Array.isArray(dashboardState.latestSessionState?.phoneWorkers) ? dashboardState.latestSessionState.phoneWorkers : [];
@@ -114,6 +121,10 @@ const pairingLoads = new Map();
 
 async function updatePairingSlotsFromState(slots) {
   if (!Array.isArray(slots)) return;
+
+  // Sin esto, cada evento de estado cambiaba la clave de cache (id:token -> id:)
+  // y volvia a pedir el mismo QR. Si el token si rota, se usa el nuevo normalmente.
+  slots = slots.map(preserveSlotToken);
 
   // Limpiar URLs cacheadas de slots eliminados
   const activeSlotIds = new Set(slots.map(pairingQrCacheKey));

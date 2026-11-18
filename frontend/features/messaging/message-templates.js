@@ -8,6 +8,15 @@ import { apiFetch } from '../auth/auth-session.js';
 const STORAGE_KEY = 'voip_message_templates';
 const DB_MIGRATION_KEY = 'voip_message_templates_db_migrated';
 const CATEGORY_ORDER = ['Alimentos y hospedaje', 'Comercio y servicios', 'Educación', 'Hogar y construcción', 'Salud y bienestar', 'Tecnología y web', 'Otros'];
+const FLYERS_PATH = '/features/messaging/campaign-2027/';
+
+/** Miniatura ligera solo para vistas previas; el envío sigue usando la imagen original. */
+function templateThumbUrl(image) {
+  const value = String(image || '');
+  const index = value.indexOf(FLYERS_PATH);
+  if (index === -1) return value;
+  return `${value.slice(0, index + FLYERS_PATH.length)}thumbs/${value.slice(index + FLYERS_PATH.length)}`;
+}
 
 // ============================================================================
 // STATE
@@ -256,7 +265,7 @@ function renderTemplates() {
         </div>
         ${hasImage ? `
           <div class="template-card-img-preview">
-            <img src="${template.image}" alt="Imagen plantilla" />
+            <img src="${escapeHtml(templateThumbUrl(template.image))}" alt="Imagen plantilla" loading="lazy" decoding="async" />
           </div>
         ` : ''}
         <div class="template-message">
@@ -600,7 +609,7 @@ function renderSendTemplateList(selectedId = '') {
         </div>
       </div>
       <div class="send-template-option-body">
-        ${hasImage ? `<img src="${template.image}" class="send-template-mini-thumb" alt="" />` : ''}
+        ${hasImage ? `<img src="${escapeHtml(templateThumbUrl(template.image))}" class="send-template-mini-thumb" alt="" loading="lazy" decoding="async" />` : ''}
         <span class="send-template-snippet">${escapeHtml(template.message)}</span>
       </div>
       <div class="send-template-option-bottom">

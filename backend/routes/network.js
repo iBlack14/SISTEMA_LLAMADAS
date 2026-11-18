@@ -128,6 +128,51 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
   }
 });
 
+// Admin bulk import contacts to a user's list
+runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  const listName = String(req.body?.list || "").trim() || "Principal";
+  const contacts = req.body?.contacts;
+  if (!Number.isSafeInteger(userId) || userId < 1 || !Array.isArray(contacts) || !contacts.length) {
+    return res.status(400).json({ ok: false, error: "Usuario inválido o contactos requeridos." });
+  }
+  try {
+    const [rows] = await runtime.auth.pool.query(`SELECT u.username,access.session_code
+      FROM auth_users u LEFT JOIN (
+        SELECT user_id,session_code FROM auth_user_workspaces WHERE user_id=?
+        UNION
+        SELECT user_id,session_code FROM auth_session_access WHERE user_id=?
+      ) access ON access.user_id=u.id WHERE u.id=?`, [userId, userId, userId]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
+    const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
+    if (!sessionCodes.length) return res.status(404).json({ ok: false, error: "Usuario sin sesiones asociadas." });
+    const code = sessionCodes[0];
+    const session = runtime.sessions.get(code);
+    if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada." });
+    let book = session.contactBook ? { ...session.contactBook, contacts: [...session.contactBook.contacts], lists: [...session.contactBook.lists] } : { contacts: [], lists: ["Principal"] };
+    if (!book.lists.includes(listName)) book.lists.push(listName);
+    let added = 0;
+    for (const c of contacts) {
+      const phone = String(c.phone || "").replace(/\D/g, "");
+      const name = String(c.name || "").trim();
+      if (!phone || !name) continue;
+      const exists = book.contacts.some(contact => contact.phone === phone && (contact.list || "Principal") === listName);
+      if (!exists) {
+        book.contacts.push({ id: crypto.randomUUID(), name, phone, list: listName, note: c.note || "" });
+        added++;
+      }
+    }
+    session.contactBook = book;
+    session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
+    session.updatedAt = Date.now();
+    await runtime.persistence.save(runtime.sessions);
+    if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision: session.contactBookRevision });
+    return res.json({ ok: true, added, list: listName, total: book.contacts.length, revision: session.contactBookRevision });
+  } catch (error) {
+    return res.status(503).json({ ok: false, error: "No se pudo importar: " + error.message });
+  }
+});
+
 runtime.app.get("/api/network", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try { res.json({ ok: true, ...await runtime.network.snapshot() }); }
