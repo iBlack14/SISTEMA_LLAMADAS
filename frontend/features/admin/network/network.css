@@ -10,33 +10,35 @@
 
   /* Fondo: violeta/fucsia vibrante (igual que panel de llamadas) */
   --bg: #7900d4;
-  /* Superficies sólidas (casi opacas) para que los cuadros destaquen del fondo */
-  --surface: rgba(46, 7, 66, 0.92);
-  --surface-2: rgba(76, 20, 94, 0.96);
+  /* Superficies más opacas y profundas: separan mejor las tarjetas del fondo */
+  --surface: rgba(34, 8, 50, 0.96);
+  --surface-2: rgba(60, 16, 80, 0.98);
   --surface-solid: #1c0b33;
 
-  /* Bordes */
-  --border: rgba(206, 122, 224, 0.42);
-  --border-hi: rgba(255, 96, 210, 0.78);
+  /* Bordes reforzados (≥3:1 sobre la superficie) */
+  --border: rgba(222, 165, 240, 0.6);
+  --border-hi: rgba(255, 156, 224, 0.92);
 
   /* Sombra de profundidad para separar las tarjetas del fondo */
-  --shadow: 0 12px 32px rgba(22, 1, 38, 0.45);
+  --shadow: 0 12px 32px rgba(22, 1, 38, 0.55);
 
-  /* Texto */
+  /* Texto: valores claros legibles incluso sobre el degradado más brillante */
   --text: #fdf4ff;
-  --text-2: #e9d5f5;
-  --muted: #c4a8d8;
+  --text-2: #f3e4fb;
+  --muted: #eeddf7;
 
   /* Acento: fucsia ViaVox */
   --accent: #ff31c6;
   --accent-bg: rgba(255, 49, 198, 0.18);
+  /* Texto oscuro sobre el fucsia: 5.5:1 frente a 3.2:1 del blanco */
+  --on-accent: #2a0638;
 
-  /* Tonos de estado — más brillantes para que destaquen en fondo oscuro */
+  /* Tonos de estado — brillantes y con contraste suficiente sobre superficies */
   --tone-active: #3ddc84;
   --tone-dialing: #ffc046;
-  --tone-ready: #b48ffa;
-  --tone-offline: #ff7070;
-  --tone-unknown: #7a6f8a;
+  --tone-ready: #c9a6ff;
+  --tone-offline: #ff8a8a;
+  --tone-unknown: #b5a6cc;
 }
 
 /* ── Reset ──────────────────────────────────────────────── */
@@ -89,7 +91,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 .net-card:focus-visible {
-  outline: 2px solid #ff7bd4;
+  outline: 3px solid #ffd0ef;
   outline-offset: 3px;
 }
 
@@ -189,7 +191,7 @@ input:focus-visible,
 .primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .primary:hover {
@@ -262,7 +264,7 @@ h3 {
   flex-wrap: wrap;
   margin-bottom: 22px;
   padding: 7px 16px 7px 13px;
-  background: rgba(30, 4, 48, 0.82);
+  background: rgba(24, 4, 38, 0.92);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: var(--shadow);
@@ -444,21 +446,20 @@ h3 {
 }
 
 .indicator .orb-sub {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
   color: var(--tone, var(--muted));
 }
 
 .indicator .orb-time {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  opacity: 0.9;
   color: var(--tone, var(--muted));
   margin-top: -1px;
-  min-height: 12px;
+  min-height: 13px;
 }
 
 /* Estado de indicadores y contraste de número dentro del punto */
@@ -568,6 +569,7 @@ h3 {
 .search input:focus {
   border-color: var(--border-hi);
   outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 156, 224, 0.25);
 }
 
 .search input::placeholder {
@@ -600,7 +602,7 @@ h3 {
 .filter-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ── EQUIPMENT GRID ─────────────────────────────────────── */
@@ -646,7 +648,7 @@ h3 {
 
 .card-model {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
   overflow-wrap: anywhere;
@@ -657,7 +659,7 @@ h3 {
   flex-wrap: wrap;
   gap: 4px 16px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 6px;
 }
 
@@ -694,8 +696,8 @@ h3 {
 }
 
 .card-time-badge .time-badge small {
-  font-size: 10px;
-  opacity: 0.8;
+  font-size: 11px;
+  opacity: 0.85;
   margin-left: 2px;
 }
 
@@ -706,7 +708,7 @@ h3 {
   align-items: center;
   gap: 5px;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -740,7 +742,7 @@ h3 {
 
 .card-stats span {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 2px;
 }
@@ -773,7 +775,7 @@ h3 {
 }
 
 .card-history summary span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-left: 6px;
 }
@@ -794,9 +796,9 @@ table {
 }
 
 th {
-  font-weight: 500;
-  color: var(--muted);
-  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-size: 12px;
 }
 
 td,
@@ -809,18 +811,18 @@ th {
 td small {
   display: block;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 2px;
 }
 
 .card-scope {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin: 10px 0 0;
 }
 
 .card-test {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tone-dialing);
   margin: 8px 0 0;
 }
@@ -831,7 +833,7 @@ td small {
   gap: 10px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .card-actions:empty,
@@ -840,12 +842,12 @@ td small {
 }
 
 .card-actions .button.card-reconnect-btn {
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 5px 12px;
-  min-height: 28px;
+  min-height: 30px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
   color: var(--text);
   font-weight: 600;
   cursor: pointer;
@@ -926,9 +928,9 @@ td small {
   padding: 6px 14px;
   min-height: 32px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
+  color: var(--text);
   cursor: pointer;
   transition: all 0.18s ease;
 }
@@ -955,7 +957,7 @@ footer {
   border-top: 1px solid var(--border);
   margin-top: 32px;
   padding-top: 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -1046,13 +1048,14 @@ footer {
 .user-form select:focus {
   border-color: var(--border-hi);
   outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 156, 224, 0.25);
 }
 
 .user-form small {
   display: block;
   margin-top: 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -1196,6 +1199,11 @@ footer {
    RESPONSIVE
    ══════════════════════════════════════════════════════ */
 @media (max-width: 1100px) {
+  /* 10 columnas quedaban demasiado estrechas: 5 por fila mantiene el texto legible */
+  .indicators {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
   .filters {
     align-items: flex-start;
     flex-direction: column;
