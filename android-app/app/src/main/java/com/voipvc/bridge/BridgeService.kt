@@ -1068,6 +1068,20 @@ class BridgeService : Service() {
             "dialing" -> {
                 launchCallUi()
                 setStatus("📞 Llamando...")
+                if (hasCampaignCall && belongsToCampaign && activeDialStartedAtElapsedMs > 0) {
+                    val dialElapsedMs = SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs
+                    if (dialElapsedMs > 30_000) {
+                        Log.w(TAG, "[DIAL_TIMEOUT] dialing exceeded 30s command=${activeCommandId.takeLast(8)} call=${activeCallId.takeLast(8)} elapsedMs=$dialElapsedMs")
+                        handleObservedCallState(
+                            "failed",
+                            campaignPhoneNumber,
+                            "",
+                            "outgoing",
+                            "dial_timeout_max"
+                        )
+                        return
+                    }
+                }
             }
             "ringing" -> {
                 launchCallUi()
@@ -1089,6 +1103,9 @@ class BridgeService : Service() {
                     currentCompanyName = ""
                     currentContactName = ""
                     currentImageUrl = ""
+                }
+                if (hasCampaignCall && belongsToCampaign) {
+                    clearCampaignTracking()
                 }
             }
         }
@@ -1337,7 +1354,9 @@ class BridgeService : Service() {
     // App-level heartbeat (10s interval, 5s timeout) - faster than Socket.IO ping for mobile
     private fun startHeartbeat(client: Socket) {
         stopHeartbeat()
+        Log.i(TAG, "[HEARTBEAT] starting clientConnected=${client.connected()}")
         heartbeatJob = serviceScope.launch {
+            Log.i(TAG, "[HEARTBEAT] coroutine running")
             while (isActive && client.connected()) {
                 delay(HEARTBEAT_INTERVAL_MS)
                 if (!isActive || !client.connected()) break
