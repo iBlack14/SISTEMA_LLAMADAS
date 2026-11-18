@@ -9,7 +9,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -21,6 +23,10 @@ import java.net.URL
 import java.util.Locale
 
 class IncomingCallActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "IncomingCallActivity"
+    }
 
     private lateinit var companyImage: ImageView
     private lateinit var companyName: TextView
@@ -78,6 +84,7 @@ class IncomingCallActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.i(TAG, "onCreate action=${intent?.action ?: "unknown"}")
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_incoming_call)
 
@@ -224,6 +231,7 @@ class IncomingCallActivity : AppCompatActivity() {
         val micMuted = data.getBooleanExtra(BridgeService.EXTRA_MIC_MUTED, false)
         val speakerOn = data.getBooleanExtra(BridgeService.EXTRA_SPEAKER_ON, false)
         val img = data.getStringExtra(BridgeService.EXTRA_IMAGE_URL).orEmpty()
+        Log.i(TAG, "render state=${state.ifBlank { "idle" }} telecom=$telecomUi")
 
         companyName.text = when {
             contact.isNotBlank() -> contact
@@ -270,8 +278,12 @@ class IncomingCallActivity : AppCompatActivity() {
         callTopSpacer.layoutParams = callTopSpacer.layoutParams.apply {
             height = dp(if (ringing) 0 else if (state == "in_call") 112 else 80)
         }
-        companyImage.layoutParams = (companyImage.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
-            topMargin = dp(if (ringing) 42 else 0)
+        val imageParams = companyImage.layoutParams
+        if (imageParams is ViewGroup.MarginLayoutParams) {
+            imageParams.topMargin = dp(if (ringing) 42 else 0)
+            companyImage.layoutParams = imageParams
+        } else {
+            Log.w(TAG, "companyImage parent does not support margins: ${imageParams.javaClass.simpleName}")
         }
         screenTitle.visibility = if (ringing) View.VISIBLE else View.GONE
         screenHint.visibility = if (ringing) View.VISIBLE else View.GONE

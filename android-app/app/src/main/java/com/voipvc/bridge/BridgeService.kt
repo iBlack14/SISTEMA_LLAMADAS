@@ -490,7 +490,9 @@ class BridgeService : Service() {
             mainHandler.post {
               if (client !== socket) return@post
               val commandId = data.optString("commandId")
-              when (data.optString("action")) {
+              val action = data.optString("action")
+              Log.i(TAG, "[CALL_ACTION] received action=$action command=${commandId.takeLast(8)}")
+              when (action) {
                 "dial"   -> {
                     val phoneNumber = data.optString("phoneNumber")
                     val companyName = data.optString("companyName")
@@ -498,6 +500,7 @@ class BridgeService : Service() {
                     val imageUrl = data.optString("imageUrl")
                     val contactId = data.optString("contactId")
                     val result = if (commandId.isNotBlank() && commandId == lastDialCommandId) {
+                        Log.w(TAG, "[DIAL] duplicate command ignored command=${commandId.takeLast(8)}")
                         lastDialAck
                     } else {
                         dialNumber(
@@ -578,13 +581,17 @@ class BridgeService : Service() {
         contactId: String,
         callId: String
     ): DialResult {
+        Log.i(TAG, "[DIAL] start command=${commandId.takeLast(8)} contactPresent=${contactId.isNotBlank()} callPresent=${callId.isNotBlank()}")
         if (number.isBlank() || commandId.isBlank()) {
+            Log.w(TAG, "[DIAL] rejected: number or command id is empty")
             return DialResult(false, "Número o identificador de llamada inválido")
         }
         if (BlockedNumberStore.contains(this, number)) {
+            Log.w(TAG, "[DIAL] rejected: number is blocked locally")
             return DialResult(false, "Número bloqueado. Quítalo de la lista de bloqueos antes de llamar.")
         }
         if (isActuallyInCall() || activeCommandId.isNotBlank()) {
+            Log.w(TAG, "[DIAL] rejected: another call is active")
             return DialResult(false, "El teléfono ya está atendiendo otra llamada")
         }
         dialAttemptToken += 1
@@ -620,9 +627,11 @@ class BridgeService : Service() {
         emitCallUiState()
 
         if (!hasPermission(Manifest.permission.CALL_PHONE)) {
+            Log.e(TAG, "[DIAL] rejected: CALL_PHONE permission missing")
             return abortDial("Falta permiso CALL_PHONE")
         }
         if (!isDefaultDialer()) {
+            Log.e(TAG, "[DIAL] rejected: app is not the default dialer")
             return abortDial("Phone-VC no es el marcador predeterminado")
         }
 
@@ -630,6 +639,7 @@ class BridgeService : Service() {
             val tm = getSystemService(TELECOM_SERVICE) as? TelecomManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && tm != null) {
                 tm.placeCall(Uri.parse("tel:$number"), Bundle())
+                Log.i(TAG, "[DIAL] TelecomManager.placeCall accepted command=${commandId.takeLast(8)}")
                 emitPhoneStatus("dialing", "command", correlateCampaign = true)
                 setStatus("📞 Intentando llamada a $number")
 
@@ -652,7 +662,7 @@ class BridgeService : Service() {
                 return DialResult(true, "Comando recibido e inicio de llamada solicitado")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "TelecomManager.placeCall failed: ${e.message}")
+            Log.e(TAG, "[DIAL] TelecomManager.placeCall failed command=${commandId.takeLast(8)}", e)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1306,6 +1316,7 @@ class BridgeService : Service() {
     }
 
     private fun emitCommandAck(commandId: String, action: String, ok: Boolean, message: String) {
+        Log.i(TAG, "[CALL_ACK] action=$action command=${commandId.takeLast(8)} ok=$ok connected=${socket?.connected() == true} message=$message")
         if (commandId.isBlank() || socket?.connected() != true) return
         socket?.emit(
             "phone:command_ack",

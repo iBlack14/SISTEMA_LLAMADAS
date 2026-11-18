@@ -143,9 +143,11 @@ runtime.app.post("/api/session/:code/workers/:workerId/start-independent", (req,
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
   const worker = (session.phoneWorkers || []).find((item) => item.id === workerId && item.connected && item.socketId);
   if (!worker) return res.status(404).json({ ok: false, error: "Telefono no conectado" });
+  const submittedContacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  console.info(`[CALL_REQUEST] start-independent session=${code.slice(-2)} worker=${worker.id} contacts=${submittedContacts.length}`);
   const campaign = ensureCampaign(session);
   // Preparar la lista del equipo sin reiniciar intentos ni otras campañas.
-  for (const input of Array.isArray(req.body?.contacts) ? req.body.contacts : []) {
+  for (const input of submittedContacts) {
     if (!input || typeof input !== "object") continue;
     const existing = campaign.contacts.find((contact) => contact.id === String(input.id || "").trim());
     if (existing?.assignedWorkerId && existing.assignedWorkerId !== workerId) continue;
@@ -155,6 +157,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/start-independent", (req,
   setWorkerPaused(session, workerId, false);
   resumeHeldContact(session, workerId);
   const dispatched = services.dispatchCampaignCalls(code, workerId);
+  console.info(`[CALL_REQUEST] start-independent result session=${code.slice(-2)} worker=${worker.id} dispatched=${dispatched.length}`);
   return res.json({ ok: true, code, workerId, dispatched: dispatched.length, campaign: getCampaignSnapshot(session) });
 });
 
@@ -222,6 +225,8 @@ runtime.app.post("/api/session/:code/workers/:workerId/call-contact", (req, res)
   setWorkerPaused(session, workerId, false);
   const contact = assignSpecificContact(session, worker, contactId);
   if (!contact) return res.status(409).json({ ok: false, error: "No se pudo asignar el contacto al equipo" });
+
+  console.info(`[CALL_REQUEST] manual session=${code.slice(-2)} worker=${worker.id} contactPresent=${Boolean(contact.id)} manualRetry=${manualRetry}`);
 
   worker.callState = "dialing";
   worker.activeContactId = contact.id;

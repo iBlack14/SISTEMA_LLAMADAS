@@ -26,6 +26,8 @@ export class SessionPersistence {
     this.lastSnapshot = {};
     this.lastError = "";
     this.storageFailed = false;
+    this.lastWriteLogAt = 0;
+    this.lastWriteLogSignature = "";
   }
 
   status() {
@@ -110,13 +112,17 @@ export class SessionPersistence {
     this.pendingDatabase = this.databaseConfigured && Boolean(disk?.pendingDatabase);
     for (const entry of disk?.records || []) this.remember(entry.code, entry.row, this.pendingDatabase);
     let chosen = local;
+    let loadSource = this.databaseOnly ? "mysql-empty" : "local";
+    let mysqlSessionRows = null;
     if (await this.initDb()) {
       try {
         const [sessions] = await this.pool.query("SELECT id, data FROM sessions");
         const [attempts] = await this.pool.query("SELECT session_code, row_data FROM vc_call_attempts");
+        mysqlSessionRows = sessions.length;
         const remote = Object.fromEntries(sessions.map(row => [row.id, parseJson(row.data)]));
         // A pending local snapshot is an outbox and must be replayed, never discarded.
         chosen = this.pendingDatabase ? { ...remote, ...local } : sessions.length ? remote : local;
+        loadSource = this.pendingDatabase ? "mysql+local-outbox" : sessions.length ? "mysql" : "mysql-empty";
         for (const entry of attempts) {
           const row = parseJson(entry.row_data);
           const key = keyOf(entry.session_code, row);
@@ -152,7 +158,23 @@ export class SessionPersistence {
       if ([...this.records.values()].some(entry => entry.code === code)) session.hasCallHistory = true;
       result.set(code, this.cleanSessionOnLoad(session));
     }
+    const summary = this.summarizeSessions(chosen);
+    console.info(`[PERSISTENCE] Load source=${loadSource} mysqlTarget=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} mysqlRows=${mysqlSessionRows ?? "unavailable"} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size}`);
     return result;
+  }
+
+  summarizeSessions(snapshot = {}) {
+    const sessions = Object.values(snapshot || {});
+    return sessions.reduce((summary, session) => {
+      const book = session?.contactBook;
+      if (book) {
+        summary.contactBooks += 1;
+        summary.lists += Array.isArray(book.lists) ? book.lists.length : 0;
+        summary.contacts += Array.isArray(book.contacts) ? book.contacts.length : 0;
+      }
+      summary.sessions += 1;
+      return summary;
+    }, { sessions: 0, contactBooks: 0, lists: 0, contacts: 0 });
   }
 
   cleanSessionOnLoad(session) {
@@ -223,6 +245,14 @@ export class SessionPersistence {
       this.pendingDatabase = false;
       this.usingDb = true;
       this.lastError = "";
+      const summary = this.summarizeSessions(snapshot);
+      const logSignature = `${summary.sessions}:${summary.contactBooks}:${summary.lists}:${summary.contacts}:${this.records.size}`;
+      const now = Date.now();
+      if (logSignature !== this.lastWriteLogSignature || now - this.lastWriteLogAt >= 30000) {
+        console.info(`[PERSISTENCE] MySQL snapshot committed target=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size}`);
+        this.lastWriteLogSignature = logSignature;
+        this.lastWriteLogAt = now;
+      }
       if (!this.databaseOnly) await this.atomicJson(this.historyPath, {
         version: 1, pendingDatabase: false, sessions: snapshot, records: [...this.records.values()]
       });

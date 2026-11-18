@@ -32,13 +32,19 @@ import {
 export function createDispatcher(runtime, services) {
 async function sendPersistedDial(code, socketId, payload) {
   try {
+    console.info(`[CALL_DISPATCH] persist-before-dial session=${String(code).slice(-2)} worker=${socketId ? "connected" : "missing"} command=${String(payload.commandId || "").slice(-8)}`);
     await runtime.persistence.save(runtime.sessions);
     const session = runtime.sessions.get(code);
     const assignment = Object.values(session?.campaign?.assignments || {})
       .find(item => item.attemptId === payload.callId);
-    if (!assignment || assignment.workerSocketId !== socketId) return;
+    if (!assignment || assignment.workerSocketId !== socketId) {
+      console.warn(`[CALL_DISPATCH] not sent session=${String(code).slice(-2)} reason=assignment_changed command=${String(payload.commandId || "").slice(-8)}`);
+      return;
+    }
     runtime.io.to(socketId).emit("call:action",payload);
-  } catch {
+    console.info(`[CALL_DISPATCH] sent session=${String(code).slice(-2)} command=${String(payload.commandId || "").slice(-8)}`);
+  } catch (error) {
+    console.error(`[CALL_DISPATCH] not sent session=${String(code).slice(-2)} reason=persistence error=${error.code || "STORAGE_UNAVAILABLE"}`);
     runtime.io.to(code).emit("call:error",{message:"No se confirmó el guardado en MySQL. No se envió la llamada."});
   }
 }

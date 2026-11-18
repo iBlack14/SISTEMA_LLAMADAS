@@ -68,6 +68,7 @@ runtime.app.get("/api/session/:code/contact-book", async (req, res) => {
   if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
   try {
     const attempts = await runtime.persistence.getCallAttempts(code);
+    console.info(`[CONTACT_BOOK] GET session=${code.slice(-2)} source=sessions.data.contactBook revision=${session.contactBookRevision || 0} lists=${session.contactBook?.lists?.length || 0} contacts=${session.contactBook?.contacts?.length || 0}`);
     res.json({ok:true,revision:session.contactBookRevision || 0,
       book:session.contactBook ? withProgress(session.contactBook,attempts,services.allCallAttempts()) : null});
   } catch { res.status(503).json({ok:false,error:"No se pudo cargar la base desde MySQL."}); }
@@ -81,6 +82,8 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
   try { book = normalizeBook(req.body?.book); }
   catch (error) { return res.status(400).json({ok:false,error:error.message}); }
   try {
+    const previousContacts = session.contactBook?.contacts?.length || 0;
+    const previousLists = session.contactBook?.lists?.length || 0;
     const revision = await runtime.historyGate.serialize(code, async () => {
       if (Number(req.body?.revision) !== Number(session.contactBookRevision || 0)) {
         throw Object.assign(new Error("La base cambió. Recarga antes de editar."),{conflict:true});
@@ -89,6 +92,7 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
       session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
       session.updatedAt = Date.now();
       await runtime.persistence.save(runtime.sessions);
+      console.info(`[CONTACT_BOOK] PUT session=${code.slice(-2)} revision=${session.contactBookRevision} contacts=${previousContacts}->${book.contacts.length} lists=${previousLists}->${book.lists.length} persisted=mysql`);
       return session.contactBookRevision;
     });
     res.json({ok:true,revision});

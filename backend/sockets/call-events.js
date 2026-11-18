@@ -222,6 +222,17 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     const alreadyFinalized = terminal && contactId && callId
       && (persistence.hasFinishedAttempt(code, callId, contactId) || campaign.contacts.some((contact) => contact.id === contactId
         && contact.attemptHistory.some((attempt) => attempt.id === callId && attempt.endedAt)));
+    const contactBook = session.contactBook;
+    console.info("[PHONE_STATUS] persisting-session-snapshot", {
+      session: String(code).slice(-2),
+      callState: callState || "unknown",
+      terminal: Boolean(terminal),
+      accepted: Boolean(updatedContact || alreadyFinalized),
+      contactLists: contactBook?.lists?.length || 0,
+      contactBookContacts: contactBook?.contacts?.length || 0,
+      campaignContacts: campaign.contacts?.length || 0,
+      note: "phone status saves the full in-memory session to MySQL"
+    });
     // No successful receipt or next call until the transaction/outbox is durable.
     await historyGate.commit(code, [callId, contactId, callState, terminal].join("|"), () => {
     emitState(code);
@@ -257,6 +268,8 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
 
     const session = sessions.get(code);
     if (!session) return;
+
+    console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} message=${String(message || "").slice(0,120)}`);
 
     const peerId = getPeer(session, "phone");
     if (!peerId) return;
