@@ -36,12 +36,23 @@ async function bootstrap() {
   if (!await runtime.persistence.initDb()) throw new Error("No se pudo conectar a MySQL. Verifica el servicio MySQL y las variables DB_*.");
   // Operational state is kept in memory: never run two writers on this database.
   const runtimeLock = await runtime.persistence.pool.getConnection();
-  const [[legacyLock]] = await runtimeLock.query("SELECT IS_USED_LOCK('sistema_llamadas_runtime') AS owner");
-  const [[lock]] = legacyLock.owner ? [[{ acquired: 0 }]] : await runtimeLock.query("SELECT GET_LOCK(?,0) AS acquired", [runtimeLockName(process.env)]);
+  let lock;
+  const lockName = runtimeLockName(process.env);
+  const retryUntil = Date.now() + 30000;
+  do {
+    const [[legacyLock]] = await runtimeLock.query("SELECT IS_USED_LOCK('sistema_llamadas_runtime') AS owner");
+    const [[result]] = legacyLock.owner
+      ? [[{ acquired: 0 }]]
+      : await runtimeLock.query("SELECT GET_LOCK(?,0) AS acquired", [lockName]);
+    lock = result;
+    if (Number(lock.acquired) === 1) break;
+    if (Date.now() >= retryUntil) break;
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  } while (true);
   if (Number(lock.acquired) !== 1) {
     runtimeLock.release();
     if (await waitForRuntime(runtime.instancePort, runtime.instanceIdentity) === "same") { runtime.alreadyRunning(); process.exit(0); }
-    throw new Error("Otro servidor utiliza esta base MySQL desde otro puerto o una versión anterior. Detén esa instancia; no se inició un segundo escritor.");
+    throw new Error(`No se pudo obtener el bloqueo exclusivo de MySQL para ${process.env.DB_HOST}:${process.env.DB_PORT || 3306}/${process.env.DB_NAME}. Otra instancia sigue escribiendo en esa base; se evitó iniciar un segundo escritor.`);
   }
   // MySQL releases this dedicated connection's lock when the process exits.
   runtime.sessions = await runtime.persistence.load();
@@ -74,7 +85,7 @@ async function bootstrap() {
   const port = Number(process.env.PORT || 3000);
   const host = runtime.easypanel ? "0.0.0.0" : process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
   runtime.server.listen(port, host, () => {
-    console.log(`Call bridge running on http://localhost:${port}`);
+    console.log(`Call bridge listening on ${host}:${port}`);
   });
 }
 

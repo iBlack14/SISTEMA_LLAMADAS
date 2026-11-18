@@ -5,12 +5,14 @@ const hash = value => createHash("sha256").update(value).digest("hex");
 export function runtimeIdentity(env, root) {
   const project = path.resolve(root);
   return hash(JSON.stringify([process.platform === "win32" ? project.toLowerCase() : project,
+    String(env.DB_HOST || "").toLowerCase(),
     process.platform === "win32" ? String(env.DB_NAME || "").toLowerCase() : env.DB_NAME || "",
     Number(env.DB_PORT || 3306), Number(env.PORT || 3000)]));
 }
 export function runtimeLockName(env) {
-  // Named MySQL locks are server-wide, so isolate unrelated databases.
-  return "voip_vc_" + hash(String(env.DB_NAME || "").toLowerCase()).slice(0, 40);
+  // Named locks are scoped to a MySQL server, so identify the complete DB target.
+  const target = [String(env.DB_HOST || "").toLowerCase(), Number(env.DB_PORT || 3306), String(env.DB_NAME || "").toLowerCase()];
+  return "voip_vc_" + hash(JSON.stringify(target)).slice(0, 40);
 }
 export async function probeRuntime(port, identity) {
   try {
