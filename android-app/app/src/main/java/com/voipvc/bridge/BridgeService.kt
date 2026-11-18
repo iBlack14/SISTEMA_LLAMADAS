@@ -1357,9 +1357,19 @@ class BridgeService : Service() {
         Log.i(TAG, "[HEARTBEAT] starting clientConnected=${client.connected()}")
         heartbeatJob = serviceScope.launch {
             Log.i(TAG, "[HEARTBEAT] coroutine running")
-            while (isActive && client.connected()) {
+            while (isActive) {
                 delay(HEARTBEAT_INTERVAL_MS)
-                if (!isActive || !client.connected()) break
+                if (!isActive) break
+                // Wait for socket to be connected (handles brief disconnects during calls)
+                var waitCount = 0
+                while (isActive && !client.connected() && waitCount < 30) { // wait up to 30s
+                    delay(1000)
+                    waitCount++
+                }
+                if (!isActive || !client.connected()) {
+                    Log.w(TAG, "[HEARTBEAT] socket not connected after wait, will retry next interval")
+                    continue
+                }
                 val sentAt = System.currentTimeMillis()
                 client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { ackArgs ->
                     val latencyMs = System.currentTimeMillis() - sentAt

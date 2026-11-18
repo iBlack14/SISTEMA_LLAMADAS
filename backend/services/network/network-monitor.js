@@ -182,7 +182,7 @@ export class NetworkMonitor {
     const equipment = Array.from({ length: 10 }, (_, index) => {
       const row = this.registry.find(item => item.position === index + 1);
       if (!row) return { number: index + 1, name: `Equipo ${index + 1}`, state: "Sin vincular", calling: false,
-        deviceId: null, metrics: null, pending: null, historyVersion: "unknown",
+        call: null, deviceId: null, metrics: null, pending: null, historyVersion: "unknown",
         connectedAt: null, disconnectedAt: null, connectedDurationSeconds: null, disconnectedDurationSeconds: null,
         ...(detailNumbers.has(index + 1) ? { activity: [] } : {}), rubro: null, schedule: null, lastActivityAt: null };
       const device = devices.get(row.device_id);
@@ -242,7 +242,16 @@ export class NetworkMonitor {
       const pending = reliableScope && assigned && (rubro || assigned.length)
         ? assigned.filter(c => pendingStates.has(c.status)).length : null;
       const lastAttempt = source?.lastAttemptByWorker?.get(row.device_id) || 0;
-      return { number: row.position, deviceId: row.device_id, name: row.name, state, calling,
+      const sameWorker = (id) => Boolean(id) && String(id) === String(row.device_id);
+      const activeContact = Array.isArray(contacts) ? contacts.find((c) =>
+        activeStates.has(c.status) && (sameWorker(c.assignedWorkerId) || sameWorker(c.targetWorkerId))) : null;
+      const call = calling && activeContact ? {
+        name: activeContact.name || "Sin nombre",
+        phone: activeContact.phone || "",
+        status: activeContact.status,
+        list: activeContact.list || null
+      } : null;
+      return { number: row.position, deviceId: row.device_id, name: row.name, state, calling, call,
         simulated: isTest(row.device_id), rubro, schedule: turn?.schedule || null,
         connectedAt, disconnectedAt, connectedDurationSeconds, disconnectedDurationSeconds,
         turn: turn ? { id: turn.id, label: turn.label, date: turn.date, startedAt: turn.startedAt } : null,

@@ -137,7 +137,7 @@ function createCard(number) {
 function renderCard(card, item, state, live) {
   card.dataset.state = state;
   card.dataset.tone = tones[state];
-  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.name || ""} ${item.rubro || ""}`.toLowerCase();
+  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
   card.querySelector(".card-title").textContent = `Equipo ${String(item.number).padStart(2, "0")}`;
   const model = (item.name || "").replace(/\bCelular\b/gi, "Equipo").replace(/^Equipo\s*\d*\s*/i, "").trim();
   const modelEl = card.querySelector(".card-model");
@@ -172,8 +172,18 @@ function renderCard(card, item, state, live) {
   card.querySelector(".card-stats").innerHTML = statCell("Intentos", m?.total) + statCell("Contestadas", m?.answered) + statCell("Pendientes", m ? item.pending ?? m.pending : null);
   const liveBox = card.querySelector(".card-live");
   liveBox.hidden = !(live && item.calling && ["En llamada", "Marcando"].includes(state));
-  liveBox.dataset.tone = tones[state];
-  liveBox.textContent = state === "Marcando" ? "Llamada saliente en curso de marcación." : "Llamada activa en este equipo.";
+  if (!liveBox.hidden) {
+    liveBox.dataset.tone = tones[state];
+    const contact = item.call;
+    if (contact?.name || contact?.phone) {
+      liveBox.innerHTML = `<span class="live-label">${state === "Marcando" ? "Marcando a" : "En llamada con"}</span>
+        <strong>${esc(contact.name || "Sin nombre")}</strong>
+        ${contact.phone ? `<span class="live-phone">📞 ${esc(contact.phone)}</span>` : ""}
+        ${contact.list ? `<span class="live-list">${esc(contact.list)}</span>` : ""}`;
+    } else {
+      liveBox.textContent = state === "Marcando" ? "Marcando… (contacto no identificado)" : "Llamada activa en este equipo.";
+    }
+  }
   card.querySelector(".card-scope").textContent = item.scopeReason || (item.turn ? item.turn.label : "Sin turno activo");
   card.querySelector(".card-test").hidden = !item.simulated;
 
