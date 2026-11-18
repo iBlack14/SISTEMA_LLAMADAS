@@ -21,6 +21,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.socket.client.IO
+import io.socket.client.Ack
 import io.socket.client.Socket
 import org.json.JSONObject
 import java.util.UUID
@@ -490,9 +491,13 @@ class BridgeService : Service() {
         client.on("call:action") { args ->
             if (client !== socket) return@on
             val data = args.firstOrNull() as? JSONObject ?: return@on
+            val serverAck = args.lastOrNull() as? Ack
             val receivedAtElapsedMs = SystemClock.elapsedRealtime()
             mainHandler.post {
-              if (client !== socket) return@post
+              if (client !== socket) {
+                  serverAck?.call(JSONObject().put("ok", false).put("message", "socket_replaced"))
+                  return@post
+              }
               val commandId = data.optString("commandId")
               val action = data.optString("action")
               val callId = data.optString("callId")
@@ -522,7 +527,7 @@ class BridgeService : Service() {
                             lastDialAck = it
                         }
                     }
-                    emitCommandAck(commandId, "dial", result.ok, result.message)
+                    emitCommandAck(commandId, "dial", result.ok, result.message, serverAck)
                 }
                 "hangup" -> {
                     val requestedContactId = data.optString("contactId")
@@ -538,17 +543,18 @@ class BridgeService : Service() {
                             !matchesActiveCall -> "La orden pertenece a otra llamada"
                             ok -> "Corte solicitado; esperando confirmación física"
                             else -> "Android no pudo solicitar el corte"
-                        }
+                        },
+                        serverAck
                     )
                 }
                 "answer" -> {
-                    emitCommandAck(commandId, "answer", answerIncomingCall(), "Respuesta procesada")
+                    emitCommandAck(commandId, "answer", answerIncomingCall(), "Respuesta procesada", serverAck)
                 }
-                "mute"   -> emitCommandAck(commandId, "mute", setMicMute(true), "Micrófono procesado")
-                "unmute" -> emitCommandAck(commandId, "unmute", setMicMute(false), "Micrófono procesado")
-                "speaker_on" -> emitCommandAck(commandId, "speaker_on", setSpeakerOn(true), "Altavoz procesado")
-                "speaker_off" -> emitCommandAck(commandId, "speaker_off", setSpeakerOn(false), "Altavoz procesado")
-                  else -> emitCommandAck(commandId, data.optString("action"), false, "Acción no soportada")
+                "mute"   -> emitCommandAck(commandId, "mute", setMicMute(true), "Micrófono procesado", serverAck)
+                "unmute" -> emitCommandAck(commandId, "unmute", setMicMute(false), "Micrófono procesado", serverAck)
+                "speaker_on" -> emitCommandAck(commandId, "speaker_on", setSpeakerOn(true), "Altavoz procesado", serverAck)
+                "speaker_off" -> emitCommandAck(commandId, "speaker_off", setSpeakerOn(false), "Altavoz procesado", serverAck)
+                  else -> emitCommandAck(commandId, data.optString("action"), false, "Acción no soportada", serverAck)
               }
             }
         }
@@ -1333,8 +1339,9 @@ class BridgeService : Service() {
         sendBroadcast(Intent(ACTION_CLOSE_CALL_UI).setPackage(packageName))
     }
 
-    private fun emitCommandAck(commandId: String, action: String, ok: Boolean, message: String) {
+    private fun emitCommandAck(commandId: String, action: String, ok: Boolean, message: String, serverAck: Ack? = null) {
         Log.i(TAG, "[CALL_ACK] action=$action command=${commandId.takeLast(8)} ok=$ok connected=${socket?.connected() == true} message=$message")
+        serverAck?.call(JSONObject().put("ok", ok).put("action", action).put("message", message))
         if (commandId.isBlank() || socket?.connected() != true) return
         socket?.emit(
             "phone:command_ack",

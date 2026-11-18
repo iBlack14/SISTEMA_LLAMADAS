@@ -40,19 +40,77 @@ async function sendPersistedDial(code, socketId, payload) {
     await runtime.persistence.save(runtime.sessions);
     const persistedMs = Date.now() - startedAt;
     const session = runtime.sessions.get(code);
-    const assignment = Object.values(session?.campaign?.assignments || {})
-      .find(item => item.attemptId === payload.callId);
-    if (!assignment || assignment.workerSocketId !== socketId) {
+    const assignmentEntry = Object.entries(session?.campaign?.assignments || {})
+      .find(([, item]) => item.attemptId === payload.callId);
+    if (!assignmentEntry) {
       console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=assignment_changed command=${commandId} call=${callId} persistMs=${persistedMs}`);
       return;
     }
-    const targetConnected = Boolean(runtime.io.sockets?.sockets?.get(socketId)?.connected);
-    runtime.io.to(socketId).emit("call:action",payload);
-    console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} persistMs=${persistedMs} targetConnected=${targetConnected}`);
+    const [workerId] = assignmentEntry;
+    const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);
+    const targetSocketId = worker?.connected && worker.socketId ? worker.socketId : socketId;
+    console.info(`[CALL_DISPATCH] persisted session=${sessionId} command=${commandId} call=${callId} persistMs=${persistedMs}`);
+    emitDialWithAck(code, workerId, targetSocketId, payload, 0, startedAt);
   } catch (error) {
     console.error(`[CALL_DISPATCH] not sent session=${sessionId} reason=persistence command=${commandId} call=${callId} elapsedMs=${Date.now() - startedAt} error=${error.code || error.message || "STORAGE_UNAVAILABLE"}`);
     runtime.io.to(code).emit("call:error",{message:"No se confirmó el guardado en MySQL. No se envió la llamada."});
   }
+}
+
+function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
+  const sessionId = String(code).slice(-2);
+  const commandId = String(payload.commandId || "").slice(-8);
+  const callId = String(payload.callId || "").slice(-8);
+  const target = runtime.io.sockets?.sockets?.get(socketId);
+  if (!target?.connected || typeof target.timeout !== "function") {
+    console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=worker_disconnected command=${commandId} call=${callId} retry=${retry}`);
+    if (Date.now() - startedAt < 30000) scheduleDialRetry(code, workerId, payload, retry, startedAt);
+    return;
+  }
+
+  target.timeout(5000).emit("call:action", payload, (error, responses) => {
+    const response = responses?.[0];
+    if (!error && response?.ok === true) {
+      console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt}`);
+      return;
+    }
+    if (!error) {
+      console.warn(`[CALL_DISPATCH] rejected session=${sessionId} command=${commandId} call=${callId} retry=${retry} message=${String(response?.message || "invalid_ack").slice(0,120)}`);
+      return;
+    }
+
+    console.warn(`[CALL_DISPATCH] ack-timeout session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt}`);
+    if (retry >= 2) return;
+    scheduleDialRetry(code, workerId, payload, retry, startedAt);
+  });
+  console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} retry=${retry} targetConnected=true`);
+}
+
+function scheduleDialRetry(code, workerId, payload, retry, startedAt) {
+  const sessionId = String(code).slice(-2);
+  const commandId = String(payload.commandId || "").slice(-8);
+  const callId = String(payload.callId || "").slice(-8);
+  setTimeout(() => {
+    const session = runtime.sessions.get(code);
+    const assignmentEntry = Object.entries(session?.campaign?.assignments || {})
+      .find(([id, item]) => id === workerId && item.attemptId === payload.callId);
+    if (!assignmentEntry || runtime.persistence.hasFinishedAttempt(code, payload.callId, payload.contactId)) {
+      console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=assignment_finished`);
+      return;
+    }
+    const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);
+    if (!worker?.connected || !worker.socketId) {
+      if (Date.now() - startedAt >= 30000) {
+        console.warn(`[CALL_DISPATCH] retry-abandoned session=${sessionId} command=${commandId} call=${callId} reason=worker_disconnected elapsedMs=${Date.now() - startedAt}`);
+        return;
+      }
+      console.info(`[CALL_DISPATCH] retry-waiting session=${sessionId} command=${commandId} call=${callId} retry=${retry} reason=worker_disconnected`);
+      scheduleDialRetry(code, workerId, payload, retry, startedAt);
+      return;
+    }
+    console.info(`[CALL_DISPATCH] retry session=${sessionId} command=${commandId} call=${callId} retry=${retry + 1}`);
+    emitDialWithAck(code, workerId, worker.socketId, payload, retry + 1, startedAt);
+  }, 1000);
 }
 
 function dispatchNextCampaignCallLegacy(code) {
