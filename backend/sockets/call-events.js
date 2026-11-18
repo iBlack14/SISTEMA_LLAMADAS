@@ -183,6 +183,10 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
       if (lastError) worker.lastError = String(lastError).trim();
       session.activePhoneSocketId = socket.id;
       worker.externalIncoming = isExternalIncoming;
+      // Store voicemail/terminal info on worker for state:changed
+      worker.detectedVoicemail = Boolean(detectedVoicemail);
+      worker.detectedAnnouncement = detectedAnnouncement || "";
+      worker.terminalConfirmed = Boolean(terminalConfirmed);
     }
     session.callState = callState || session.callState;
     if (typeof phoneNumber === "string" && phoneNumber.trim()) {

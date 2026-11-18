@@ -101,7 +101,10 @@ function emitState(code) {
       durationSeconds: contact?.durationSeconds || 0,
       speakerOn: Boolean(worker.speakerOn),
       lastError: worker.lastError || "",
-      lineLabel: worker.lineLabel || ""
+      lineLabel: worker.lineLabel || "",
+      detectedVoicemail: Boolean(worker.detectedVoicemail),
+      detectedAnnouncement: worker.detectedAnnouncement || "",
+      terminalConfirmed: Boolean(worker.terminalConfirmed)
     };
   });
 
