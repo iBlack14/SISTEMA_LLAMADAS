@@ -1,4 +1,4 @@
-import { apiFetch, currentUser } from "../auth/auth-session.js";
+import { apiFetch, currentUser, requireLogin } from "../auth/auth-session.js";
 
 // Spinner animation for import feedback
 if (!document.getElementById("admin-import-spinner-style")) {
@@ -117,6 +117,10 @@ async function loadUsers() {
   const status = $("adminListsStatus");
   status.textContent = "Cargando usuarios y listas…";
   try {
+    // Ensure currentUser is populated (sidebar may call us before auth completes)
+    if (!currentUser) {
+      try { await requireLogin(); } catch { /* ignore, will use window.VOIP_VC_AUTH_USER */ }
+    }
     const response = await apiFetch("/api/users/lists", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los usuarios.");

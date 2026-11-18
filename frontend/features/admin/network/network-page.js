@@ -3,6 +3,9 @@ import { requireLogin, bindAccountControls, apiFetch } from "../../auth/auth-ses
 let snapshot;
 let socket;
 let lastReceived = 0;
+// El monitor publica cada 30 s (NETWORK_MONITOR_INTERVAL_MS). Un umbral de 6 s
+// marcaba "Sin conexión" entre publicaciones aunque el socket estuviera sano.
+const STALE_MS = 45000;
 const cards = new Map();
 const orbs = new Map();
 const histories = new Map();
@@ -244,7 +247,7 @@ function updateFilterCounts() {
 }
 function render() {
   if (!snapshot) return;
-  const live = Boolean(socket?.connected && Date.now() - lastReceived < 6000);
+  const live = Boolean(socket?.connected && Date.now() - lastReceived < STALE_MS);
   $("liveStatus").textContent = live ? "En vivo" : "Sin conexión";
   $("liveDot").className = "status-dot" + (live ? " connected" : "");
   document.querySelector(".connection").classList.toggle("is-offline", !live);
@@ -331,7 +334,7 @@ async function reconnectSingleEquipment(number, btn, msgEl) {
 
 async function reconnectAllDisconnected() {
   if (!snapshot || !Array.isArray(snapshot.equipment)) return;
-  const live = Boolean(socket?.connected && Date.now() - lastReceived < 6000);
+  const live = Boolean(socket?.connected && Date.now() - lastReceived < STALE_MS);
   const disconnected = snapshot.equipment.filter(item => displayState(item, live) === "Desconectado");
   if (!disconnected.length) return;
 
@@ -387,7 +390,7 @@ function unavailable() { lastReceived = 0; $("liveStatus").textContent = "Sin co
 
 function tickLiveDurations() {
   if (!snapshot || !Array.isArray(snapshot.equipment)) return;
-  const live = Boolean(socket?.connected && Date.now() - lastReceived < 6000);
+  const live = Boolean(socket?.connected && Date.now() - lastReceived < STALE_MS);
   for (const item of snapshot.equipment) {
     const state = displayState(item, live);
     const orb = orbs.get(item.number);
@@ -431,7 +434,7 @@ try {
     bindAccountControls();
     const response = await apiFetch("/api/network", { cache: "no-store" });
     if (!response.ok) throw new Error("No se pudo cargar Núcleo de Red.");
-    snapshot = await response.json(); render();
+    snapshot = await response.json(); lastReceived = Date.now(); render();
 
     if ($("reconnectAllAlertBtn")) $("reconnectAllAlertBtn").addEventListener("click", reconnectAllDisconnected);
 
@@ -469,7 +472,7 @@ try {
     socket.on("disconnect", unavailable);
     socket.on("connect_error", error => { unavailable(); if (["AUTH_REQUIRED", "AUTH_CHANGED"].includes(error.message)) window.location.replace("/login"); });
     socket.on("session:error", data => { unavailable(); $("accountError").textContent = data.message; if (data.reason === "AUTH_REQUIRED") window.location.replace("/login"); });
-    setInterval(() => { if (lastReceived && Date.now() - lastReceived >= 6000) unavailable(); }, 1000);
+    setInterval(() => { if (lastReceived && Date.now() - lastReceived >= STALE_MS) unavailable(); }, 1000);
   }
 } catch (error) { $("accountError").textContent = error.message; unavailable(); throw error; }
 }
