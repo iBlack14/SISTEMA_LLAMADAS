@@ -98,6 +98,7 @@ export const refs = {
   previewBody: document.getElementById("previewBody"),
   importConfirm: document.getElementById("importConfirmBtn"),
   importCancel: document.getElementById("importCancelBtn"),
+  importSaveFeedback: document.getElementById("importSaveFeedback"),
   floatingAddContactBtn: document.getElementById("floatingAddContactBtn"),
   reminderFloatContainer: document.getElementById("reminderFloatContainer"),
   addContactModalEl: document.getElementById("addContactModal"),

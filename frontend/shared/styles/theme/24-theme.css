@@ -1595,6 +1595,22 @@
   color: #5a3c68 !important;
 }
 
+#importSaveFeedback {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(90, 255, 180, 0.45);
+  border-radius: 9px;
+  background: rgba(24, 112, 75, 0.24);
+  color: #e8fff2 !important;
+  font-size: 13px;
+}
+
+#importSaveFeedback[data-error="true"] {
+  border-color: rgba(255, 150, 180, 0.7);
+  background: rgba(130, 25, 70, 0.42);
+  color: #fff0f4 !important;
+}
+
 .pairing-slot-qr-loading {
   width: min(210px, 82%);
   aspect-ratio: 1;

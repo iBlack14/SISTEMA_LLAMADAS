@@ -10,48 +10,73 @@ import { loadBrowserLibrary } from '../../../shared/utils/browser-libraries.js';
  * Se construye una vez por dashboard.
  */
 export function createImportActions(dashboardState, dashboardActions) {
+function showImportSaveFeedback(message, isError = false) {
+  const feedback = refs.importSaveFeedback;
+  if (!feedback) return;
+  feedback.textContent = message;
+  feedback.hidden = !message;
+  feedback.dataset.error = String(isError);
+}
+
 async function addImportedContacts() {
-  try { await Contacts.flushDatabase(); }
-  catch (error) { setStatus(error.message, true); return; }
-  if (dashboardState.importPreviewBatches.length) {
-    let totalAdded = 0;
-    let processedLists = 0;
-    let omitted = 0;
-    for (const batch of dashboardState.importPreviewBatches) {
-      Contacts.addList(batch.listName);
-      const added = Contacts.addContacts(batch.contacts, batch.listName);
-      totalAdded += added;
-      omitted += Math.max(0, batch.contacts.length - added);
-      processedLists += 1;
+  if (refs.importConfirm?.disabled) return;
+  if (!dashboardState.importPreviewBatches.length && !dashboardState.importPreviewData.length) return;
+  const button = refs.importConfirm;
+  const originalLabel = button?.textContent || "Guardar contactos";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Guardando…";
+  }
+  showImportSaveFeedback("Guardando los contactos en MySQL…");
+
+  try {
+    await Contacts.flushDatabase();
+    let successMessage = "";
+    if (dashboardState.importPreviewBatches.length) {
+      let totalAdded = 0;
+      let processedLists = 0;
+      let omitted = 0;
+      for (const batch of dashboardState.importPreviewBatches) {
+        Contacts.addList(batch.listName);
+        const added = Contacts.addContacts(batch.contacts, batch.listName);
+        totalAdded += added;
+        omitted += Math.max(0, batch.contacts.length - added);
+        processedLists += 1;
+      }
+      Contacts.setActiveList(dashboardState.importPreviewBatches[0].listName);
+      await Contacts.flushDatabase();
+      successMessage = `${processedLists} lista(s) guardada(s): ${totalAdded} contacto(s) agregado(s)${omitted ? ` y ${omitted} duplicado(s) omitido(s)` : ""}.`;
+    } else {
+      const defaultTab = dashboardState.currentImportFileName ? dashboardState.currentImportFileName.split('.')[0] : "Lista Nueva";
+      const listName = await dashboardActions.requestListName({ title: "Guardar contactos importados", defaultValue: defaultTab });
+      if (!listName) {
+        showImportSaveFeedback("Guardado cancelado; los contactos siguen en la vista previa.");
+        return;
+      }
+      Contacts.addList(listName);
+      Contacts.setActiveList(listName);
+      const addedCount = Contacts.addContacts(dashboardState.importPreviewData, listName);
+      await Contacts.flushDatabase();
+      successMessage = `Lista "${listName}" guardada con ${addedCount} contacto(s).`;
     }
-    Contacts.setActiveList(dashboardState.importPreviewBatches[0].listName);
-    try { await Contacts.flushDatabase(); }
-    catch (error) { setStatus(error.message, true); return; }
-    setStatus(`${processedLists} lista(s) procesada(s): ${totalAdded} contacto(s) agregado(s)${omitted ? ` y ${omitted} duplicado(s) omitido(s)` : ""}.`, true);
+
+    setStatus(successMessage, true);
     dashboardActions.resetImportPreview();
     dashboardActions.renderTabs();
     dashboardActions.renderContacts();
     dashboardActions.renderCampaignPanel();
+    showImportSaveFeedback(successMessage);
     if (dashboardState.sessionCode) dashboardActions.loadPairingData(dashboardState.sessionCode);
-    return;
+  } catch (error) {
+    const message = error?.message || "No se pudo confirmar el guardado en MySQL.";
+    setStatus(`No se guardaron los contactos: ${message}`, true);
+    showImportSaveFeedback(`No se guardaron los contactos: ${message}`, true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
   }
-  if (!dashboardState.importPreviewData.length) return;
-
-  const defaultTab = dashboardState.currentImportFileName ? dashboardState.currentImportFileName.split('.')[0] : "Lista Nueva";
-  const listName = await dashboardActions.requestListName({ title: "Guardar contactos importados", defaultValue: defaultTab });
-  if (!listName) return;
-
-  Contacts.addList(listName);
-  Contacts.setActiveList(listName);
-  const addedCount = Contacts.addContacts(dashboardState.importPreviewData, listName);
-  try { await Contacts.flushDatabase(); }
-  catch (error) { setStatus(error.message, true); return; }
-  setStatus(`Lista "${listName}" creada con ${addedCount} contacto(s).`, true);
-  dashboardActions.resetImportPreview();
-  dashboardActions.renderTabs();
-  dashboardActions.renderContacts();
-  dashboardActions.renderCampaignPanel();
-  if (dashboardState.sessionCode) dashboardActions.loadPairingData(dashboardState.sessionCode);
 }
 
 async function parseContactsFromFile(file) {
