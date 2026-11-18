@@ -56,10 +56,12 @@ runtime.app.post("/api/session/:code/campaign/start", async (req, res) => {
   try {
     const history = await runtime.persistence.getCallAttempts(code);
     contacts = uncalledContacts(contacts, services.allCallAttempts());
+    const blockedPhones = new Set(services.globalBlockedNumbers().map(entry => phoneKey(entry.phone)));
+    contacts = contacts.filter(contact => !blockedPhones.has(phoneKey(contact.phone)));
   } catch {
     return res.status(503).json({ok:false,error:"No se pudo comprobar el historial en MySQL."});
   }
-  if (!contacts.length) return res.status(409).json({ok:false,error:"Número llamado anteriormente: todos los teléfonos de esta selección están bloqueados por 12 meses o duplicados."});
+  if (!contacts.length) return res.status(409).json({ok:false,error:"Todos los teléfonos seleccionados ya fueron llamados, están bloqueados globalmente o están duplicados."});
   if (ensureCampaign(session).status === "running" || Object.keys(ensureCampaign(session).assignments || {}).length) {
     return res.status(409).json({ok:false,error:"Ya se inició una campaña mientras se consultaba el historial."});
   }

@@ -14,7 +14,7 @@ function reportData(session, date) {
   services.archiveCurrentCampaign(session);
   const restrictions = annualPhoneBlocks(services.allCallAttempts());
   const knownAttempts = new Map(collectReportAttempts(session).map(attempt => [attempt.attemptId, attempt]));
-  const blocked = new Set((session.blockedNumbers || []).map(entry => phoneKey(entry.phone)));
+  const blocked = new Set(services.globalBlockedNumbers().map(entry => phoneKey(entry.phone)));
 
   return (session.reportArchive || [])
     .filter(r => !date || r.date === date)

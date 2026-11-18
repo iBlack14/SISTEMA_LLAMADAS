@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
 import { bindDeviceToPairingSlot, clearDeviceFromPairingSlots, dedupePairingSlotDevices } from "../services/calls/pairing-lifecycle.js";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../services/campaigns/contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks } from "../services/campaigns/contact-book.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -28,7 +28,7 @@ import {
 
 /**
  * registerDevices: conserva los contratos y reglas existentes.
- * Dependencias: runtime.app, runtime.io, runtime.pairingRateLimit, runtime.sessions, services.annualBlock, services.blockedCallMessage, services.createPairingSlot, services.dispatchCampaignCalls, services.emitCampaignState, services.emitState, services.getAndroidApiBaseUrl, services.getOrCreateSession, services.getPairingLink, services.getPairingSlotByToken, services.hasDashboardAccess, services.saveSoon, services.sendPersistedDial, services.syncSessionPhoneState, services.upsertPhoneWorker.
+ * Dependencias: runtime.app, runtime.io, runtime.pairingRateLimit, runtime.sessions, services.annualBlock, services.blockedCallMessage, services.createPairingSlot, services.dispatchCampaignCalls, services.emitCampaignState, services.emitState, services.getAndroidApiBaseUrl, services.getOrCreateSession, services.getPairingLink, services.getPairingSlotByToken, services.hasDashboardAccess, services.isGloballyBlocked, services.refreshGlobalCallRestrictions, services.saveSoon, services.sendPersistedDial, services.syncSessionPhoneState, services.upsertPhoneWorker.
  * Se construye una vez por proceso.
  */
 export function registerDevices(runtime, services) {
@@ -207,11 +207,14 @@ runtime.app.post("/api/session/:code/workers/:workerId/call-contact", (req, res)
     return res.status(409).json({ ok: false, error: "El contacto pertenece a otro equipo" });
   }
 
-  if ((session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(requested.phone))) {
+  const manualRetry = req.body?.manualRetry === true;
+  if (services.isGloballyBlocked(requested.phone)) {
     return res.status(409).json({ ok: false, error: "Número en la lista de bloqueos. Desbloquéalo antes de llamar.", reason: "numero_bloqueado" });
   }
   const block = services.annualBlock(requested.phone);
-  if (block) return res.status(409).json({ok:false,error:services.blockedCallMessage(block),reason:"numero_llamado_anteriormente",nextAllowedAt:block.nextAllowedAt});
+  if (block && (!manualRetry || block.permanent)) {
+    return res.status(409).json({ok:false,error:services.blockedCallMessage(block),reason:"numero_llamado_anteriormente",nextAllowedAt:block.nextAllowedAt});
+  }
   const held = holdActiveContact(session, workerId);
   if (held) {
     runtime.io.to(worker.socketId).emit("call:action", { action: "hangup", from: "dashboard", contactId: held.id, commandId: nanoid() });
@@ -237,6 +240,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/call-contact", (req, res)
   services.saveSoon();
   services.emitState(code);
   services.emitCampaignState(code);
+  services.refreshGlobalCallRestrictions(code);
   return res.json({ ok: true, code, workerId, contactId: contact.id, campaign: getCampaignSnapshot(session) });
 });
 

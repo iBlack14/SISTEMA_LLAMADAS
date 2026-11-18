@@ -73,6 +73,7 @@ function bindEvents() {
     try {
       const data = await dashboardActions.postCampaignAction(`/workers/${encodeURIComponent(workerId)}/call-contact`, {
         contactId: row.contactId,
+        manualRetry: true,
         contact: { id: row.contactId, name: row.name, phone: row.phone, list: row.list }
       });
       if (data) setStatus("Rellamada enviada. El intento anterior permanece en el reporte.", true);

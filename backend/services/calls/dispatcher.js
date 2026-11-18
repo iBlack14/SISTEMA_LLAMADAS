@@ -56,7 +56,7 @@ function dispatchNextCampaignCallLegacy(code) {
   // Seleccionar worker para saber si vamos directo o por PBX
   const worker = services.getActivePhoneWorker(session);
   excludeCalledPending(campaign, services.allCallAttempts());
-  excludeBlockedPending(campaign, session.blockedNumbers);
+  excludeBlockedPending(campaign, services.globalBlockedNumbers());
   const next = assignNextContact(session, worker || {});
   session.updatedAt = Date.now();
   services.saveSoon();
@@ -96,6 +96,7 @@ function dispatchNextCampaignCallLegacy(code) {
 
   services.emitState(code);
   services.emitCampaignState(code);
+  if (worker) services.refreshGlobalCallRestrictions(code);
   return next;
 }
 
@@ -106,7 +107,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
   excludeCalledPending(campaign, services.allCallAttempts());
-  excludeBlockedPending(campaign, session.blockedNumbers);
+  excludeBlockedPending(campaign, services.globalBlockedNumbers());
 
   const dispatched = [];
   const connectedWorkers = services.getConnectedPhoneWorkers(session);
@@ -129,7 +130,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
 
   for (const worker of workers) {
     excludeCalledPending(campaign, services.allCallAttempts());
-    excludeBlockedPending(campaign, session.blockedNumbers);
+    excludeBlockedPending(campaign, services.globalBlockedNumbers());
     const next = assignNextContact(session, worker);
     if (!next) continue;
     worker.callState = "dialing";
@@ -156,6 +157,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   services.saveSoon();
   services.emitState(code);
   services.emitCampaignState(code);
+  if (dispatched.length) services.refreshGlobalCallRestrictions(code);
   return dispatched;
 }
 

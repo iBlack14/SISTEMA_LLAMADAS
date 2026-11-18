@@ -166,7 +166,46 @@ button.viavox-menu-toggle { background: #350642 !important; }
 .admin-user-lists-view h3 { margin: 0 0 6px; }
 .admin-user-lists-view > p { margin: 0 0 16px; }
 .admin-user-lists-view label { display: grid; gap: 6px; min-width: min(260px, 100%); color: #dec6eb; }
-.admin-user-lists-view select { min-height: 42px; padding: 8px 12px; color: #21112c; background: #fff; border-radius: 8px; }
+.admin-user-lists-view select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 42px 10px 14px;
+  appearance: none;
+  color: #261032 !important;
+  color-scheme: light;
+  background-color: #fbf7ff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b2585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 18px;
+  border: 1px solid #c28bd4;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 75%);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.admin-user-lists-view select:hover:not(:disabled) { border-color: #e0a9f0; }
+.admin-user-lists-view select:focus-visible {
+  outline: none;
+  border-color: #e4b1f3;
+  box-shadow: 0 0 0 3px rgb(214 151 235 / 25%), inset 0 1px 0 rgb(255 255 255 / 75%);
+}
+.admin-user-lists-view select:disabled {
+  color: #594b60 !important;
+  background-color: #d9cddd !important;
+  border-color: #c6b2ce;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.admin-user-lists-view select option {
+  color: #261032 !important;
+  background: #fbf7ff !important;
+}
+.admin-user-lists-view select option:checked {
+  color: #fff !important;
+  background: #651080 !important;
+}
 .admin-user-lists-view table { width: 100%; }
 .admin-user-lists-view td { overflow-wrap: anywhere; }
 
@@ -287,9 +326,9 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .viavox-sidebar {
   width: 248px;
   padding: 22px 14px 16px;
-  background: linear-gradient(180deg, #25052f 0%, #30063a 58%, #26042f 100%);
-  border-right: 1px solid rgba(231, 111, 236, .24);
-  box-shadow: 10px 0 34px rgba(20, 0, 28, .16);
+  background: linear-gradient(180deg, #541875 0%, #481363 58%, #3e0e58 100%);
+  border-right: 1px solid rgba(245, 190, 255, .22);
+  box-shadow: 10px 0 34px rgba(20, 0, 28, .12);
 }
 .viavox-sidebar::before {
   content: "";
@@ -312,57 +351,57 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .viavox-sidebar .viavox-navigation > a,
 .viavox-sidebar .viavox-navigation > button {
   position: relative;
-  min-height: 46px;
-  gap: 11px;
+  min-height: 50px;
+  gap: 13px;
   padding: 10px 12px;
   border: 1px solid transparent;
   border-left: 3px solid transparent;
   border-radius: 9px;
-  color: #d9c3e2;
-  font-size: 12px;
+  color: #f0def7;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: .35px;
+  letter-spacing: .2px;
   transition: background-color .16s ease, border-color .16s ease, color .16s ease;
 }
-.viavox-sidebar .viavox-navigation > a::before,
-.viavox-sidebar .viavox-navigation > button::before {
+.viavox-nav-icon {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border: 1px solid rgba(225, 187, 241, .18);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, .035);
-  color: #df9ced;
-  font-size: 13px;
-  line-height: 1;
-  content: "•";
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f3b9fb;
+  transition: color .16s ease, transform .16s ease;
 }
-.viavox-sidebar [data-view="calls"]::before { content: "◉" !important; }
-.viavox-sidebar [data-view="contacts"]::before { content: "▤" !important; }
-.viavox-sidebar [data-view="reports"]::before { content: "▦" !important; }
-.viavox-sidebar [data-view="reservations"]::before { content: "◷" !important; }
-.viavox-sidebar [data-view="blocked"]::before { content: "⊘" !important; }
-.viavox-sidebar [data-view="messages"]::before { content: "◌" !important; }
-.viavox-sidebar [data-view="network"]::before { content: "⌘" !important; }
-.viavox-sidebar [data-view="users"]::before { content: "♙" !important; }
+.viavox-nav-icon-art {
+  display: block;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.viavox-sidebar .viavox-navigation > :hover .viavox-nav-icon,
+.viavox-sidebar .viavox-navigation > [aria-current="page"] .viavox-nav-icon {
+  color: #fff;
+  transform: scale(1.08);
+}
 .viavox-sidebar .viavox-navigation > :hover {
-  border-color: rgba(229, 157, 244, .12);
-  background: rgba(176, 70, 204, .15);
+  border-color: transparent;
+  background: rgba(255, 255, 255, .09);
   color: #fff;
 }
 .viavox-sidebar .viavox-navigation > [aria-current="page"] {
-  border-color: rgba(244, 154, 248, .22);
+  border-color: transparent;
   border-left-color: #ff63ce !important;
-  background: linear-gradient(100deg, rgba(188, 56, 203, .36), rgba(112, 38, 139, .34)) !important;
+  background: rgba(255, 255, 255, .13) !important;
   color: #fff !important;
   box-shadow: inset 0 0 18px rgba(255, 105, 222, .055);
-}
-.viavox-sidebar .viavox-navigation > [aria-current="page"]::before {
-  border-color: rgba(255, 171, 241, .38);
-  background: rgba(255, 100, 215, .15);
-  color: #ffb5ee;
 }
 .viavox-sidebar-footer {
   padding-top: 18px;

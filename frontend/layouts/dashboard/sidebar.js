@@ -10,6 +10,35 @@ const sidebar = document.getElementById("viavoxSidebar");
 const toggle = document.querySelector(".viavox-menu-toggle");
 const downloadArea = sidebar.querySelector(".viavox-downloads");
 const accountArea = sidebar.querySelector(".viavox-account");
+const sidebarIconShapes = {
+  calls: [["path", { d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.7 2.8a2 2 0 0 1-.45 2.1L8.1 9.9a16 16 0 0 0 6 6l1.28-1.27a2 2 0 0 1 2.1-.45c.9.35 1.84.58 2.8.7A2 2 0 0 1 22 16.92Z" }]],
+  contacts: [["rect", { x: "4", y: "3", width: "16", height: "18", rx: "2" }], ["path", { d: "M8 8h8M8 12h8M8 16h5" }]],
+  reports: [["rect", { x: "3", y: "4", width: "18", height: "17", rx: "2" }], ["path", { d: "M16 2v4M8 2v4M3 9h18M8 13h2M14 13h2M8 17h2" }]],
+  reservations: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 7v5l3 2M8 2 6 4M16 2l2 2" }]],
+  blocked: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "m5.6 5.6 12.8 12.8" }]],
+  messages: [["path", { d: "M20 11.5a7.5 7.5 0 0 1-7.5 7.5H7l-4 2 1.4-4A7.5 7.5 0 1 1 20 11.5Z" }], ["path", { d: "M8 11.5h.01M12 11.5h.01M16 11.5h.01" }]],
+  network: [["circle", { cx: "12", cy: "5", r: "2.5" }], ["circle", { cx: "5", cy: "18", r: "2.5" }], ["circle", { cx: "19", cy: "18", r: "2.5" }], ["path", { d: "m10.8 7.2-4.6 8.6M13.2 7.2l4.6 8.6M7.5 18h9" }]],
+  users: [["path", { d: "M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }], ["circle", { cx: "10", cy: "7", r: "4" }], ["path", { d: "M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" }]]
+};
+const svgNamespace = "http://www.w3.org/2000/svg";
+for (const item of navigation.querySelectorAll("[data-view]")) {
+  const shapes = sidebarIconShapes[item.dataset.view];
+  if (!shapes) continue;
+  const holder = document.createElement("span");
+  holder.className = "viavox-nav-icon";
+  holder.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(svgNamespace, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", "viavox-nav-icon-art");
+  svg.setAttribute("focusable", "false");
+  for (const [tag, attributes] of shapes) {
+    const shape = document.createElementNS(svgNamespace, tag);
+    for (const [name, value] of Object.entries(attributes)) shape.setAttribute(name, value);
+    svg.append(shape);
+  }
+  holder.append(svg);
+  item.prepend(holder);
+}
 for (const id of ["apkDownloadBtn", "shizukuDownloadBtn"]) {
   const link = document.getElementById(id);
   if (link) downloadArea.append(link);
@@ -70,14 +99,7 @@ async function loadAdminWorkspace() {
     if (!response.ok) throw new Error("No se pudo cargar la sección administrativa.");
     const source = new DOMParser().parseFromString(await response.text(), "text/html");
     const workspace = document.getElementById("adminWorkspace");
-    const header = source.querySelector(".app-header");
-    header?.querySelector(".account")?.remove();
-    const brand = header?.querySelector(".brand");
-    if (brand) {
-      brand.href = "/llamadas";
-      brand.dataset.view = "calls";
-    }
-    const candidates = [header, source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("editUserDialog")];
+    const candidates = [source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("editUserDialog")];
     if (candidates.some(item => !item)) throw new Error("La vista administrativa está incompleta.");
     workspace.replaceChildren(...candidates);
     workspace.addEventListener("click", event => {
@@ -87,8 +109,8 @@ async function loadAdminWorkspace() {
         navigate(link.dataset.view);
       }
     });
-    adminNetwork = candidates[1];
-    adminUsers = candidates[2];
+    adminNetwork = candidates[0];
+    adminUsers = candidates[1];
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
     stylesheet.href = "/features/admin/network/network.css?v=20261116-orbpoint";

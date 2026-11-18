@@ -56,7 +56,7 @@ import {
 export function registerUtilityEvents(runtime, services, socket) {
 const { io, sessions, persistence } = runtime;
 const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneState, emitCampaignState, hasPersistentCampaignData, emitState, emitMessageContacts } = services;
-  socket.on("blocked-numbers:change", (payload = {}) => {
+  socket.on("blocked-numbers:change", async (payload = {}) => {
     const code = socket.data.code;
     const role = socket.data.role;
     if (!code || !["dashboard", "phone"].includes(role)) return;
@@ -73,24 +73,16 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
       return;
     }
 
-    const blockedNumbers = Array.isArray(session.blockedNumbers) ? session.blockedNumbers : [];
-    if (action === "add") {
-      const current = blockedNumbers.find((item) => phoneKey(item.phone) === key);
-      if (!current && blockedNumbers.length >= 5000) {
-        socket.emit("blocked-numbers:error", { message: "La lista alcanzó el límite de 5000 números." });
-        return;
+    try {
+      await services.changeGlobalBlockedNumber(action, { name, phone });
+      for (const [sessionCode, blockedSession] of sessions) {
+        blockedSession.updatedAt = Date.now();
+        emitState(sessionCode);
       }
-      session.blockedNumbers = [
-        ...blockedNumbers.filter((item) => phoneKey(item.phone) !== key),
-        { name, phone }
-      ];
-    } else {
-      session.blockedNumbers = blockedNumbers.filter((item) => phoneKey(item.phone) !== key);
+      socket.emit("blocked-numbers:ack", { accepted: true, action, phone });
+    } catch (error) {
+      socket.emit("blocked-numbers:error", { message: error.message || "No se pudo guardar el bloqueo global." });
     }
-    session.updatedAt = Date.now();
-    saveSoon();
-    emitState(code);
-    socket.emit("blocked-numbers:ack", { accepted: true, action, phone });
   });
 
   socket.on("phone:message-contact:add", async (payload = {}) => {

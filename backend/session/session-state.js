@@ -116,7 +116,7 @@ function emitState(code) {
     },
     phoneDevice: session.phoneDevice,
     phoneWorkers,
-    blockedNumbers: session.blockedNumbers,
+    blockedNumbers: services.globalBlockedNumbers(),
     callState: session.callState,
     lastNumber: session.lastNumber,
     lastCompanyName: session.lastCompanyName,

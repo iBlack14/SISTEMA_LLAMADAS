@@ -15,7 +15,7 @@ import { AuthService } from "../services/auth/service.js";
 import { installSocketAuth } from "../services/auth/sockets.js";
 import { NetworkMonitor } from "../services/network/network-monitor.js";
 import { SessionPersistence } from "../shared/persistence.js";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../services/campaigns/contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks } from "../services/campaigns/contact-book.js";
 import { collectReportAttempts } from "../services/reports/report-attempts.js";
 import { collectCallAttempts } from "../services/calls/call-history.js";
 import { CallHistoryGate } from "../services/calls/call-history-gate.js";
@@ -69,7 +69,7 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
         socket.emit("session:error", { error: "El historial tiene un guardado pendiente. Espera antes de llamar." });
         return;
       }
-      if ((session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(phoneNumber))) {
+      if (services.isGloballyBlocked(phoneNumber)) {
         socket.emit("call:error", { message: "Número en la lista de bloqueos. Desbloquéalo antes de llamar." });
         return;
       }
@@ -117,6 +117,7 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
         });
         saveSoon();
         emitState(code);
+        services.refreshGlobalCallRestrictions(code);
       } else {
         console.log(`[MANUAL] Intento fallido para ${phoneNumber} (No hay worker activo)`);
         session.callState = "failed";

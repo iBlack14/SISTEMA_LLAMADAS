@@ -273,7 +273,6 @@ function render() {
   $("alertBanner").hidden = !hasDisconnected;
   $("alertTitle").textContent = `${disconnected.length} equipo(s) desconectado(s)`;
   $("alertText").textContent = disconnected.map(item => `Equipo ${item.number}`).join(", ");
-  if ($("reconnectAllTopButton")) $("reconnectAllTopButton").hidden = !hasDisconnected;
   if ($("reconnectAllAlertBtn")) $("reconnectAllAlertBtn").hidden = !hasDisconnected;
   $("overflowNotice").hidden = !snapshot.overflow;
   $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) fuera de las 10 posiciones.` : "";
@@ -337,8 +336,7 @@ async function reconnectAllDisconnected() {
   if (!disconnected.length) return;
 
   const alertBtn = $("reconnectAllAlertBtn");
-  const topBtn = $("reconnectAllTopButton");
-  const btns = [alertBtn, topBtn].filter(Boolean);
+  const btns = [alertBtn].filter(Boolean);
   btns.forEach(b => { b.disabled = true; b.textContent = "Reconectando…"; });
 
   try {
@@ -436,7 +434,6 @@ try {
     snapshot = await response.json(); render();
 
     if ($("reconnectAllAlertBtn")) $("reconnectAllAlertBtn").addEventListener("click", reconnectAllDisconnected);
-    if ($("reconnectAllTopButton")) $("reconnectAllTopButton").addEventListener("click", reconnectAllDisconnected);
 
     $("refreshButton").addEventListener("click", async () => {
       $("refreshButton").disabled = true;

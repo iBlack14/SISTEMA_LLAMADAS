@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { selectPendingReportContacts } from "../services/reports/report-selection.js";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../services/campaigns/contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks } from "../services/campaigns/contact-book.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -130,7 +130,7 @@ runtime.app.post(
       return res.status(409).json({ ok: false, error: "Hay una campaña en curso" });
     }
     const restricted = pending.find(contact =>
-      (session.blockedNumbers || []).some(entry => phoneKey(entry.phone) === phoneKey(contact.phone)) ||
+      services.isGloballyBlocked(contact.phone) ||
       (manualRetry ? services.annualBlock(contact.phone)?.permanent : services.annualBlock(contact.phone)));
     if (restricted) {
       const block = services.annualBlock(restricted.phone);

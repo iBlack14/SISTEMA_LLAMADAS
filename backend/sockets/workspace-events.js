@@ -62,6 +62,8 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     try {
       const { code, session } = await workspaces.open(user, String(previousCode || "").toUpperCase());
       if (!socket.connected) return;
+      session.blockedNumbers = services.globalBlockedNumbers();
+      saveSoon();
       detachSocketFromCurrentSession(socket);
       session.updatedAt = Date.now();
       socket.data.code = code;

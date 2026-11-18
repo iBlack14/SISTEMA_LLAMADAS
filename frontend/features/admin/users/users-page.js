@@ -207,13 +207,6 @@ function bindUsers() {
   };
   bindPasswordToggles(document);
 
-  const usersButton = document.getElementById("usersButton");
-  if (usersButton) {
-    usersButton.addEventListener("click", () => {
-      window.navigatePanel?.("users");
-    });
-  }
-
   if (backBtn) {
     backBtn.addEventListener("click", () => {
       window.navigatePanel?.("network");

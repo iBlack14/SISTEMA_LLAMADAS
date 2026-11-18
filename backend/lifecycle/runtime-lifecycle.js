@@ -60,6 +60,7 @@ async function bootstrap() {
     }
     session.callState = "idle";
   }
+  services.synchronizeGlobalBlockedNumbers();
   // MySQL is the sole session/history store; file backups are optional exports.
   await runtime.persistence.save(runtime.sessions);
   runtime.persistence.startBackups();

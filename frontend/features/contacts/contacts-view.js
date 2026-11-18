@@ -100,7 +100,7 @@ function renderContacts() {
 
     tr.innerHTML = `
       <td>${dashboardActions.escHtml(c.name)}</td>
-      <td style="font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}${dashboardActions.contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">' + (dashboardActions.contactAnnualBlock(c) === "permanent" ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : "Número llamado anteriormente") + '</small>' : ""}</td>
+      <td style="font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}${dashboardActions.contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">' + (dashboardActions.contactAnnualBlock(c) === "permanent" ? "NO VOLVER A LLAMAR: número inválido" : dashboardActions.contactAnnualBlock(c) === "blocked" ? "Bloqueado en todas las cuentas" : "Ya llamado; disponible para rellamada manual") + '</small>' : ""}</td>
       <td class="actions-cell contact-direct-cell">${dashboardActions.contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }

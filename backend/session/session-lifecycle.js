@@ -75,7 +75,8 @@ function disconnectAllSessionPhones(session, reason = "turn_finished") {
 
 function hasPersistentCampaignData(session) {
   const campaign = ensureCampaign(session);
-  return Boolean(session.ownerUserId || session.contactBook || session.hasCallHistory) || campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
+  return Boolean(session.ownerUserId || session.contactBook || session.hasCallHistory || session.blockedNumbers?.length)
+    || campaign.contacts.length > 0 || campaign.history.length > 0 || campaign.callbacks.length > 0;
 }
 
 function detachSocketFromCurrentSession(socket) {

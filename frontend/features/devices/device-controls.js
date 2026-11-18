@@ -3,7 +3,7 @@ import * as Contacts from '../contacts/contacts-repository.js';
 
 /**
  * createDeviceControls: conserva los contratos y reglas existentes.
- * Dependencias: dashboardActions.escHtml, dashboardActions.formatSeconds, dashboardActions.loadPairingData, dashboardActions.normalizeValidPeruPhone, dashboardActions.postCampaignAction, dashboardActions.requestConfirmation, dashboardState.PAIRING_LIST_ASSIGNMENTS_PREFIX, dashboardState.campaignState, dashboardState.latestSessionState, dashboardState.pairingSlotsSnapshot, dashboardState.sessionCode.
+ * Dependencias: dashboardActions.contactAnnualBlock, dashboardActions.escHtml, dashboardActions.formatSeconds, dashboardActions.loadPairingData, dashboardActions.normalizeValidPeruPhone, dashboardActions.postCampaignAction, dashboardActions.requestConfirmation, dashboardState.PAIRING_LIST_ASSIGNMENTS_PREFIX, dashboardState.campaignState, dashboardState.latestSessionState, dashboardState.pairingSlotsSnapshot, dashboardState.sessionCode.
  * Se construye una vez por dashboard.
  */
 export function createDeviceControls(dashboardState, dashboardActions) {
@@ -252,8 +252,23 @@ async function callContactFromAssignedList(contactId, listName) {
     return;
   }
   const contact = Contacts.contacts.find((item) => item.id === contactId);
+  if (!contact) return;
+  const restriction = dashboardActions.contactAnnualBlock(contact);
+  const manualRetry = Boolean(restriction && restriction !== "blocked" && restriction !== "permanent");
+  if (restriction === "blocked" || restriction === "permanent") {
+    setStatus(restriction === "blocked"
+      ? "Este número está bloqueado para todas las cuentas. Quítalo del panel global para llamar."
+      : "Este número está marcado como inválido y no se puede volver a llamar.", true);
+    return;
+  }
+  if (manualRetry && !await dashboardActions.requestConfirmation({
+    title: "Rellamada manual",
+    message: "Este número ya fue llamado. ¿Quieres volver a intentarlo manualmente? Las campañas automáticas seguirán excluyéndolo.",
+    confirmLabel: "Reintentar manualmente"
+  })) return;
   const data = await dashboardActions.postCampaignAction(`/workers/${encodeURIComponent(slot.deviceId)}/call-contact`, {
     contactId,
+    manualRetry,
     contact: contact ? {
       id: contact.id,
       name: contact.name,
