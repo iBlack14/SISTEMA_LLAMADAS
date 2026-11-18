@@ -177,6 +177,8 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
       if (worker) {
         worker.socketId = null;
         worker.connected = false;
+        // Track disconnect time to detect prolonged absence on reconnect
+        session.lastPhoneDisconnectAt = Date.now();
         if (socket.data.explicitLogout) {
           removePhoneWorker(session, socket.id);
         } else if (worker.callState && ["dialing", "ringing", "in_call"].includes(worker.callState)) {

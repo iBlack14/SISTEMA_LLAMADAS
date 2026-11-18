@@ -187,6 +187,19 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     if (role === "phone") {
         const campaign = ensureCampaign(session);
         if (campaign.status === "running") {
+            // Check if phone was disconnected for a prolonged period (> 5 min)
+            // If so, finalize the previous turn and start a new one for proper reporting
+            const lastPhoneDisconnect = session.lastPhoneDisconnectAt || 0;
+            const disconnectDuration = Date.now() - lastPhoneDisconnect;
+            if (disconnectDuration > 5 * 60 * 1000) { // 5 minutes threshold
+                // Finalize current turn (saves metrics, moves to history)
+                finalizeCurrentTurn(session, campaign);
+                // Force new turn creation by clearing lastFinalizedWindowKey
+                if (session.shiftManagement) {
+                    session.shiftManagement.lastFinalizedWindowKey = "";
+                }
+                session.lastPhoneDisconnectAt = null;
+            }
             setTimeout(() => dispatchCampaignCalls(normalizedCode), 1000);
         }
     }
