@@ -183,5 +183,19 @@ function renderDayNavigation() {
       </button>
     `);
   }
-return { renderDay, clearDayNavigation, renderDayNavigation };
+async function setReportScope(scope) {
+  reportState.reportScope = scope === "all" ? "all" : "mine";
+  reportState.selectedReport = "";
+  reportState.showingDetailedReport = false;
+  reportState.detailedPendingOnly = false;
+  reportState.visibleRubrosStart = 0;
+  try {
+    if (reportState.selectedDate) await reportActions.showDay(reportState.selectedDate);
+    else await reportActions.showCalendar();
+  } catch (error) {
+    reportActions.showError(error);
+  }
+}
+
+return { renderDay, clearDayNavigation, renderDayNavigation, setReportScope };
 }

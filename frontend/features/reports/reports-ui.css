@@ -338,6 +338,182 @@
   background: rgba(255, 91, 200, .1);
 }
 
+/* ── Reporte diario: misma familia morada, sin el panel blanco ───────── */
+body .panel #annualReport .report-day-toolbar,
+body .panel #annualReport .report-day-toolbar *,
+body .panel #annualReport .report-content-panel,
+body .panel #annualReport .report-content-panel * {
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-day-toolbar,
+body .panel #annualReport .report-search-input,
+body .panel #annualReport .report-rubros button,
+body .panel #annualReport .report-content-panel,
+body .panel #annualReport .report-detail-heading,
+body .panel #annualReport .report-table-wrap,
+body .panel #annualReport .report-detail-card {
+  background: var(--r-card) !important;
+}
+
+body .panel #annualReport .report-day-toolbar {
+  display: grid;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--r-line);
+  border-radius: 18px 18px 0 0;
+}
+
+body .panel #annualReport .report-content-panel {
+  padding: 22px;
+  border: 1px solid var(--r-line);
+  border-top: 0;
+  border-radius: 0 0 18px 18px;
+}
+
+body .panel #annualReport .report-day-toolbar .report-day-title h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+body .panel #annualReport .report-day-toolbar .report-day-title p {
+  margin: 4px 0 0;
+  color: var(--r-muted) !important;
+  font-size: 13px;
+}
+
+body .panel #annualReport .report-scope-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--r-muted) !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body .panel #annualReport .report-scope-select select {
+  min-height: 38px;
+  min-width: 190px;
+  padding: 6px 12px;
+  border: 1px solid var(--r-line) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-search-input input {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--r-line) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .05) !important;
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-search-input input::placeholder {
+  color: #c9add8 !important;
+}
+
+body .panel #annualReport .report-rubros button,
+body .panel #annualReport .report-rubros button * {
+  border: 1px solid var(--r-line) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-rubros button {
+  display: grid;
+  gap: 4px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 10px !important;
+  text-align: left;
+}
+
+body .panel #annualReport .report-rubros button.chosen,
+body .panel #annualReport .report-rubros button.chosen * {
+  border-color: var(--r-accent) !important;
+  background: rgba(255, 91, 200, .2) !important;
+  color: #ffd6f2 !important;
+}
+
+body .panel #annualReport .report-rubros .report-rubro-owner {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .85;
+}
+
+body .panel #annualReport .report-summary {
+  margin-bottom: 18px;
+}
+
+body .panel #annualReport .report-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+body .panel #annualReport .report-metric {
+  padding: 12px 14px;
+  border: 1px solid var(--r-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .04);
+}
+
+body .panel #annualReport .report-metric-label {
+  display: block;
+  color: var(--r-muted) !important;
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+
+body .panel #annualReport .report-metric-value,
+body .panel #annualReport .report-table-wrap tbody td {
+  color: var(--r-text) !important;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+body .panel #annualReport .report-table-wrap tbody td {
+  font-weight: 400;
+  font-size: 12px;
+}
+
+body .panel #annualReport .report-table-wrap th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #43125f !important;
+  color: #f3d7ff !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+body .panel #annualReport .report-table-wrap tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, .035) !important;
+}
+
+body .panel #annualReport .report-table-wrap tbody tr:hover td {
+  background: rgba(255, 91, 200, .1) !important;
+}
+
+body .panel #annualReport .report-result.is-answered { color: #7bf0b6 !important; }
+body .panel #annualReport .report-result.is-pending { color: #ffd27a !important; }
+body .panel #annualReport .report-result.is-inoperable { color: #ff9db1 !important; }
+
+body .panel #annualReport .report-date-navigation button,
+body .panel #annualReport .report-tools button {
+  border: 1px solid var(--r-line) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: var(--r-text) !important;
+}
+
 /* Responsive */
 @media (max-width: 1100px) {
   #annualReport .months-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }

@@ -72,6 +72,7 @@ function renderDetails() {
     };
     const metrics = [
       ["RUBRO", report.rubro],
+      ...(report.owner ? [["USUARIO", report.owner]] : []),
       ["FECHA", formatReportDate(report.date)],
       ["EQUIPOS USADOS", equipmentCount || "—"],
       ["NÚMEROS USADOS", report.numbers],
