@@ -113,7 +113,16 @@ async function loadUsers() {
     users = data.users;
     const select = $("adminListsUser");
     select.replaceChildren(new Option("Selecciona un usuario", ""));
-    for (const user of users) select.add(new Option(`${user.username} · ${user.role === "ADMINISTRADOR" ? "Administrador" : "Ventas"}`, String(user.id)));
+    const myId = currentUser?.id || window.VOIP_VC_AUTH_USER?.id;
+    for (const user of users) {
+      const isMe = myId && String(user.id) === String(myId);
+      select.add(new Option(`${user.username}${isMe ? " (YO)" : ""} · ${user.role === "ADMINISTRADOR" ? "Administrador" : "Ventas"}`, String(user.id)));
+    }
+    // Auto-select current user
+    if (myId && users.some(u => String(u.id) === String(myId))) {
+      select.value = String(myId);
+      onUserChange();
+    }
     status.textContent = users.length ? "Selecciona un usuario para ver sus listas." : "No hay usuarios registrados.";
   } catch (error) {
     status.textContent = error.message || "No se pudieron cargar los usuarios.";
@@ -124,15 +133,22 @@ function onUserChange() {
   contactRequest++;
   const user = users.find(item => String(item.id) === $("adminListsUser").value);
   const select = $("adminListsName");
-  select.replaceChildren(new Option(user?.lists.length ? "Selecciona una lista" : "Este usuario no tiene listas", ""));
-  for (const list of user?.lists || []) select.add(new Option(`${list.name} (${list.count})`, list.name));
-  select.disabled = !user?.lists.length;
+  if (!user?.lists?.length) {
+    // Auto-create "Principal" list via backend on first import
+    select.replaceChildren(new Option("Principal (nueva)", "Principal"));
+    select.disabled = false;
+    $("adminListsStatus").textContent = "Sin listas. Se creará 'Principal' al importar.";
+  } else {
+    select.replaceChildren(new Option("Selecciona una lista", ""));
+    for (const list of user.lists) select.add(new Option(`${list.name} (${list.count})`, list.name));
+    select.disabled = false;
+    $("adminListsStatus").textContent = "Selecciona una lista.";
+  }
   $("adminListsContacts").replaceChildren();
   $("adminListsPage").textContent = "";
   $("adminListsPrev").disabled = true;
   $("adminListsNext").disabled = true;
   pageOffset = 0;
-  $("adminListsStatus").textContent = user?.lists.length ? "Selecciona una lista." : "No hay listas para esta cuenta.";
 }
 
 async function loadContacts() {
@@ -207,13 +223,24 @@ function showImportPreview() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(content, "text/html");
         contacts = extractContactsFromHtmlTable(doc);
+      } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+        // Load SheetJS dynamically
+        if (!window.XLSX) {
+          status.textContent = "Cargando lector Excel…";
+          await loadSheetJS();
+        }
+        const workbook = window.XLSX.read(content, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        contacts = extractContactsFromRows(json);
       } else {
         const text = new TextDecoder("utf-8").decode(content);
         contacts = parseDelimitedText(text);
       }
       console.log("[IMPORT] Parsed contacts:", contacts.length);
       if (!contacts.length) {
-        status.textContent = "No se detectaron contactos válidos. Verifica que el CSV/HTML tenga columnas nombre y teléfono.";
+        status.textContent = "No se detectaron contactos válidos. Verifica que el archivo tenga columnas nombre y teléfono.";
         return;
       }
       importPreviewData = contacts.map(c => ({ ...c, list }));
@@ -230,6 +257,17 @@ function showImportPreview() {
     status.textContent = "Error leyendo el archivo.";
   };
   reader.readAsArrayBuffer(file);
+}
+
+function loadSheetJS() {
+  return new Promise((resolve, reject) => {
+    if (window.XLSX) return resolve();
+    const script = document.createElement("script");
+    script.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    script.onload = () => { console.log("[IMPORT] SheetJS loaded"); resolve(); };
+    script.onerror = () => reject(new Error("No se pudo cargar librería Excel"));
+    document.head.appendChild(script);
+  });
 }
 
 function renderImportPreview() {
