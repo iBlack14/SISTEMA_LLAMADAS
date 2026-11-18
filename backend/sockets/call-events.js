@@ -197,6 +197,8 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     session.micMuted = Boolean(micMuted);
     session.isSpeakerOn = Boolean(speakerOn);
     session.updatedAt = Date.now();
+    // Mark session as dirty for targeted persistence
+    runtime.persistence.markSessionDirty(code);
     let updatedContact = null;
     if (isExternalIncoming && worker) {
       if (["ringing", "dialing", "in_call"].includes(String(callState || ""))) {

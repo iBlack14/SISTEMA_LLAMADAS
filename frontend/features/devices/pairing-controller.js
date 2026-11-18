@@ -112,6 +112,41 @@ function renderPairingSlotsUi(slots) {
 
 const pairingLoads = new Map();
 
+function updatePairingSlotsFromState(slots) {
+  if (!Array.isArray(slots)) return;
+  dashboardState.pairingSlotsSnapshot = slots;
+
+  // Limpiar URLs cacheadas de slots eliminados
+  const activeSlotIds = new Set(slots.map(pairingQrCacheKey));
+  for (const [cachedSlotId, url] of dashboardState.pairQrCache.entries()) {
+    if (!activeSlotIds.has(cachedSlotId)) {
+      URL.revokeObjectURL(url);
+      dashboardState.pairQrCache.delete(cachedSlotId);
+    }
+  }
+
+  // Solo consultar QR para slots NO vinculados y que NO estén cacheados
+  const unassignedToFetch = slots.filter((slot) => !slot.deviceId && !dashboardState.pairQrCache.has(pairingQrCacheKey(slot)));
+  if (unassignedToFetch.length > 0) {
+    Promise.all(unassignedToFetch.map(async (slot) => {
+      try {
+        const qrResponse = await fetch(`${API_BASE}/api/pairing-qr/${dashboardState.sessionCode}.svg?slot=${encodeURIComponent(slot.id)}&v=${encodeURIComponent(slot.token || slot.id)}`, {
+          headers: { "X-Dashboard-Token": dashboardState.dashboardToken }
+        });
+        if (qrResponse.ok) {
+          const url = URL.createObjectURL(await qrResponse.blob());
+          dashboardState.pairQrCache.set(pairingQrCacheKey(slot), url);
+          dashboardState.pairQrObjectUrls.push(url);
+        }
+      } catch {
+        // Ignorar fallas temporales
+      }
+    }));
+  }
+
+  renderPairingSlotsUi(slots);
+}
+
 function renderPairingSlotsOnly() {
   if (Array.isArray(dashboardState.pairingSlotsSnapshot) && dashboardState.pairingSlotsSnapshot.length) {
     renderPairingSlotsUi(dashboardState.pairingSlotsSnapshot);
@@ -204,5 +239,5 @@ async function deletePairingQr(slotId) {
     setStatus(error.message || "No se pudo eliminar el QR.", true);
   }
 }
-return { loadPairingData, createPairingQr, deletePairingQr, renderPairingSlotsOnly };
+return { loadPairingData, createPairingQr, deletePairingQr, renderPairingSlotsOnly, updatePairingSlotsFromState };
 }

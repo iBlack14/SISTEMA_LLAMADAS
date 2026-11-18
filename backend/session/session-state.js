@@ -44,7 +44,8 @@ function saveSoon() {
   saveSoonPromise = new Promise((resolve) => {
     saveSoonTimer = setTimeout(() => {
       saveSoonTimer = null;
-      runtime.persistence.save(runtime.sessions)
+      const dirtyCodes = runtime.persistence.getDirtySessions();
+      runtime.persistence.save(runtime.sessions, dirtyCodes.size ? [...dirtyCodes] : null)
         .then(resolve)
         .catch(error => {
           console.error("[PERSISTENCE] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
@@ -116,6 +117,7 @@ function emitState(code) {
     },
     phoneDevice: session.phoneDevice,
     phoneWorkers,
+    pairingSlots: session.pairingSlots || [],
     blockedNumbers: services.globalBlockedNumbers(),
     callState: session.callState,
     lastNumber: session.lastNumber,

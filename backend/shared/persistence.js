@@ -13,8 +13,15 @@ export class SessionPersistence {
     this.filePath = path.resolve(filePath);
     this.historyPath = this.filePath + ".call-history.json";
     this.backupDir = path.resolve(env.CALL_BACKUP_DIR || path.join(path.dirname(this.filePath), "backups"));
-    this.env = env;
+this.env = env;
     this.poolFactory = poolFactory;
+    this.poolConfig = {
+      host: env.DB_HOST, port: Number(env.DB_PORT || 3306),
+      user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME,
+      waitForConnections: true, connectionLimit: Number(env.DB_POOL_LIMIT || 50), queueLimit: 0,
+      connectTimeout: 10000, timezone: "Z",
+      ...(env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: true } } : {})
+    };
     this.databaseConfigured = Boolean(env.DB_HOST && env.DB_USER && env.DB_NAME);
     this.pool = null;
     this.usingDb = false;
@@ -76,13 +83,7 @@ export class SessionPersistence {
   async initDb() {
     if (!this.databaseConfigured) return false;
     try {
-      if (!this.pool) this.pool = this.poolFactory({
-        host: this.env.DB_HOST, port: Number(this.env.DB_PORT || 3306),
-        user: this.env.DB_USER, password: this.env.DB_PASSWORD, database: this.env.DB_NAME,
-        waitForConnections: true, connectionLimit: 10, queueLimit: 0,
-        connectTimeout: 10000, timezone: "Z",
-        ...(this.env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: true } } : {})
-      });
+      if (!this.pool) this.pool = this.poolFactory(this.poolConfig);
       await this.pool.query("SELECT 1");
       if (!this.schemaReady) {
         await this.pool.query(`CREATE TABLE IF NOT EXISTS sessions (
@@ -186,15 +187,17 @@ export class SessionPersistence {
     };
   }
 
-  save(sessionsMap) {
+  save(sessionsMap, changedCodes = null) {
     // Capture immediately, before another reset/delete can mutate the live Map.
     const snapshot = {};
+    const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
+      if (codesToSave && !codesToSave.has(code)) continue;
       if (collectCallAttempts(session).length) session.hasCallHistory = true;
       const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...data } = session;
       snapshot[code] = JSON.parse(JSON.stringify(data));
     }
-    const operation = this.saveChain.then(() => this.saveNow(snapshot)).then(result => {
+    const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes)).then(result => {
       this.storageFailed = false;
       this.lastError = "";
       return result;
@@ -208,7 +211,19 @@ export class SessionPersistence {
     return operation;
   }
 
-  async saveNow(snapshot) {
+  markSessionDirty(code) {
+    // Track which sessions have pending changes for targeted saves
+    this.dirtySessions = this.dirtySessions || new Set();
+    this.dirtySessions.add(code);
+  }
+
+  getDirtySessions() {
+    const dirty = this.dirtySessions || new Set();
+    this.dirtySessions = new Set();
+    return dirty;
+  }
+
+  async saveNow(snapshot, changedCodes = null) {
     for (const [code, session] of Object.entries(snapshot)) {
       for (const row of collectCallAttempts(session)) this.remember(code, row);
     }
@@ -229,9 +244,14 @@ export class SessionPersistence {
     const changed = [...this.dirty];
     try {
       await connection.beginTransaction();
-      for (const [code, data] of Object.entries(snapshot)) await connection.query(
-        "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
-        [code, JSON.stringify(data)]);
+      // Only update sessions that actually changed
+      const codesToUpdate = changedCodes ? new Set(changedCodes) : new Set(Object.keys(snapshot));
+      for (const [code, data] of Object.entries(snapshot)) {
+        if (!codesToUpdate.has(code)) continue;
+        await connection.query(
+          "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
+          [code, JSON.stringify(data)]);
+      }
       const bySession = new Map();
       for (const key of changed) {
         const entry = this.records.get(key);

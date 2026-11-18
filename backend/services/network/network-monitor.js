@@ -276,12 +276,13 @@ export class NetworkMonitor {
   }
 
   start() {
+    const intervalMs = Number(process.env.NETWORK_MONITOR_INTERVAL_MS || 30000);
     this.timer = setInterval(() => {
       if (this.publishing) return;
       this.publishing = true;
       this.snapshot().then(data => this.broadcast(data)).catch(() => this.broadcast({ unavailable: true }))
         .finally(() => { this.publishing = false; });
-    }, 2000);
+    }, intervalMs);
     this.timer.unref();
   }
 }
