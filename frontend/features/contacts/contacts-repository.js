@@ -50,11 +50,13 @@ function apply(book) {
   preferences = book.preferences || {};
 }
 
+let persistTimer = null;
+
 function persist() {
-  if (!ready || !transport || scheduled) return;
-  scheduled = true;
-  queueMicrotask(() => {
-    scheduled = false;
+  if (!ready || !transport) return;
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
     const book = snapshot();
     const key = connectionKey;
     const request = transport;
@@ -101,7 +103,11 @@ function persist() {
         window.dispatchEvent(new CustomEvent("contact-book:error",{detail:error.message}));
       }
     });
-  });
+  }, 600);
+}
+
+export function getRevision() {
+  return revision;
 }
 
 export function connectDatabase(key, request) {

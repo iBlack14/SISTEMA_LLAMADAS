@@ -316,7 +316,6 @@ async function markContactDisposition(contactId, result) {
 
 function syncCampaignResultsToContacts() {
   const campaignContacts = Array.isArray(dashboardState.campaignState?.contacts) ? dashboardState.campaignState.contacts : [];
-  let changed = false;
   for (const result of campaignContacts) {
     const local = Contacts.contacts.find((contact) => contact.id === result.id);
     if (!local) continue;
@@ -327,9 +326,9 @@ function syncCampaignResultsToContacts() {
     local.lastAttemptAt = result.lastAttemptAt || null;
     local.callDurationSeconds = Number(result.durationSeconds || 0);
     local.lastWorkerName = result.assignedWorkerName || local.lastWorkerName || "";
-    changed = true;
   }
-  if (changed) Contacts.saveContacts();
+  // Los resultados y estados de campaña ya son persistidos en el servidor y MySQL (call_attempts).
+  // No reenviar los 850 KB del libro completo en cada tick de llamada para no saturar la red ni MySQL.
 }
 return { getCampaignContactMap, getActiveCampaignContact, campaignCounter, renderCampaignPanel, fetchCampaignState, postCampaignAction, stopCampaignRun, saveVoiceAgentConfig, startCampaignRunLegacy, startCampaignRun, pauseCampaignRun, resumeCampaignRun, skipCampaignContact, markCampaignResult, markContactDisposition, syncCampaignResultsToContacts };
 }

@@ -15,7 +15,6 @@ let previousContactSignature = "";
 let previousShiftSignature = "";
 window.addEventListener("contact-book:loaded", () => {
   WhatsApp.loadWhatsAppPresetMessages();
-  WhatsApp.saveWhatsAppPresetMessages();
   dashboardActions.renderTabs(); dashboardActions.renderContacts(); dashboardActions.renderCampaignPanel();
 });
 
@@ -36,7 +35,10 @@ window.dismissReminder = (id) => {
 
 socket.on("quote:open_modal", data => openQuoteModal(data));
 
-socket.on("contact-book:changed", async () => {
+socket.on("contact-book:changed", async (payload) => {
+  if (payload?.revision && typeof Contacts.getRevision === "function" && payload.revision <= Contacts.getRevision()) {
+    return;
+  }
   if (Contacts && typeof Contacts.refreshDatabase === "function") {
     await Contacts.refreshDatabase().catch(() => {});
   }

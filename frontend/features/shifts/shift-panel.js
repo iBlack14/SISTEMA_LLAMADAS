@@ -27,15 +27,12 @@ function loadTurnPendingContacts() {
 }
 
 function saveTurnPendingContacts(contacts) {
-  if (!dashboardState.sessionCode) return;
-  Contacts.setPreference("turnPending", contacts);
+  // El servidor y MySQL gestionan la lista de pendientes de turno en session.shiftManagement.
+  // Evitamos reenviar el libro de contactos completo a MySQL en cada actualización de llamada.
 }
 
 function syncTurnPendingContacts() {
-  if (!dashboardState.sessionCode) return;
-  const serverPending = dashboardState.campaignState?.turn?.pendingContacts
-    ?? dashboardState.latestSessionState?.shiftManagement?.pendingContacts;
-  if (Array.isArray(serverPending)) saveTurnPendingContacts(serverPending);
+  // Los pendientes de turno ya se transmiten y sincronizan por WebSocket desde el backend.
 }
 
 function renderTurnPendingContacts() {
