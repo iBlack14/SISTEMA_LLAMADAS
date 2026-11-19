@@ -1,14 +1,18 @@
 import { requireLogin, bindAccountControls, apiFetch } from "../../auth/auth-session.js";
+import { equipmentStatus, displayState } from "./equipment-status.js";
 
 let snapshot;
 let socket;
 let lastReceived = 0;
+let receivedAt = 0;
+let reconnectingAll = false;
 // El monitor publica cada 30 s (NETWORK_MONITOR_INTERVAL_MS). Un umbral de 6 s
 // marcaba "Sin conexión" entre publicaciones aunque el socket estuviera sano.
 const STALE_MS = 45000;
 const cards = new Map();
 const orbs = new Map();
 const histories = new Map();
+const reconnectingEquipment = new Set();
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const date = value => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "medium" }).format(new Date(value)) : "Sin datos";
@@ -17,7 +21,7 @@ const value = n => typeof n === "number" ? n.toLocaleString("es-PE") : "—";
 const resultLabels = { contesto: "Contestó", sin_respuesta: "Sin respuesta", no_contesto: "No contestó", no_contactado: "No contactado", buzon_de_voz: "Buzón de voz", sin_servicio: "Sin servicio", no_disponible: "No disponible", numero_incorrecto: "Número incorrecto", numero_inexistente: "No volver a llamar" };
 
 
-const tones = { "En llamada": "active", "Marcando": "dialing", "Disponible": "ready", "Desconectado": "offline", "Sin datos": "unknown" };
+const tones = { "En llamada": "active", "Marcando": "dialing", "Disponible": "ready", "Desconectado": "offline", "Sin equipo": "unknown", "Sin señal de estado": "unknown" };
 const duration = n => typeof n === "number" && Number.isFinite(n) ? Math.floor(n / 60) + ":" + String(Math.floor(n % 60)).padStart(2, "0") : "—";
 
 function formatElapsed(seconds) {
@@ -52,14 +56,6 @@ function getItemElapsedSeconds(item, state) {
   return null;
 }
 
-function getTimeText(item, state) {
-  const secs = getItemElapsedSeconds(item, state);
-  return typeof secs === "number" ? formatElapsed(secs) : "";
-}
-
-function displayState(item, live) {
-  return live && tones[item.state] ? item.state : "Sin datos";
-}
 function selectFilter(state) {
   filterState = state;
   document.querySelectorAll("#stateFilters .filter-pill").forEach(button => {
@@ -72,7 +68,7 @@ function createOrb(number) {
   const el = document.createElement("button");
   el.type = "button";
   el.className = "indicator";
-  el.innerHTML = '<span class="indicator-dot"><span class="orb-num"></span></span><span class="orb-sub"></span><span class="orb-time"></span>';
+  el.innerHTML = '<span class="indicator-dot" aria-hidden="true"></span><span class="orb-num"></span><span class="orb-sub"></span><span class="orb-time-caption"></span><span class="orb-time"></span><span class="orb-connection"><span></span></span>';
   el.addEventListener("click", () => {
     const card = cards.get(number);
     if (!card) return;
@@ -83,21 +79,47 @@ function createOrb(number) {
     card.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center"});
     card.focus({preventScroll: true});
   });
-  $("equipmentIndicators").appendChild(el);
+  const position = document.createElement("div");
+  position.className = "equipment-position";
+  position.dataset.equipment = number;
+  const reconnect = document.createElement("button");
+  reconnect.type = "button";
+  reconnect.className = "button secondary equipment-reconnect-btn";
+  reconnect.textContent = "Reconectar";
+  reconnect.disabled = true;
+  const message = document.createElement("span");
+  message.className = "equipment-reconnect-msg";
+  message.hidden = true;
+  message.setAttribute("role", "status");
+  reconnect.addEventListener("click", () => reconnectSingleEquipment(number, reconnect, message));
+  position.append(el, reconnect, message);
+  $("equipmentIndicators").appendChild(position);
   orbs.set(number, el);
   return el;
 }
-function renderOrb(el, number, state, name, item) {
+function renderOrb(el, number, state, name, item, live) {
   el.dataset.tone = tones[state];
-  const timeText = getTimeText(item, state);
-  el.setAttribute("aria-label", `Equipo ${number}, ${name || ""}, ${state}${timeText ? `. ${timeText}` : ""}. Ver detalle.`);
+  const serverNow = Date.parse(snapshot.generatedAt) + Math.max(0, performance.now() - receivedAt);
+  const status = equipmentStatus(item, live, serverNow);
+  const timeText = status.seconds === null ? "—" : formatElapsed(status.seconds);
+  el.setAttribute("aria-label", `Equipo ${number}, ${name || ""}, ${status.label}. ${status.caption}: ${timeText}. ${status.connectionLabel}. Ver detalle.`);
   el.querySelector(".orb-num").textContent = String(number).padStart(2, "0");
-  el.querySelector(".orb-sub").textContent = state;
+  el.querySelector(".orb-sub").textContent = status.label;
+  el.querySelector(".orb-time-caption").textContent = status.caption;
+  const connection = el.querySelector(".orb-connection");
+  connection.dataset.connection = status.connection;
+  connection.querySelector("span").textContent = status.connectionLabel;
   const timeEl = el.querySelector(".orb-time");
   if (timeEl) {
     timeEl.textContent = timeText;
-    timeEl.title = timeText ? (["Disponible", "En llamada", "Marcando"].includes(state) ? `Conectado hace ${timeText}` : `Desconectado hace ${timeText}`) : "";
+    timeEl.title = status.seconds === null ? "Inicio del estado no disponible" : `${status.caption}: ${timeText}`;
   }
+  const reconnect = el.parentElement.querySelector(".equipment-reconnect-btn");
+  reconnect.disabled = reconnectingEquipment.has(number) || !live || !item.deviceId || item.calling || ["En llamada", "Marcando"].includes(state);
+  reconnect.setAttribute("aria-label", `Reconectar equipo ${String(number).padStart(2, "0")}`);
+  reconnect.title = !item.deviceId ? "Sin dispositivo vinculado" : !live ? "Sin conexion con el servidor"
+    : item.calling || ["En llamada", "Marcando"].includes(state) ? "No disponible durante una llamada"
+    : "Solicitar reconexion de este equipo";
 }
 function statCell(label, n) {
   return `<div><span>${label}</span><strong>${value(n)}</strong></div>`;
@@ -125,11 +147,7 @@ function createCard(number) {
       <table><thead><tr><th scope="col">Contacto</th><th scope="col">Hora de Lima</th><th scope="col">Duración</th><th scope="col">Resultado</th></tr></thead><tbody class="card-rows"></tbody></table>
     </div>
   </details>
-  <div class="card-actions" hidden>
-    <button class="button secondary card-reconnect-btn" type="button">🔄 Reconectar</button>
-    <span class="card-reconnect-msg" hidden></span>
-  </div>
-  <p class="card-scope"></p><p class="card-test" hidden>Equipo de prueba simulada</p>`;
+  <p class="card-scope"></p>`;
   $("equipmentGrid").appendChild(card);
   cards.set(number, card);
   return card;
@@ -185,19 +203,6 @@ function renderCard(card, item, state, live) {
     }
   }
   card.querySelector(".card-scope").textContent = item.scopeReason || (item.turn ? item.turn.label : "Sin turno activo");
-  card.querySelector(".card-test").hidden = !item.simulated;
-
-  const actionsBox = card.querySelector(".card-actions");
-  const reconnectBtn = card.querySelector(".card-reconnect-btn");
-  const reconnectMsg = card.querySelector(".card-reconnect-msg");
-  if (actionsBox && reconnectBtn) {
-    const isDisconnected = state === "Desconectado" || (!["Disponible", "En llamada", "Marcando"].includes(state) && Boolean(item.deviceId));
-    actionsBox.hidden = !isDisconnected;
-    if (!reconnectBtn.dataset.bound) {
-      reconnectBtn.dataset.bound = "true";
-      reconnectBtn.addEventListener("click", () => reconnectSingleEquipment(item.number, reconnectBtn, reconnectMsg));
-    }
-  }
 
   renderCardHistory(card, item);
 }
@@ -264,16 +269,16 @@ function render() {
   $("updatedAt").textContent = `Actualizado ${stamp(snapshot.generatedAt)}`;
   $("nodeCount").textContent = `${snapshot.equipment.length} posiciones`;
   $("downloadLog").disabled = false;
-  const counts = {"En llamada": 0, "Marcando": 0, "Disponible": 0, "Desconectado": 0, "Sin datos": 0};
+  const counts = {"En llamada": 0, "Marcando": 0, "Disponible": 0, "Desconectado": 0, "Sin equipo": 0, "Sin señal de estado": 0};
   const disconnected = [];
   for (const item of snapshot.equipment) {
     const state = displayState(item, live);
     counts[state]++;
     if (state === "Desconectado") disconnected.push(item);
-    renderOrb(orbs.get(item.number) || createOrb(item.number), item.number, state, item.name, item);
+    renderOrb(orbs.get(item.number) || createOrb(item.number), item.number, state, item.name, item, live);
     renderCard(cards.get(item.number) || createCard(item.number), item, state, live);
   }
-  for (const [id, state] of [["legendActive","En llamada"],["legendDialing","Marcando"],["legendReady","Disponible"],["legendOffline","Desconectado"],["legendNone","Sin datos"]]) $(id).textContent = counts[state];
+  for (const [id, state] of [["legendActive","En llamada"],["legendDialing","Marcando"],["legendReady","Disponible"],["legendOffline","Desconectado"],["legendNone","Sin equipo"],["legendUnknown","Sin señal de estado"]]) $(id).textContent = counts[state];
   const m = live ? snapshot.summary?.metrics : null;
   $("turnUnavailable").hidden = Boolean(m);
   $("turnUnavailable").textContent = live ? "No hay datos de turno para consolidar el resumen." : "El resumen no está disponible hasta recuperar la conexión.";
@@ -283,10 +288,10 @@ function render() {
   $("kpiProgress").textContent = value(m?.inProgress);
   $("kpiAnsweredPct").textContent = m && m.total > 0 && typeof m.answered === "number" ? `${Math.round(m.answered / m.total * 100)}% de contacto` : "";
   const hasDisconnected = live && Boolean(disconnected.length);
-  $("alertBanner").hidden = !hasDisconnected;
-  $("alertTitle").textContent = `${disconnected.length} equipo(s) desconectado(s)`;
-  $("alertText").textContent = disconnected.map(item => `Equipo ${item.number}`).join(", ");
-  if ($("reconnectAllAlertBtn")) $("reconnectAllAlertBtn").hidden = !hasDisconnected;
+  const reconnectAll = $("reconnectAllAlertBtn");
+  reconnectAll.disabled = reconnectingAll || !hasDisconnected;
+  reconnectAll.title = !live ? "Sin conexion con el servidor" : hasDisconnected
+    ? `Reconectar ${disconnected.length} equipo(s) desconectado(s)` : "No hay equipos desconectados";
   $("overflowNotice").hidden = !snapshot.overflow;
   $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) fuera de las 10 posiciones.` : "";
   updateFilterCounts();
@@ -304,19 +309,20 @@ $("equipmentGrid").addEventListener("toggle", event => {
 async function reconnectSingleEquipment(number, btn, msgEl) {
   if (btn.disabled) return;
   const originalHtml = btn.innerHTML;
+  reconnectingEquipment.add(number);
   btn.disabled = true;
   btn.textContent = "Reconectando…";
   if (msgEl) {
     msgEl.hidden = true;
     msgEl.textContent = "";
-    msgEl.className = "card-reconnect-msg";
+    msgEl.className = "equipment-reconnect-msg";
   }
   try {
     const res = await apiFetch(`/api/network/equipment/${number}/reconnect`, { method: "POST" });
     if (!res.ok) throw new Error("No se pudo enviar orden");
     if (msgEl) {
       msgEl.textContent = "✓ Señal enviada";
-      msgEl.className = "card-reconnect-msg";
+      msgEl.className = "equipment-reconnect-msg";
       msgEl.hidden = false;
       setTimeout(() => { if (msgEl) msgEl.hidden = true; }, 4000);
     }
@@ -324,21 +330,20 @@ async function reconnectSingleEquipment(number, btn, msgEl) {
     if (r.ok) {
       const snap = await r.json();
       if (snap && Array.isArray(snap.equipment)) {
-        snapshot = snap;
-        lastReceived = Date.now();
-        render();
+        accept(snap);
       }
     }
   } catch (err) {
     if (msgEl) {
       msgEl.textContent = "⚠️ Error al reconectar";
-      msgEl.className = "card-reconnect-msg error";
+      msgEl.className = "equipment-reconnect-msg error";
       msgEl.hidden = false;
       setTimeout(() => { if (msgEl) msgEl.hidden = true; }, 4000);
     }
   } finally {
-    btn.disabled = false;
+    reconnectingEquipment.delete(number);
     btn.innerHTML = originalHtml;
+    render();
   }
 }
 
@@ -349,6 +354,9 @@ async function reconnectAllDisconnected() {
   if (!disconnected.length) return;
 
   const alertBtn = $("reconnectAllAlertBtn");
+  if (reconnectingAll) return;
+  reconnectingAll = true;
+  $("reconnectFeedback").textContent = "";
   const btns = [alertBtn].filter(Boolean);
   btns.forEach(b => { b.disabled = true; b.textContent = "Reconectando…"; });
 
@@ -361,23 +369,13 @@ async function reconnectAllDisconnected() {
     });
     if (!res.ok) throw new Error("Error en la reconexión");
 
-    if ($("alertText")) {
-      const originalText = disconnected.map(item => `Equipo ${item.number}`).join(", ");
-      $("alertText").textContent = `✓ Solicitud de reconexión enviada a ${numbers.length} equipo(s). Esperando enlace...`;
-      setTimeout(() => {
-        if ($("alertText") && $("alertText").textContent.startsWith("✓")) {
-          $("alertText").textContent = originalText;
-        }
-      }, 5000);
-    }
+    $("reconnectFeedback").textContent = `Solicitud enviada a ${numbers.length} equipo(s). Esperando conexion...`;
 
     const r = await apiFetch("/api/network", { cache: "no-store" });
     if (r.ok) {
       const snap = await r.json();
       if (snap && Array.isArray(snap.equipment)) {
-        snapshot = snap;
-        lastReceived = Date.now();
-        render();
+        accept(snap);
       }
     }
   } catch (err) {
@@ -386,14 +384,16 @@ async function reconnectAllDisconnected() {
       setTimeout(() => { if ($("accountError")) $("accountError").textContent = ""; }, 5000);
     }
   } finally {
-    if (alertBtn) { alertBtn.disabled = false; alertBtn.textContent = "🔄 Reconectar todos"; }
-    if (topBtn) { topBtn.disabled = false; topBtn.textContent = "🔄 Reconectar desconectados"; }
+    reconnectingAll = false;
+    if (alertBtn) alertBtn.textContent = "Reconectar bridges";
+    render();
   }
 }
 
 function accept(data) {
   if (data.unavailable || !Array.isArray(data.equipment)) return unavailable();
   snapshot = data; lastReceived = Date.now();
+  receivedAt = performance.now();
   render();
 }
 function unavailable() { lastReceived = 0; $("liveStatus").textContent = "Sin conexión"; $("liveDot").className = "status-dot"; document.querySelector(".connection").classList.add("is-offline"); render(); }
@@ -404,14 +404,7 @@ function tickLiveDurations() {
   for (const item of snapshot.equipment) {
     const state = displayState(item, live);
     const orb = orbs.get(item.number);
-    if (orb) {
-      const timeText = getTimeText(item, state);
-      const timeEl = orb.querySelector(".orb-time");
-      if (timeEl && timeEl.textContent !== timeText) {
-        timeEl.textContent = timeText;
-        timeEl.title = timeText ? (["Disponible", "En llamada", "Marcando"].includes(state) ? `Conectado hace ${timeText}` : `Desconectado hace ${timeText}`) : "";
-      }
-    }
+    if (orb) renderOrb(orb, item.number, state, item.name, item, live);
     const card = cards.get(item.number);
     if (card) {
       const strong = card.querySelector(".card-time-badge strong");
@@ -444,7 +437,7 @@ try {
     bindAccountControls();
     const response = await apiFetch("/api/network", { cache: "no-store" });
     if (!response.ok) throw new Error("No se pudo cargar Núcleo de Red.");
-    snapshot = await response.json(); lastReceived = Date.now(); render();
+    accept(await response.json());
 
     if ($("reconnectAllAlertBtn")) $("reconnectAllAlertBtn").addEventListener("click", reconnectAllDisconnected);
 
@@ -455,7 +448,7 @@ try {
         if (!r.ok) throw new Error("No se pudo actualizar el estado de los equipos.");
         const data = await r.json();
         if (data.unavailable || !Array.isArray(data.equipment)) throw new Error("El estado de equipos no está disponible.");
-        snapshot = data; lastReceived = Date.now(); $("accountError").textContent = ""; render();
+        $("accountError").textContent = ""; accept(data);
       } catch (error) { $("accountError").textContent = error.message; unavailable(); }
       finally { $("refreshButton").disabled = false; }
     });
