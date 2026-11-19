@@ -100,15 +100,15 @@
   min-width: 0;
   min-height: 48px;
   padding: 12px 16px;
-  border: 1px solid #ceafd8 !important;
+  border: 1px solid rgba(236, 198, 250, 0.34) !important;
   border-radius: 10px !important;
-  background: #fff !important;
-  color: #341442 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fdf4ff !important;
   font: inherit;
   font-size: 16px;
   box-shadow: none;
 }
-#contactsSection #filterInput::placeholder { color: #705b78 !important; }
+#contactsSection #filterInput::placeholder { color: #c4a8d8 !important; }
 #contactsSection #filterInput:focus-visible {
   outline: 3px solid #ed58cf;
   outline-offset: 3px;

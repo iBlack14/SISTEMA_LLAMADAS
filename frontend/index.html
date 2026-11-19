@@ -250,7 +250,7 @@
           <!-- IMPORT - SIMPLE -->
           <div class="import-panel" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
             <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-              <label class="file-label" for="importFile" style="flex:1;min-width:180px;text-align:center;background:#f0fdf4;border:2px dashed #16a34a;color:#166534;padding:16px;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+              <label class="file-label" for="importFile" style="flex:1;min-width:180px;text-align:center;background:rgba(255,91,200,.08);border:2px dashed rgba(236,198,250,.45);color:#f7d5ff;padding:18px;border-radius:10px;cursor:pointer;transition:all 0.2s;font-weight:600;">
                 📁 Arrastra o haz clic para subir CSV/Excel/Word
                 <input id="importFile" type="file" accept=".csv,.txt,.xlsx,.xls,.docx" multiple hidden />
               </label>
@@ -258,14 +258,14 @@
             </div>
 
             <!-- PREVIEW -->
-            <div id="importPreview" style="display:none;margin-top:12px;padding:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;max-height:30vh;overflow:auto;">
+            <div id="importPreview" style="display:none;margin-top:12px;padding:14px;background:rgba(30,6,46,.97);border:1px solid rgba(236,198,250,.28);border-radius:12px;max-height:30vh;overflow:auto;color:#fdf4ff;">
               <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <strong>Vista previa: <span id="previewCount">0</span> contactos</strong>
                 <button id="importCancelBtn" class="secondary" style="padding:6px 12px;">✕</button>
               </div>
               <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
                 <table class="import-preview-table" style="width:100%;font-size:13px;">
-                  <thead style="position:sticky;top:0;background:#f9fafb;">
+                  <thead style="position:sticky;top:0;background:#43125f;">
                     <tr>
                       <th style="text-align:left;padding:8px;">Empresa</th>
                       <th style="text-align:left;padding:8px;">Teléfono</th>
@@ -275,7 +275,7 @@
                 </table>
               </div>
               <div class="row" style="margin-top:12px;justify-content:flex-end;">
-                <button id="importConfirmBtn" style="background:#16a34a;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer;">✅ Guardar</button>
+                <button id="importConfirmBtn" style="background:linear-gradient(120deg,#c81fa5,#8b2fd6);color:#fff;border:1px solid #ff7bd4;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">✅ Guardar</button>
               </div>
             </div>
             <p id="importSaveFeedback" role="status" aria-live="polite" hidden style="margin-top:8px;font-size:13px;"></p>
