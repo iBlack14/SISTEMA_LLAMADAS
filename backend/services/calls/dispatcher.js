@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { isDialAcknowledged } from "../sockets/call-events.js";
+import { isDialAcknowledged } from "../../sockets/call-events.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
   ensureCampaign,
