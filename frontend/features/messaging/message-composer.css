@@ -1048,6 +1048,38 @@
   color: #d43757 !important;
 }
 
+/* Botón para crear una plantilla dentro de esa categoría */
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-add-template {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e7b9e4 !important;
+  border-radius: 9px;
+  background: #fdf2fb !important;
+  color: #a024a5 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  opacity: 1;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-add-template svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-add-template:hover,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-add-template:focus-visible {
+  border-color: #d91483 !important;
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  color: #ffffff !important;
+  transform: scale(1.08);
+}
+
 /* Botón para borrar categorías creadas con el "+" */
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-delete {
   display: grid;
@@ -1080,6 +1112,7 @@
   box-shadow: 0 4px 10px rgba(212, 55, 87, .35) !important;
   transform: scale(1.08);
 }
+
 
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover,
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:focus-visible,

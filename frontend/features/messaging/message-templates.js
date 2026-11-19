@@ -43,6 +43,7 @@ function templateThumbUrl(image) {
 let templates = [];
 let currentEditingId = null;
 let currentEditingType = 'both'; // Las plantillas nuevas siempre son para WhatsApp y Correo
+let pendingTemplateCategory = ''; // Categoría preseleccionada al crear desde un filtro
 let currentEditingImage = null; // Base64 o URL para templateModal
 let currentSendImage = null;    // Base64 o URL para sendMessageModal
 let initializationPromise = null;
@@ -56,7 +57,6 @@ let contactSendResolved = true;
 const activeFilters = { rubro: '', speech: '', precio: '', combo: '' };
 
 // Categorías creadas por el usuario en cada filtro (se guardan en el navegador)
-const CUSTOM_FILTER_KEY = 'voip_stf_custom_filters';
 const CUSTOM_FILTER_KINDS = ['rubro', 'speech', 'precio', 'combo'];
 const customFilters = { rubro: {}, speech: {}, precio: {}, combo: {} };
 
@@ -195,7 +195,7 @@ export function init() {
       initializationPromise = null;
       showToast(err.message || 'No se pudieron cargar las plantillas.', 'error');
     }
-    loadCustomFilters();
+    await loadCustomFilters();
     renderTemplates();
     renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
   })();
@@ -351,7 +351,7 @@ function renderTemplates() {
 // ============================================================================
 // TEMPLATE MODAL (Crear / Actualizar Plantillas con Imagen)
 // ============================================================================
-function openTemplateModal(templateId = null) {
+function openTemplateModal(templateId = null, presetCategory = '') {
   const modal = document.getElementById('templateModal');
   const title = document.getElementById('templateModalTitle');
   const nameInput = document.getElementById('templateNameInput');
@@ -373,6 +373,7 @@ function openTemplateModal(templateId = null) {
     if (title) title.textContent = 'Editar plantilla';
     if (nameInput) nameInput.value = template.name;
     currentEditingType = template.type || 'both';
+    pendingTemplateCategory = template.category || '';
     if (messageInput) messageInput.value = template.message;
 
     if (template.image) {
@@ -388,6 +389,7 @@ function openTemplateModal(templateId = null) {
     if (title) title.textContent = 'Nueva plantilla';
     if (nameInput) nameInput.value = '';
     currentEditingType = 'both';
+    pendingTemplateCategory = String(presetCategory || '').trim();
     if (messageInput) messageInput.value = '';
     if (previewWrap) previewWrap.style.display = 'none';
     if (emptyWrap) emptyWrap.style.display = 'flex';
@@ -467,7 +469,8 @@ async function saveTemplate() {
 
   const isEditing = Boolean(currentEditingId);
   const template = {
-    id: currentEditingId || generateId(), name, category: inferCategory(name), type, message,
+    id: currentEditingId || generateId(), name,
+    category: pendingTemplateCategory || inferCategory(name), type, message,
     image: currentEditingImage || null
   };
   const saveButton = document.getElementById('templateSaveBtn');
@@ -486,6 +489,7 @@ async function saveTemplate() {
     const sendModal = document.getElementById('sendMessageModal');
     if (sendModal && sendModal.style.display !== 'none') renderSendTemplateList(currentEditingId || sendModal.dataset.templateId);
     closeTemplateModal();
+    pendingTemplateCategory = '';
   } catch (err) {
     showToast(err.message || 'No se pudo guardar la plantilla en la base de datos.', 'error');
   } finally {
@@ -752,57 +756,49 @@ function optionHasAllImages(kind, value) {
   return matches.length > 0 && matches.every(template => Boolean(template.image));
 }
 
-/** Carga las categorías creadas por el usuario y las agrega a cada menú. */
-function loadCustomFilters() {
-  let stored = {};
+/** Carga desde la base de datos las categorías creadas por los usuarios. */
+async function loadCustomFilters() {
+  CUSTOM_FILTER_KINDS.forEach(kind => { customFilters[kind] = {}; });
   try {
-    stored = JSON.parse(localStorage.getItem(CUSTOM_FILTER_KEY) || '{}') || {};
-  } catch {
-    stored = {};
-  }
+    const response = await apiFetch('/api/message-filter-options', { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'No se pudieron cargar las categorías.');
 
-  CUSTOM_FILTER_KINDS.forEach(kind => {
-    const raw = stored[kind];
-    if (Array.isArray(raw)) {
-      raw.forEach(item => {
-        if (typeof item === 'string' && item.trim()) customFilters[kind][item.trim()] = '';
-        else if (item && typeof item.value === 'string' && item.value.trim()) {
-          customFilters[kind][item.value.trim()] = String(item.description || '');
-        }
+    CUSTOM_FILTER_KINDS.forEach(kind => {
+      (data.options?.[kind] || []).forEach(option => {
+        const value = String(option.value || '').trim();
+        if (!value) return;
+        const description = String(option.description || '');
+        customFilters[kind][value] = { description, canDelete: option.canDelete !== false };
+        STF_MENU_UI[kind].options[value] = {
+          description: description || STF_MENU_UI[kind].fallbackDescription,
+          icon: ''
+        };
       });
-    } else if (raw && typeof raw === 'object') {
-      Object.entries(raw).forEach(([value, description]) => {
-        if (value.trim()) customFilters[kind][value.trim()] = String(description || '');
-      });
-    }
-
-    Object.entries(customFilters[kind]).forEach(([value, description]) => {
-      STF_MENU_UI[kind].options[value] = {
-        description: description || STF_MENU_UI[kind].fallbackDescription,
-        icon: ''
-      };
     });
-  });
-}
-
-/** Guarda las categorías creadas por el usuario. */
-function saveCustomFilters() {
-  try {
-    localStorage.setItem(CUSTOM_FILTER_KEY, JSON.stringify(customFilters));
-  } catch {
-    // Almacenamiento no disponible: las categorías siguen activas en esta sesión.
+  } catch (error) {
+    console.error('Error cargando categorías de filtros:', error);
   }
 }
 
-/** Elimina una categoría creada por el usuario y actualiza los menús. */
-function deleteStfOption(kind, value) {
+/** Elimina una categoría de la base de datos y actualiza los menús. */
+async function deleteStfOption(kind, value) {
   if (!STF_MENU_UI[kind] || !customFilters[kind]) return;
-  if (!Object.prototype.hasOwnProperty.call(customFilters[kind], value)) return;
+  const entry = customFilters[kind][value];
+  if (!entry || entry.canDelete === false) return;
+
+  try {
+    const params = new URLSearchParams({ kind, value });
+    const response = await apiFetch(`/api/message-filter-options?${params}`, { method: 'DELETE' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'No se pudo eliminar la categoría.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar la categoría.', 'error');
+    return;
+  }
 
   delete customFilters[kind][value];
   delete STF_MENU_UI[kind].options[value];
-  saveCustomFilters();
-
   if (activeFilters[kind] === value) activeFilters[kind] = '';
 
   refreshStfDropdowns();
@@ -861,9 +857,24 @@ function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
     btn.addEventListener('click', () => onSelect(value));
     row.appendChild(btn);
 
-    const isCustom = Boolean(value) &&
-      Object.prototype.hasOwnProperty.call(customFilters[kind] || {}, value);
-    if (isCustom) {
+    if (value && ui) {
+      const addTemplateBtn = document.createElement('button');
+      addTemplateBtn.type = 'button';
+      addTemplateBtn.className = 'stf-option-add-template';
+      addTemplateBtn.title = `Agregar plantilla en ${value}`;
+      addTemplateBtn.setAttribute('aria-label', `Agregar plantilla en ${value}`);
+      addTemplateBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+      addTemplateBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closeAllStfMenus();
+        openTemplateModal(null, value);
+      });
+      row.appendChild(addTemplateBtn);
+    }
+
+    const customEntry = value ? customFilters[kind]?.[value] : null;
+    if (customEntry && customEntry.canDelete !== false) {
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'stf-option-delete';
@@ -975,8 +986,8 @@ function closeStfOptionModal() {
   stfOptionKind = '';
 }
 
-/** Guarda la categoría nueva, la agrega al menú y la deja seleccionada. */
-function createStfOption() {
+/** Guarda la categoría nueva en la base de datos, la agrega al menú y la deja seleccionada. */
+async function createStfOption() {
   const kind = stfOptionKind;
   if (!STF_MENU_UI[kind]) return;
 
@@ -996,12 +1007,28 @@ function createStfOption() {
   }
 
   const description = document.getElementById('stfOptionDescription')?.value.trim() || '';
-  customFilters[kind][value] = description;
+  const saveBtn = document.getElementById('stfOptionSaveBtn');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const response = await apiFetch('/api/message-filter-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, value, description })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'No se pudo crear la categoría.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo crear la categoría.', 'error');
+    return;
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+
+  customFilters[kind][value] = { description, canDelete: true };
   STF_MENU_UI[kind].options[value] = {
     description: description || STF_MENU_UI[kind].fallbackDescription,
     icon: ''
   };
-  saveCustomFilters();
   closeStfOptionModal();
   refreshStfDropdowns();
   setStfFilter(kind, value);

@@ -13,6 +13,7 @@ import { registerTwilio } from "./twilio.js";
 import { registerStatic } from "./static.js";
 import { registerReservations } from "./reservations.js";
 import { registerMessageTemplates } from "./message-templates.js";
+import { registerMessageFilterOptions } from "./message-filter-options.js";
 
 // El orden mantiene autenticación y autorización antes de las rutas protegidas.
 export function registerRoutes(runtime, services) {
@@ -25,6 +26,7 @@ export function registerRoutes(runtime, services) {
   registerReports(runtime, services);
   registerReservations(runtime, services);
   registerMessageTemplates(runtime);
+  registerMessageFilterOptions(runtime);
   registerCampaigns(runtime, services);
   registerServerInfo(runtime, services);
   registerApk(runtime, services);
