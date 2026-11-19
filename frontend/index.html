@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
 
 <head>
@@ -24,7 +24,7 @@
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261117-sidebar-select-contrast" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261116-action-contrast" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-triple-dropdown" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261117-sidebar-svg"></script>
@@ -667,8 +667,43 @@
         <p>Elige un texto para cargarlo en el mensaje.</p>
         <div class="send-template-filter-tools">
           <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
-          <label for="sendTemplateCategory">Categoría<select id="sendTemplateCategory"><option value="">Todas las categorías</option></select></label>
-          <span id="sendTemplateResultCount" aria-live="polite"></span>
+          <!-- Filtros de tres columnas: Rubro · Speech · Precio -->
+          <div class="stf-dropdown-row" id="stfDropdownRow">
+            <!-- Rubro -->
+            <div class="stf-dropdown" id="stfRubroDropdown">
+              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-icon">🏷️</span>
+                <span class="stf-btn-label" id="stfRubroLabel">Rubro</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <ul class="stf-dropdown-menu" id="stfRubroMenu" role="listbox" aria-label="Filtrar por Rubro"></ul>
+            </div>
+            <!-- Speech -->
+            <div class="stf-dropdown" id="stfSpeechDropdown">
+              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-icon">💬</span>
+                <span class="stf-btn-label" id="stfSpeechLabel">Speech</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <ul class="stf-dropdown-menu" id="stfSpeechMenu" role="listbox" aria-label="Filtrar por Speech"></ul>
+            </div>
+            <!-- Precio -->
+            <div class="stf-dropdown" id="stfPrecioDropdown">
+              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-icon">💲</span>
+                <span class="stf-btn-label" id="stfPrecioLabel">Precio</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <ul class="stf-dropdown-menu" id="stfPrecioMenu" role="listbox" aria-label="Filtrar por Precio"></ul>
+            </div>
+          </div>
+          <!-- Contador de resultados + limpiar filtros -->
+          <div class="stf-status-row">
+            <span id="sendTemplateResultCount" aria-live="polite"></span>
+            <button type="button" id="stfClearFiltersBtn" class="stf-clear-btn" hidden>✕ Limpiar filtros</button>
+          </div>
+          <!-- select oculto mantenido para compatibilidad con JS existente -->
+          <select id="sendTemplateCategory" style="display:none"><option value="">Todas las categorías</option></select>
         </div>
         <div id="sendMessageTemplates" class="send-template-list"></div>
       </aside>

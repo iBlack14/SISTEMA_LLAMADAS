@@ -591,8 +591,17 @@ export function switchWorkerList(session, workerId, currentList, nextList) {
   const unfinished = (contact) => !["completed", "failed", "awaiting_callback"].includes(String(contact.status || ""));
   const targetContacts = campaign.contacts.filter((contact) => contact.list === toList && unfinished(contact));
   if (!targetContacts.length) return { ok: false, error: "La siguiente lista no tiene contactos pendientes" };
-  if (targetContacts.some((contact) => contact.targetWorkerId && contact.targetWorkerId !== normalizedWorkerId)) {
-    return { ok: false, error: "La siguiente lista ya esta ocupada por otro equipo" };
+  const connectedWorkerIds = new Set(
+    (session.phoneWorkers || []).filter((w) => w.connected && w.id !== normalizedWorkerId).map((w) => String(w.id))
+  );
+  const isOccupiedByActiveWorker = targetContacts.some((contact) =>
+    contact.targetWorkerId &&
+    contact.targetWorkerId !== normalizedWorkerId &&
+    connectedWorkerIds.has(String(contact.targetWorkerId)) &&
+    ["dialing", "ringing", "in_call"].includes(contact.status)
+  );
+  if (isOccupiedByActiveWorker) {
+    return { ok: false, error: "La siguiente lista ya esta ocupada por otro equipo en llamada activa" };
   }
 
   const active = getContactByWorker(session, normalizedWorkerId);

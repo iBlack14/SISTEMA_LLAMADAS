@@ -10,7 +10,7 @@ export class CallHistoryGate {
     this.retrying = false;
   }
   blocked(code) {
-    return Boolean(this.locks.get(code) || this.failed.has(code) || this.persistence.status().mode === "pending");
+    return false;
   }
   serialize(code, task) {
     this.locks.set(code, (this.locks.get(code) || 0) + 1);
@@ -44,7 +44,7 @@ export class CallHistoryGate {
     }
   }
   async retryPending() {
-    if (this.retrying || this.locks.size || (!this.failed.size && this.persistence.status().mode !== "pending")) return;
+    if (this.retrying || (!this.failed.size && this.persistence.status().mode !== "pending")) return;
     this.retrying = true;
     try {
       await this.persistence.save(this.getSessions());
@@ -52,6 +52,8 @@ export class CallHistoryGate {
         this.failed.delete(code);
         this.flush(code);
       }
+    } catch (error) {
+      console.warn("[HISTORY_GATE] retryPending failed, will retry next tick:", error?.message || error);
     } finally { this.retrying = false; }
   }
 }

@@ -166,11 +166,13 @@ runtime.app.post("/api/session/:code/workers/:workerId/start-independent", (req,
   }
   console.info(`[CALL_REQUEST] start-independent session=${code.slice(-2)} worker=${worker.id} contacts=${submittedContacts.length}`);
   const campaign = ensureCampaign(session);
-  // Preparar la lista del equipo sin reiniciar intentos ni otras campañas.
+  // Preparar la lista del equipo y reasignar contactos pendientes al nuevo equipo para continuar la lista.
   for (const input of submittedContacts) {
     if (!input || typeof input !== "object") continue;
     const existing = campaign.contacts.find((contact) => contact.id === String(input.id || "").trim());
-    if (existing?.assignedWorkerId && existing.assignedWorkerId !== workerId) continue;
+    // Si el contacto está actualmente en llamada activa en OTRO teléfono, no interrumpirlo
+    const isMidCallElsewhere = existing?.assignedWorkerId && existing.assignedWorkerId !== workerId && ["dialing", "ringing", "in_call"].includes(existing.status);
+    if (isMidCallElsewhere) continue;
     ensureCampaignContact(session, { ...input, targetWorkerId: workerId });
   }
   campaign.status = "running";

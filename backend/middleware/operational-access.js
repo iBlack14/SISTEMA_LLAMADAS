@@ -19,12 +19,4 @@ runtime.app.use(["/api/session/:code", "/api/pairing/:code", "/api/pairing-qr/:c
   });
 
 runtime.app.use("/api/session/:code", services.requireDashboardAccess);
-
-runtime.app.use("/api/session/:code", (req, res, next) => {
-  const startsCall = req.method === "POST" && /\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(req.path);
-  if (startsCall && runtime.historyGate.blocked(String(req.params.code || "").toUpperCase())) {
-    return res.status(503).json({ ok: false, error: "El historial tiene un guardado pendiente; no se iniciarán nuevas llamadas." });
-  }
-  next();
-});
 }

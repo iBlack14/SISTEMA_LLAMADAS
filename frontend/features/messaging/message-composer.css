@@ -22,10 +22,194 @@
   border-right: 1px solid #eee6f3;
 }
 
+/* ---- filter tools wrapper ---- */
 #sendMessageModal .send-template-filter-tools {
   display: grid;
   gap: 9px;
   margin: 12px 0 4px;
+}
+
+/* ---- three-column dropdown row ---- */
+#sendMessageModal .stf-dropdown-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+/* ---- individual dropdown container ---- */
+#sendMessageModal .stf-dropdown {
+  position: relative;
+}
+
+/* ---- trigger button ---- */
+#sendMessageModal .stf-dropdown-btn {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 34px;
+  max-height: 38px;
+  padding: 0 8px;
+  border: 1px solid #e0d4ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #4a3062;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms, color 160ms;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#sendMessageModal .stf-dropdown-btn:hover {
+  background: #f0e8f8;
+  border-color: #c8aee8;
+  color: #3a2050;
+}
+
+#sendMessageModal .stf-dropdown-btn.is-active {
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+#sendMessageModal .stf-btn-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+#sendMessageModal .stf-btn-label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+#sendMessageModal .stf-btn-arrow {
+  flex-shrink: 0;
+  transition: transform 180ms;
+}
+
+#sendMessageModal .stf-dropdown-btn[aria-expanded="true"] .stf-btn-arrow {
+  transform: rotate(180deg);
+}
+
+/* ---- dropdown menu ---- */
+#sendMessageModal .stf-dropdown-menu {
+  position: absolute;
+  z-index: 9999;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid #e0d4ec;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(20, 4, 35, .16), 0 2px 8px rgba(20, 4, 35, .08);
+  scrollbar-width: thin;
+  scrollbar-color: #c9b6d5 #f7f2fa;
+  display: none;
+}
+
+#sendMessageModal .stf-dropdown-menu.is-open {
+  display: block;
+}
+
+#sendMessageModal .stf-dropdown-menu li {
+  padding: 0;
+  margin: 0;
+}
+
+#sendMessageModal .stf-dropdown-menu li button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #3a2050;
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms;
+  white-space: nowrap;
+}
+
+#sendMessageModal .stf-dropdown-menu li button:hover {
+  background: #f4edfb;
+}
+
+#sendMessageModal .stf-dropdown-menu li button.is-selected {
+  background: linear-gradient(135deg, #f9e8f8, #ece2fc);
+  color: #5a1888;
+  font-weight: 700;
+}
+
+#sendMessageModal .stf-dropdown-menu li button.is-selected::before {
+  content: "✓";
+  font-size: 10px;
+  color: #8e1ab2;
+}
+
+/* ---- status row (result count + clear btn) ---- */
+#sendMessageModal .stf-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 18px;
+}
+
+/* ---- clear filters button ---- */
+#sendMessageModal .stf-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 0 9px;
+  border: 1px solid #e0d4ec;
+  border-radius: 999px;
+  background: #fdf0f7;
+  color: #9d1c6e;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms, border-color 140ms;
+  white-space: nowrap;
+}
+
+#sendMessageModal .stf-clear-btn:hover {
+  background: #f9d6ea;
+  border-color: #d16ea0;
+}
+
+/* Mobile: stack dropdowns 2+1 to avoid truncation */
+@media (max-width: 760px) {
+  #sendMessageModal .stf-dropdown-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  #sendMessageModal .stf-dropdown-btn {
+    font-size: 10px;
+    padding: 0 6px;
+    gap: 3px;
+  }
+  #sendMessageModal .stf-btn-icon { display: none; }
 }
 
 #sendMessageModal .send-template-filter-tools label {

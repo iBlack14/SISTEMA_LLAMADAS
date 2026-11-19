@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sistema de plantillas de mensajes y mensajería
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
@@ -8,6 +8,22 @@ import { apiFetch } from '../auth/auth-session.js';
 const STORAGE_KEY = 'voip_message_templates';
 const DB_MIGRATION_KEY = 'voip_message_templates_db_migrated';
 const CATEGORY_ORDER = ['Alimentos y hospedaje', 'Comercio y servicios', 'Educación', 'Hogar y construcción', 'Salud y bienestar', 'Tecnología y web', 'Otros'];
+
+// Palabras clave para clasificar "Speech" (tipo de contenido del mensaje)
+const SPEECH_KEYWORDS = {
+  'Oferta': /oferta|descuento|promo|especial|gratis|hasta \d+%|ahorra/i,
+  'Presentación': /present|somos|empresa|trabajamos|servicio|dedicad/i,
+  'Seguimiento': /seguimiento|contactamos|hablamos|anterior|llamada/i,
+  'Recordatorio': /recordar|recordatorio|no olvi|fecha|cita|reserva/i,
+  'Agradecimiento': /gracias|agradec|apreciam|estimad/i,
+  'Informativo': /informar|detall|adjunt|enviam|cotizac|presupuest/i,
+};
+
+// Palabras clave para clasificar "Precio"
+const PRECIO_KEYWORDS = {
+  'Con precio': /s\/\s*[\d,.]+|precio|costo|tarifa|inversión|paquete|plan desde|\$\s*[\d,.]+/i,
+  'Sin precio': null,  // fallback: las que no caen en "Con precio"
+};
 const FLYERS_PATH = '/features/messaging/campaign-2027/';
 
 /** Miniatura ligera solo para vistas previas; el envío sigue usando la imagen original. */
@@ -28,6 +44,9 @@ let currentSendImage = null;    // Base64 o URL para sendMessageModal
 let initializationPromise = null;
 let eventsBound = false;
 let currentSendContact = null;
+
+// Estado de los tres filtros dropdown
+const activeFilters = { rubro: '', speech: '', precio: '' };
 
 // ============================================================================
 // TOAST NOTIFICATIONS
@@ -541,45 +560,171 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
   modal.style.display = 'grid';
 }
 
+// ============================================================================
+// DROPDOWN FILTER HELPERS
+// ============================================================================
+
+/** Infiere la categoria "Speech" (tipo de mensaje) a partir de su contenido. */
+function inferSpeech(template) {
+  const text = `${template.name} ${template.message}`;
+  for (const [label, pattern] of Object.entries(SPEECH_KEYWORDS)) {
+    if (pattern && pattern.test(text)) return label;
+  }
+  return 'General';
+}
+
+/** Infiere si la plantilla menciona precio o no. */
+function inferPrecio(template) {
+  const text = `${template.name} ${template.message}`;
+  return PRECIO_KEYWORDS['Con precio'].test(text) ? 'Con precio' : 'Sin precio';
+}
+
+/** Cierra todos los menus desplegables del filtro. */
+function closeAllStfMenus(except = null) {
+  ['stfRubroDropdown', 'stfSpeechDropdown', 'stfPrecioDropdown'].forEach(id => {
+    if (id === except) return;
+    const wrap = document.getElementById(id);
+    if (!wrap) return;
+    wrap.querySelector('.stf-dropdown-menu')?.classList.remove('is-open');
+    const btn = wrap.querySelector('.stf-dropdown-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+/** Genera las opciones de un menu a partir de un Set de valores. */
+function buildStfMenu(menuEl, values, currentValue, onSelect) {
+  if (!menuEl) return;
+  menuEl.innerHTML = '';
+  const allLi = document.createElement('li');
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.textContent = 'Todos';
+  if (!currentValue) allBtn.classList.add('is-selected');
+  allBtn.addEventListener('click', () => onSelect(''));
+  allLi.appendChild(allBtn);
+  menuEl.appendChild(allLi);
+  [...values].forEach(val => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = val;
+    if (val === currentValue) btn.classList.add('is-selected');
+    btn.addEventListener('click', () => onSelect(val));
+    li.appendChild(btn);
+    menuEl.appendChild(li);
+  });
+}
+
+/** Actualiza el label y el estado visual del boton segun si hay filtro activo. */
+function updateStfBtnState(btnId, labelId, defaultLabel, activeValue) {
+  const btn = document.getElementById(btnId);
+  const lbl = document.getElementById(labelId);
+  if (!btn || !lbl) return;
+  if (activeValue) {
+    lbl.textContent = activeValue;
+    btn.classList.add('is-active');
+  } else {
+    lbl.textContent = defaultLabel;
+    btn.classList.remove('is-active');
+  }
+}
+
+/** Muestra u oculta el boton "Limpiar filtros" segun si algun filtro esta activo. */
+function syncClearBtn() {
+  const btn = document.getElementById('stfClearFiltersBtn');
+  if (!btn) return;
+  const anyActive = activeFilters.rubro || activeFilters.speech || activeFilters.precio;
+  btn.hidden = !anyActive;
+}
+
+/** Inicializa o refresca los tres dropdowns de filtro. */
+function refreshStfDropdowns() {
+  const rubroBtnEl  = document.getElementById('stfRubroBtn');
+  const speechBtnEl = document.getElementById('stfSpeechBtn');
+  const precioBtnEl = document.getElementById('stfPrecioBtn');
+  if (!rubroBtnEl) return;
+
+  const rubros   = new Set(templates.map(t => t.category || 'Otros').filter(Boolean));
+  const speeches = new Set(templates.map(inferSpeech).filter(Boolean));
+  const precios  = new Set(templates.map(inferPrecio).filter(Boolean));
+
+  const refresh = () => {
+    renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
+  };
+
+  buildStfMenu(document.getElementById('stfRubroMenu'), rubros, activeFilters.rubro, (val) => {
+    activeFilters.rubro = val;
+    updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'Rubro', val);
+    closeAllStfMenus();
+    rubroBtnEl.setAttribute('aria-expanded', 'false');
+    syncClearBtn();
+    refresh();
+  });
+
+  buildStfMenu(document.getElementById('stfSpeechMenu'), speeches, activeFilters.speech, (val) => {
+    activeFilters.speech = val;
+    updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', val);
+    closeAllStfMenus();
+    speechBtnEl.setAttribute('aria-expanded', 'false');
+    syncClearBtn();
+    refresh();
+  });
+
+  buildStfMenu(document.getElementById('stfPrecioMenu'), precios, activeFilters.precio, (val) => {
+    activeFilters.precio = val;
+    updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', val);
+    closeAllStfMenus();
+    precioBtnEl.setAttribute('aria-expanded', 'false');
+    syncClearBtn();
+    refresh();
+  });
+
+  updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'Rubro',  activeFilters.rubro);
+  updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', activeFilters.speech);
+  updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', activeFilters.precio);
+  syncClearBtn();
+}
+
 function renderSendTemplateList(selectedId = '') {
   const list = document.getElementById('sendMessageTemplates');
   const count = document.getElementById('sendTemplateCount');
   const search = document.getElementById('sendTemplateSearch');
-  const categorySelect = document.getElementById('sendTemplateCategory');
   const resultCount = document.getElementById('sendTemplateResultCount');
   if (!list) return;
 
   if (count) count.textContent = String(templates.length);
-  list.replaceChildren();
 
-  if (categorySelect) {
-    const selectedCategory = categorySelect.value;
-    const categories = [...new Set(templates.map(item => item.category || 'Otros'))].sort((a, b) => {
-      const categoryDiff = CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b);
-      return categoryDiff || a.localeCompare(b, 'es');
-    });
-    categorySelect.replaceChildren(new Option('Todas las categorías', ''));
-    categories.forEach(category => categorySelect.add(new Option(category, category)));
-    if (categories.includes(selectedCategory)) categorySelect.value = selectedCategory;
-  }
+  refreshStfDropdowns();
+  list.replaceChildren();
 
   if (!templates.length) {
     const empty = document.createElement('p');
     empty.className = 'send-template-empty';
-    empty.textContent = 'No hay plantillas en la base de datos. Haz clic en “+ Nueva” para crear una.';
+    empty.textContent = 'No hay plantillas en la base de datos. Haz clic en "+ Nueva" para crear una.';
     list.appendChild(empty);
     if (resultCount) resultCount.textContent = '0 plantillas';
     return;
   }
 
   const query = String(search?.value || '').trim().toLocaleLowerCase('es');
-  const selectedCategory = categorySelect?.value || '';
+
   const visibleTemplates = sortTemplates(templates.filter(template => {
-    const matchesCategory = !selectedCategory || (template.category || 'Otros') === selectedCategory;
-    const searchable = `${template.name} ${template.message} ${template.category || ''}`.toLocaleLowerCase('es');
-    return matchesCategory && (!query || searchable.includes(query));
+    if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
+    if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
+    if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
+    if (query) {
+      const searchable = `${template.name} ${template.message} ${template.category || ''}`.toLocaleLowerCase('es');
+      if (!searchable.includes(query)) return false;
+    }
+    return true;
   }));
-  if (resultCount) resultCount.textContent = `${visibleTemplates.length} de ${templates.length} plantillas`;
+
+  if (resultCount) {
+    const anyFilter = activeFilters.rubro || activeFilters.speech || activeFilters.precio || query;
+    resultCount.textContent = anyFilter
+      ? `${visibleTemplates.length} de ${templates.length} plantillas`
+      : `${templates.length} plantillas`;
+  }
 
   if (!visibleTemplates.length) {
     const empty = document.createElement('p');
@@ -604,8 +749,8 @@ function renderSendTemplateList(selectedId = '') {
       <div class="send-template-option-top">
         <strong title="${escapeHtml(template.name)}">${escapeHtml(template.name)}</strong>
         <div class="send-template-actions">
-          <span class="btn-action edit" data-action="edit" data-id="${template.id}" title="Editar plantilla">✏️</span>
-          <span class="btn-action delete" data-action="delete" data-id="${template.id}" title="Eliminar plantilla">🗑️</span>
+          <span class="btn-action edit" data-action="edit" data-id="${template.id}" title="Editar plantilla">&#x270F;&#xFE0F;</span>
+          <span class="btn-action delete" data-action="delete" data-id="${template.id}" title="Eliminar plantilla">&#x1F5D1;&#xFE0F;</span>
         </div>
       </div>
       <div class="send-template-option-body">
@@ -615,7 +760,7 @@ function renderSendTemplateList(selectedId = '') {
       <div class="send-template-option-bottom">
         <small class="template-category-tag">${escapeHtml(template.category || 'Otros')}</small>
         <small class="type-tag">${typeLabel}</small>
-        ${hasImage ? '<span class="has-img-chip">🖼️ Con imagen</span>' : ''}
+        ${hasImage ? '<span class="has-img-chip">&#x1F5BC;&#xFE0F; Con imagen</span>' : ''}
       </div>
     `;
 
@@ -922,11 +1067,48 @@ function isValidEmail(email) {
 // ============================================================================
 function bindEvents() {
   const templateSearch = document.getElementById('sendTemplateSearch');
-  const templateCategory = document.getElementById('sendTemplateCategory');
   const sendModal = document.getElementById('sendMessageModal');
   const refreshTemplateFilter = () => renderSendTemplateList(sendModal?.dataset.templateId || '');
   templateSearch?.addEventListener('input', refreshTemplateFilter);
-  templateCategory?.addEventListener('change', refreshTemplateFilter);
+
+  // Dropdown toggle buttons (Rubro / Speech / Precio)
+  ['stfRubroBtn', 'stfSpeechBtn', 'stfPrecioBtn'].forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const dropId = btn.id.replace('Btn', 'Dropdown');
+    const menuId = btn.id.replace('Btn', 'Menu');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById(menuId);
+      const isOpen = menu?.classList.contains('is-open');
+      closeAllStfMenus(isOpen ? null : dropId);
+      menu?.classList.toggle('is-open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    });
+  });
+
+  // Clear all filters button
+  const clearBtn = document.getElementById('stfClearFiltersBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      activeFilters.rubro = '';
+      activeFilters.speech = '';
+      activeFilters.precio = '';
+      updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'Rubro',  '');
+      updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', '');
+      updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', '');
+      syncClearBtn();
+      renderSendTemplateList(sendModal?.dataset.templateId || '');
+    });
+  }
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#stfDropdownRow')) {
+      closeAllStfMenus();
+    }
+  });
+
 
   // Crear nueva plantilla desde messagesView
   const createBtn = document.getElementById('createTemplateBtn');
