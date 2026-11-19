@@ -46,49 +46,55 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   min-height: 34px;
-  max-height: 38px;
-  padding: 0 8px;
-  border: 1px solid #e0d4ec;
-  border-radius: 9px;
-  background: #fff;
-  color: #4a3062;
+  max-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  color: #ffffff !important;
   font: inherit;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 160ms, border-color 160ms, color 160ms;
+  box-shadow: 0 2px 8px rgba(180, 20, 120, 0.22) !important;
+  transition: all 160ms ease;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 #sendMessageModal .stf-dropdown-btn:hover {
-  background: #f0e8f8;
-  border-color: #c8aee8;
-  color: #3a2050;
+  background: linear-gradient(135deg, #e3188d 0%, #9a1ec0 100%) !important;
+  box-shadow: 0 4px 12px rgba(217, 20, 131, 0.35) !important;
+  transform: translateY(-1px);
+  color: #ffffff !important;
 }
 
-#sendMessageModal .stf-dropdown-btn.is-active {
-  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%);
-  border-color: transparent;
-  color: #fff;
+#sendMessageModal .stf-dropdown-btn:active,
+#sendMessageModal .stf-dropdown-btn.is-active,
+#sendMessageModal .stf-dropdown-btn[aria-expanded="true"] {
+  background: linear-gradient(135deg, #ba0f6f 0%, #761295 100%) !important;
+  box-shadow: 0 1px 4px rgba(142, 26, 178, 0.4) !important;
+  color: #ffffff !important;
 }
 
 #sendMessageModal .stf-btn-icon {
-  font-size: 12px;
-  flex-shrink: 0;
+  display: none !important;
 }
 
 #sendMessageModal .stf-btn-label {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: left;
+  text-align: center;
 }
 
 #sendMessageModal .stf-btn-arrow {
@@ -110,60 +116,79 @@
   max-height: 220px;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 0;
+  padding: 4px;
   list-style: none;
-  border: 1px solid #e0d4ec;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 8px 28px rgba(20, 4, 35, .16), 0 2px 8px rgba(20, 4, 35, .08);
+  border: 1px solid #ebdcf5;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(20, 4, 35, .2), 0 3px 10px rgba(20, 4, 35, .08);
   scrollbar-width: thin;
   scrollbar-color: #c9b6d5 #f7f2fa;
   display: none;
 }
 
 #sendMessageModal .stf-dropdown-menu.is-open {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 #sendMessageModal .stf-dropdown-menu li {
   padding: 0;
   margin: 0;
+  list-style: none;
 }
 
 #sendMessageModal .stf-dropdown-menu li button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   box-sizing: border-box;
   width: 100%;
   min-height: 32px;
-  padding: 5px 12px;
-  border: none;
-  border-radius: 0;
+  padding: 7px 12px;
+  border: 1px solid transparent !important;
+  border-radius: 8px;
   background: transparent;
-  color: #3a2050;
+  color: #311c47;
   font: inherit;
   font-size: 11.5px;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background 120ms;
+  transition: all 140ms ease;
   white-space: nowrap;
 }
 
-#sendMessageModal .stf-dropdown-menu li button:hover {
-  background: #f4edfb;
+/* Hover viceversa: se vuelve morado intenso con texto blanco para saber qué se está seleccionando */
+#sendMessageModal .stf-dropdown-menu li button:hover,
+#sendMessageModal .stf-dropdown-menu li button:focus {
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  color: #ffffff !important;
+  font-weight: 750;
+  box-shadow: 0 3px 10px rgba(217, 20, 131, 0.35) !important;
+  transform: translateX(3px);
 }
 
+/* Elemento seleccionado actualmente */
 #sendMessageModal .stf-dropdown-menu li button.is-selected {
-  background: linear-gradient(135deg, #f9e8f8, #ece2fc);
-  color: #5a1888;
-  font-weight: 700;
+  background: #fbf0f8 !important;
+  border-color: #e5c0e8 !important;
+  color: #8e1ab2 !important;
+  font-weight: 800;
+}
+
+#sendMessageModal .stf-dropdown-menu li button.is-selected:hover {
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
 }
 
 #sendMessageModal .stf-dropdown-menu li button.is-selected::before {
   content: "✓";
-  font-size: 10px;
-  color: #8e1ab2;
+  font-size: 11px;
+  font-weight: 900;
+  color: currentColor;
 }
 
 /* ---- status row (result count + clear btn) ---- */
@@ -712,4 +737,133 @@
 #sendMessageModal button.sm-btn-remove:hover {
   background: #ffd6dc !important;
   color: #7f1527 !important;
+}
+
+
+/* ==========================================================================
+   NUEVO BOTÓN Y MODAL PARA AGREGAR CONTACTO MANUAL
+   ========================================================================== */
+.add-manual-contact-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #c21980 !important;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d91483, #8e1ab2) !important;
+  color: #ffffff !important;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(180, 20, 120, 0.25) !important;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.add-manual-contact-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 5px 14px rgba(180, 20, 120, 0.35) !important;
+}
+
+.add-manual-contact-btn:active {
+  transform: translateY(0);
+}
+
+.add-manual-contact-btn svg {
+  flex-shrink: 0;
+}
+
+/* Modal personalizado */
+#addManualContactModal .add-contact-card {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 440px;
+  background: #ffffff !important;
+  color: #241337 !important;
+  border: 1px solid #ebdcf5 !important;
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 24px 70px rgba(20, 4, 35, 0.38), 0 8px 24px rgba(20, 4, 35, 0.12);
+}
+
+#addManualContactModal .add-contact-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1e4f7;
+}
+
+#addManualContactModal .add-contact-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fae6f4, #f2e2fa);
+  color: #a21077;
+  border: 1px solid #ebd4f2;
+  flex-shrink: 0;
+}
+
+#addManualContactModal input[type="text"],
+#addManualContactModal input[type="tel"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #dcc9eb !important;
+  border-radius: 10px;
+  background: #fbf9fd !important;
+  color: #241337 !important;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#addManualContactModal input[type="text"]:focus,
+#addManualContactModal input[type="tel"]:focus {
+  border-color: #d81482 !important;
+  box-shadow: 0 0 0 3px rgba(216, 20, 130, 0.15) !important;
+  background: #ffffff !important;
+}
+
+#addManualContactModal input::placeholder {
+  color: #a491b2 !important;
+}
+
+#addManualContactModal button.secondary {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid #dec8ee !important;
+  border-radius: 10px;
+  background: #f6edf9 !important;
+  color: #5d367c !important;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+#addManualContactModal button.secondary:hover {
+  background: #eedef5 !important;
+  color: #4a2168 !important;
+}
+
+#addManualContactModal button.primary {
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(216, 20, 130, 0.25) !important;
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+#addManualContactModal button.primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }

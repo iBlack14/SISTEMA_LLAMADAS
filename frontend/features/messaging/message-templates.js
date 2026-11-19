@@ -598,6 +598,7 @@ function closeAllStfMenus(except = null) {
 }
 
 /** Genera las opciones de un menu a partir de un Set de valores. */
+/** Genera las opciones de un menu a partir de un Set de valores (formato lista limpia) */
 function buildStfMenu(menuEl, values, currentValue, onSelect) {
   if (!menuEl) return;
   menuEl.innerHTML = '';
@@ -660,7 +661,7 @@ function refreshStfDropdowns() {
 
   buildStfMenu(document.getElementById('stfRubroMenu'), rubros, activeFilters.rubro, (val) => {
     activeFilters.rubro = val;
-    updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'Rubro', val);
+    updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', val);
     closeAllStfMenus();
     rubroBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
@@ -669,7 +670,7 @@ function refreshStfDropdowns() {
 
   buildStfMenu(document.getElementById('stfSpeechMenu'), speeches, activeFilters.speech, (val) => {
     activeFilters.speech = val;
-    updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', val);
+    updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', val);
     closeAllStfMenus();
     speechBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
@@ -678,16 +679,16 @@ function refreshStfDropdowns() {
 
   buildStfMenu(document.getElementById('stfPrecioMenu'), precios, activeFilters.precio, (val) => {
     activeFilters.precio = val;
-    updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', val);
+    updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', val);
     closeAllStfMenus();
     precioBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
     refresh();
   });
 
-  updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'Rubro',  activeFilters.rubro);
-  updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', activeFilters.speech);
-  updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', activeFilters.precio);
+  updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'RUBRO',  activeFilters.rubro);
+  updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', activeFilters.speech);
+  updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', activeFilters.precio);
   syncClearBtn();
 }
 
@@ -699,8 +700,6 @@ function renderSendTemplateList(selectedId = '') {
   if (!list) return;
 
   if (count) count.textContent = String(templates.length);
-
-  refreshStfDropdowns();
   list.replaceChildren();
 
   if (!templates.length) {
@@ -715,19 +714,15 @@ function renderSendTemplateList(selectedId = '') {
   const query = String(search?.value || '').trim().toLocaleLowerCase('es');
 
   const visibleTemplates = sortTemplates(templates.filter(template => {
-    if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
-    if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
-    if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
     if (query) {
-      const searchable = `${template.name} ${template.message} ${template.category || ''}`.toLocaleLowerCase('es');
+      const searchable = `${template.name} ${template.message}`.toLocaleLowerCase('es');
       if (!searchable.includes(query)) return false;
     }
     return true;
   }));
 
   if (resultCount) {
-    const anyFilter = activeFilters.rubro || activeFilters.speech || activeFilters.precio || query;
-    resultCount.textContent = anyFilter
+    resultCount.textContent = query
       ? `${visibleTemplates.length} de ${templates.length} plantillas`
       : `${templates.length} plantillas`;
   }
@@ -735,7 +730,7 @@ function renderSendTemplateList(selectedId = '') {
   if (!visibleTemplates.length) {
     const empty = document.createElement('p');
     empty.className = 'send-template-empty';
-    empty.textContent = 'No hay plantillas que coincidan con esos filtros.';
+    empty.textContent = 'No hay plantillas que coincidan con la búsqueda.';
     list.appendChild(empty);
     return;
   }
@@ -766,7 +761,6 @@ function renderSendTemplateList(selectedId = '') {
         </div>
       </div>
       <div class="send-template-option-bottom">
-        <small class="template-category-tag">${escapeHtml(template.category || "Otros")}</small>
         <small class="type-tag">${typeLabel}</small>
         ${hasImage ? `<span class="has-img-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Con imagen</span>` : ""}
       </div>
@@ -1118,9 +1112,9 @@ function bindEvents() {
       activeFilters.rubro = '';
       activeFilters.speech = '';
       activeFilters.precio = '';
-      updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'Rubro',  '');
-      updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'Speech', '');
-      updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'Precio', '');
+      updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'RUBRO',  '');
+      updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', '');
+      updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', '');
       syncClearBtn();
       renderSendTemplateList(sendModal?.dataset.templateId || '');
     });

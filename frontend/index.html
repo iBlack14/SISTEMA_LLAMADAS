@@ -24,7 +24,7 @@
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-message-buttons" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-pro-compact" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-viceversa-classic" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261117-sidebar-svg"></script>
@@ -421,6 +421,7 @@
           <span id="messageContactsHint" class="muted" style="font-size:0.85rem;align-self:flex-end">Selecciona un vendedor para ver sus contactos guardados en el celular</span>
         </div>
         <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
+<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
@@ -561,6 +562,37 @@
     </div>
   </div>
 
+  <!-- ADD MANUAL CONTACT MODAL -->
+  <div id="addManualContactModal" class="edit-modal" style="display:none">
+    <div class="edit-card list-name-card add-contact-card" role="dialog" aria-modal="true" aria-labelledby="addManualContactTitle">
+      <button id="addManualContactCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
+      <div class="add-contact-header">
+        <div class="add-contact-icon-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        </div>
+        <div>
+          <h3 id="addManualContactTitle" style="margin:0;font-size:1.15rem;font-weight:700">Agregar contacto</h3>
+          <p style="margin:2px 0 0;font-size:0.8rem;color:#7e6a92">Guarda un contacto para mensajería directa</p>
+        </div>
+      </div>
+      <form id="addManualContactForm" onsubmit="return false;" style="display:grid;gap:12px;margin-top:14px">
+        <div class="edit-form" style="display:grid;gap:4px">
+          <label for="addManualContactName" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Empresa / Nombre del contacto</label>
+          <input id="addManualContactName" type="text" maxlength="100" autocomplete="off" placeholder="Ej. Corporación ABC / Juan Pérez" required />
+        </div>
+        <div class="edit-form" style="display:grid;gap:4px">
+          <label for="addManualContactPhone" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Número (con código de país)</label>
+          <input id="addManualContactPhone" type="tel" maxlength="20" autocomplete="off" placeholder="Ej. 51987654321" required />
+        </div>
+        <p id="addManualContactError" class="list-name-error" role="alert" style="margin:0;font-size:0.8rem;color:#d81482;min-height:16px"></p>
+        <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px">
+          <button id="addManualContactCancelBtn" type="button" class="secondary">Cancelar</button>
+          <button id="addManualContactSaveBtn" type="button" class="primary" style="background:linear-gradient(135deg,#d91483,#8e1ab2);color:#fff;border:none">Guardar contacto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- GENERIC CONFIRMATION MODAL -->
   <div id="confirmModal" class="edit-modal" style="display:none">
     <div class="edit-card list-name-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -667,32 +699,29 @@
         <p>Elige un texto para cargarlo en el mensaje.</p>
         <div class="send-template-filter-tools">
           <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
-          <!-- Filtros de tres columnas: Rubro · Speech · Precio -->
+          <!-- Filtros de tres columnas: RUBRO · SPEECH · PRECIO -->
           <div class="stf-dropdown-row" id="stfDropdownRow">
             <!-- Rubro -->
             <div class="stf-dropdown" id="stfRubroDropdown">
               <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-haspopup="listbox" aria-expanded="false">
-                <svg class="stf-btn-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                <span class="stf-btn-label" id="stfRubroLabel">Rubro</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="stf-btn-label" id="stfRubroLabel">RUBRO</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <ul class="stf-dropdown-menu" id="stfRubroMenu" role="listbox" aria-label="Filtrar por Rubro"></ul>
             </div>
             <!-- Speech -->
             <div class="stf-dropdown" id="stfSpeechDropdown">
               <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-haspopup="listbox" aria-expanded="false">
-                <svg class="stf-btn-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                <span class="stf-btn-label" id="stfSpeechLabel">Speech</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="stf-btn-label" id="stfSpeechLabel">SPEECH</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <ul class="stf-dropdown-menu" id="stfSpeechMenu" role="listbox" aria-label="Filtrar por Speech"></ul>
             </div>
             <!-- Precio -->
             <div class="stf-dropdown" id="stfPrecioDropdown">
               <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-haspopup="listbox" aria-expanded="false">
-                <svg class="stf-btn-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                <span class="stf-btn-label" id="stfPrecioLabel">Precio</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="stf-btn-label" id="stfPrecioLabel">PRECIO</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <ul class="stf-dropdown-menu" id="stfPrecioMenu" role="listbox" aria-label="Filtrar por Precio"></ul>
             </div>
@@ -702,7 +731,7 @@
             <span id="sendTemplateResultCount" aria-live="polite"></span>
             <button type="button" id="stfClearFiltersBtn" class="stf-clear-btn" hidden>✕ Limpiar filtros</button>
           </div>
-          <!-- select oculto mantenido para compatibilidad con JS existente -->
+
           <select id="sendTemplateCategory" style="display:none"><option value="">Todas las categorías</option></select>
         </div>
         <div id="sendMessageTemplates" class="send-template-list"></div>

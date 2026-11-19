@@ -1,4 +1,4 @@
-import { openContactSendModal } from './message-templates.js';
+﻿import { openContactSendModal } from './message-templates.js';
 import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
@@ -172,6 +172,83 @@ export function createMessageContacts(dashboardState, dashboardActions) {
         </div></td>
       </tr>`;
     }).join("");
+  }
+
+  function promptContactModal() {
+    return new Promise((resolve) => {
+      const modal = $("addManualContactModal");
+      const nameInput = $("addManualContactName");
+      const phoneInput = $("addManualContactPhone");
+      const errorMsg = $("addManualContactError");
+      const saveBtn = $("addManualContactSaveBtn");
+      const cancelBtn = $("addManualContactCancelBtn");
+      const closeBtn = $("addManualContactCloseBtn");
+
+      if (!modal || !nameInput || !phoneInput) return resolve(null);
+
+      nameInput.value = "";
+      phoneInput.value = "";
+      if (errorMsg) errorMsg.textContent = "";
+      modal.style.display = "grid";
+
+      const cleanup = (result) => {
+        modal.style.display = "none";
+        saveBtn.onclick = null;
+        cancelBtn.onclick = null;
+        closeBtn.onclick = null;
+        nameInput.onkeydown = null;
+        phoneInput.onkeydown = null;
+        resolve(result);
+      };
+
+      const handleSave = () => {
+        const nameVal = nameInput.value.trim();
+        const phoneVal = phoneInput.value.trim();
+        if (!nameVal) {
+          if (errorMsg) errorMsg.textContent = "Ingresa el nombre o empresa del contacto.";
+          nameInput.focus();
+          return;
+        }
+        if (!phoneVal) {
+          if (errorMsg) errorMsg.textContent = "Ingresa el número de teléfono con código de país.";
+          phoneInput.focus();
+          return;
+        }
+        cleanup({ name: nameVal, phone: phoneVal });
+      };
+
+      saveBtn.onclick = handleSave;
+      cancelBtn.onclick = () => cleanup(null);
+      closeBtn.onclick = () => cleanup(null);
+
+      const onEnter = (e) => {
+        if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+        if (e.key === "Escape") { e.preventDefault(); cleanup(null); }
+      };
+      nameInput.onkeydown = onEnter;
+      phoneInput.onkeydown = onEnter;
+
+      setTimeout(() => nameInput.focus(), 50);
+    });
+  }
+
+  const addBtn = $("addManualContactBtn");
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      const contactData = await promptContactModal();
+      if (!contactData) return;
+      addBtn.disabled = true;
+      try {
+        const data = await dashboardActions.postCampaignAction("/message-contacts/update", {
+          action: "add",
+          name: contactData.name,
+          phone: contactData.phone
+        });
+        if (data) renderMessageContacts(data.contacts);
+      } finally {
+        addBtn.disabled = false;
+      }
+    };
   }
 
   return { renderMessageContacts, initMessageContactsAdmin };
