@@ -24,7 +24,7 @@
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-contact-selector" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-template-in-category" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-email-footer2" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
 
@@ -641,6 +641,15 @@
         </div>
         <textarea id="templateMessageInput" rows="5" placeholder="Escribe tu mensaje aquí..." maxlength="1000" required></textarea>
 
+        <div id="templateFooterField">
+          <div class="template-field-header">
+            <label for="templateFooterInput">Pie de página del correo (opcional)</label>
+            <span class="template-char-count"><span id="templateFooterCharCount">0</span> / 2000</span>
+          </div>
+          <textarea id="templateFooterInput" rows="3" placeholder="Firma, datos de contacto, aviso legal…" maxlength="2000"></textarea>
+          <small class="muted template-footer-help">Se agregará al final del mensaje al usar la plantilla en Correo. Podrás editarlo aquí cuando quieras.</small>
+        </div>
+
         <!-- Zona de imagen adjunta de la plantilla -->
         <label>Imagen de la plantilla (opcional)</label>
         <div id="templateImageDropZone" class="template-image-dropzone">
@@ -680,7 +689,7 @@
         </div>
       </div>
 
-      <aside class="send-template-panel" aria-labelledby="sendTemplatesTitle">
+      <aside class="send-template-panel" id="sendTemplatePanel" aria-labelledby="sendTemplatesTitle">
         <div class="send-template-heading">
           <div>
             <span class="send-message-eyebrow">PLANTILLAS</span>
@@ -691,8 +700,8 @@
             <button id="sendModalNewTemplateBtn" type="button" class="send-modal-new-template-btn" title="Crear nueva plantilla">+ Nueva</button>
           </div>
         </div>
-        <p>Elige un texto para cargarlo en el mensaje.</p>
-        <div class="send-template-filter-tools">
+        <p id="sendTemplateIntro">Elige un texto para cargarlo en el mensaje.</p>
+        <div class="send-template-filter-tools" id="sendTemplateFilterTools">
           <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
           <!-- Filtros de cuatro columnas: RUBRO · SPEECH · PRECIO · COMBO -->
           <div class="stf-dropdown-row" id="stfDropdownRow">

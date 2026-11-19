@@ -8,6 +8,7 @@ const TEMPLATE_SCHEMA = `CREATE TABLE IF NOT EXISTS message_templates (
   category VARCHAR(60) NOT NULL DEFAULT 'Otros',
   type ENUM('both','whatsapp','email') NOT NULL DEFAULT 'both',
   message TEXT NOT NULL,
+  footer TEXT NULL,
   image MEDIUMTEXT NULL,
   is_seeded BOOLEAN NOT NULL DEFAULT FALSE,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -27,7 +28,8 @@ async function ensureSchema(pool) {
       await pool.query(TEMPLATE_SCHEMA);
       const migrations = [
         ["is_seeded", "BOOLEAN NOT NULL DEFAULT FALSE"],
-        ["is_deleted", "BOOLEAN NOT NULL DEFAULT FALSE"]
+        ["is_deleted", "BOOLEAN NOT NULL DEFAULT FALSE"],
+        ["footer", "TEXT NULL"]
       ];
       for (const [column, definition] of migrations) {
         const [rows] = await pool.query(
@@ -51,18 +53,19 @@ function cleanTemplate(input = {}) {
   const category = String(input.category || "Otros").trim().slice(0, 60) || "Otros";
   const type = ["both", "whatsapp", "email"].includes(input.type) ? input.type : "both";
   const message = String(input.message || "").trim().slice(0, 5000);
+  const footer = String(input.footer || "").trim().slice(0, 2000);
   const image = input.image == null ? null : String(input.image);
   if (!/^[a-z0-9_-]{1,120}$/i.test(id) || !name || !message) throw new Error("Cada plantilla necesita un identificador, nombre y mensaje válidos.");
   if (image && (image.length > MAX_IMAGE_LENGTH || !/^(data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/=]+|\/[a-z0-9/_\-.%]+)$/i.test(image))) {
     throw new Error("La imagen de una plantilla no es válida o supera el tamaño permitido.");
   }
-  return { id, name, category, type, message, image };
+  return { id, name, category, type, message, footer, image };
 }
 
 function toClient(row) {
   return {
     id: String(row.id), name: row.name, category: row.category, type: row.type,
-    message: row.message, image: row.image || null,
+    message: row.message, footer: row.footer || "", image: row.image || null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
   };
@@ -91,11 +94,11 @@ export function registerMessageTemplates(runtime) {
       for (const flyer of CAMPAIGN_FLYERS_2027) {
         const id = `campaign-2027-${flyer.image.split("/").pop().replace(/\.webp$/i, "")}`;
         values.push(req.user.id, id, flyer.name, flyer.category || "Otros", "both",
-          `Hola, te compartimos nuestro flyer de ${flyer.name}. Si deseas más información, estamos para ayudarte.`, flyer.image);
+          `Hola, te compartimos nuestro flyer de ${flyer.name}. Si deseas más información, estamos para ayudarte.`, "", flyer.image);
       }
       await db.query(`INSERT IGNORE INTO message_templates
-        (user_id,id,name,category,type,message,image,is_seeded) VALUES ${CAMPAIGN_FLYERS_2027.map(() => "(?,?,?,?,?,?,?,TRUE)").join(",")}`, values);
-      const [rows] = await db.query(`SELECT id,name,category,type,message,image,created_at,updated_at
+        (user_id,id,name,category,type,message,footer,image,is_seeded) VALUES ${CAMPAIGN_FLYERS_2027.map(() => "(?,?,?,?,?,?,?,?,TRUE)").join(",")}`, values);
+      const [rows] = await db.query(`SELECT id,name,category,type,message,footer,image,created_at,updated_at
         FROM message_templates WHERE user_id=? AND is_deleted=FALSE`, [req.user.id]);
       res.setHeader("Cache-Control", "no-store");
       return res.json({ ok: true, templates: rows.map(toClient) });
@@ -113,10 +116,10 @@ export function registerMessageTemplates(runtime) {
       if (!db) throw new Error("DATABASE_UNAVAILABLE");
       await ensureSchema(db);
       if (records.length) {
-        const values = records.flatMap(item => [req.user.id, item.id, item.name, item.category, item.type, item.message, item.image]);
-        await db.query(`INSERT INTO message_templates (user_id,id,name,category,type,message,image)
-          VALUES ${records.map(() => "(?,?,?,?,?,?,?)").join(",")}
-          ON DUPLICATE KEY UPDATE name=VALUES(name),category=VALUES(category),type=VALUES(type),message=VALUES(message),image=VALUES(image),updated_at=CURRENT_TIMESTAMP(3)`, values);
+        const values = records.flatMap(item => [req.user.id, item.id, item.name, item.category, item.type, item.message, item.footer, item.image]);
+        await db.query(`INSERT INTO message_templates (user_id,id,name,category,type,message,footer,image)
+          VALUES ${records.map(() => "(?,?,?,?,?,?,?,?)").join(",")}
+          ON DUPLICATE KEY UPDATE name=VALUES(name),category=VALUES(category),type=VALUES(type),message=VALUES(message),footer=VALUES(footer),image=VALUES(image),updated_at=CURRENT_TIMESTAMP(3)`, values);
       }
       return res.json({ ok: true, imported: records.length });
     } catch (error) { return templateError(res, error); }
@@ -128,9 +131,9 @@ export function registerMessageTemplates(runtime) {
       const db = pool();
       if (!db) throw new Error("DATABASE_UNAVAILABLE");
       await ensureSchema(db);
-      await db.query(`INSERT INTO message_templates (user_id,id,name,category,type,message,image)
-        VALUES (?,?,?,?,?,?,?)`, [req.user.id, item.id, item.name, item.category, item.type, item.message, item.image]);
-      const [rows] = await db.query(`SELECT id,name,category,type,message,image,created_at,updated_at
+      await db.query(`INSERT INTO message_templates (user_id,id,name,category,type,message,footer,image)
+        VALUES (?,?,?,?,?,?,?,?)`, [req.user.id, item.id, item.name, item.category, item.type, item.message, item.footer, item.image]);
+      const [rows] = await db.query(`SELECT id,name,category,type,message,footer,image,created_at,updated_at
         FROM message_templates WHERE user_id=? AND id=?`, [req.user.id, item.id]);
       return res.status(201).json({ ok: true, template: toClient(rows[0]) });
     } catch (error) { return templateError(res, error); }
@@ -142,10 +145,10 @@ export function registerMessageTemplates(runtime) {
       const db = pool();
       if (!db) throw new Error("DATABASE_UNAVAILABLE");
       await ensureSchema(db);
-      const [result] = await db.query(`UPDATE message_templates SET name=?,category=?,type=?,message=?,image=?,updated_at=CURRENT_TIMESTAMP(3)
-        WHERE user_id=? AND id=?`, [item.name, item.category, item.type, item.message, item.image, req.user.id, item.id]);
+      const [result] = await db.query(`UPDATE message_templates SET name=?,category=?,type=?,message=?,footer=?,image=?,updated_at=CURRENT_TIMESTAMP(3)
+        WHERE user_id=? AND id=?`, [item.name, item.category, item.type, item.message, item.footer, item.image, req.user.id, item.id]);
       if (!result.affectedRows) return res.status(404).json({ ok: false, error: "Plantilla no encontrada." });
-      const [rows] = await db.query(`SELECT id,name,category,type,message,image,created_at,updated_at
+      const [rows] = await db.query(`SELECT id,name,category,type,message,footer,image,created_at,updated_at
         FROM message_templates WHERE user_id=? AND id=?`, [req.user.id, item.id]);
       return res.json({ ok: true, template: toClient(rows[0]) });
     } catch (error) { return templateError(res, error); }

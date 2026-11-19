@@ -708,6 +708,45 @@
   word-break: break-word;
 }
 
+/* Vista CORREO: plantillas corporativas con pie de página visible */
+#sendMessageModal .send-template-option.is-email {
+  border-color: #d9c2e8 !important;
+  background: #fffdfd;
+}
+
+#sendMessageModal .send-template-option.is-email:hover {
+  border-color: #8e1ab2 !important;
+  background: #fbf6ff !important;
+}
+
+#sendMessageModal .send-template-option.is-email.is-selected {
+  border-color: #8e1ab2 !important;
+  background: #f8f0ff !important;
+  box-shadow: 0 0 0 1.5px #8e1ab2, 0 4px 12px rgba(142, 26, 178, 0.12) !important;
+}
+
+#sendMessageModal .send-template-footer {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px dashed #e4d3ef;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #6b5380;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  font-style: italic;
+}
+
+#templateModal .template-footer-help {
+  display: block;
+  margin-top: 4px;
+  color: #6b5380;
+  font-size: 11px;
+}
+
 #sendMessageModal .send-template-option-bottom {
   display: flex;
   align-items: center;

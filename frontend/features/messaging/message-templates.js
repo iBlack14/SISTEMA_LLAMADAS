@@ -44,6 +44,7 @@ let templates = [];
 let currentEditingId = null;
 let currentEditingType = 'both'; // Las plantillas nuevas siempre son para WhatsApp y Correo
 let pendingTemplateCategory = ''; // Categoría preseleccionada al crear desde un filtro
+let currentSendTab = 'whatsapp'; // Pestaña activa del modal de envío
 let currentEditingImage = null; // Base64 o URL para templateModal
 let currentSendImage = null;    // Base64 o URL para sendMessageModal
 let initializationPromise = null;
@@ -351,11 +352,13 @@ function renderTemplates() {
 // ============================================================================
 // TEMPLATE MODAL (Crear / Actualizar Plantillas con Imagen)
 // ============================================================================
-function openTemplateModal(templateId = null, presetCategory = '') {
+function openTemplateModal(templateId = null, presetCategory = '', presetType = '') {
   const modal = document.getElementById('templateModal');
   const title = document.getElementById('templateModalTitle');
   const nameInput = document.getElementById('templateNameInput');
   const messageInput = document.getElementById('templateMessageInput');
+  const footerInput = document.getElementById('templateFooterInput');
+  const footerCharCount = document.getElementById('templateFooterCharCount');
   const charCount = document.getElementById('templateCharCount');
   const emptyWrap = document.getElementById('templateImageEmptyWrap');
   const previewWrap = document.getElementById('templateImagePreviewWrap');
@@ -375,6 +378,7 @@ function openTemplateModal(templateId = null, presetCategory = '') {
     currentEditingType = template.type || 'both';
     pendingTemplateCategory = template.category || '';
     if (messageInput) messageInput.value = template.message;
+    if (footerInput) footerInput.value = template.footer || '';
 
     if (template.image) {
       currentEditingImage = template.image;
@@ -386,11 +390,12 @@ function openTemplateModal(templateId = null, presetCategory = '') {
       if (emptyWrap) emptyWrap.style.display = 'flex';
     }
   } else {
-    if (title) title.textContent = 'Nueva plantilla';
+    if (title) title.textContent = presetType === 'email' ? 'Nueva plantilla de correo' : 'Nueva plantilla';
     if (nameInput) nameInput.value = '';
-    currentEditingType = 'both';
+    currentEditingType = presetType === 'whatsapp' || presetType === 'email' ? presetType : 'both';
     pendingTemplateCategory = String(presetCategory || '').trim();
     if (messageInput) messageInput.value = '';
+    if (footerInput) footerInput.value = '';
     if (previewWrap) previewWrap.style.display = 'none';
     if (emptyWrap) emptyWrap.style.display = 'flex';
   }
@@ -398,8 +403,18 @@ function openTemplateModal(templateId = null, presetCategory = '') {
   if (charCount && messageInput) {
     charCount.textContent = String(messageInput.value.length);
   }
+  if (footerCharCount && footerInput) {
+    footerCharCount.textContent = String(footerInput.value.length);
+  }
+  updateTemplateFooterVisibility();
 
   modal.style.display = 'flex';
+}
+
+function updateTemplateFooterVisibility() {
+  const field = document.getElementById('templateFooterField');
+  if (!field) return;
+  field.style.display = currentEditingType === 'whatsapp' ? 'none' : '';
 }
 
 function closeTemplateModal() {
@@ -448,12 +463,14 @@ function removeTemplateImage() {
 async function saveTemplate() {
   const nameInput = document.getElementById('templateNameInput');
   const messageInput = document.getElementById('templateMessageInput');
+  const footerInput = document.getElementById('templateFooterInput');
 
   if (!nameInput || !messageInput) return;
 
   const name = nameInput.value.trim();
   const type = currentEditingType;
   const message = messageInput.value.trim();
+  const footer = String(footerInput?.value || '').trim();
 
   if (!name) {
     showToast('Ingresa un nombre para la plantilla.', 'warning');
@@ -470,7 +487,7 @@ async function saveTemplate() {
   const isEditing = Boolean(currentEditingId);
   const template = {
     id: currentEditingId || generateId(), name,
-    category: pendingTemplateCategory || inferCategory(name), type, message,
+    category: pendingTemplateCategory || inferCategory(name), type, message, footer,
     image: currentEditingImage || null
   };
   const saveButton = document.getElementById('templateSaveBtn');
@@ -535,8 +552,11 @@ async function openSendModal(templateId, initialTab = 'whatsapp') {
   modal.dataset.templateId = templateId;
 
   const message = replaceVariables(template.message);
+  const footer = replaceVariables(template.footer || '');
+  currentSendTab = initialTab === 'email' ? 'email' : 'whatsapp';
   setSendModalValues({
     message,
+    emailBody: composeEmailBody(message, footer),
     subject: template.name,
     image: template.image || null
   });
@@ -559,8 +579,10 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
   const email = String(contact?.email || contact?.correo || '').trim();
   const template = templates.find(item => item.type === 'both' || item.type === initialTab) || templates[0];
   const message = replaceVariables(template?.message || '', contact?.name || '', contact?.company || contact?.empresa || '');
+  const footer = replaceVariables(template?.footer || '', contact?.name || '', contact?.company || contact?.empresa || '');
 
   modal.dataset.templateId = template?.id || '';
+  currentSendTab = initialTab === 'email' ? 'email' : 'whatsapp';
   currentSendContact = contact;
   contactSendResolved = false;
   const contactName = document.getElementById('sendMessageContactName');
@@ -569,6 +591,7 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
     phone,
     email,
     message,
+    emailBody: composeEmailBody(message, footer),
     subject: template?.name || '',
     image: template?.image || null
   });
@@ -1073,25 +1096,44 @@ function renderSendTemplateList(selectedId = '') {
   const count = document.getElementById('sendTemplateCount');
   const search = document.getElementById('sendTemplateSearch');
   const resultCount = document.getElementById('sendTemplateResultCount');
+  const filterTools = document.getElementById('sendTemplateFilterTools');
   if (!list) return;
 
-  refreshStfDropdowns();
-  if (count) count.textContent = String(templates.length);
+  const emailMode = currentSendTab === 'email';
+
+  // En Correo no hay categorías: solo la lista de plantillas corporativas.
+  if (filterTools) filterTools.style.display = emailMode ? 'none' : '';
+  const heading = document.getElementById('sendTemplatesTitle');
+  if (heading) heading.textContent = emailMode ? 'Plantillas de correo' : 'Mensajes guardados';
+  const intro = document.getElementById('sendTemplateIntro');
+  if (intro) {
+    intro.textContent = emailMode
+      ? 'Plantillas corporativas: edita el contenido y el pie de página desde cada plantilla.'
+      : 'Elige un texto para cargarlo en el mensaje.';
+  }
+
+  const pool = templates.filter(t => emailMode
+    ? (t.type === 'email' || t.type === 'both')
+    : (t.type === 'whatsapp' || t.type === 'both'));
+  if (!emailMode) refreshStfDropdowns();
+  if (count) count.textContent = String(pool.length);
   list.replaceChildren();
 
-  if (!templates.length) {
+  if (!pool.length) {
     const empty = document.createElement('p');
     empty.className = 'send-template-empty';
-    empty.textContent = 'No hay plantillas en la base de datos. Haz clic en "+ Nueva" para crear una.';
+    empty.textContent = emailMode
+      ? 'No hay plantillas de correo. Haz clic en "+ Nueva" para crear una.'
+      : 'No hay plantillas en la base de datos. Haz clic en "+ Nueva" para crear una.';
     list.appendChild(empty);
     if (resultCount) resultCount.textContent = '0 plantillas';
     return;
   }
 
-  const query = String(search?.value || '').trim().toLocaleLowerCase('es');
+  const query = emailMode ? '' : String(search?.value || '').trim().toLocaleLowerCase('es');
 
   const hasActiveFilters = Boolean(activeFilters.rubro || activeFilters.speech || activeFilters.precio || activeFilters.combo);
-  const visibleTemplates = sortTemplates(templates.filter(template => {
+  const visibleTemplates = sortTemplates(pool.filter(template => {
     if (query) {
       const searchable = `${template.name} ${template.message}`.toLocaleLowerCase('es');
       if (!searchable.includes(query)) return false;
@@ -1105,8 +1147,8 @@ function renderSendTemplateList(selectedId = '') {
 
   if (resultCount) {
     resultCount.textContent = query || hasActiveFilters
-      ? `${visibleTemplates.length} de ${templates.length} plantillas`
-      : `${templates.length} plantillas`;
+      ? `${visibleTemplates.length} de ${pool.length} plantillas`
+      : `${pool.length} plantillas`;
   }
 
   if (!visibleTemplates.length) {
@@ -1122,11 +1164,15 @@ function renderSendTemplateList(selectedId = '') {
     button.type = 'button';
     button.className = 'send-template-option';
     button.classList.toggle('is-selected', template.id === selectedId);
+    button.classList.toggle('is-email', emailMode);
     button.dataset.sendTemplateId = template.id;
 
     const hasImage = Boolean(template.image);
     const typeLabel = template.type === 'email' ? 'Correo' :
       template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
+    const footerSnippet = emailMode && template.footer
+      ? `<div class="send-template-footer">${escapeHtml(template.footer)}</div>`
+      : '';
 
     button.innerHTML = `
       <div class="send-template-card-main">
@@ -1140,6 +1186,7 @@ function renderSendTemplateList(selectedId = '') {
             </div>
           </div>
           <div class="send-template-snippet">${escapeHtml(template.message)}</div>
+          ${footerSnippet}
         </div>
       </div>
       <div class="send-template-option-bottom">
@@ -1152,6 +1199,11 @@ function renderSendTemplateList(selectedId = '') {
   });
 }
 
+function composeEmailBody(message, footer = '') {
+  const cleanFooter = String(footer || '').trim();
+  return cleanFooter ? `${message}\n\n${cleanFooter}` : message;
+}
+
 function applySendTemplate(templateId) {
   const template = templates.find(item => item.id === templateId);
   if (!template) return;
@@ -1161,11 +1213,17 @@ function applySendTemplate(templateId) {
     currentSendContact?.name || '',
     currentSendContact?.company || currentSendContact?.empresa || ''
   );
+  const footer = replaceVariables(
+    template.footer || '',
+    currentSendContact?.name || '',
+    currentSendContact?.company || currentSendContact?.empresa || ''
+  );
 
   setSendModalValues({
     phone: document.getElementById('sendWhatsAppNumber')?.value || '',
     email: document.getElementById('sendEmailAddress')?.value || '',
     message,
+    emailBody: composeEmailBody(message, footer),
     subject: template.name,
     image: template.image || null
   });
@@ -1175,7 +1233,7 @@ function applySendTemplate(templateId) {
   renderSendTemplateList(template.id);
 }
 
-function setSendModalValues({ phone = '', email = '', message = '', subject = '', image = null }) {
+function setSendModalValues({ phone = '', email = '', message = '', emailBody = null, subject = '', image = null }) {
   const phoneInput = document.getElementById('sendWhatsAppNumber');
   const emailInput = document.getElementById('sendEmailAddress');
   const subjectInput = document.getElementById('sendEmailSubject');
@@ -1186,7 +1244,7 @@ function setSendModalValues({ phone = '', email = '', message = '', subject = ''
   if (emailInput && email) emailInput.value = email;
   if (subjectInput && subject) subjectInput.value = subject;
   if (waMessage) waMessage.value = message;
-  if (emailMessage) emailMessage.value = message;
+  if (emailMessage) emailMessage.value = emailBody ?? message;
 
   updateCharCount(waMessage, document.getElementById('whatsappCharCount'), 1000);
   updateCharCount(emailMessage, document.getElementById('emailCharCount'), 5000);
@@ -1316,7 +1374,11 @@ function switchSendTab(tab) {
 
   if (!waTab || !emailTab || !waContent || !emailContent) return;
 
-  if (tab === 'whatsapp') {
+  const nextTab = tab === 'email' ? 'email' : 'whatsapp';
+  const changed = currentSendTab !== nextTab;
+  currentSendTab = nextTab;
+
+  if (nextTab === 'whatsapp') {
     waTab.classList.add('active');
     emailTab.classList.remove('active');
     waTab.setAttribute('aria-selected', 'true');
@@ -1330,6 +1392,13 @@ function switchSendTab(tab) {
     waTab.setAttribute('aria-selected', 'false');
     emailContent.style.display = 'grid';
     waContent.style.display = 'none';
+  }
+
+  if (changed) {
+    const modal = document.getElementById('sendMessageModal');
+    const selectedId = modal?.dataset.templateId || '';
+    if (selectedId) applySendTemplate(selectedId);
+    else renderSendTemplateList(selectedId);
   }
 }
 
@@ -1540,7 +1609,8 @@ function bindEvents() {
   if (sendModalNewBtn) {
     sendModalNewBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openTemplateModal();
+      const presetType = currentSendTab === 'email' ? 'email' : 'whatsapp';
+      openTemplateModal(null, '', presetType);
     });
   }
 
@@ -1566,6 +1636,15 @@ function bindEvents() {
   if (templateMessageInput && templateCharCount) {
     templateMessageInput.addEventListener('input', () => {
       updateCharCount(templateMessageInput, templateCharCount, 1000);
+    });
+  }
+
+  // Pie de página de la plantilla de correo
+  const templateFooterInput = document.getElementById('templateFooterInput');
+  const templateFooterCharCount = document.getElementById('templateFooterCharCount');
+  if (templateFooterInput && templateFooterCharCount) {
+    templateFooterInput.addEventListener('input', () => {
+      updateCharCount(templateFooterInput, templateFooterCharCount, 2000);
     });
   }
 
