@@ -7,13 +7,15 @@
  *   - "failed": se cerró el popup sin enviar o el navegador bloqueó la apertura.
  */
 
+import { currentUser } from "../auth/auth-session.js";
+
 export const MESSAGE_SEND_STATUS_EVENT = "message-send-status:changed";
 
 const STORAGE_PREFIX = "voip vc.messageSendStatus";
 
 function currentAccountId() {
   return String(
-    window.VOIP_VC_AUTH_USER?.id || ""
+    window.VOIP_VC_AUTH_USER?.id || currentUser?.id || ""
   );
 }
 
