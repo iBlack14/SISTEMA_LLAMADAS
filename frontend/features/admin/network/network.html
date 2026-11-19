@@ -65,26 +65,25 @@
       </section>
       <p id="turnUnavailable" class="muted summary-note" hidden>No hay datos de turno para consolidar el resumen.</p>
       <section class="equipment-overview" aria-labelledby="equipmentTitle">
-        <div class="section-heading"><h2 id="equipmentTitle">Equipos</h2><span id="nodeCount" class="muted">Cargando equipos…</span></div>
-        <div id="equipmentIndicators" class="indicators" aria-label="Ir a un equipo"></div>
+        <div class="section-heading equipment-heading">
+          <h2 id="equipmentTitle">Equipos</h2>
+          <span id="nodeCount" class="muted">Cargando equipos…</span>
+        </div>
         <div class="legend">
           <span><i data-tone="active"></i>En llamada <b id="legendActive">—</b></span>
           <span><i data-tone="dialing"></i>Marcando <b id="legendDialing">—</b></span>
           <span><i data-tone="ready"></i>Disponible <b id="legendReady">—</b></span>
           <span><i data-tone="offline"></i>Desconectado <b id="legendOffline">—</b></span>
-          <span><i data-tone="unknown"></i>Sin datos <b id="legendNone">—</b></span>
+          <span><i data-tone="unknown"></i>Sin equipo <b id="legendNone">—</b></span>
+          <span><i data-tone="unknown"></i>Sin señal de estado <b id="legendUnknown">—</b></span>
+        </div>
+        <div id="equipmentIndicators" class="indicators" aria-label="Ir a un equipo"></div>
+        <div class="equipment-reconnect-actions">
+          <button id="reconnectAllAlertBtn" class="button secondary reconnect-all-btn" type="button" disabled>Reconectar bridges</button>
+          <span id="reconnectFeedback" class="reconnect-feedback" role="status"></span>
         </div>
         <p id="overflowNotice" class="notice" hidden></p>
       </section>
-      <div id="alertBanner" class="notice error alert-banner" role="status" hidden>
-        <div class="alert-info">
-          <strong id="alertTitle"></strong>
-          <p id="alertText"></p>
-        </div>
-        <div class="alert-actions">
-          <button id="reconnectAllAlertBtn" class="button secondary reconnect-all-btn" type="button">🔄 Reconectar todos</button>
-        </div>
-      </div>
       <section aria-label="Detalle de equipos">
         <div class="filters">
           <label class="search" for="searchInput">Buscar equipo<input id="searchInput" type="search" placeholder="Equipo, nombre o rubro…"></label>
@@ -94,7 +93,8 @@
             <button class="filter-pill" data-filter="Marcando" type="button" aria-pressed="false">Marcando</button>
             <button class="filter-pill" data-filter="Disponible" type="button" aria-pressed="false">Disponibles</button>
             <button class="filter-pill" data-filter="Desconectado" type="button" aria-pressed="false">Desconectados</button>
-            <button class="filter-pill" data-filter="Sin datos" type="button" aria-pressed="false">Sin datos</button>
+            <button class="filter-pill" data-filter="Sin equipo" type="button" aria-pressed="false">Sin equipo</button>
+            <button class="filter-pill" data-filter="Sin señal de estado" type="button" aria-pressed="false">Sin señal de estado</button>
           </div>
         </div>
         <div id="equipmentGrid" class="equipment-grid"></div>
