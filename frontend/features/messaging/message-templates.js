@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Sistema de plantillas de mensajes y mensajería
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */

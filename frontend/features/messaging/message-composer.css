@@ -465,11 +465,21 @@
   #sendMessageModal .sm-image-preview-wrap { flex-direction: column; }
 }
 
-/* Keep long template catalogs from collapsing their cards into overlapping rows. */
+/* Keep long template catalogs from collapsing their cards into overlapping rows.
+   overflow-x: clip (not hidden) lets absolutely-positioned dropdown menus escape the panel. */
 #sendMessageModal .send-template-panel {
   box-sizing: border-box;
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip;    /* 'clip' prevents scroll but lets abs-positioned children escape */
+}
+
+/* The filter-tools section must NOT clip so its dropdown menus remain visible */
+#sendMessageModal .send-template-filter-tools {
+  overflow: visible;
+}
+
+#sendMessageModal .stf-dropdown-row {
+  overflow: visible;
 }
 
 #sendMessageModal .send-template-list {
