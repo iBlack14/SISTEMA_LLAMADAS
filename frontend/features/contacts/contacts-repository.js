@@ -37,7 +37,10 @@ function isConflictError(error) {
 }
 
 function apply(book) {
-  contacts = book.contacts || [];
+  contacts = (book.contacts || []).map(contact => ({
+    ...contact,
+    createdAt: contact.createdAt || contact.created_at || contact.date || null
+  }));
   lists = book.lists || ["Principal"];
   activeList = book.activeList || lists[0];
   calledCounts = book.calledCounts || {};

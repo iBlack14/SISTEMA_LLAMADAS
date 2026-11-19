@@ -80,10 +80,15 @@ function renderContacts() {
   const pageRows = contacts.slice(startIndex, startIndex + dashboardState.PAGE_SIZE);
 
   const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  function formatDate(dateStr) {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "";
+  function formatDate(contact) {
+    const raw = contact?.createdAt || contact?.created_at || contact?.date || contact?.fecha;
+    if (!raw) return "—";
+    // MySQL devuelve "2026-11-18 17:09:57"; normalizarlo evita fechas inválidas.
+    const normalized = typeof raw === "string"
+      ? raw.trim().replace(" ", "T").replace(/\s+.*$/, "")
+      : raw;
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return "—";
     return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
   }
 
@@ -107,11 +112,11 @@ function renderContacts() {
     }
 
     const company = c.company || c.name || "";
-    const dateStr = formatDate(c.createdAt);
+    const dateStr = formatDate(c);
     tr.innerHTML = `
       <td style="padding:10px 12px;border-bottom:1px solid var(--border);">${dashboardActions.escHtml(company)}</td>
       <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">${dashboardActions.escHtml(dateStr)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:#e7d4f1;font-size:12px;font-variant-numeric:tabular-nums;">${dashboardActions.escHtml(dateStr)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${dashboardActions.contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
