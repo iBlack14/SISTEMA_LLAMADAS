@@ -1,4 +1,4 @@
-import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
+﻿import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js";
 
 const adminPaths = { network: "/nucleo-red", users: "/usuarios" };

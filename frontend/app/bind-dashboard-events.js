@@ -1,4 +1,4 @@
-import { socket, API_BASE } from '../shared/realtime/socket.js';
+﻿import { socket, API_BASE } from '../shared/realtime/socket.js';
 import { validateReportPeriod, isInReportPeriod, reportPeriodLabel } from '../features/reports/report-period.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../shared/ui/dom.js';
 import * as Contacts from '../features/contacts/contacts-repository.js';

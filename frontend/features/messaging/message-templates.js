@@ -266,7 +266,7 @@ function renderTemplates() {
 
   container.innerHTML = sortTemplates(templates).map(template => {
     const typeLabel = template.type === 'whatsapp' ? 'WhatsApp' :
-                      template.type === 'email' ? 'Correo' : 'WhatsApp y Correo';
+      template.type === 'email' ? 'Correo' : 'WhatsApp y Correo';
     const hasImage = Boolean(template.image);
 
     return `
@@ -599,28 +599,176 @@ function closeAllStfMenus(except = null) {
 
 /** Genera las opciones de un menu a partir de un Set de valores. */
 /** Genera las opciones de un menu a partir de un Set de valores (formato lista limpia) */
-function buildStfMenu(menuEl, values, currentValue, onSelect) {
+
+/** Metadatos visuales del filtro RUBRO */
+const RUBRO_UI = {
+  'Comercio y servicios': {
+    description: 'Negocios y atención comercial',
+    icon: '<path d="M3 10h18l-2-6H5l-2 6Z"/><path d="M5 10v10h14V10M9 20v-7h6v7"/>'
+  },
+  'Alimentos y hospedaje': {
+    description: 'Restaurantes, hoteles y turismo',
+    icon: '<path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M17 21V3c-4 2-5 6-5 10h5"/>'
+  },
+  'Hogar y construcción': {
+    description: 'Obras, viviendas y materiales',
+    icon: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-8h6v8"/>'
+  },
+  'Salud y bienestar': {
+    description: 'Salud, clínicas y cuidado personal',
+    icon: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h5l2-3 3 6 2-3h5"/>'
+  },
+  'Educación': {
+    description: 'Institutos, colegios y formación',
+    icon: '<path d="m2 10 10-5 10 5-10 5ZM6 12v5c4 3 8 3 12 0v-5M22 10v7"/>'
+  },
+  'Tecnología y web': {
+    description: 'Software y soluciones digitales',
+    icon: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4M9 9l-2 2 2 2m6-4 2 2-2 2"/>'
+  },
+  'Otros': {
+    description: 'Otras actividades y sectores',
+    icon: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
+  }
+};
+
+/** Metadatos visuales del filtro SPEECH */
+const SPEECH_UI = {
+  'Oferta': {
+    description: 'Promociones y descuentos',
+    icon: '<path d="M20 13 12 21l-9-9V3h9l8 8Z"/><circle cx="8" cy="8" r="1.2"/>'
+  },
+  'Presentación': {
+    description: 'Datos de la empresa y servicios',
+    icon: '<path d="M3 11v2a1 1 0 0 0 1 1h3l8 5V5L7 10H4a1 1 0 0 0-1 1Z"/><path d="M18 9a4 4 0 0 1 0 6"/>'
+  },
+  'Seguimiento': {
+    description: 'Contactos y llamadas anteriores',
+    icon: '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/>'
+  },
+  'Recordatorio': {
+    description: 'Fechas, citas y reservas',
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
+  },
+  'Agradecimiento': {
+    description: 'Gratitud hacia el cliente',
+    icon: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>'
+  },
+  'Informativo': {
+    description: 'Detalles, cotizaciones y adjuntos',
+    icon: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6M8 13h8M8 17h8"/>'
+  },
+  'General': {
+    description: 'Mensajes sin categoría específica',
+    icon: '<path d="M21 11.5a8 8 0 0 1-8 8 9 9 0 0 1-3-.5L4 21l1.5-4a8 8 0 1 1 15.5-5.5Z"/>'
+  }
+};
+
+/** Metadatos visuales del filtro PRECIO */
+const PRECIO_UI = {
+  'Con precio': {
+    description: 'Incluye montos o tarifas',
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M15 9.5a3 3 0 0 0-3-1.5 3 3 0 0 0 0 6 3 3 0 0 1 0 6 3 3 0 0 0 3-1.5M12 6v12"/>'
+  },
+  'Sin precio': {
+    description: 'Sin montos en el mensaje',
+    icon: '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>'
+  }
+};
+
+/** Configuración compartida de los tres menús con formato enriquecido */
+const STF_MENU_UI = {
+  rubro: {
+    allLabel: 'Todos los rubros',
+    allDescription: 'Mostrar todas las categorías',
+    fallbackDescription: 'Otras actividades',
+    options: RUBRO_UI
+  },
+  speech: {
+    allLabel: 'Todos los tipos',
+    allDescription: 'Mostrar todos los mensajes',
+    fallbackDescription: 'Tipo de mensaje',
+    options: SPEECH_UI
+  },
+  precio: {
+    allLabel: 'Todos los precios',
+    allDescription: 'Mostrar todas las opciones',
+    fallbackDescription: 'Opción de precio',
+    options: PRECIO_UI
+  }
+};
+
+const STF_CHECK_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+
+/** Genera opciones sin modificar la lógica de filtrado */
+function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
   if (!menuEl) return;
-  menuEl.innerHTML = '';
-  const allLi = document.createElement('li');
-  const allBtn = document.createElement('button');
-  allBtn.type = 'button';
-  allBtn.textContent = 'Todos';
-  if (!currentValue) allBtn.classList.add('is-selected');
-  allBtn.addEventListener('click', () => onSelect(''));
-  allLi.appendChild(allBtn);
-  menuEl.appendChild(allLi);
-  [...values].forEach(val => {
+
+  const ui = STF_MENU_UI[kind] || null;
+  menuEl.replaceChildren();
+  menuEl.classList.toggle('stf-rich-menu', Boolean(ui));
+
+  const appendOption = (value, title, description = '', iconPaths = '') => {
     const li = document.createElement('li');
     const btn = document.createElement('button');
+
     btn.type = 'button';
-    btn.textContent = val;
-    if (val === currentValue) btn.classList.add('is-selected');
-    btn.addEventListener('click', () => onSelect(val));
+    btn.className = 'stf-menu-option';
+
+    const selected = value === currentValue;
+    btn.classList.toggle('is-selected', selected);
+    btn.setAttribute('aria-pressed', String(selected));
+
+    if (ui) {
+      const copy = document.createElement('span');
+      copy.className = 'stf-option-copy';
+
+      const name = document.createElement('span');
+      name.className = 'stf-option-title';
+      name.textContent = title;
+
+      const desc = document.createElement('span');
+      desc.className = 'stf-option-description';
+      desc.textContent = description;
+
+      copy.append(name, desc);
+
+      const visual = document.createElement('span');
+      visual.className = 'stf-option-visual';
+
+      visual.innerHTML = iconPaths
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths}</svg>`
+        : STF_CHECK_SVG;
+
+      btn.append(copy, visual);
+    } else {
+      btn.textContent = title;
+    }
+
+    btn.addEventListener('click', () => onSelect(value));
     li.appendChild(btn);
     menuEl.appendChild(li);
+  };
+
+  appendOption(
+    '',
+    ui?.allLabel || 'Todos',
+    ui?.allDescription || ''
+  );
+
+  [...values].forEach(value => {
+    const meta = ui?.options[value];
+
+    appendOption(
+      value,
+      value,
+      meta?.description || ui?.fallbackDescription || '',
+      meta?.icon || ''
+    );
   });
 }
+
 
 /** Actualiza el label y el estado visual del boton segun si hay filtro activo. */
 function updateStfBtnState(btnId, labelId, defaultLabel, activeValue) {
@@ -646,14 +794,14 @@ function syncClearBtn() {
 
 /** Inicializa o refresca los tres dropdowns de filtro. */
 function refreshStfDropdowns() {
-  const rubroBtnEl  = document.getElementById('stfRubroBtn');
+  const rubroBtnEl = document.getElementById('stfRubroBtn');
   const speechBtnEl = document.getElementById('stfSpeechBtn');
   const precioBtnEl = document.getElementById('stfPrecioBtn');
   if (!rubroBtnEl) return;
 
-  const rubros   = new Set(templates.map(t => t.category || 'Otros').filter(Boolean));
+  const rubros = new Set(templates.map(t => t.category || 'Otros').filter(Boolean));
   const speeches = new Set(templates.map(inferSpeech).filter(Boolean));
-  const precios  = new Set(templates.map(inferPrecio).filter(Boolean));
+  const precios = new Set(templates.map(inferPrecio).filter(Boolean));
 
   const refresh = () => {
     renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
@@ -666,7 +814,7 @@ function refreshStfDropdowns() {
     rubroBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
     refresh();
-  });
+  }, 'rubro');
 
   buildStfMenu(document.getElementById('stfSpeechMenu'), speeches, activeFilters.speech, (val) => {
     activeFilters.speech = val;
@@ -675,7 +823,7 @@ function refreshStfDropdowns() {
     speechBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
     refresh();
-  });
+  }, 'speech');
 
   buildStfMenu(document.getElementById('stfPrecioMenu'), precios, activeFilters.precio, (val) => {
     activeFilters.precio = val;
@@ -684,9 +832,9 @@ function refreshStfDropdowns() {
     precioBtnEl.setAttribute('aria-expanded', 'false');
     syncClearBtn();
     refresh();
-  });
+  }, 'precio');
 
-  updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'RUBRO',  activeFilters.rubro);
+  updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', activeFilters.rubro);
   updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', activeFilters.speech);
   updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', activeFilters.precio);
   syncClearBtn();
@@ -699,6 +847,7 @@ function renderSendTemplateList(selectedId = '') {
   const resultCount = document.getElementById('sendTemplateResultCount');
   if (!list) return;
 
+  refreshStfDropdowns();
   if (count) count.textContent = String(templates.length);
   list.replaceChildren();
 
@@ -713,16 +862,20 @@ function renderSendTemplateList(selectedId = '') {
 
   const query = String(search?.value || '').trim().toLocaleLowerCase('es');
 
+  const hasActiveFilters = Boolean(activeFilters.rubro || activeFilters.speech || activeFilters.precio);
   const visibleTemplates = sortTemplates(templates.filter(template => {
     if (query) {
       const searchable = `${template.name} ${template.message}`.toLocaleLowerCase('es');
       if (!searchable.includes(query)) return false;
     }
+    if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
+    if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
+    if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
     return true;
   }));
 
   if (resultCount) {
-    resultCount.textContent = query
+    resultCount.textContent = query || hasActiveFilters
       ? `${visibleTemplates.length} de ${templates.length} plantillas`
       : `${templates.length} plantillas`;
   }
@@ -744,7 +897,7 @@ function renderSendTemplateList(selectedId = '') {
 
     const hasImage = Boolean(template.image);
     const typeLabel = template.type === 'email' ? 'Correo' :
-                      template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
+      template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
 
     button.innerHTML = `
       <div class="send-template-card-main">
@@ -1089,22 +1242,6 @@ function bindEvents() {
   const refreshTemplateFilter = () => renderSendTemplateList(sendModal?.dataset.templateId || '');
   templateSearch?.addEventListener('input', refreshTemplateFilter);
 
-  // Dropdown toggle buttons (Rubro / Speech / Precio)
-  ['stfRubroBtn', 'stfSpeechBtn', 'stfPrecioBtn'].forEach(btnId => {
-    const btn = document.getElementById(btnId);
-    if (!btn) return;
-    const dropId = btn.id.replace('Btn', 'Dropdown');
-    const menuId = btn.id.replace('Btn', 'Menu');
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const menu = document.getElementById(menuId);
-      const isOpen = menu?.classList.contains('is-open');
-      closeAllStfMenus(isOpen ? null : dropId);
-      menu?.classList.toggle('is-open', !isOpen);
-      btn.setAttribute('aria-expanded', String(!isOpen));
-    });
-  });
-
   // Clear all filters button
   const clearBtn = document.getElementById('stfClearFiltersBtn');
   if (clearBtn) {
@@ -1112,7 +1249,7 @@ function bindEvents() {
       activeFilters.rubro = '';
       activeFilters.speech = '';
       activeFilters.precio = '';
-      updateStfBtnState('stfRubroBtn',  'stfRubroLabel',  'RUBRO',  '');
+      updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', '');
       updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', '');
       updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', '');
       syncClearBtn();
@@ -1120,11 +1257,23 @@ function bindEvents() {
     });
   }
 
-  // Close dropdowns on outside click
+  // Delegate dropdown clicks so re-rendered controls keep working.
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#stfDropdownRow')) {
-      closeAllStfMenus();
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+
+    const btn = target.closest('.stf-dropdown-btn');
+    if (btn && btn.closest('#stfDropdownRow')) {
+      const dropId = btn.id.replace('Btn', 'Dropdown');
+      const menu = document.getElementById(btn.id.replace('Btn', 'Menu'));
+      const isOpen = menu?.classList.contains('is-open') || false;
+      closeAllStfMenus(isOpen ? null : dropId);
+      menu?.classList.toggle('is-open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+      return;
     }
+
+    if (!target.closest('#stfDropdownRow')) closeAllStfMenus();
   });
 
 
