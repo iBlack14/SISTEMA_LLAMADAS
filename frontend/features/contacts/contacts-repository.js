@@ -306,8 +306,9 @@ export function addContact(contact, listName = "Principal") {
 
 export function addContacts(contactList, listName = "Principal") {
   const existingPhones = new Set(contacts.filter(c => c.list === listName).map(c => String(c.phone || "").replace(/\D/g, "")));
+  const now = new Date().toISOString();
   const processed = contactList
-    .map(c => ({ ...c, list: listName }))
+    .map(c => ({ ...c, list: listName, createdAt: c.createdAt || now, company: c.company || c.name || "" }))
     .filter(c => {
       const phone = String(c.phone || "").replace(/\D/g, "");
       if (phone.length < 6 || phone.length > 15 || existingPhones.has(phone)) return false;

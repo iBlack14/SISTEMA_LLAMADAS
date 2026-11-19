@@ -70,7 +70,7 @@ function renderContacts() {
   if (dashboardState.currentPage > totalPages) dashboardState.currentPage = totalPages;
 
   if (!contacts.length) {
-    cBodyEl.innerHTML = `<tr><td colspan="3" class="muted" style="text-align:center;padding:18px;">Sin contactos. Importa un archivo para crear la primera lista.</td></tr>`;
+    cBodyEl.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center;padding:18px;">Sin contactos. Importa un archivo para crear la primera lista.</td></tr>`;
     refs.contactsPaginationEl.style.display = "none";
     renderReminderFloat();
     return;
@@ -78,6 +78,14 @@ function renderContacts() {
 
   const startIndex = (dashboardState.currentPage - 1) * dashboardState.PAGE_SIZE;
   const pageRows = contacts.slice(startIndex, startIndex + dashboardState.PAGE_SIZE);
+
+  const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  function formatDate(dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
+  }
 
   const fragment = document.createDocumentFragment();
   for (const c of pageRows) {
@@ -98,9 +106,12 @@ function renderContacts() {
         tr.classList.add(dashboardState.currentState === "in_call" ? "contact-row-active-in-call" : "contact-row-active-call");
     }
 
+    const company = c.company || c.name || "";
+    const dateStr = formatDate(c.createdAt);
     tr.innerHTML = `
-      <td>${dashboardActions.escHtml(c.name)}</td>
-      <td style="font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}${dashboardActions.contactAnnualBlock(c) ? '<small style="display:block;font-family:inherit;">' + (dashboardActions.contactAnnualBlock(c) === "permanent" ? "NO VOLVER A LLAMAR: número inválido" : dashboardActions.contactAnnualBlock(c) === "blocked" ? "Bloqueado en todas las cuentas" : "Ya llamado; disponible para rellamada manual") + '</small>' : ""}</td>
+      <td>${dashboardActions.escHtml(company)}</td>
+      <td style="font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}</td>
+      <td>${dashboardActions.escHtml(dateStr)}</td>
       <td class="actions-cell contact-direct-cell">${dashboardActions.contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
