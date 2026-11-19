@@ -190,8 +190,15 @@ async function setReportScope(scope) {
   reportState.detailedPendingOnly = false;
   reportState.visibleRubrosStart = 0;
   try {
-    if (reportState.selectedDate) await reportActions.showDay(reportState.selectedDate);
-    else await reportActions.showCalendar();
+    if (reportState.viewedPeriod?.from && reportState.viewedPeriod?.to) {
+      // Conservar el rango que se estaba viendo (o el día, si era de una sola fecha).
+      reportState.calendarRange = { ...reportState.viewedPeriod };
+      await reportActions.showRange();
+    } else if (reportState.selectedDate) {
+      await reportActions.showDay(reportState.selectedDate);
+    } else {
+      await reportActions.showCalendar();
+    }
   } catch (error) {
     reportActions.showError(error);
   }
