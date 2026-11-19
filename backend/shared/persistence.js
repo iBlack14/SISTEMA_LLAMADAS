@@ -179,8 +179,15 @@ this.env = env;
   }
 
   cleanSessionOnLoad(session) {
+    const rawProcessed = session.processedCallIds;
+    let processedCallIds;
+    if (rawProcessed instanceof Set) processedCallIds = new Set(rawProcessed);
+    else if (Array.isArray(rawProcessed)) processedCallIds = new Set(rawProcessed);
+    else if (rawProcessed && typeof rawProcessed === "object") processedCallIds = new Set(Object.keys(rawProcessed));
+    else processedCallIds = new Set();
     return {
       ...session, dashboardSocketId: null, phoneSocketId: null, activePhoneSocketId: null,
+      processedCallIds,
       phoneWorkers: (session.phoneWorkers || []).map(worker => ({
         ...worker, socketId: null, connected: false, callState: "idle"
       }))

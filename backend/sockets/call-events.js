@@ -171,7 +171,7 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
     if (!session) return;
 
     // Idempotency: track processed callId+state to avoid duplicate processing
-    if (!session.processedCallIds) session.processedCallIds = new Set();
+    if (!(session.processedCallIds instanceof Set)) session.processedCallIds = new Set();
     const idempotencyKey = `${callId}:${callState}`;
     if (session.processedCallIds.has(idempotencyKey)) {
       console.info("[PHONE_STATUS] duplicate-ignored", { session: String(code).slice(-2), callId: String(callId || "").slice(-8), callState });
