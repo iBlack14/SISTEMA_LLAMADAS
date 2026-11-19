@@ -70,7 +70,7 @@ function renderContacts() {
   if (dashboardState.currentPage > totalPages) dashboardState.currentPage = totalPages;
 
   if (!contacts.length) {
-    cBodyEl.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center;padding:18px;">Sin contactos. Importa un archivo para crear la primera lista.</td></tr>`;
+    cBodyEl.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center;padding:24px;">Sin contactos. Sube un archivo CSV/Excel para empezar.</td></tr>`;
     refs.contactsPaginationEl.style.display = "none";
     renderReminderFloat();
     return;
@@ -109,10 +109,10 @@ function renderContacts() {
     const company = c.company || c.name || "";
     const dateStr = formatDate(c.createdAt);
     tr.innerHTML = `
-      <td>${dashboardActions.escHtml(company)}</td>
-      <td style="font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}</td>
-      <td>${dashboardActions.escHtml(dateStr)}</td>
-      <td class="actions-cell contact-direct-cell">${dashboardActions.contactActionButtons(c)}</td>`;
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);">${dashboardActions.escHtml(company)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;">${dashboardActions.escHtml(dateStr)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${dashboardActions.contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
   cBodyEl.appendChild(fragment);

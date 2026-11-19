@@ -134,21 +134,12 @@ async function handleImportFiles(fileList) {
   dashboardState.importPreviewData = dashboardState.importPreviewBatches.flatMap((batch) =>
     batch.contacts.map((contact) => ({ ...contact, importListName: batch.listName }))
   );
-  const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  function formatDate(dateStr) {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "";
-    return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
-  }
-  const todayStr = formatDate(new Date().toISOString());
-
   refs.previewBody.innerHTML = "";
   refs.previewCountEl.textContent = String(dashboardState.importPreviewData.length);
   const fragment = document.createDocumentFragment();
   for (const item of dashboardState.importPreviewData.slice(0, 500)) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${dashboardActions.escHtml(item.importListName)}</td><td>${dashboardActions.escHtml(item.company || item.name || "")}</td><td style="font-family:monospace;">${dashboardActions.escHtml(item.phone)}</td><td>${dashboardActions.escHtml(todayStr)}</td>`;
+    tr.innerHTML = `<td style="padding:8px;border-bottom:1px solid #f3f4f6;">${dashboardActions.escHtml(item.company || item.name || "")}</td><td style="padding:8px;border-bottom:1px solid #f3f4f6;font-family:monospace;">${dashboardActions.escHtml(item.phone)}</td>`;
     fragment.appendChild(tr);
   }
   refs.previewBody.appendChild(fragment);

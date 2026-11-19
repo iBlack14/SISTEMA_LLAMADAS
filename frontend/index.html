@@ -236,54 +236,69 @@
           <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>
 
           <div class="contacts-topbar">
-            <p class="section-title contacts-title">📋 Contactos</p>
+            <p class="section-title contacts-title">📋 Mis contactos</p>
             <div class="called-counter">
-              <span>Contactos llamados</span>
+              <span>Llamados</span>
               <strong id="calledContactsValue">0</strong>
             </div>
           </div>
           <div class="contact-actions contacts-search">
-            <label for="filterInput">Buscar contactos</label>
-            <input id="filterInput" type="search" placeholder="Escribe un nombre o teléfono" autocomplete="off" />
+            <label for="filterInput">Buscar</label>
+            <input id="filterInput" type="search" placeholder="Nombre o teléfono..." autocomplete="off" />
           </div>
 
-          <!-- IMPORT PANEL - SIMPLIFICADO -->
-          <div class="import-panel">
-            <p class="section-title" style="margin-top:0;">📥 Importar contactos (CSV, Excel, Word)</p>
-            <p class="muted" style="font-size:12px;margin-bottom:12px;">
-              Arrastra o selecciona archivos <strong>.csv, .xlsx, .xls, .docx</strong>. 
-              Cada archivo crea una lista con su nombre. Columnas detectadas: <em>Nombre, Teléfono, Nota</em>.
-            </p>
-            <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap;">
-              <label class="file-label" for="importFile" style="flex:1;min-width:200px;text-align:center;">
-                📂 Seleccionar archivos
+          <!-- IMPORT - SIMPLE -->
+          <div class="import-panel" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
+            <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+              <label class="file-label" for="importFile" style="flex:1;min-width:180px;text-align:center;background:#f0fdf4;border:2px dashed #16a34a;color:#166534;padding:16px;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+                📁 Arrastra o haz clic para subir CSV/Excel/Word
                 <input id="importFile" type="file" accept=".csv,.txt,.xlsx,.xls,.docx" multiple hidden />
               </label>
-              <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;">Ninguno seleccionado</span>
+              <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;min-width:150px;">Ningún archivo</span>
             </div>
 
             <!-- PREVIEW -->
-            <div id="importPreview" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);max-height:35vh;overflow:auto;">
-              <p class="section-title" style="margin-top:0;margin-bottom:8px;">Vista previa — <span id="previewCount">0</span> contactos detectados</p>
-              <div class="table-wrap" style="max-height:250px;overflow-y:auto;">
-                <table>
-                  <thead>
+            <div id="importPreview" style="display:none;margin-top:12px;padding:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;max-height:30vh;overflow:auto;">
+              <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong>Vista previa: <span id="previewCount">0</span> contactos</strong>
+                <button id="importCancelBtn" class="secondary" style="padding:6px 12px;">✕</button>
+              </div>
+              <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+                <table style="width:100%;font-size:13px;">
+                  <thead style="position:sticky;top:0;background:#f9fafb;">
                     <tr>
-                      <th>Lista</th>
-                      <th>Empresa</th>
-                      <th>Teléfono</th>
-                      <th>Fecha creación</th>
+                      <th style="text-align:left;padding:8px;">Empresa</th>
+                      <th style="text-align:left;padding:8px;">Teléfono</th>
                     </tr>
                   </thead>
                   <tbody id="previewBody"></tbody>
                 </table>
               </div>
-              <div class="row" style="margin-top:12px;justify-content:flex-end;gap:8px;">
-                <button id="importCancelBtn" class="secondary">✕ Cancelar</button>
-                <button id="importConfirmBtn" style="background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;">✅ Guardar contactos</button>
+              <div class="row" style="margin-top:12px;justify-content:flex-end;">
+                <button id="importConfirmBtn" style="background:#16a34a;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer;">✅ Guardar</button>
               </div>
             </div>
-            <p id="importSaveFeedback" role="status" aria-live="polite" hidden></p>
+            <p id="importSaveFeedback" role="status" aria-live="polite" hidden style="margin-top:8px;font-size:13px;"></p>
+          </div>
+
+          <!-- CONTACTS TABLE -->
+          <div class="table-wrap contacts-table-wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead style="background:#f9fafb;position:sticky;top:0;">
+                <tr>
+                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Empresa</th>
+                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Teléfono</th>
+                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Fecha</th>
+                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;width:100px;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="contactsBody"></tbody>
+            </table>
+          </div>
+          <div id="contactsPagination" class="pagination" style="display:none;justify-content:center;gap:8px;margin-top:12px;">
+            <button id="prevPageBtn" class="secondary" style="padding:8px 16px;">← Ant</button>
+            <span id="pageInfo" class="muted" style="align-self:center;font-size:13px;">Página 1 de 1</span>
+            <button id="nextPageBtn" class="secondary" style="padding:8px 16px;">Sig →</button>
           </div>
 
         </section>
