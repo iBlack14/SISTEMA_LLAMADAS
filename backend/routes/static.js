@@ -25,10 +25,10 @@ export function registerStatic(runtime) {
   const staticOptions = {
     maxAge: "1d",
     setHeaders(res, filePath) {
-      if (/\.(?:html)$/.test(filePath)) {
+      if (/\.(?:html|js|css)$/.test(filePath)) {
+        // El código y los estilos cambian con cada deploy: revalidar siempre.
         res.setHeader("Cache-Control", "no-cache, must-revalidate");
-      } else if (/\.(?:js|css|png|jpg|jpeg|svg|ico|woff2?)$/.test(filePath)) {
-        // Recursos estáticos versionados: cacheable por el navegador
+      } else if (/\.(?:png|jpg|jpeg|svg|ico|woff2?)$/.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
       }
     }
