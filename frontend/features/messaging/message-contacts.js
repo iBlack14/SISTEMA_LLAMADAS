@@ -1,10 +1,50 @@
 import { openContactSendModal } from './message-templates.js';
+import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
 let initialized = false;
 let users = [];
+let sendStatusBound = false;
+
+const MAIL_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>`;
+const TRASH_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>`;
 
 function $(id) { return document.getElementById(id); }
+
+function formatStatusDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" });
+}
+
+/** Chip de estado: Enviado / No contactado / Sin envío. */
+function sendStatusChip(contact, escHtml) {
+  const status = getSendStatus(contact?.phone);
+  if (!status) {
+    return `<span class="send-status-chip is-idle">— Sin envío</span>`;
+  }
+  const channel = status.channel === "email" ? "Correo" : "WhatsApp";
+  const when = formatStatusDate(status.at);
+  const title = escHtml(when ? `${channel} · ${when}` : channel);
+  if (status.status === "sent") {
+    return `<span class="send-status-chip is-sent" title="${title}">✔ Enviado</span>`;
+  }
+  return `<span class="send-status-chip is-failed" title="${title}">✕ No contactado</span>`;
+}
+
+/** Actualiza solo la celda de estado, sin re-renderizar toda la tabla. */
+function bindSendStatusUpdates() {
+  if (sendStatusBound) return;
+  sendStatusBound = true;
+  window.addEventListener(MESSAGE_SEND_STATUS_EVENT, event => {
+    const phone = event.detail?.phone;
+    if (!phone) return;
+    const row = [...document.querySelectorAll("#messageContactsBody tr[data-phone]")]
+      .find(item => sendStatusKey(item.dataset.phone) === phone);
+    const cell = row?.querySelector("[data-status-cell]");
+    if (cell) cell.innerHTML = sendStatusChip({ phone }, String);
+  });
+}
 
 /**
  * createMessageContacts: conserva los contratos y reglas existentes.
@@ -76,6 +116,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
 
   function renderMessageContacts(contacts = dashboardState.messageContacts) {
     dashboardState.messageContacts = Array.isArray(contacts) ? contacts : [];
+    bindSendStatusUpdates();
     const body = $("messageContactsBody");
     const count = $("messageContactsCount");
     const status = $("messageContactsStatus");
@@ -94,6 +135,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       if (!contact) return;
       const action = button.dataset.messageAction;
       if (action === "send") { openContactSendModal(contact, "whatsapp"); return; }
+      if (action === "mail") { openContactSendModal(contact, "email"); return; }
       if (action === "delete") {
         if (!await dashboardActions.requestConfirmation({ 
           title: "Eliminar contacto", 
@@ -111,17 +153,21 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       const hint = userId === "mine" 
         ? "Los contactos que guardes desde la APK aparecerán aquí."
         : "Este vendedor no tiene contactos guardados aún.";
-      body.innerHTML = `<tr><td colspan="3" class="muted">${hint}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="4" class="muted">${hint}</td></tr>`;
       return;
     }
+    const safeName = value => dashboardActions.escHtml(value);
     body.innerHTML = dashboardState.messageContacts.map((contact) => {
       const phone = String(contact.phone || "").replace(/\D/g, "");
-      return `<tr>
-        <td>${dashboardActions.escHtml(contact.name || phone)}</td>
-        <td>${dashboardActions.escHtml(phone)}</td>
-        <td><div class="message-contact-actions" style="display:flex;gap:8px;justify-content:center">
-          <button type="button" class="message-contact-wa" data-message-action="send" data-phone="${phone}" title="Enviar por WhatsApp" aria-label="Enviar WhatsApp a ${dashboardActions.escHtml(contact.name || phone)}" style="background:#25D366;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600">💬 WhatsApp</button>
-          <button type="button" class="message-contact-icon message-contact-delete" data-message-action="delete" data-phone="${phone}" title="Eliminar" aria-label="Eliminar contacto" style="background:#fee;color:#c00;border:1px solid #fcc;padding:6px 10px;border-radius:4px;cursor:pointer">🗑️</button>
+      const name = contact.name || phone;
+      return `<tr data-phone="${phone}">
+        <td>${safeName(name)}</td>
+        <td>${safeName(phone)}</td>
+        <td class="message-contact-status" data-status-cell>${sendStatusChip(contact, safeName)}</td>
+        <td><div class="message-contact-actions">
+          <button type="button" class="message-contact-wa" data-message-action="send" data-phone="${phone}" title="Enviar por WhatsApp" aria-label="Enviar WhatsApp a ${safeName(name)}">${dashboardActions.whatsappActionIcon()}</button>
+          <button type="button" class="message-contact-icon message-contact-mail" data-message-action="mail" data-phone="${phone}" title="Enviar por correo" aria-label="Enviar correo a ${safeName(name)}">${MAIL_ICON}</button>
+          <button type="button" class="message-contact-icon message-contact-delete" data-message-action="delete" data-phone="${phone}" title="Eliminar" aria-label="Eliminar contacto">${TRASH_ICON}</button>
         </div></td>
       </tr>`;
     }).join("");

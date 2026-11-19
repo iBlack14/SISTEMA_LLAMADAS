@@ -4,6 +4,7 @@
  */
 
 import { apiFetch } from '../auth/auth-session.js';
+import { recordSendStatus } from './message-send-status.js';
 
 const STORAGE_KEY = 'voip_message_templates';
 const DB_MIGRATION_KEY = 'voip_message_templates_db_migrated';
@@ -44,6 +45,9 @@ let currentSendImage = null;    // Base64 o URL para sendMessageModal
 let initializationPromise = null;
 let eventsBound = false;
 let currentSendContact = null;
+// true cuando ya se resolvió el envío (éxito, error o plantilla suelta):
+// al cerrar el modal sin enviar se marca "No contactado".
+let contactSendResolved = true;
 
 // Estado de los tres filtros dropdown
 const activeFilters = { rubro: '', speech: '', precio: '' };
@@ -526,6 +530,7 @@ async function openSendModal(templateId, initialTab = 'whatsapp') {
     image: template.image || null
   });
   currentSendContact = null;
+  contactSendResolved = true;
   const contactName = document.getElementById('sendMessageContactName');
   if (contactName) contactName.textContent = 'Plantilla guardada';
   renderSendTemplateList(template.id);
@@ -546,6 +551,7 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
 
   modal.dataset.templateId = template?.id || '';
   currentSendContact = contact;
+  contactSendResolved = false;
   const contactName = document.getElementById('sendMessageContactName');
   if (contactName) contactName.textContent = contact?.name || phone || email || 'Contacto';
   setSendModalValues({
@@ -912,11 +918,17 @@ async function copySendImage() {
 
 function closeSendModal() {
   const modal = document.getElementById('sendMessageModal');
+  // Si se abrió desde un contacto y no se llegó a enviar, queda "No contactado".
+  if (currentSendContact && !contactSendResolved) {
+    const emailActive = document.getElementById('tabEmailBtn')?.classList.contains('active');
+    recordSendStatus(currentSendContact.phone, 'failed', emailActive ? 'email' : 'whatsapp');
+  }
   if (modal) {
     modal.style.display = 'none';
     modal.dataset.templateId = '';
   }
   currentSendContact = null;
+  contactSendResolved = true;
   currentSendImage = null;
 }
 
@@ -984,7 +996,15 @@ async function sendWhatsApp() {
   const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-  window.open(waUrl, '_blank');
+  const waWindow = window.open(waUrl, '_blank');
+  const opened = Boolean(waWindow);
+  // El estado se registra para el contacto de la fila, no para el número tecleado.
+  recordSendStatus(currentSendContact?.phone || phone, opened ? 'sent' : 'failed', 'whatsapp');
+  contactSendResolved = true;
+  if (!opened) {
+    showToast('El navegador bloqueó WhatsApp Web. Permite las ventanas emergentes y reintenta.', 'warning');
+    return;
+  }
   closeSendModal();
 }
 
@@ -1027,6 +1047,8 @@ function sendEmail() {
 
   const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
   window.location.href = mailtoUrl;
+  recordSendStatus(currentSendContact?.phone || email, 'sent', 'email');
+  contactSendResolved = true;
   closeSendModal();
 }
 

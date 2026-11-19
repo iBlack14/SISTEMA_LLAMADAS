@@ -271,15 +271,16 @@ button.viavox-menu-toggle { background: #350642 !important; }
 body .panel .messages-contact-list .message-contact-wa {
   display: inline-flex; align-items: center; justify-content: center;
   box-sizing: border-box; flex: 0 0 34px; width: 34px; height: 34px;
-  min-height: 34px; padding: 8px; border-radius: 50% !important;
-  border: 1px solid #63c991;
-  background: rgba(70, 184, 120, .14); color: #85e4ad !important;
+  min-height: 34px; padding: 7px; border-radius: 50% !important;
+  border: 1px solid #1da851 !important;
+  background: #25d366 !important; color: #ffffff !important;
   text-decoration: none; box-shadow: none;
 }
 body .panel .messages-contact-list .message-contact-wa svg {
-  display: block; width: 17px; height: 17px; color: inherit !important;
+  display: block; width: 18px; height: 18px; color: inherit !important;
+  fill: currentColor !important; stroke: none !important;
 }
-body .panel .messages-contact-list .message-contact-wa:hover { background: rgba(70, 184, 120, .3); }
+body .panel .messages-contact-list .message-contact-wa:hover { background: #1eb85a !important; }
 body .panel .messages-contact-list .message-contact-wa:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 @media (pointer: coarse) {
   body .panel .messages-contact-list .message-contact-wa { width: 44px; height: 44px; flex-basis: 44px; }
@@ -298,7 +299,33 @@ body .panel .messages-contact-list .message-contact-icon svg {
 }
 body .panel .messages-contact-list .message-contact-send { color: #70c6f2 !important; }
 body .panel .messages-contact-list .message-contact-edit { color: #e7c5ed !important; }
+body .panel .messages-contact-list .message-contact-mail { color: #8fd3ff !important; }
 body .panel .messages-contact-list .message-contact-delete { color: #ff839d !important; }
+
+/* Estado de envío por contacto */
+body .panel .messages-contact-list .message-contact-status { white-space: nowrap; }
+body .panel .messages-contact-list .send-status-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+body .panel .messages-contact-list .send-status-chip.is-sent {
+  color: #9df5c1 !important;
+  background: rgba(37, 211, 102, .16) !important;
+  border-color: rgba(37, 211, 102, .45) !important;
+}
+body .panel .messages-contact-list .send-status-chip.is-failed {
+  color: #ffa6b7 !important;
+  background: rgba(255, 72, 110, .14) !important;
+  border-color: rgba(255, 72, 110, .42) !important;
+}
+body .panel .messages-contact-list .send-status-chip.is-idle {
+  color: #cfb9dd !important;
+  background: rgba(255, 255, 255, .06) !important;
+  border-color: rgba(255, 255, 255, .18) !important;
+  font-weight: 600;
+}
 body .panel .messages-contact-list .message-contact-icon:hover { background: #ffffff18 !important; }
 body .panel .messages-contact-list .message-contact-icon:focus-visible { outline: 2px solid white; outline-offset: 3px; }
 body .panel .messages-contact-list .message-contact-icon:disabled { opacity: .5; cursor: wait; }
