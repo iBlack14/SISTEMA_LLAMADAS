@@ -482,6 +482,12 @@ body .panel #annualReport .report-table-wrap tbody td {
   font-size: 12px;
 }
 
+/* El tema base pinta cada celda de blanco; aquí el texto es claro. */
+body .panel #annualReport .report-table-wrap td {
+  background: rgba(255, 255, 255, .02) !important;
+  color: var(--r-text) !important;
+}
+
 body .panel #annualReport .report-table-wrap th {
   position: sticky;
   top: 0;
@@ -557,4 +563,82 @@ body .panel #annualReport .report-tools button {
 #annualReport .report-pagination span {
   font-weight: 700;
   letter-spacing: .02em;
+}
+
+/* ── Detalle: el tema base pone fondos blancos; aquí van sobre morado ── */
+body .panel #annualReport .report-detailed-equipment h3 {
+  color: var(--r-accent) !important;
+}
+
+body .panel #annualReport .report-detailed-equipment span,
+body .panel #annualReport .report-detailed-table td {
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-detailed-metric,
+body .panel #annualReport .report-detailed-table-wrap {
+  border-color: var(--r-line) !important;
+  background: var(--r-card-hi) !important;
+}
+
+body .panel #annualReport .report-detailed-metric span {
+  color: var(--r-muted) !important;
+}
+
+body .panel #annualReport .report-detailed-metric strong {
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-detailed-metric.total strong { color: #f3d7ff !important; }
+body .panel #annualReport .report-detailed-metric.voicemail,
+body .panel #annualReport .report-detailed-metric.voicemail * { color: #ffd27a !important; }
+body .panel #annualReport .report-detailed-metric.answered strong { color: #7bf0b6 !important; }
+body .panel #annualReport .report-detailed-metric.no-answer strong { color: #ffd27a !important; }
+body .panel #annualReport .report-detailed-metric.inoperable strong { color: #ff9db1 !important; }
+body .panel #annualReport .report-detailed-metric.pending strong { color: #7bf0b6 !important; }
+
+body .panel #annualReport .report-detailed-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, .045) !important;
+}
+
+body .panel #annualReport .report-detailed-table tbody tr:hover td {
+  background: rgba(255, 91, 200, .12) !important;
+}
+
+body .panel #annualReport .report-detailed-table th {
+  background: #43125f !important;
+  color: #f3d7ff !important;
+}
+
+#annualReport .report-pagination span,
+#annualReport .report-pagination button {
+  color: var(--r-text) !important;
+}
+
+#annualReport .report-pagination button {
+  border: 1px solid var(--r-line) !important;
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+/* Las filas pares del tema también traen fondo blanco: se quita aquí. */
+body .panel #annualReport .report-table-wrap tbody tr,
+body .panel #annualReport .report-detailed-table tbody tr {
+  background: transparent !important;
+}
+
+body .panel #annualReport .report-table-wrap tbody tr:nth-child(even) td,
+body .panel #annualReport .report-detailed-table tbody tr:nth-child(even) td {
+  background: rgba(70, 24, 99, .55) !important;
+  color: var(--r-text) !important;
+}
+
+body .panel #annualReport .report-table-wrap tbody tr:hover td,
+body .panel #annualReport .report-detailed-table tbody tr:hover td {
+  background: rgba(255, 91, 200, .18) !important;
+}
+
+body .panel #annualReport .report-row-call {
+  color: var(--r-text) !important;
+  background: rgba(255, 91, 200, .16) !important;
+  border: 1px solid var(--r-line) !important;
 }

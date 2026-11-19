@@ -266,6 +266,10 @@ function archiveCurrentCampaign(session) {
 
   if (index < 0) {
     archive.push(record);
+    // Retention policy: keep max 100 archives per session to prevent unbounded growth
+    if (archive.length > 100) {
+      archive.splice(0, archive.length - 100);
+    }
   } else {
     archive[index] = record;
   }

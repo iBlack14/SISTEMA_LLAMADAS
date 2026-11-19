@@ -73,7 +73,7 @@ export function installSocketAuth(io, auth, { onAdminSubscribe } = {}) {
         if (socket.data.authUser && socket.data.role !== "phone") socket.disconnect(true);
       }
     } finally { checking = false; }
-  }, 5000);
+  }, 30000);
   timer.unref();
   return tokenHash => io.in(`auth:${tokenHash}`).disconnectSockets(true);
 }

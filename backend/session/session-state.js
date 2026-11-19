@@ -48,6 +48,10 @@ function saveSoon() {
       runtime.persistence.save(runtime.sessions, dirtyCodes.size ? [...dirtyCodes] : null)
         .then(resolve)
         .catch(error => {
+          // Re-add dirty codes on failure so they can be retried
+          for (const code of dirtyCodes) {
+            runtime.persistence.markSessionDirty(code);
+          }
           console.error("[PERSISTENCE] Guardado pendiente:", error.code || "STORAGE_UNAVAILABLE");
           resolve();
         });

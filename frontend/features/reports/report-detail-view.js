@@ -132,6 +132,26 @@ function renderDetails() {
 
     const renderDetailedReport = () => {
       const detailed = makeDetailedRows();
+      // El detalle también se muestra de 20 en 20.
+      const detailedPageKey = [
+        report.id,
+        reportState.selectedDetailedTeam,
+        reportState.detailedPendingOnly
+      ].join("|");
+      if (reportState.detailedPageKey !== detailedPageKey) {
+        reportState.detailedPageKey = detailedPageKey;
+        reportState.detailedPage = 0;
+      }
+      const detailedPerPage = reportState.tableRowsPerPage || 20;
+      const detailedTotalPages = Math.max(1, Math.ceil(detailed.rows.length / detailedPerPage));
+      reportState.detailedPage = Math.min(
+        Math.max(0, reportState.detailedPage || 0),
+        detailedTotalPages - 1
+      );
+      const detailedPageRows = detailed.rows.slice(
+        reportState.detailedPage * detailedPerPage,
+        (reportState.detailedPage + 1) * detailedPerPage
+      );
       const teamNames = Array.from(new Set([
         ...(report.rows || []).map(contact => contact.workerName),
         ...(report.calls || []).map(call => call.workerName)
@@ -225,13 +245,13 @@ function renderDetails() {
                 ).join("")}</tr>
               </thead>
               <tbody>
-                ${detailed.rows.map((row, index) => `
+                ${detailedPageRows.map((row, index) => `
                   <tr>
                     ${index === 0 ? `
-                      <td rowspan="${detailed.rows.length}">
+                      <td rowspan="${detailedPageRows.length}">
                         ${reportState.esc(row.team)}
                       </td>
-                      <td rowspan="${detailed.rows.length}">
+                      <td rowspan="${detailedPageRows.length}">
                         ${row.designated}
                       </td>
                     ` : ""}
@@ -253,6 +273,11 @@ function renderDetails() {
               </tbody>
             </table>
           </div>
+          <nav class="report-pagination" aria-label="Paginación del detalle">
+            <button id="detailedPrevPage" class="secondary" type="button" ${reportState.detailedPage === 0 ? "disabled" : ""}>← ANTERIOR</button>
+            <span id="detailedPageInfo">Página ${reportState.detailedPage + 1} de ${detailedTotalPages} · ${detailed.rows.length} registros</span>
+            <button id="detailedNextPage" class="secondary" type="button" ${reportState.detailedPage >= detailedTotalPages - 1 ? "disabled" : ""}>SIGUIENTE →</button>
+          </nav>
           <div class="report-footer report-detailed-footer">
             <div class="report-actions">
               <button id="detailedBack" class="secondary" type="button">
@@ -279,6 +304,15 @@ function renderDetails() {
           </div>
         </section>
       `;
+
+      reportState.$("detailedPrevPage")?.addEventListener("click", () => {
+        reportState.detailedPage = Math.max(0, reportState.detailedPage - 1);
+        renderDetailedReport();
+      });
+      reportState.$("detailedNextPage")?.addEventListener("click", () => {
+        reportState.detailedPage = Math.min(detailedTotalPages - 1, reportState.detailedPage + 1);
+        renderDetailedReport();
+      });
 
       reportState.$("detailedBack").onclick = () => {
         reportState.showingDetailedReport = false;

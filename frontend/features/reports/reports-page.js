@@ -60,6 +60,8 @@ reportState.rubrosPerPage = 3;
 reportState.tableRowsPerPage = 20;
 reportState.tablePage = 0;
 reportState.tablePageKey = '';
+reportState.detailedPage = 0;
+reportState.detailedPageKey = '';
 reportState.esc = value => String(value ?? "").replace(
     /[&<>"']/g,
     char => ({

@@ -73,7 +73,10 @@ async function bootstrap() {
   }
   services.synchronizeGlobalBlockedNumbers();
   // MySQL is the sole session/history store; file backups are optional exports.
-  await runtime.persistence.save(runtime.sessions);
+  // Only save if there are sessions with pending changes to avoid unnecessary binlog writes.
+  if (runtime.sessions.size > 0) {
+    await runtime.persistence.save(runtime.sessions);
+  }
   runtime.persistence.startBackups();
   runtime.network.start();
   setInterval(() => runtime.historyGate.retryPending().catch(error => {
