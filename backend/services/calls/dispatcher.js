@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { isDialAcknowledged } from "../sockets/call-events.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
   ensureCampaign,
@@ -68,10 +69,22 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
     return;
   }
 
+  // The APK answers a dial with a separate phone:command_ack event, not via the
+  // call:action ack callback. Treat an already-acknowledged command as success
+  // so the dispatcher does not retry a call the phone already started.
+  if (isDialAcknowledged(payload.commandId)) {
+    console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt} source=phone_ack`);
+    return;
+  }
+
   target.timeout(5000).emit("call:action", payload, (error, responses) => {
     const response = responses?.[0];
     if (!error && response?.ok === true) {
       console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt}`);
+      return;
+    }
+    if (isDialAcknowledged(payload.commandId)) {
+      console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt} source=phone_ack`);
       return;
     }
     if (!error) {
@@ -91,11 +104,19 @@ function scheduleDialRetry(code, workerId, payload, retry, startedAt) {
   const commandId = String(payload.commandId || "").slice(-8);
   const callId = String(payload.callId || "").slice(-8);
   setTimeout(() => {
+    if (isDialAcknowledged(payload.commandId)) {
+      console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=phone_ack_received`);
+      return;
+    }
     const session = runtime.sessions.get(code);
     const assignmentEntry = Object.entries(session?.campaign?.assignments || {})
       .find(([id, item]) => id === workerId && item.attemptId === payload.callId);
     if (!assignmentEntry || runtime.persistence.hasFinishedAttempt(code, payload.callId, payload.contactId)) {
       console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=assignment_finished`);
+      return;
+    }
+    if (isDialAcknowledged(payload.commandId)) {
+      console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=phone_ack_received`);
       return;
     }
     const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);

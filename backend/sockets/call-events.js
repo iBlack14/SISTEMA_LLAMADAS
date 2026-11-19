@@ -53,9 +53,18 @@ import {
 } from "../services/campaigns/shift-manager.js";
 
 // Extraído del servidor original; conserva validaciones y contratos públicos.
+// Command IDs whose dial was confirmed by the APK via phone:command_ack.
+// The dispatcher sends call:action with a Socket.IO ack callback, but the APK
+// answers with a separate phone:command_ack event instead of resolving that
+// callback. Without this set every dial is reported as invalid_ack/ack-timeout
+// and retried, even though the phone already started the call.
+const acknowledgedCommandIds = new Set();
+export function isDialAcknowledged(commandId) {
+  return acknowledgedCommandIds.has(commandId);
+}
 export function registerCallEvents(runtime, services, socket) {
-const { io, sessions, historyGate, persistence, network } = runtime;
-const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState } = services;
+  const { io, sessions, historyGate, persistence, network } = runtime;
+  const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState } = services;
   socket.on("call:action", ({ action, phoneNumber, companyName, contactName, imageUrl, commandId, contactId, workerId }) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -317,6 +326,10 @@ const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActiveP
 
     const log = ok ? console.info : console.warn;
     log(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} message=${String(message || "").slice(0,120)}`);
+
+    // The APK confirms the dial with this separate event (not via the call:action
+    // ack callback), so record it for the dispatcher to stop retrying.
+    if (ok && action === "dial" && commandId) acknowledgedCommandIds.add(commandId);
 
     const peerId = getPeer(session, "phone");
     if (!peerId) return;
