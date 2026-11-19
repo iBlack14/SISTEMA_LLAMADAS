@@ -1,25 +1,3 @@
-/* Orden de cascada original preservado; ver docs/architecture/README.md. */
-@import url("./theme/01-theme.css");
-@import url("./theme/02-theme.css");
-@import url("./theme/03-theme.css");
-@import url("./theme/04-theme.css");
-@import url("./theme/05-theme.css");
-@import url("./theme/06-theme.css");
-@import url("./theme/07-theme.css");
-@import url("./theme/08-theme.css");
-@import url("./theme/09-theme.css");
-@import url("./theme/10-theme.css");
-@import url("./theme/11-theme.css");
-@import url("./theme/12-theme.css");
-@import url("./theme/13-theme.css");
-@import url("./theme/14-theme.css");
-@import url("./theme/15-theme.css");
-@import url("./theme/16-theme.css");
-@import url("./theme/17-theme.css");
-@import url("./theme/18-theme.css");
-@import url("./theme/19-theme.css");
-@import url("./theme/20-theme.css");
-@import url("./theme/21-theme.css");
-@import url("./theme/22-theme.css");
-@import url("./theme/23-theme.css");
-@import url("./theme/24-theme.css");
+/* CSS unificado para alto rendimiento: elimina 24 solicitudes HTTP en cascada */
+@import url("./theme/all-themes-merged.css");
+
