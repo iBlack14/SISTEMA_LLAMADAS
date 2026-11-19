@@ -166,7 +166,6 @@ button,
 }
 
 button:not(:disabled):hover,
-.file-label:hover,
 #apkDlBtn:hover {
   background: linear-gradient(135deg, #ff18c4, #c217ed) !important;
   transform: translateY(-2px) scale(1.045);
@@ -175,7 +174,6 @@ button:not(:disabled):hover,
 }
 
 button:not(:disabled):active,
-.file-label:active,
 #apkDlBtn:active {
   transform: translateY(0) scale(0.985);
 }
