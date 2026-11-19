@@ -84,10 +84,13 @@ function renderContacts() {
     const raw = contact?.createdAt || contact?.created_at || contact?.date || contact?.fecha;
     if (!raw) return "—";
     // MySQL devuelve "2026-11-18 17:09:57"; normalizarlo evita fechas inválidas.
-    const normalized = typeof raw === "string"
-      ? raw.trim().replace(" ", "T").replace(/\s+.*$/, "")
-      : raw;
-    const d = new Date(normalized);
+    const text = String(raw).trim();
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text.slice(0, 10));
+    const normalized = text.replace(" ", "T").replace(/\s+.*$/, "");
+    // YYYY-MM-DD se parsea por componentes para no correr un día en Lima (UTC-5).
+    const d = dateOnly
+      ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+      : new Date(normalized);
     if (isNaN(d.getTime())) return "—";
     return `${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
   }
