@@ -37,7 +37,7 @@
   --tone-active: #3ddc84;
   --tone-dialing: #ffc046;
   --tone-ready: #c9a6ff;
-  --tone-offline: #ff8a8a;
+  --tone-offline: #ff0000;
   --tone-unknown: #b5a6cc;
 }
 
@@ -400,11 +400,12 @@ h3 {
 
 .indicator {
   min-width: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 12px 4px;
+  gap: 8px;
+  padding: 22px 6px 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -422,25 +423,43 @@ h3 {
 }
 
 .indicator .indicator-dot {
-  width: 38px;
-  height: 38px;
+  position: relative;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--tone);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-bottom: 2px;
+  margin: 0 0 6px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
   transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.indicator .indicator-dot::before,
+.indicator .indicator-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid var(--tone);
+  border-radius: 50%;
+  opacity: 0.3;
+}
+
+.indicator .indicator-dot::after {
+  inset: -10px;
+  border-color: var(--tone) transparent;
+  transform: rotate(-30deg);
+  opacity: 0.2;
 }
 
 .indicator:hover .indicator-dot {
   transform: scale(1.06);
 }
 
-.indicator .indicator-dot .orb-num {
-  font-size: 16px;
+.indicator .orb-num {
+  font-size: 22px;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -449,19 +468,68 @@ h3 {
 
 .indicator .orb-sub {
   font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
   color: var(--tone, var(--muted));
 }
 
+.indicator .orb-time-caption {
+  font-size: 9px;
+  line-height: 1.4;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
 .indicator .orb-time {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: var(--tone, var(--muted));
+  color: var(--text);
   margin-top: -1px;
-  min-height: 13px;
+  min-height: 20px;
+  margin-bottom: 6px;
+}
+
+.indicator .orb-connection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 32px;
+  margin: 0 -6px;
+  padding: 8px 2px;
+  border-top: 1px solid rgba(238, 221, 247, 0.18);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  color: var(--muted);
+  border-radius: 0;
+  background: rgba(20, 6, 32, 0.36);
+}
+
+.indicator .orb-connection[data-connection=connected] {
+  background: var(--tone-active);
+  color: #fff;
+}
+
+.indicator .orb-connection[data-connection=disconnected] {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.indicator[data-tone=offline] .orb-sub {
+  color: #fff;
 }
 
 /* Estado de indicadores y contraste de número dentro del punto */
@@ -487,7 +555,28 @@ h3 {
 
 .indicator[data-tone=active] .indicator-dot {
   color: #082110;
-  box-shadow: 0 0 0 3px rgba(61, 220, 132, 0.28), 0 3px 10px rgba(0, 0, 0, 0.32);
+  transform: none;
+  box-shadow: 0 0 0 2px rgba(61, 220, 132, 0.14), 0 0 8px rgba(61, 220, 132, 0.12);
+  animation: equipment-halo 2.8s ease-in-out infinite;
+}
+
+.indicator[data-tone=active] .indicator-dot::before {
+  inset: -5px;
+  border: 2px solid var(--tone-active);
+  animation: equipment-wave 2.8s ease-out infinite;
+}
+
+.indicator[data-tone=active] .indicator-dot::after {
+  content: none;
+}
+
+@keyframes equipment-halo {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(61, 220, 132, 0.14), 0 0 8px rgba(61, 220, 132, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(61, 220, 132, 0.32), 0 0 14px rgba(61, 220, 132, 0.38);
+  }
 }
 
 .indicator[data-tone=dialing] .indicator-dot {
@@ -510,7 +599,7 @@ h3 {
 .indicator[data-tone=active],
 .indicator[data-tone=dialing] {
   border-top: 3px solid var(--tone);
-  padding-top: 9px;
+  padding-top: 20px;
 }
 
 /* Leyenda */
@@ -518,7 +607,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 22px;
-  margin-top: 14px;
+  margin: 0 0 18px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -872,33 +961,33 @@ td small {
   margin: 10px 0 0;
 }
 
-.card-test {
-  font-size: 12px;
-  color: var(--tone-dialing);
-  margin: 8px 0 0;
-}
-
-.card-actions {
+.equipment-position {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
+  flex-direction: column;
+  gap: 8px;
 }
 
-.card-actions:empty,
-.card-actions[hidden] {
-  display: none;
+@keyframes equipment-wave {
+  0% { transform: scale(0.95); opacity: 0; }
+  12% { transform: scale(1); opacity: 0.75; }
+  60% { transform: scale(1.42); opacity: 0.32; }
+  100% { transform: scale(1.65); opacity: 0; }
 }
 
-.card-actions .button.card-reconnect-btn {
-  font-size: 12px;
-  padding: 5px 12px;
+.equipment-position .indicator {
+  width: 100%;
+}
+
+.equipment-position .button.equipment-reconnect-btn {
+  width: 100%;
+  min-width: 0;
+  font-size: 10px;
+  padding: 5px 2px;
   min-height: 30px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--border);
+  border: 0;
   color: var(--text);
   font-weight: 600;
   cursor: pointer;
@@ -908,24 +997,25 @@ td small {
   transition: all 0.18s ease;
 }
 
-.card-actions .button.card-reconnect-btn:hover:not(:disabled) {
+.equipment-position .button.equipment-reconnect-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.35);
   color: #fff;
 }
 
-.card-actions .button.card-reconnect-btn:disabled {
-  opacity: 0.6;
-  cursor: wait;
+.equipment-position .button.equipment-reconnect-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.card-reconnect-msg {
+.equipment-reconnect-msg {
+  text-align: center;
+  overflow-wrap: anywhere;
   font-size: 11px;
   font-weight: 500;
   color: #7bed9f;
 }
 
-.card-reconnect-msg.error {
+.equipment-reconnect-msg.error {
   color: #ff6b81;
 }
 
@@ -951,49 +1041,55 @@ td small {
   display: none;
 }
 
-#alertBanner {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.equipment-heading {
   flex-wrap: wrap;
   gap: 12px;
 }
 
-#alertBanner[hidden] {
-  display: none;
-}
-
-.alert-banner .alert-info {
-  flex: 1;
-  min-width: 200px;
-}
-
-.alert-banner .alert-actions {
+.equipment-reconnect-actions {
   display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 12px;
 }
 
-.reconnect-all-btn {
-  font-size: 12px;
-  padding: 6px 14px;
-  min-height: 32px;
+.equipment-reconnect-actions #reconnectAllAlertBtn {
+  border-radius: 6px;
+  font-size: 14px;
+  padding: 12px 28px;
+  min-height: 46px;
+  min-width: min(240px, 100%);
+  max-width: 100%;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.12);
-  border: 1px solid var(--border);
+  border: 0;
   color: var(--text);
   cursor: pointer;
   transition: all 0.18s ease;
 }
 
-.reconnect-all-btn:hover:not(:disabled) {
+.equipment-reconnect-actions .reconnect-all-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.45);
 }
 
 .reconnect-all-btn:disabled {
-  opacity: 0.6;
-  cursor: wait;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.reconnect-feedback {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reconnect-feedback:empty {
+  display: none;
 }
 
 .empty {
@@ -1357,7 +1453,7 @@ footer {
   }
 
   .indicators {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .connection {

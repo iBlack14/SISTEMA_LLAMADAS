@@ -5,6 +5,7 @@ const states = new Set(["idle", "available", "dialing", "ringing", "in_call", "e
 const activeStates = new Set(["dialing", "ringing", "in_call"]);
 const pendingStates = new Set(["pending", "retry_pending", "held"]);
 const labels = { dialing: "Marcando", ringing: "Marcando", in_call: "En llamada" };
+const displayState = state => state === "in_call" ? "in_call" : activeStates.has(state) ? "dialing" : "idle";
 const timestamp = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : 0;
 const iso = value => value ? new Date(value).toISOString() : null;
 const isTest = id => /^(android-test-|TEST-|SIM-)/.test(id);
@@ -15,6 +16,7 @@ export class NetworkMonitor {
   constructor({ pool, persistence, getSessions, isSocketConnected, broadcast, now = () => Date.now() }) {
     Object.assign(this, { pool, persistence, getSessions, isSocketConnected, broadcast, now });
     this.observations = new Map();
+    this.displayTimings = new Map();
     this.connectionTimestamps = new Map();
     this.registry = [];
     this.chain = Promise.resolve();
@@ -49,8 +51,26 @@ export class NetworkMonitor {
 
   observe(code, worker, payload) {
     if (!worker || !states.has(payload.callState)) return;
-    const previous = this.observations.get(worker.id);
+    const device = this.candidates().get(worker.id);
+    if (!device?.connected || device.code !== code || device.worker.socketId !== worker.socketId) return;
+    const timing = this.displayTimings.get(worker.id);
+    const sameConnection = timing?.code === code && timing.socketId === worker.socketId
+      && !["disconnected", "unknown"].includes(timing.state);
+    const previous = sameConnection ? this.observations.get(worker.id) : null;
     const at = this.now();
+    const state = displayState(payload.callState);
+    const callId = String(payload.callId || "").trim() || null;
+    const newCall = activeStates.has(payload.callState) && callId && timing?.callId && callId !== timing.callId;
+    const terminal = ["ended", "failed"].includes(payload.callState);
+    const newTerminal = terminal && !["ended", "failed"].includes(previous?.state);
+    // Receipt time is a known transition, not a reconstructed call/connection start.
+    // A first status report cannot establish when the current activity began.
+    const stateSince = sameConnection && state === timing.state && !newCall && !newTerminal
+      ? timing.stateSince : (previous || terminal ? at : null);
+    this.displayTimings.set(worker.id, {
+      code, socketId: worker.socketId, state, stateSince,
+      callId: callId || (sameConnection && state === timing.state ? timing.callId : null)
+    });
     this.observations.set(worker.id, {
       code, socketId: worker.socketId, state: payload.callState, reportedAt: at,
       lastActivity: activeStates.has(payload.callState) || ["ended", "failed"].includes(payload.callState)
@@ -182,6 +202,7 @@ export class NetworkMonitor {
     const equipment = Array.from({ length: 10 }, (_, index) => {
       const row = this.registry.find(item => item.position === index + 1);
       if (!row) return { number: index + 1, name: `Equipo ${index + 1}`, state: "Sin vincular", calling: false,
+        stateSince: null,
         call: null, deviceId: null, metrics: null, pending: null, historyVersion: "unknown",
         connectedAt: null, disconnectedAt: null, connectedDurationSeconds: null, disconnectedDurationSeconds: null,
         ...(detailNumbers.has(index + 1) ? { activity: [] } : {}), rubro: null, schedule: null, lastActivityAt: null };
@@ -193,6 +214,18 @@ export class NetworkMonitor {
       const calling = Boolean(currentObservation && activeStates.has(currentObservation.state));
       const isConnected = Boolean(device?.connected);
       const state = !device ? "Sin vincular" : !isConnected ? "Desconectado" : calling ? labels[currentObservation.state] : "Disponible";
+      let displayTiming = this.displayTimings.get(row.device_id);
+      if (!device || !isConnected || !currentObservation) {
+        const timingState = device && !isConnected ? "disconnected" : "unknown";
+        if (!displayTiming || displayTiming.state !== timingState) {
+          displayTiming = { code: device?.code, socketId: device?.worker?.socketId, state: timingState,
+            stateSince: timingState === "disconnected" ? this.now() : null };
+          this.displayTimings.set(row.device_id, displayTiming);
+        }
+        // An old report cannot become current again after a sampled disconnect.
+        this.observations.delete(row.device_id);
+      }
+      const stateSince = iso(displayTiming?.stateSince);
 
       let connRecord = this.connectionTimestamps.get(row.device_id);
       if (!connRecord) {
@@ -252,6 +285,7 @@ export class NetworkMonitor {
         list: activeContact.list || null
       } : null;
       return { number: row.position, deviceId: row.device_id, name: row.name, state, calling, call,
+        stateSince,
         simulated: isTest(row.device_id), rubro, schedule: turn?.schedule || null,
         connectedAt, disconnectedAt, connectedDurationSeconds, disconnectedDurationSeconds,
         turn: turn ? { id: turn.id, label: turn.label, date: turn.date, startedAt: turn.startedAt } : null,
