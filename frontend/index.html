@@ -22,9 +22,9 @@
   <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261118-clean" />
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
- <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-message-buttons" />
+ <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-contact-selector" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-filters-rich" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-template-clean" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261119-force"></script>
@@ -416,9 +416,16 @@
           <h3 id="messageContactsTitle">Contactos para WhatsApp</h3>
           <span id="messageContactsCount" class="muted">0 contactos</span>
         </div>
-        <div id="messageContactsUserSelector" class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:8px;display:none">
-          <label>Ver contactos de:<select id="messageContactsUser"><option value="">Cargando…</option></select></label>
-          <span id="messageContactsHint" class="muted" style="font-size:0.85rem;align-self:flex-end">Selecciona un vendedor para ver sus contactos guardados en el celular</span>
+        <div id="messageContactsUserSelector" class="mc-user-selector">
+          <div class="mc-user-selector-field">
+            <label for="messageContactsUser">Ver contactos de</label>
+            <div class="mc-select-wrap">
+              <svg class="mc-select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <select id="messageContactsUser"><option value="">Cargando…</option></select>
+              <svg class="mc-select-chevron" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <p id="messageContactsHint" class="mc-user-selector-hint">Elige un vendedor para ver sus contactos guardados en el celular, o deja “Mis contactos” para ver los tuyos.</p>
         </div>
         <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
 <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button></div>
@@ -627,24 +634,11 @@
         <label for="templateNameInput">Nombre de la plantilla</label>
         <input id="templateNameInput" type="text" placeholder="Ej: Propuesta de mejora" maxlength="100" required />
 
-        <label for="templateTypeInput">Tipo de comunicación</label>
-        <select id="templateTypeInput">
-          <option value="both">WhatsApp y Correo</option>
-          <option value="whatsapp">Solo WhatsApp</option>
-          <option value="email">Solo Correo</option>
-        </select>
-
         <div class="template-field-header">
           <label for="templateMessageInput">Mensaje</label>
           <span class="template-char-count"><span id="templateCharCount">0</span> / 1000</span>
         </div>
         <textarea id="templateMessageInput" rows="5" placeholder="Escribe tu mensaje aquí..." maxlength="1000" required></textarea>
-
-        <div class="template-vars-row">
-          <span class="vars-title">Insertar variable:</span>
-          <button type="button" class="var-chip" data-var="{nombre}">+ {nombre}</button>
-          <button type="button" class="var-chip" data-var="{empresa}">+ {empresa}</button>
-        </div>
 
         <!-- Zona de imagen adjunta de la plantilla -->
         <label>Imagen de la plantilla (opcional)</label>
@@ -699,37 +693,66 @@
         <p>Elige un texto para cargarlo en el mensaje.</p>
         <div class="send-template-filter-tools">
           <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
-          <!-- Filtros de tres columnas: RUBRO · SPEECH · PRECIO -->
+          <!-- Filtros de cuatro columnas: RUBRO · SPEECH · PRECIO · COMBO -->
           <div class="stf-dropdown-row" id="stfDropdownRow">
             <!-- Rubro -->
             <div class="stf-dropdown" id="stfRubroDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-haspopup="listbox" aria-expanded="false">
-                <span class="stf-btn-label" id="stfRubroLabel">RUBRO</span>
+              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-label="Filtrar por rubro" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-label" id="stfRubroLabel">R</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
+              <button type="button" class="stf-add-btn" id="stfRubroAddBtn" data-kind="rubro" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
               <ul class="stf-dropdown-menu" id="stfRubroMenu" role="listbox" aria-label="Filtrar por Rubro"></ul>
             </div>
             <!-- Speech -->
             <div class="stf-dropdown" id="stfSpeechDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-haspopup="listbox" aria-expanded="false">
-                <span class="stf-btn-label" id="stfSpeechLabel">SPEECH</span>
+              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-label="Filtrar por speech" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-label" id="stfSpeechLabel">S</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
+              <button type="button" class="stf-add-btn" id="stfSpeechAddBtn" data-kind="speech" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
               <ul class="stf-dropdown-menu" id="stfSpeechMenu" role="listbox" aria-label="Filtrar por Speech"></ul>
             </div>
             <!-- Precio -->
             <div class="stf-dropdown" id="stfPrecioDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-haspopup="listbox" aria-expanded="false">
-                <span class="stf-btn-label" id="stfPrecioLabel">PRECIO</span>
+              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-label="Filtrar por precio" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-label" id="stfPrecioLabel">P</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
+              <button type="button" class="stf-add-btn" id="stfPrecioAddBtn" data-kind="precio" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
               <ul class="stf-dropdown-menu" id="stfPrecioMenu" role="listbox" aria-label="Filtrar por Precio"></ul>
+            </div>
+            <!-- Combo -->
+            <div class="stf-dropdown" id="stfComboDropdown">
+              <button type="button" class="stf-dropdown-btn" id="stfComboBtn" aria-label="Filtrar por combo" aria-haspopup="listbox" aria-expanded="false">
+                <span class="stf-btn-label" id="stfComboLabel">C</span>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button type="button" class="stf-add-btn" id="stfComboAddBtn" data-kind="combo" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
+              <ul class="stf-dropdown-menu" id="stfComboMenu" role="listbox" aria-label="Filtrar por Combo"></ul>
             </div>
           </div>
           <!-- Contador de resultados + limpiar filtros -->
           <div class="stf-status-row">
             <span id="sendTemplateResultCount" aria-live="polite"></span>
             <button type="button" id="stfClearFiltersBtn" class="stf-clear-btn" hidden>✕ Limpiar filtros</button>
+          </div>
+
+          <div class="stf-option-modal" id="stfOptionModal" role="dialog" aria-modal="true" aria-labelledby="stfOptionModalTitle">
+            <div class="stf-option-modal-card">
+              <h4 id="stfOptionModalTitle">Nueva categoría</h4>
+              <p id="stfOptionModalHint">Se agregará al filtro y quedará guardada.</p>
+              <label for="stfOptionName">Nombre
+                <input id="stfOptionName" type="text" maxlength="60" placeholder="Ej. Servicios legales" autocomplete="off" />
+              </label>
+              <label for="stfOptionDescription">Descripción (opcional)
+                <input id="stfOptionDescription" type="text" maxlength="80" placeholder="Ej. Asesoría y gestiones" autocomplete="off" />
+              </label>
+              <div class="stf-option-modal-actions">
+                <button type="button" id="stfOptionCancelBtn" class="stf-option-cancel-btn">Cancelar</button>
+                <button type="button" id="stfOptionSaveBtn" class="stf-option-save-btn">Crear</button>
+              </div>
+            </div>
           </div>
 
           <select id="sendTemplateCategory" style="display:none"><option value="">Todas las categorías</option></select>

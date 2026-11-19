@@ -57,7 +57,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     const authUser = currentUser || window.VOIP_VC_AUTH_USER;
     if (authUser?.role !== "ADMINISTRADOR") return;
     const selector = $("messageContactsUserSelector");
-    if (selector) selector.style.display = "flex";
+    if (selector) selector.classList.add("is-visible");
     if (!initialized) {
       initialized = true;
       $("messageContactsUser").addEventListener("change", onMessageUserChange);
@@ -85,7 +85,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       // Auto-select "Mis contactos" by default
       select.value = "mine";
       onMessageUserChange();
-      status.textContent = users.length ? "Selecciona un vendedor para ver sus contactos." : "Solo tú tienes acceso.";
+      status.textContent = users.length ? "Contactos sincronizados desde el celular." : "Solo tú tienes acceso.";
     } catch (error) {
       status.textContent = error.message || "No se pudieron cargar los vendedores.";
     }

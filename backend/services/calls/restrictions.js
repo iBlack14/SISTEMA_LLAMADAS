@@ -7,10 +7,37 @@ import { collectCallAttempts } from "./call-history.js";
  * Se construye una vez por proceso.
  */
 export function createRestrictions(runtime, services) {
-function allCallAttempts() {
+  const cachedAllCallAttempts = new Map();
+  
+  function allCallAttempts() {
+    // Use cached attempts if available
+    const cacheKey = `${runtime.sessions.size}-${Object.keys(runtime.persistence.records).join('-')}`;
+    if (cachedAllCallAttempts.has(cacheKey)) return cachedAllCallAttempts.get(cacheKey);
+    
+    const rows = [...runtime.persistence.records.values()].map(entry => entry.row);
+    for (const session of runtime.sessions.values()) rows.push(...collectCallAttempts(session));
+    
+    cachedAllCallAttempts.set(cacheKey, rows);
+    return rows;
+  }
+  
+  function clearAllCallAttemptsCache() {
+    cachedAllCallAttempts.clear();
+  }
+  // Use cached attempts if available and sessions haven't changed significantly
+  const cached = cachedAllCallAttempts();
+  if (cached) return cached;
+  
   const rows = [...runtime.persistence.records.values()].map(entry => entry.row);
   for (const session of runtime.sessions.values()) rows.push(...collectCallAttempts(session));
+  
+  // Cache the result
+  cachedAllCallAttempts.set(rows.hashCode || (rows.length + '-' + Date.now()), rows);
   return rows;
+}
+
+function clearAllCallAttemptsCache() {
+  cachedAllCallAttempts.clear();
 }
 
 function globalBlockedNumbers() {

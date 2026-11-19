@@ -255,6 +255,10 @@ this.env = env;
       const codesToUpdate = changedCodes ? new Set(changedCodes) : new Set(Object.keys(snapshot));
       for (const [code, data] of Object.entries(snapshot)) {
         if (!codesToUpdate.has(code)) continue;
+        const [existing] = await connection.query(
+          "SELECT data FROM sessions WHERE id=?", [code]);
+        const existingData = existing[0]?.data;
+        if (existingData && JSON.stringify(existingData) === JSON.stringify(data)) continue;
         await connection.query(
           "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
           [code, JSON.stringify(data)]);

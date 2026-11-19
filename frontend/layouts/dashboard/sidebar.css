@@ -254,6 +254,121 @@ button.viavox-menu-toggle { background: #350642 !important; }
   color: #fff;
 }
 
+/* Selector de vendedor para "Contactos para WhatsApp" */
+#messageContactsUserSelector.mc-user-selector {
+  display: none;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(222, 172, 235, .28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .04);
+}
+
+#messageContactsUserSelector.mc-user-selector.is-visible {
+  display: flex;
+}
+
+#messageContactsUserSelector .mc-user-selector-field {
+  display: grid;
+  gap: 7px;
+  min-width: 250px;
+  flex: 0 0 auto;
+}
+
+#messageContactsUserSelector label {
+  color: #e5c9ee;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+#messageContactsUserSelector .mc-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#messageContactsUserSelector .mc-select-icon,
+#messageContactsUserSelector .mc-select-chevron {
+  position: absolute;
+  color: #d98bea;
+  pointer-events: none;
+}
+
+#messageContactsUserSelector .mc-select-icon {
+  left: 11px;
+  width: 16px;
+  height: 16px;
+}
+
+#messageContactsUserSelector .mc-select-chevron {
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  transition: transform .18s ease;
+}
+
+#messageContactsUserSelector select:focus-visible + .mc-select-chevron {
+  transform: rotate(180deg);
+}
+
+#messageContactsUser {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 36px 0 37px;
+  border: 1px solid #a553b8 !important;
+  border-radius: 10px;
+  background: rgba(16, 3, 26, .55) !important;
+  color: #fff !important;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+#messageContactsUser:hover {
+  border-color: #e07ae9 !important;
+  background: rgba(23, 5, 36, .8) !important;
+}
+
+#messageContactsUser:focus {
+  outline: none;
+  border-color: #e879ee !important;
+  box-shadow: 0 0 0 3px rgba(216, 20, 130, .25);
+}
+
+#messageContactsUser option {
+  background: #2a0a3c;
+  color: #fff;
+}
+
+#messageContactsUserSelector .mc-user-selector-hint {
+  margin: 0 0 3px;
+  color: #c9aed8;
+  font-size: 12px;
+  line-height: 1.5;
+  flex: 1 1 220px;
+}
+
+@media (max-width: 760px) {
+  #messageContactsUserSelector.mc-user-selector.is-visible {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  #messageContactsUserSelector .mc-user-selector-field {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 .wa-view-qr-box {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;

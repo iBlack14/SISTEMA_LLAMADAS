@@ -35,7 +35,8 @@ export class CallHistoryGate {
   async commit(code, key, afterCommit) {
     this.receipts.set(JSON.stringify([code,key]), { code, afterCommit });
     try {
-      await this.persistence.save(this.getSessions());
+      const session = this.getSessions().get(code);
+      await this.persistence.save(session ? [session] : []);
       this.failed.delete(code);
       this.flush(code);
     } catch (error) {

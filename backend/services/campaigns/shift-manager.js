@@ -102,6 +102,10 @@ export function ensureShiftManagement(session, date = new Date()) {
 }
 
 export function syncPendingContacts(session, campaign, date = new Date()) {
+  // Return early if nothing changed and campaign is stable
+  if (session._syncPendingSkip && date <= (session._syncPendingSkip || 0)) return;
+  session._syncPendingSkip = date + 60000; // Skip for 60 seconds
+  
   const management = ensureShiftManagement(session, date);
   const report = new Map(management.currentReport.map((item, index) => [
     String(item.attemptId || [item.list, item.phone, item.workerId, item.attemptNumber, item.startedAt, index].join("|")),
@@ -112,6 +116,7 @@ export function syncPendingContacts(session, campaign, date = new Date()) {
     report.set(key, { ...item });
   }
   management.currentReport = [...report.values()];
+  
   const pending = new Map(management.pendingContacts.map((item) => [pendingKey(item), item]));
   for (const contact of campaign?.contacts || []) {
     const key = pendingKey(contact);

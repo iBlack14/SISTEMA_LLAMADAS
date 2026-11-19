@@ -29,20 +29,56 @@
   margin: 12px 0 4px;
 }
 
-/* ---- three-column dropdown row ---- */
+/* ---- four-column dropdown row (R · S · P · C) ---- */
 #sendMessageModal .stf-dropdown-row {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+/* Los menús se anclan a la fila, no al botón, para no desbordar el panel. */
+#sendMessageModal .stf-dropdown-row:has(.stf-dropdown-menu.is-open) {
+  z-index: 10001;
 }
 
 /* ---- individual dropdown container ---- */
 #sendMessageModal .stf-dropdown {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
-#sendMessageModal .stf-dropdown:has(.stf-dropdown-menu.is-open) {
-  z-index: 10000;
+/* ---- botón "+" para crear una nueva opción del filtro (sin caja de fondo) ---- */
+#sendMessageModal .stf-add-btn {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 50%;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #8e1ab2 !important;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+#sendMessageModal .stf-add-btn:hover,
+#sendMessageModal .stf-add-btn:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #e3188d !important;
+  text-shadow: 0 0 8px rgba(216, 20, 130, .45);
+  transform: scale(1.3);
 }
 
 /* ---- trigger button ---- */
@@ -52,6 +88,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
   width: 100%;
   min-height: 34px;
   max-height: 36px;
@@ -74,9 +112,10 @@
 }
 
 #sendMessageModal .stf-dropdown-btn:hover {
-  background: linear-gradient(135deg, #e3188d 0%, #9a1ec0 100%) !important;
-  box-shadow: 0 4px 12px rgba(217, 20, 131, 0.35) !important;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #f01a95 0%, #a71fd0 100%) !important;
+  box-shadow: 0 0 0 3px rgba(216, 20, 130, .22), 0 6px 16px rgba(217, 20, 131, .45) !important;
+  filter: brightness(1.08);
+  transform: translateY(-2px);
   color: #ffffff !important;
 }
 
@@ -228,16 +267,28 @@
   border-color: #d16ea0;
 }
 
-/* Mobile: stack dropdowns 2+1 to avoid truncation */
+/* Mobile: los cuatro filtros caben en una sola fila */
 @media (max-width: 760px) {
   #sendMessageModal .stf-dropdown-row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  #sendMessageModal .stf-dropdown {
+    gap: 2px;
+  }
+
+  #sendMessageModal .stf-add-btn {
+    flex-basis: 18px;
+    width: 18px;
+    height: 18px;
+    font-size: 16px;
   }
 
   #sendMessageModal .stf-dropdown-btn {
     font-size: 10px;
-    padding: 0 6px;
-    gap: 3px;
+    padding: 0 4px;
+    gap: 2px;
   }
 
   #sendMessageModal .stf-btn-icon {
@@ -402,31 +453,6 @@
 
 #templateModal .template-char-count {
   color: #82718e !important;
-}
-
-#templateModal .template-vars-row {
-  gap: 8px;
-  margin: 10px 0 20px;
-}
-
-#templateModal .template-vars-row .vars-title {
-  color: #665274 !important;
-  font-size: 12px;
-}
-
-#templateModal .template-vars-row .var-chip {
-  min-height: 34px;
-  padding: 6px 12px;
-  border: 1px solid #e7cbe0 !important;
-  border-radius: 999px;
-  background: #fff4fa !important;
-  color: #a20c69 !important;
-  box-shadow: none !important;
-}
-
-#templateModal .template-vars-row .var-chip:hover {
-  background: #fce5f2 !important;
-  color: #7a0750 !important;
 }
 
 #templateModal .template-image-dropzone {
@@ -935,8 +961,8 @@
 /* VOIP VC — Rubro/Speech/Precio: opciones con descripción e ícono SVG a la derecha. */
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu {
   box-sizing: border-box;
-  width: min(300px, calc(100vw - 36px));
-  min-width: min(280px, calc(100vw - 36px));
+  width: min(300px, 100%);
+  min-width: min(280px, 100%);
   max-height: min(350px, 52dvh);
   padding: 6px;
   border: 1px solid #ead9f0 !important;
@@ -945,10 +971,6 @@
   box-shadow: 0 18px 42px rgba(41, 16, 60, .20) !important;
   overflow-x: hidden;
   overflow-y: auto;
-}
-
-#sendMessageModal .stf-dropdown:has(.stf-rich-menu.is-open) {
-  z-index: 10001;
 }
 
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option {
@@ -1009,11 +1031,39 @@
   height: 19px;
 }
 
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-visual.stf-visual-ok {
+  background: #e6f6ec !important;
+  color: #249c58 !important;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-visual.stf-visual-missing {
+  background: #fdeaee !important;
+  color: #d43757 !important;
+}
+
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover,
-#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:focus-visible {
-  background: #fbf1fa !important;
-  border-color: #e8c6e6 !important;
-  color: #801b8f !important;
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:focus-visible,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected:hover,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected:focus-visible {
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(142, 26, 178, .38) !important;
+  transform: translateX(3px);
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover .stf-option-visual,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:focus-visible .stf-option-visual,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected:hover .stf-option-visual {
+  background: rgba(255, 255, 255, .22) !important;
+  color: #ffffff !important;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover .stf-option-title,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover .stf-option-description,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected:hover .stf-option-title,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected:hover .stf-option-description {
+  color: #ffffff !important;
 }
 
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected {
@@ -1026,13 +1076,107 @@
   content: none !important;
 }
 
-#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover .stf-option-description,
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option.is-selected .stf-option-description {
   color: #795a89;
 }
 
 @media (max-width: 420px) {
   #sendMessageModal .stf-dropdown-menu.stf-rich-menu {
-    width: min(290px, calc(100vw - 32px));
+    width: min(290px, 100%);
   }
+}
+
+/* ---- modal para crear una nueva opción de filtro ---- */
+#sendMessageModal .stf-option-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  display: none;
+  place-items: center;
+  padding: 16px;
+  background: rgba(26, 9, 40, .55);
+}
+
+#sendMessageModal .stf-option-modal.is-open {
+  display: grid;
+}
+
+#sendMessageModal .stf-option-modal-card {
+  box-sizing: border-box;
+  width: min(360px, 100%);
+  padding: 20px;
+  border: 1px solid #ead9f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(41, 16, 60, .28);
+}
+
+#sendMessageModal .stf-option-modal-card h4 {
+  margin: 0 0 4px;
+  color: #241337;
+  font-size: 16px;
+}
+
+#sendMessageModal .stf-option-modal-card p {
+  margin: 0 0 16px;
+  color: #82718e;
+  font-size: 12px;
+}
+
+#sendMessageModal .stf-option-modal-card label {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+  color: #685477;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#sendMessageModal .stf-option-modal-card input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #e1d1ec !important;
+  border-radius: 9px;
+  background: #fff !important;
+  color: #31213e !important;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+#sendMessageModal .stf-option-modal-card input:focus {
+  border-color: #d91483 !important;
+  box-shadow: 0 0 0 3px rgba(216, 20, 130, .14);
+}
+
+#sendMessageModal .stf-option-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+#sendMessageModal .stf-option-modal-actions button {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#sendMessageModal .stf-option-cancel-btn {
+  border: 1px solid #dec8ee !important;
+  background: #f6edf9 !important;
+  color: #5d367c !important;
+}
+
+#sendMessageModal .stf-option-save-btn {
+  border: 0 !important;
+  background: linear-gradient(135deg, #d91483 0%, #8e1ab2 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 10px rgba(216, 20, 130, .25) !important;
 }

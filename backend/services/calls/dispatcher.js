@@ -37,7 +37,7 @@ async function sendPersistedDial(code, socketId, payload) {
   const callId = String(payload.callId || "").slice(-8);
   try {
     console.info(`[CALL_DISPATCH] persist-before-dial session=${sessionId} worker=${socketId ? "connected" : "missing"} command=${commandId} call=${callId}`);
-    await runtime.persistence.save(runtime.sessions);
+    await runtime.persistence.save(runtime.sessions, [code]);
     const persistedMs = Date.now() - startedAt;
     const session = runtime.sessions.get(code);
     const assignmentEntry = Object.entries(session?.campaign?.assignments || {})

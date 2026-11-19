@@ -25,6 +25,8 @@ const PRECIO_KEYWORDS = {
   'Con precio': /s\/\s*[\d,.]+|precio|costo|tarifa|inversión|paquete|plan desde|\$\s*[\d,.]+/i,
   'Sin precio': null,  // fallback: las que no caen en "Con precio"
 };
+// Palabras clave para clasificar "Combo" (paquetes o promociones agrupadas)
+const COMBO_KEYWORDS = /combo|paquete|kit\b|promo|incluye|conjunto|duo|tr[íi]o|oferta conjunta/i;
 const FLYERS_PATH = '/features/messaging/campaign-2027/';
 
 /** Miniatura ligera solo para vistas previas; el envío sigue usando la imagen original. */
@@ -40,6 +42,7 @@ function templateThumbUrl(image) {
 // ============================================================================
 let templates = [];
 let currentEditingId = null;
+let currentEditingType = 'both'; // Las plantillas nuevas siempre son para WhatsApp y Correo
 let currentEditingImage = null; // Base64 o URL para templateModal
 let currentSendImage = null;    // Base64 o URL para sendMessageModal
 let initializationPromise = null;
@@ -49,8 +52,13 @@ let currentSendContact = null;
 // al cerrar el modal sin enviar se marca "No contactado".
 let contactSendResolved = true;
 
-// Estado de los tres filtros dropdown
-const activeFilters = { rubro: '', speech: '', precio: '' };
+// Estado de los cuatro filtros dropdown
+const activeFilters = { rubro: '', speech: '', precio: '', combo: '' };
+
+// Categorías creadas por el usuario en cada filtro (se guardan en el navegador)
+const CUSTOM_FILTER_KEY = 'voip_stf_custom_filters';
+const CUSTOM_FILTER_KINDS = ['rubro', 'speech', 'precio', 'combo'];
+const customFilters = { rubro: {}, speech: {}, precio: {}, combo: {} };
 
 // ============================================================================
 // TOAST NOTIFICATIONS
@@ -187,6 +195,7 @@ export function init() {
       initializationPromise = null;
       showToast(err.message || 'No se pudieron cargar las plantillas.', 'error');
     }
+    loadCustomFilters();
     renderTemplates();
     renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
   })();
@@ -346,7 +355,6 @@ function openTemplateModal(templateId = null) {
   const modal = document.getElementById('templateModal');
   const title = document.getElementById('templateModalTitle');
   const nameInput = document.getElementById('templateNameInput');
-  const typeSelect = document.getElementById('templateTypeInput');
   const messageInput = document.getElementById('templateMessageInput');
   const charCount = document.getElementById('templateCharCount');
   const emptyWrap = document.getElementById('templateImageEmptyWrap');
@@ -364,7 +372,7 @@ function openTemplateModal(templateId = null) {
 
     if (title) title.textContent = 'Editar plantilla';
     if (nameInput) nameInput.value = template.name;
-    if (typeSelect) typeSelect.value = template.type || 'both';
+    currentEditingType = template.type || 'both';
     if (messageInput) messageInput.value = template.message;
 
     if (template.image) {
@@ -379,7 +387,7 @@ function openTemplateModal(templateId = null) {
   } else {
     if (title) title.textContent = 'Nueva plantilla';
     if (nameInput) nameInput.value = '';
-    if (typeSelect) typeSelect.value = 'both';
+    currentEditingType = 'both';
     if (messageInput) messageInput.value = '';
     if (previewWrap) previewWrap.style.display = 'none';
     if (emptyWrap) emptyWrap.style.display = 'flex';
@@ -437,13 +445,12 @@ function removeTemplateImage() {
 
 async function saveTemplate() {
   const nameInput = document.getElementById('templateNameInput');
-  const typeSelect = document.getElementById('templateTypeInput');
   const messageInput = document.getElementById('templateMessageInput');
 
-  if (!nameInput || !typeSelect || !messageInput) return;
+  if (!nameInput || !messageInput) return;
 
   const name = nameInput.value.trim();
-  const type = typeSelect.value;
+  const type = currentEditingType;
   const message = messageInput.value.trim();
 
   if (!name) {
@@ -585,9 +592,15 @@ function inferPrecio(template) {
   return PRECIO_KEYWORDS['Con precio'].test(text) ? 'Con precio' : 'Sin precio';
 }
 
+/** Infiere si la plantilla corresponde a un combo/paquete. */
+function inferCombo(template) {
+  const text = `${template.name} ${template.message}`;
+  return COMBO_KEYWORDS.test(text) ? 'Con combo' : 'Sin combo';
+}
+
 /** Cierra todos los menus desplegables del filtro. */
 function closeAllStfMenus(except = null) {
-  ['stfRubroDropdown', 'stfSpeechDropdown', 'stfPrecioDropdown'].forEach(id => {
+  ['stfRubroDropdown', 'stfSpeechDropdown', 'stfPrecioDropdown', 'stfComboDropdown'].forEach(id => {
     if (id === except) return;
     const wrap = document.getElementById(id);
     if (!wrap) return;
@@ -676,7 +689,19 @@ const PRECIO_UI = {
   }
 };
 
-/** Configuración compartida de los tres menús con formato enriquecido */
+/** Metadatos visuales del filtro COMBO */
+const COMBO_UI = {
+  'Con combo': {
+    description: 'Paquetes y promociones agrupadas',
+    icon: '<path d="M3 8h18l-1.5 12h-15L3 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/>'
+  },
+  'Sin combo': {
+    description: 'Mensajes individuales',
+    icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/>'
+  }
+};
+
+/** Configuración compartida de los cuatro menús con formato enriquecido */
 const STF_MENU_UI = {
   rubro: {
     allLabel: 'Todos los rubros',
@@ -695,11 +720,95 @@ const STF_MENU_UI = {
     allDescription: 'Mostrar todas las opciones',
     fallbackDescription: 'Opción de precio',
     options: PRECIO_UI
+  },
+  combo: {
+    allLabel: 'Todos los combos',
+    allDescription: 'Mostrar todas las opciones',
+    fallbackDescription: 'Opción de combo',
+    options: COMBO_UI
   }
 };
 
 const STF_CHECK_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+
+const STF_X_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+/** Devuelve true si todas las plantillas de una opción tienen imagen adjunta. */
+function optionHasAllImages(kind, value) {
+  if (!value) {
+    return templates.length > 0 && templates.every(template => Boolean(template.image));
+  }
+
+  const matches = templates.filter(template => {
+    if (kind === 'rubro') return (template.category || 'Otros') === value;
+    if (kind === 'speech') return inferSpeech(template) === value;
+    if (kind === 'precio') return inferPrecio(template) === value;
+    if (kind === 'combo') return inferCombo(template) === value;
+    return false;
+  });
+
+  return matches.length > 0 && matches.every(template => Boolean(template.image));
+}
+
+/** Carga las categorías creadas por el usuario y las agrega a cada menú. */
+function loadCustomFilters() {
+  let stored = {};
+  try {
+    stored = JSON.parse(localStorage.getItem(CUSTOM_FILTER_KEY) || '{}') || {};
+  } catch {
+    stored = {};
+  }
+
+  CUSTOM_FILTER_KINDS.forEach(kind => {
+    const raw = stored[kind];
+    if (Array.isArray(raw)) {
+      raw.forEach(item => {
+        if (typeof item === 'string' && item.trim()) customFilters[kind][item.trim()] = '';
+        else if (item && typeof item.value === 'string' && item.value.trim()) {
+          customFilters[kind][item.value.trim()] = String(item.description || '');
+        }
+      });
+    } else if (raw && typeof raw === 'object') {
+      Object.entries(raw).forEach(([value, description]) => {
+        if (value.trim()) customFilters[kind][value.trim()] = String(description || '');
+      });
+    }
+
+    Object.entries(customFilters[kind]).forEach(([value, description]) => {
+      STF_MENU_UI[kind].options[value] = {
+        description: description || STF_MENU_UI[kind].fallbackDescription,
+        icon: ''
+      };
+    });
+  });
+}
+
+/** Guarda las categorías creadas por el usuario. */
+function saveCustomFilters() {
+  try {
+    localStorage.setItem(CUSTOM_FILTER_KEY, JSON.stringify(customFilters));
+  } catch {
+    // Almacenamiento no disponible: las categorías siguen activas en esta sesión.
+  }
+}
+
+/** Elimina una categoría creada por el usuario y actualiza los menús. */
+function deleteStfOption(kind, value) {
+  if (!STF_MENU_UI[kind] || !customFilters[kind]) return;
+  if (!Object.prototype.hasOwnProperty.call(customFilters[kind], value)) return;
+
+  delete customFilters[kind][value];
+  delete STF_MENU_UI[kind].options[value];
+  saveCustomFilters();
+
+  if (activeFilters[kind] === value) activeFilters[kind] = '';
+
+  refreshStfDropdowns();
+  renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
+  showToast(`Categoría "${value}" eliminada`, 'success');
+}
 
 /** Genera opciones sin modificar la lógica de filtrado */
 function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
@@ -709,8 +818,10 @@ function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
   menuEl.replaceChildren();
   menuEl.classList.toggle('stf-rich-menu', Boolean(ui));
 
-  const appendOption = (value, title, description = '', iconPaths = '') => {
+  const appendOption = (value, title, description = '') => {
     const li = document.createElement('li');
+    const row = document.createElement('div');
+    row.className = 'stf-option-row';
     const btn = document.createElement('button');
 
     btn.type = 'button';
@@ -734,12 +845,13 @@ function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
 
       copy.append(name, desc);
 
+      const hasAllImages = optionHasAllImages(kind, value);
       const visual = document.createElement('span');
-      visual.className = 'stf-option-visual';
-
-      visual.innerHTML = iconPaths
-        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths}</svg>`
-        : STF_CHECK_SVG;
+      visual.className = `stf-option-visual ${hasAllImages ? 'stf-visual-ok' : 'stf-visual-missing'}`;
+      visual.title = hasAllImages
+        ? 'Todas las plantillas tienen imagen'
+        : 'Al menos una plantilla no tiene imagen';
+      visual.innerHTML = hasAllImages ? STF_CHECK_SVG : STF_X_SVG;
 
       btn.append(copy, visual);
     } else {
@@ -747,7 +859,26 @@ function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
     }
 
     btn.addEventListener('click', () => onSelect(value));
-    li.appendChild(btn);
+    row.appendChild(btn);
+
+    const isCustom = Boolean(value) &&
+      Object.prototype.hasOwnProperty.call(customFilters[kind] || {}, value);
+    if (isCustom) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'stf-option-delete';
+      deleteBtn.title = 'Eliminar categoría';
+      deleteBtn.setAttribute('aria-label', `Eliminar categoría ${value}`);
+      deleteBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4l1 3H9l1-3ZM6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
+      deleteBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        deleteStfOption(kind, value);
+      });
+      row.appendChild(deleteBtn);
+    }
+
+    li.appendChild(row);
     menuEl.appendChild(li);
   };
 
@@ -763,8 +894,7 @@ function buildStfMenu(menuEl, values, currentValue, onSelect, kind = '') {
     appendOption(
       value,
       value,
-      meta?.description || ui?.fallbackDescription || '',
-      meta?.icon || ''
+      meta?.description || ui?.fallbackDescription || ''
     );
   });
 }
@@ -775,11 +905,14 @@ function updateStfBtnState(btnId, labelId, defaultLabel, activeValue) {
   const btn = document.getElementById(btnId);
   const lbl = document.getElementById(labelId);
   if (!btn || !lbl) return;
+  const fullLabel = btn.getAttribute('aria-label') || defaultLabel;
   if (activeValue) {
     lbl.textContent = activeValue;
+    btn.title = `${fullLabel}: ${activeValue}`;
     btn.classList.add('is-active');
   } else {
     lbl.textContent = defaultLabel;
+    btn.title = fullLabel;
     btn.classList.remove('is-active');
   }
 }
@@ -788,55 +921,123 @@ function updateStfBtnState(btnId, labelId, defaultLabel, activeValue) {
 function syncClearBtn() {
   const btn = document.getElementById('stfClearFiltersBtn');
   if (!btn) return;
-  const anyActive = activeFilters.rubro || activeFilters.speech || activeFilters.precio;
+  const anyActive = activeFilters.rubro || activeFilters.speech || activeFilters.precio || activeFilters.combo;
   btn.hidden = !anyActive;
+}
+
+/** Botones de los tres filtros: id del botón, id del label y texto corto. */
+const STF_BTN = {
+  rubro: ['stfRubroBtn', 'stfRubroLabel', 'R'],
+  speech: ['stfSpeechBtn', 'stfSpeechLabel', 'S'],
+  precio: ['stfPrecioBtn', 'stfPrecioLabel', 'P'],
+  combo: ['stfComboBtn', 'stfComboLabel', 'C']
+};
+
+/** Aplica un valor a un filtro y actualiza la lista de plantillas. */
+function setStfFilter(kind, value) {
+  activeFilters[kind] = value;
+  const [btnId, labelId, shortLabel] = STF_BTN[kind] || [];
+  if (!btnId) return;
+  updateStfBtnState(btnId, labelId, shortLabel, value);
+  document.getElementById(btnId)?.setAttribute('aria-expanded', 'false');
+  closeAllStfMenus();
+  syncClearBtn();
+  renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
+}
+
+let stfOptionKind = '';
+
+/** Abre el cuadro para crear una nueva categoría en el filtro indicado. */
+function openStfOptionModal(kind) {
+  if (!STF_MENU_UI[kind]) return;
+  const modal = document.getElementById('stfOptionModal');
+  if (!modal) return;
+
+  stfOptionKind = kind;
+  const titles = {
+    rubro: 'Nuevo rubro',
+    speech: 'Nuevo speech',
+    precio: 'Nuevo precio',
+    combo: 'Nuevo combo'
+  };
+  document.getElementById('stfOptionModalTitle').textContent = titles[kind];
+  document.getElementById('stfOptionModalHint').textContent =
+    `Se agregará al filtro ${kind} y quedará guardada en este navegador.`;
+  document.getElementById('stfOptionName').value = '';
+  document.getElementById('stfOptionDescription').value = '';
+  modal.classList.add('is-open');
+  document.getElementById('stfOptionName')?.focus();
+}
+
+/** Cierra el cuadro de nueva categoría. */
+function closeStfOptionModal() {
+  document.getElementById('stfOptionModal')?.classList.remove('is-open');
+  stfOptionKind = '';
+}
+
+/** Guarda la categoría nueva, la agrega al menú y la deja seleccionada. */
+function createStfOption() {
+  const kind = stfOptionKind;
+  if (!STF_MENU_UI[kind]) return;
+
+  const nameInput = document.getElementById('stfOptionName');
+  const value = nameInput?.value.trim() || '';
+  if (!value) {
+    nameInput?.focus();
+    showToast('Escribe el nombre de la categoría.', 'error');
+    return;
+  }
+
+  const exists = Boolean(STF_MENU_UI[kind].options[value]) ||
+    Object.keys(customFilters[kind]).some(item => item.toLowerCase() === value.toLowerCase());
+  if (exists) {
+    showToast('Esa categoría ya existe en el filtro.', 'error');
+    return;
+  }
+
+  const description = document.getElementById('stfOptionDescription')?.value.trim() || '';
+  customFilters[kind][value] = description;
+  STF_MENU_UI[kind].options[value] = {
+    description: description || STF_MENU_UI[kind].fallbackDescription,
+    icon: ''
+  };
+  saveCustomFilters();
+  closeStfOptionModal();
+  refreshStfDropdowns();
+  setStfFilter(kind, value);
+  showToast(`Categoría "${value}" creada`, 'success');
 }
 
 /** Inicializa o refresca los tres dropdowns de filtro. */
 function refreshStfDropdowns() {
-  const rubroBtnEl = document.getElementById('stfRubroBtn');
-  const speechBtnEl = document.getElementById('stfSpeechBtn');
-  const precioBtnEl = document.getElementById('stfPrecioBtn');
-  if (!rubroBtnEl) return;
+  if (!document.getElementById('stfRubroBtn')) return;
 
   const rubros = new Set(templates.map(t => t.category || 'Otros').filter(Boolean));
   const speeches = new Set(templates.map(inferSpeech).filter(Boolean));
   const precios = new Set(templates.map(inferPrecio).filter(Boolean));
+  const combos = new Set(templates.map(inferCombo).filter(Boolean));
 
-  const refresh = () => {
-    renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
-  };
+  Object.keys(customFilters.rubro).forEach(value => rubros.add(value));
+  Object.keys(customFilters.speech).forEach(value => speeches.add(value));
+  Object.keys(customFilters.precio).forEach(value => precios.add(value));
+  Object.keys(customFilters.combo).forEach(value => combos.add(value));
 
-  buildStfMenu(document.getElementById('stfRubroMenu'), rubros, activeFilters.rubro, (val) => {
-    activeFilters.rubro = val;
-    updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', val);
-    closeAllStfMenus();
-    rubroBtnEl.setAttribute('aria-expanded', 'false');
-    syncClearBtn();
-    refresh();
-  }, 'rubro');
+  buildStfMenu(document.getElementById('stfRubroMenu'), rubros, activeFilters.rubro,
+    (val) => setStfFilter('rubro', val), 'rubro');
 
-  buildStfMenu(document.getElementById('stfSpeechMenu'), speeches, activeFilters.speech, (val) => {
-    activeFilters.speech = val;
-    updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', val);
-    closeAllStfMenus();
-    speechBtnEl.setAttribute('aria-expanded', 'false');
-    syncClearBtn();
-    refresh();
-  }, 'speech');
+  buildStfMenu(document.getElementById('stfSpeechMenu'), speeches, activeFilters.speech,
+    (val) => setStfFilter('speech', val), 'speech');
 
-  buildStfMenu(document.getElementById('stfPrecioMenu'), precios, activeFilters.precio, (val) => {
-    activeFilters.precio = val;
-    updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', val);
-    closeAllStfMenus();
-    precioBtnEl.setAttribute('aria-expanded', 'false');
-    syncClearBtn();
-    refresh();
-  }, 'precio');
+  buildStfMenu(document.getElementById('stfPrecioMenu'), precios, activeFilters.precio,
+    (val) => setStfFilter('precio', val), 'precio');
 
-  updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', activeFilters.rubro);
-  updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', activeFilters.speech);
-  updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', activeFilters.precio);
+  buildStfMenu(document.getElementById('stfComboMenu'), combos, activeFilters.combo,
+    (val) => setStfFilter('combo', val), 'combo');
+
+  updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'R', activeFilters.rubro);
+  updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'S', activeFilters.speech);
+  updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'P', activeFilters.precio);
+  updateStfBtnState('stfComboBtn', 'stfComboLabel', 'C', activeFilters.combo);
   syncClearBtn();
 }
 
@@ -862,7 +1063,7 @@ function renderSendTemplateList(selectedId = '') {
 
   const query = String(search?.value || '').trim().toLocaleLowerCase('es');
 
-  const hasActiveFilters = Boolean(activeFilters.rubro || activeFilters.speech || activeFilters.precio);
+  const hasActiveFilters = Boolean(activeFilters.rubro || activeFilters.speech || activeFilters.precio || activeFilters.combo);
   const visibleTemplates = sortTemplates(templates.filter(template => {
     if (query) {
       const searchable = `${template.name} ${template.message}`.toLocaleLowerCase('es');
@@ -871,6 +1072,7 @@ function renderSendTemplateList(selectedId = '') {
     if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
     if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
     if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
+    if (activeFilters.combo && inferCombo(template) !== activeFilters.combo) return false;
     return true;
   }));
 
@@ -1249,9 +1451,11 @@ function bindEvents() {
       activeFilters.rubro = '';
       activeFilters.speech = '';
       activeFilters.precio = '';
-      updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'RUBRO', '');
-      updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'SPEECH', '');
-      updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'PRECIO', '');
+      activeFilters.combo = '';
+      updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'R', '');
+      updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'S', '');
+      updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'P', '');
+      updateStfBtnState('stfComboBtn', 'stfComboLabel', 'C', '');
       syncClearBtn();
       renderSendTemplateList(sendModal?.dataset.templateId || '');
     });
@@ -1261,6 +1465,13 @@ function bindEvents() {
   document.addEventListener('click', (e) => {
     const target = e.target;
     if (!(target instanceof Element)) return;
+
+    const addBtn = target.closest('.stf-add-btn');
+    if (addBtn) {
+      closeAllStfMenus();
+      openStfOptionModal(addBtn.dataset.kind);
+      return;
+    }
 
     const btn = target.closest('.stf-dropdown-btn');
     if (btn && btn.closest('#stfDropdownRow')) {
@@ -1276,6 +1487,20 @@ function bindEvents() {
     if (!target.closest('#stfDropdownRow')) closeAllStfMenus();
   });
 
+  // Nueva categoría desde los botones "+" de R / S / P
+  document.getElementById('stfOptionSaveBtn')?.addEventListener('click', createStfOption);
+  document.getElementById('stfOptionCancelBtn')?.addEventListener('click', closeStfOptionModal);
+  document.getElementById('stfOptionModal')?.addEventListener('click', (event) => {
+    if (event.target?.id === 'stfOptionModal') closeStfOptionModal();
+  });
+  document.getElementById('stfOptionName')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') createStfOption();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.getElementById('stfOptionModal')?.classList.contains('is-open')) {
+      closeStfOptionModal();
+    }
+  });
 
   // Crear nueva plantilla desde messagesView
   const createBtn = document.getElementById('createTemplateBtn');
@@ -1316,23 +1541,6 @@ function bindEvents() {
       updateCharCount(templateMessageInput, templateCharCount, 1000);
     });
   }
-
-  // Chips para insertar variables {nombre} y {empresa}
-  document.querySelectorAll('.template-vars-row .var-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const variable = chip.dataset.var;
-      if (!variable || !templateMessageInput) return;
-      const start = templateMessageInput.selectionStart || templateMessageInput.value.length;
-      const end = templateMessageInput.selectionEnd || templateMessageInput.value.length;
-      const val = templateMessageInput.value;
-      templateMessageInput.value = val.substring(0, start) + variable + val.substring(end);
-      templateMessageInput.focus();
-      templateMessageInput.selectionStart = templateMessageInput.selectionEnd = start + variable.length;
-      if (templateCharCount) {
-        updateCharCount(templateMessageInput, templateCharCount, 1000);
-      }
-    });
-  });
 
   // Selector y DropZone de imagen para templateModal
   const tplImageFileInput = document.getElementById('templateImageFileInput');
