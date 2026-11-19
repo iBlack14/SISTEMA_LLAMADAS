@@ -153,7 +153,6 @@
 
 /* Identidad visual: acciones magenta con etiquetas destacadas. */
 button,
-.file-label,
 #apkDlBtn {
   background: linear-gradient(135deg, #ed00b5, #a900d6) !important;
   border-color: rgba(255, 112, 220, 0.78) !important;
