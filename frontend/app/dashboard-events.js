@@ -15,7 +15,11 @@ let previousContactSignature = "";
 let previousShiftSignature = "";
 window.addEventListener("contact-book:loaded", () => {
   WhatsApp.loadWhatsAppPresetMessages();
-  dashboardActions.renderTabs(); dashboardActions.renderContacts(); dashboardActions.renderCampaignPanel();
+  dashboardActions.renderTabs();
+  dashboardActions.renderContacts();
+  dashboardActions.renderCampaignPanel();
+  if (dashboardActions.renderPairingSlotsOnly) dashboardActions.renderPairingSlotsOnly();
+  if (dashboardActions.renderAssignedListsPanel) dashboardActions.renderAssignedListsPanel();
 });
 
 window.addEventListener("contact-book:error", event => {

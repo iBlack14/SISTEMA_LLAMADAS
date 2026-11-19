@@ -1,5 +1,4 @@
 import { nanoid } from "nanoid";
-import { isDialAcknowledged } from "../../sockets/call-events.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
   ensureCampaign,
@@ -63,39 +62,17 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
   const commandId = String(payload.commandId || "").slice(-8);
   const callId = String(payload.callId || "").slice(-8);
   const target = runtime.io.sockets?.sockets?.get(socketId);
-  if (!target?.connected || typeof target.timeout !== "function") {
+  if (!target?.connected) {
     console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=worker_disconnected command=${commandId} call=${callId} retry=${retry}`);
     if (Date.now() - startedAt < 30000) scheduleDialRetry(code, workerId, payload, retry, startedAt);
     return;
   }
 
-  // The APK answers a dial with a separate phone:command_ack event, not via the
-  // call:action ack callback. Treat an already-acknowledged command as success
-  // so the dispatcher does not retry a call the phone already started.
-  if (isDialAcknowledged(payload.commandId)) {
-    console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt} source=phone_ack`);
-    return;
-  }
-
-  target.timeout(5000).emit("call:action", payload, (error, responses) => {
-    const response = responses?.[0];
-    if (!error && response?.ok === true) {
-      console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt}`);
-      return;
-    }
-    if (isDialAcknowledged(payload.commandId)) {
-      console.info(`[CALL_DISPATCH] acknowledged session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt} source=phone_ack`);
-      return;
-    }
-    if (!error) {
-      console.warn(`[CALL_DISPATCH] rejected session=${sessionId} command=${commandId} call=${callId} retry=${retry} message=${String(response?.message || "invalid_ack").slice(0,120)}`);
-      return;
-    }
-
-    console.warn(`[CALL_DISPATCH] ack-timeout session=${sessionId} command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt}`);
-    if (retry >= 2) return;
-    scheduleDialRetry(code, workerId, payload, retry, startedAt);
-  });
+  // The APK does not answer call:action via the Socket.IO ack callback; it
+  // confirms with a separate phone:command_ack event and reports call state
+  // through phone:status. Sending without a callback avoids the 5s timeout
+  // that otherwise reports invalid_ack/ack-timeout for every successful dial.
+  target.emit("call:action", payload);
   console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} retry=${retry} targetConnected=true`);
 }
 
@@ -104,19 +81,11 @@ function scheduleDialRetry(code, workerId, payload, retry, startedAt) {
   const commandId = String(payload.commandId || "").slice(-8);
   const callId = String(payload.callId || "").slice(-8);
   setTimeout(() => {
-    if (isDialAcknowledged(payload.commandId)) {
-      console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=phone_ack_received`);
-      return;
-    }
     const session = runtime.sessions.get(code);
     const assignmentEntry = Object.entries(session?.campaign?.assignments || {})
       .find(([id, item]) => id === workerId && item.attemptId === payload.callId);
     if (!assignmentEntry || runtime.persistence.hasFinishedAttempt(code, payload.callId, payload.contactId)) {
       console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=assignment_finished`);
-      return;
-    }
-    if (isDialAcknowledged(payload.commandId)) {
-      console.info(`[CALL_DISPATCH] retry-cancelled session=${sessionId} command=${commandId} call=${callId} reason=phone_ack_received`);
       return;
     }
     const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);
