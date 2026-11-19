@@ -532,3 +532,29 @@ body .panel #annualReport .report-tools button {
   #annualReport .report-month,
   #annualReport .report-days button { transition: none !important; }
 }
+
+/* Paginación del listado de llamadas (20 por página) */
+#annualReport .report-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+  color: #e7d4f1;
+  font-size: 12px;
+}
+
+#annualReport .report-pagination button {
+  min-width: 120px;
+}
+
+#annualReport .report-pagination button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+#annualReport .report-pagination span {
+  font-weight: 700;
+  letter-spacing: .02em;
+}

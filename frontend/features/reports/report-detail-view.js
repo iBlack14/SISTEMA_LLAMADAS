@@ -37,6 +37,25 @@ function renderDetails() {
       )
       : report.rows.map(contact => ({ report, contact }))
     );
+    // El listado se muestra de 20 en 20; el PDF y la descarga total siguen usando todo.
+    const rowsPerPage = reportState.tableRowsPerPage || 20;
+    const pageKey = [
+      reportState.selectedReport,
+      reportState.reportSearchTerm,
+      reportState.selectedDetailedTeam,
+      reportState.detailedPendingOnly
+    ].join("|");
+    if (reportState.tablePageKey !== pageKey) {
+      reportState.tablePageKey = pageKey;
+      reportState.tablePage = 0;
+    }
+    const totalPages = Math.max(1, Math.ceil(tableRows.length / rowsPerPage));
+    reportState.tablePage = Math.min(Math.max(0, reportState.tablePage || 0), totalPages - 1);
+    const pageRows = tableRows.slice(
+      reportState.tablePage * rowsPerPage,
+      (reportState.tablePage + 1) * rowsPerPage
+    );
+
     const rows = report.rows.filter(contact =>
       normalizeSearchText(
         `${report.rubro} ${contact.name} ${contact.phone} ` +
@@ -626,13 +645,13 @@ function renderDetails() {
                 </tr>
               </thead>
               <tbody>
-                ${tableRows.map(({ report: rowReport, contact }, index) => `
+                ${pageRows.map(({ report: rowReport, contact }, index) => `
                   <tr>
                     <td class="report-select-cell"><input type="checkbox" data-select-contact="${reportState.esc(String(contact.id))}"
                       aria-label="Seleccionar ${reportState.esc(contact.name)} ${reportState.esc(contact.phone)}"
                       ${rowReport.id === report.id && canSelect(contact) ? "" : 'disabled title="Número bloqueado, inoperable o de otro rubro"'}
                       ${rowReport.id === report.id && reportState.selectedContactIds.has(String(contact.id)) ? "checked" : ""} /></td>
-                    <td>${index + 1}</td>
+                    <td>${reportState.tablePage * rowsPerPage + index + 1}</td>
                     <td>${reportState.esc(contact.list || rowReport.rubro)}</td>
                     <td>${reportState.esc(contact.name)}</td>
                     <td>${reportState.esc(contact.phone)}</td>
@@ -657,6 +676,11 @@ function renderDetails() {
               </tbody>
             </table>
           </div>
+          <nav class="report-pagination" aria-label="Paginación de llamadas">
+            <button id="reportPrevPage" class="secondary" type="button" ${reportState.tablePage === 0 ? "disabled" : ""}>← ANTERIOR</button>
+            <span id="reportPageInfo">Página ${reportState.tablePage + 1} de ${totalPages} · ${tableRows.length} registros</span>
+            <button id="reportNextPage" class="secondary" type="button" ${reportState.tablePage >= totalPages - 1 ? "disabled" : ""}>SIGUIENTE →</button>
+          </nav>
           <div class="report-footer">
             <div class="report-actions">
               <button id="reportPdf" type="button">⬇ DESCARGAR REPORTE</button>
@@ -680,6 +704,15 @@ function renderDetails() {
         </section>
       </section>
     `;
+
+    reportState.$("reportPrevPage")?.addEventListener("click", () => {
+      reportState.tablePage = Math.max(0, reportState.tablePage - 1);
+      reportActions.renderDetails();
+    });
+    reportState.$("reportNextPage")?.addEventListener("click", () => {
+      reportState.tablePage = Math.min(totalPages - 1, reportState.tablePage + 1);
+      reportActions.renderDetails();
+    });
 
     let selectionSubmitting = false;
     const checkboxes = () => [...reportState.$("reportDetails").querySelectorAll("[data-select-contact]:not(:disabled)")];

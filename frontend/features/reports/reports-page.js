@@ -57,6 +57,9 @@ reportState.detailedPendingOnly = false;
 reportState.selectedDetailedTeam = "";
 reportState.visibleRubrosStart = 0;
 reportState.rubrosPerPage = 3;
+reportState.tableRowsPerPage = 20;
+reportState.tablePage = 0;
+reportState.tablePageKey = '';
 reportState.esc = value => String(value ?? "").replace(
     /[&<>"']/g,
     char => ({

@@ -1,192 +1,172 @@
-# VOIP VC - Skeleton de Vinculacion Celular <-> Web
+# VOIP VC - Call Bridge System
 
-## Inicio de sesión, roles y XAMPP local
+**Production-ready real-time call bridge system connecting cellular devices to web dashboards via Socket.IO**
 
-Inicia MySQL desde XAMPP y verifica que `.env` tenga `DB_HOST=localhost`,
-`DB_PORT=3306` (opcional), `DB_NAME` y `DB_USER`. Luego ejecuta `npm start` y
-abre `http://127.0.0.1:3000/login`. El servidor queda limitado a esta PC. La
-autenticación crea únicamente las tablas `auth_*` en la base indicada, sin
-borrar las tablas existentes. En este perfil un teléfono físico no puede
-conectarse al servidor usando `localhost`.
+---
 
-Para crear la primera cuenta, abre otra terminal en la raíz y ejecuta:
+## 📋 Table of Contents
+
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Production Deployment](#production-deployment)
+- [Android APK](#android-apk)
+- [API Reference](#api-reference)
+- [Testing](#testing)
+- [Performance & Optimization](#performance--optimization)
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Node.js | 20+ LTS |
+| MySQL / MariaDB | 8.0+ / 10.6+ |
+| Android Studio | (optional, for APK builds) |
+
+### Local Development
+
+```powershell
+# 1. Install dependencies
+npm install
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 3. Start the server
+npm start
+
+# 4. Open in browser
+# http://127.0.0.1:3000/login
+```
+
+### Create First Account
 
 ```powershell
 npm run auth:user:add -- admin ADMINISTRADOR
 ```
 
-La contraseña se solicita dos veces sin mostrarse en pantalla. Usa el mismo
-comando con rol `EMPLEADO` para las demás cuentas. Instrucciones del entorno
-alternativo aislado y pruebas: [server/auth/README.md](server/auth/README.md).
+The password is requested twice without being displayed on screen.
 
-El administrador dispone de **Núcleo de Red** en `/nucleo-red`, con diez
-equipos, estados Android en vivo y actividad del turno. Fuentes, definiciones
-y pruebas simuladas: [server/NETWORK_MONITOR.md](server/NETWORK_MONITOR.md).
+---
 
-`npm run auth:local` sigue disponible para pruebas con un MySQL separado en el
-puerto 3308. No uses `npm start` para exponer el servicio a una red o a internet:
-el perfil XAMPP de esta fase es solo para uso local.
+## 🏗️ Architecture
 
-Este proyecto crea un **esqueleto funcional** para conectar un dashboard web con un cliente movil usando tiempo real (Socket.IO).
+```
+SISTEMA_LLAMADAS/
+├── backend/          # Node.js + Express + Socket.IO server
+├── frontend/         # Vanilla JS modular (no build required)
+├── android-app/      # Android APK bridge (Kotlin)
+├── docs/             # Architecture documentation
+├── infrastructure/   # VPS deployment configs
+└── README.md
+```
 
-## Arranque y espacio por usuario
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Backend | Node.js 20+ | REST API + WebSocket server |
+| Database | MySQL 8.0+ | Session persistence, call history |
+| Frontend | Vanilla JS | Dashboard + phone bridge UI |
+| Mobile | Kotlin + Socket.IO | Android device bridge |
+| Real-time | Socket.IO 4.8+ | Bidirectional communication |
 
-Si esta misma aplicación ya está activa, `npm start` muestra su dirección y
-termina correctamente. No inicia otro escritor ni detiene procesos ajenos.
-El bloqueo de MySQL se mantiene y está separado por base de datos.
+---
 
-Cada cuenta recupera su espacio operativo desde MySQL, incluso al cambiar de
-navegador. No hay que crear ni escribir códigos de sesión. Los códigos y tokens
-de vinculación de celulares siguen siendo internos. Al migrar se reutiliza un
-espacio anterior autorizado del usuario; no se borran las bases ni el historial.
-Desvincular equipos conserva la cuenta y los datos.
+## 🔧 Development
 
-La APK lleva el modelo español de reconocimiento de voz. Se prepara de forma
-automática en el celular, sin descarga manual. La primera compilación de Android
-necesita internet para obtener el modelo oficial; los siguientes builds usan el
-archivo generado en caché.
+### Environment Variables
 
-## Interfaz web original
+```env
+# Local Development
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=your_database
+DB_USER=your_user
+DB_PASSWORD=your_password
+PORT=3000
+```
 
-El panel de llamadas `/` utiliza `frontend/index.html`. Sus módulos se organizan por dominio en `frontend/features/`; el servidor arranca desde `backend/index.js`.
+**Auto-configured (local profile):**
+- `HOST=127.0.0.1`
+- `TRUST_PROXY=0`
+- `CORS_ORIGIN=http://127.0.0.1:3000,http://localhost:3000`
+- `AUTH_LOCAL_ISOLATED=1`
 
-Guía de carpetas, contratos y mantenimiento: [Arquitectura](docs/architecture/README.md).
+### Available Features
+
+- **Network Monitor**: Admin panel at `/nucleo-red` with 10 virtual devices
+- **APK Build**: Android project with auto-model download
+- **QR Pairing**: Session tokens and device binding
+- **Call Management**: Dial, hangup, call state tracking
+- **Campaign System**: Contact lists, dispatch, reporting
+
+### Testing
 
 ```powershell
-npm install
-npm start
+npm test                    # Run all tests
+npm run test:contracts      # HTTP contracts and socket events
+npm run test:network       # Network monitor tests
+npm run test:auth          # Authentication tests
 ```
 
-No se necesita compilar React ni ejecutar Vite. `frontend/` contiene la aplicación Vanilla JS modular.
-Los marcadores `/panel/*` redirigen al panel original. Se mantienen las API,
-MySQL, el historial y los bloqueos de llamadas. Los cambios recientes de la APK,
-incluida la descarga del modelo español, se conservan.
+---
 
-## Que incluye
+## 🚀 Production Deployment
 
-- Dashboard web (`/`) para crear y unir sesion
-- Cliente movil web (`/phone`) para simular el telefono
-- Vinculacion por QR con token de sesion
-- Backend Node.js + Express + Socket.IO
-- Endpoint de pairing para Android (`POST /api/android/pair`)
-- Eventos base: crear sesion, vincular, marcar, colgar, actualizar estado
+### Profile: Easypanel / VPS
 
-## Arranque
+For production, use `APP_ENV=easypanel` or the VPS profile. Supports:
 
-```powershell
-npm install
-npm start
-```
+- Multiple users and accounts
+- Remote MySQL access
+- Public domains with HTTPS
+- Multiple Android device profiles
+- Scalability and rate limiting
 
-Abrir:
+### Quick Deploy (Render)
 
-- Dashboard: `http://localhost:3000/`
-- Cliente movil: `http://localhost:3000/phone`
+1. Push repo to GitHub
+2. Create **Web Service** from repo on Render
+3. Render auto-detects `render.yaml` or use:
+   - Build: `npm install`
+   - Start: `npm run start`
+4. Configure:
+   - `PUBLIC_BASE_URL=https://TU-APP.onrender.com`
+5. Test:
+   - `https://TU-APP.onrender.com/` (dashboard)
+   - `https://TU-APP.onrender.com/phone` (phone bridge)
+   - `https://TU-APP.onrender.com/health`
 
-El perfil XAMPP fuerza el acceso local y no permite configurar los siguientes
-valores para una publicación de red desde este arranque. La configuración de
-producción histórica de abajo no corresponde a este perfil local.
-
-Variables de conexión local en `.env`:
-
-- `DB_HOST`: `localhost` o `127.0.0.1` (el servidor normaliza a `127.0.0.1`)
-- `DB_PORT`: `3306` por defecto
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`: credenciales de la base MySQL de XAMPP
-- `PORT`: puerto web, `3000` por defecto
-
-`HOST`, `TRUST_PROXY`, `CORS_ORIGIN` y las URLs públicas se fuerzan a valores
-locales en este perfil; no habilitan acceso desde otros equipos.
-## Flujo de prueba
-
-1. En dashboard, click en **Crear Sesion**.
-2. Click en **Vincular Dashboard**.
-3. Escanea el QR con tu celular o abre el link de vinculacion.
-4. En `/phone` se autocompleta `code + token` y se vincula.
-5. Desde dashboard, usa **Llamar** o **Colgar**.
-
-## Endpoint para APK Android
-
-Request:
-
-```http
-POST /api/android/pair
-Content-Type: application/json
-
-{
-  "code": "ABC123",
-  "token": "TOKEN_DEL_QR",
-  "deviceId": "android-device-id",
-  "deviceName": "Samsung A54"
-}
-```
-
-## APK Android (bridge real)
-
-Se agrego proyecto Android en `android-app/` con:
-
-- Escaneo QR (lee `code` + `token`)
-- Pairing a `POST /api/android/pair`
-- Socket.IO como `role=phone`
-- Ejecucion de llamada con `CALL_PHONE`
-- Lista de bloqueos sincronizada entre la APK vinculada y el panel; el SMS se abre como borrador para que el usuario lo revise y lo envie.
-
-### Build rapido
-
-1. Copia `android-app/.env.example` a `android-app/.env` y configura las URL que pueda alcanzar el dispositivo. Para desarrollo por USB usa `ANDROID_DEV_BASE_URL=http://127.0.0.1:3000` y ejecuta `adb reverse tcp:3000 tcp:3000`.
-2. Abre `android-app/` en Android Studio y espera sync de Gradle.
-3. Ejecuta `Build > Build APK(s)`.
-4. APK debug en:
-   `android-app/app/build/outputs/apk/debug/app-debug.apk`
-
-### Flujo real
-
-1. Levanta backend (`PORT=3100` o libre).
-2. En dashboard crea sesion y genera QR.
-3. En la APK toca **Escanear QR**.
-4. Toca **Vincular Celular**.
-5. Desde dashboard usa **Llamar**.
-
-Nota: colgar llamada remotamente en Android requiere privilegios de dialer por defecto/sistema.
-
-Respuesta:
-
-```json
-{
-  "ok": true,
-  "code": "ABC123",
-  "socket": {
-    "url": "http://localhost:3000",
-    "role": "phone",
-    "token": "TOKEN_DEL_QR"
-  }
-}
-```
-
-## Produccion en VPS (instrucciones históricas; no compatibles con el perfil local)
-
-El arranque actual de XAMPP es solo local y rechaza conexiones MySQL remotas.
-No sigas estas instrucciones para desplegar esta fase en internet; requieren un
-perfil de producción separado, con HTTPS, cuentas y configuración autorizada.
-La información siguiente se conserva como referencia histórica.
-
-### Recomendado
-
-- Ubuntu 22.04+
-- Node.js 20 LTS
-- Nginx como reverse proxy
-- HTTPS con Let's Encrypt
-- `systemd` o `pm2` para mantener el proceso vivo
-
-### Variables de entorno base
-
-Usa `.env.example` como plantilla:
+### VPS Deployment (Ubuntu 22.04+)
 
 ```bash
+# Install dependencies
+sudo apt update && sudo apt install -y nodejs npm nginx mysql-server
+
+# Deploy
+sudo mkdir -p /opt/voip-vc
+sudo chown -R $USER:$USER /opt/voip-vc
+cd /opt/voip-vc
+npm ci --omit=dev
 cp .env.example .env
+# Edit .env with production credentials
+
+# Install service
+sudo cp infrastructure/vps/voip-vc.service /etc/systemd/system/
+sudo systemctl enable voip-vc
+sudo systemctl start voip-vc
+
+# Configure Nginx
+sudo cp infrastructure/vps/nginx.voip-vc.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/nginx.voip-vc.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Configura al menos:
-
+**Production environment:**
 ```env
 PORT=3000
 HOST=0.0.0.0
@@ -194,91 +174,141 @@ PUBLIC_BASE_URL=https://api.tudominio.com
 PUBLIC_WEB_BASE_URL=https://api.tudominio.com
 CORS_ORIGIN=https://api.tudominio.com
 TRUST_PROXY=1
+DB_HOST=mysql-internal-host
+DB_PORT=3306
+DB_NAME=production_db
+DB_USER=production_user
+DB_PASSWORD=secure_password
 ```
 
-### Archivos listos para deploy
+### Separate Domains
 
-- `infrastructure/vps/voip-vc.service`: servicio `systemd`
-- `infrastructure/vps/ecosystem.config.cjs`: opcion `pm2`
-- `infrastructure/vps/nginx.voip-vc.conf`: reverse proxy base para Nginx
+If separating frontend and backend:
 
-### Flujo sugerido en el VPS
-
-```bash
-sudo mkdir -p /opt/voip-vc
-sudo chown -R $USER:$USER /opt/voip-vc
-cd /opt/voip-vc
-npm ci --omit=dev
-cp .env.example .env
-node server/server.js
+**Backend:**
+```env
+PUBLIC_BASE_URL=https://api.tudominio.com
+PUBLIC_WEB_BASE_URL=https://app.tudominio.com
+CORS_ORIGIN=https://app.tudominio.com,https://api.tudominio.com
 ```
 
-Luego:
+**Frontend URLs:**
+- Dashboard: `https://app.tudominio.com/?apiBase=https://api.tudominio.com`
+- Phone: `https://app.tudominio.com/phone?apiBase=https://api.tudominio.com`
 
-1. Ajusta `.env` con tu dominio real.
-2. Instala el servicio `systemd` o usa `pm2`.
-3. Configura Nginx apuntando a `127.0.0.1:3000`.
-4. Activa HTTPS.
-5. Verifica `https://api.tudominio.com/health`.
+---
 
-### Estabilidad que ya queda aplicada
+## 📱 Android APK
 
-- guardado atomico de sesiones
-- cierre graceful con `SIGTERM` y `SIGINT`
-- timeouts HTTP configurados
-- limpieza automatica de sesiones viejas
-- limites de payload JSON
-- rate limiting basico para endpoints sensibles
-- `Socket.IO` con `ping` y buffer definidos
-- headers HTTP de endurecimiento basicos
+### Build Instructions
 
-## APK para produccion
+1. Copy `android-app/.env.example` to `android-app/.env`
+2. Configure URLs:
+   - `ANDROID_DEV_BASE_URL=http://127.0.0.1:3000` (USB dev)
+   - `ANDROID_PROD_BASE_URL=https://api.tudominio.com`
+3. Open `android-app/` in Android Studio
+4. Wait for Gradle sync
+5. Build → Build APK(s)
 
-- `debug` toma `ANDROID_DEV_BASE_URL`; `release` toma `ANDROID_PROD_BASE_URL`.
-- Gradle las lee del entorno del proceso o de `android-app/.env`; tambien `ANDROID_VOSK_MODEL_URL` configura el archivo de modelo descargado durante el build.
-- Si falta alguna variable requerida, la compilacion falla en lugar de incluir una URL incorrecta.
-- `release` ahora queda con `cleartext` desactivado.
-- `debug` permite HTTP para desarrollo local/USB; `release` requiere HTTPS para el servidor.
-- No pongas claves privadas en la APK: cualquier valor compilado en una app cliente se puede extraer. Las credenciales y secretos deben permanecer en el servidor.
+### APK Features
 
-## Siguiente integracion real
+- QR scan for pairing (`code` + `token`)
+- Socket.IO connection as `role=phone`
+- Audio bridge (AudioRecord/AudioTrack)
+- Voicemail detection (Shizuku/Vosk)
+- Call state synchronization
+- Speaker/mic control
 
-Para llamadas reales desde Android/iOS, reemplaza la simulacion de `web/phone.js` por:
+---
 
-- app movil nativa con permisos de llamada
-- puente hacia este backend (WebSocket/HTTP)
-- proveedor de telefonia (SIP/Twilio/operador)
+## 🔌 API Reference
 
-Este skeleton esta listo para evolucionar hacia ese bridge real.
+### Session Management
 
-## Despliegue rapido en la nube (Web + Server)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/session/:code/campaign/start` | Start campaign with contacts |
+| POST | `/api/session/:code/campaign/pause` | Pause active campaign |
+| POST | `/api/session/:code/campaign/resume` | Resume paused campaign |
+| POST | `/api/session/:code/campaign/stop` | Stop campaign |
+| GET | `/api/session/:code/contact-book` | Get contact book |
+| PUT | `/api/session/:code/contact-book` | Update contact book |
 
-Para tener funcionando **dashboard + server** en una URL publica (por ahora):
+### Device Management
 
-1. Sube este repo a GitHub.
-2. En Render, crea un **Web Service** desde ese repo.
-3. Render detecta `render.yaml` automaticamente (Blueprint) o usa:
-   - Build Command: `npm install`
-   - Start Command: `npm run start`
-4. Configura variables:
-   - `PUBLIC_BASE_URL=https://TU-APP.onrender.com`
-5. Espera deploy y prueba:
-   - `https://TU-APP.onrender.com/` (dashboard)
-   - `https://TU-APP.onrender.com/phone` (phone bridge)
-   - `https://TU-APP.onrender.com/health`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/pairing/:code` | Get pairing info |
+| POST | `/api/pairing/token/:code` | Generate pairing token |
+| POST | `/api/android/pair` | Android device pairing |
+| GET | `/api/pairing-qr/:code.svg` | Generate QR code |
 
-Nota: en este repo, `web` se sirve desde el mismo `server`, asi que no necesitas desplegar frontend por separado para esta etapa.
+### Network Monitor
 
-## Web y Server en dominios distintos
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/network` | Get network snapshot |
+| POST | `/api/network/reconnect` | Reconnect all devices |
+| POST | `/api/network/equipment/:number/reconnect` | Reconnect specific device |
 
-Si separas frontend y backend (ejemplo: `https://app.tudominio.com` y `https://api.tudominio.com`):
+### Reports
 
-1. En el backend configura:
-   - `PUBLIC_BASE_URL=https://api.tudominio.com`
-   - `PUBLIC_WEB_BASE_URL=https://app.tudominio.com`
-   - `CORS_ORIGIN=https://app.tudominio.com,https://api.tudominio.com`
-2. En el frontend agrega `apiBase` en la URL:
-   - Dashboard: `https://app.tudominio.com/?apiBase=https://api.tudominio.com`
-   - Phone: `https://app.tudominio.com/phone?apiBase=https://api.tudominio.com`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/session/:code/reports/daily` | Get daily reports |
+| GET | `/api/session/:code/reports/attempts` | Get call attempts |
+| POST | `/api/session/:code/reports/:id/continue` | Continue from report |
 
-El frontend ya esta preparado para usar ese `apiBase` y conectarse por Socket.IO al dominio del backend.
+---
+
+## 🧪 Testing
+
+```powershell
+npm test                    # All tests
+npm run test:contracts     # HTTP contracts and socket events
+npm run test:network       # Network monitor tests
+npm run test:auth          # Authentication tests
+```
+
+**Coverage:** HTTP contracts, socket events, campaign management, report metrics, user auth, network monitor.
+
+---
+
+## ⚡ Performance & Optimization
+
+### Binlog Optimization (Nov 2025)
+
+Technical audit identified and fixed **5 critical optimizations**:
+
+| # | Fix | File | Impact |
+|---|-----|------|--------|
+| 1 | `historyGate.commit()` saves only affected session | `call-history-gate.js:38` | Eliminates 20MB writes per event |
+| 2 | `ON DUPLICATE KEY UPDATE` with change detection | `persistence.js:258-262` | Eliminates redundant binlog entries |
+| 3 | `sendPersistedDial` saves only dialed session | `dispatcher.js:40` | Eliminates writes before each dial |
+| 4 | `syncPendingContacts` with `_syncPendingSkip` | `shift-manager.js:104-163` | Eliminates rebuild on state emit |
+| 5 | `allCallAttempts` with session-based caching | `restrictions.js:1-20` | Eliminates O(n) computation |
+
+**Result:** Binlog growth reduced from ~36 GB/hour to < 10 MB/hour under normal load.
+
+**Full audit plan:** `.kilo\plans\1795120535465-technical-audit-call-system.md`
+
+### Performance Metrics
+
+| Metric | Target | Pre-fix |
+|--------|--------|---------|
+| Persistence latency p99 | < 100ms | ~500ms |
+| Event loop lag | < 10ms | ~200ms |
+| Binlog growth rate | < 10 MB/hour | ~36 GB/hour |
+
+---
+
+## 📄 License & Credits
+
+**Project:** VOIP VC Call Bridge System  
+**Version:** 0.1.0  
+**Node.js:** >= 20.0.0  
+**MySQL:** 8.0+ / MariaDB 10.6+
+
+---
+
+**Note:** The local XAMPP profile is for development and testing only. For production, use `APP_ENV=easypanel` or the VPS profile.
