@@ -141,21 +141,8 @@ function bindEvents() {
   if (refs.addSaveBtn) refs.addSaveBtn.onclick = dashboardActions.saveModalContact;
   if (refs.addPhoneInput) refs.addPhoneInput.onkeydown = (event) => { if (event.key === "Enter") dashboardActions.saveModalContact(); };
   if (refs.importFileEl) refs.importFileEl.onchange = (e) => dashboardActions.handleImportFiles(e.target.files);
-  if (refs.importUrlBtn) refs.importUrlBtn.onclick = dashboardActions.handleImportUrl;
   if (refs.importConfirm) refs.importConfirm.onclick = dashboardActions.addImportedContacts;
   if (refs.importCancel) refs.importCancel.onclick = dashboardActions.resetImportPreview;
-  if (refs.tabWord) refs.tabWord.onclick = () => {
-    refs.tabWord.classList.add("active");
-    refs.tabUrl.classList.remove("active");
-    refs.panelWord.style.display = "block";
-    refs.panelUrl.style.display = "none";
-  };
-  if (refs.tabUrl) refs.tabUrl.onclick = () => {
-    refs.tabUrl.classList.add("active");
-    refs.tabWord.classList.remove("active");
-    refs.panelUrl.style.display = "block";
-    refs.panelWord.style.display = "none";
-  };
   if (refs.prevPageBtn) refs.prevPageBtn.onclick = () => {
     dashboardState.currentPage = Math.max(1, dashboardState.currentPage - 1);
     dashboardActions.renderContacts();
