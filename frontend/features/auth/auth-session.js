@@ -58,7 +58,9 @@ export function bindAccountControls() {
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.hidden = currentUser.role !== "ADMINISTRADOR";
   const usersLink = document.getElementById("sidebarUsers");
+  const settingsLink = document.getElementById("sidebarSettings");
   if (usersLink) usersLink.hidden = currentUser.role !== "ADMINISTRADOR";
+  if (settingsLink) settingsLink.hidden = currentUser.role !== "ADMINISTRADOR";
   const button = document.getElementById("logoutButton");
   if (button) button.onclick = async () => {
     button.disabled = true;

@@ -4,14 +4,14 @@ Auditoría estática del árbol de trabajo de este repositorio. No se modificó 
 
 ## 1. Resumen ejecutivo y alcance
 
-El síntoma pedido es: tras unas 10–20 llamadas, uno o más Xiaomi dejan de marcar, a veces mientras otro sigue, incluso con listas distintas. En este código no existe un tope de 10 ni de 20 contactos. Lo que sí está escrito es una cadena que se detiene sola y un filtro que puede impedir el marcado desde el inicio.
+El síntoma pedido es: tras unas 10–20 llamadas, uno o más Xiaomi dejan de marcar, a veces mientras otro sigue, incluso con listas distintas. En este código no existe un tope de 10 ni de 20 contactos. Lo que sí está escrito es un guardado que siempre falla en el camino directo, un reintento que puede reanudar la cola con retraso, y un filtro que puede impedir el marcado desde el inicio.
 
-Dos defectos están confirmados por el código y explican una parada silenciosa:
+Revisión de esta pasada, solo lectura, sobre el árbol actual (`package.json` versión `0.1.0`). Se reprodujo en Node el `TypeError` del bucle de `save` con un arreglo de un objeto. No se llamó a ningún teléfono, no se tocó MySQL y no se modificó la aplicación.
 
-1. Cada `phone:status` guarda la sesión con un arreglo y `SessionPersistence.save` solo acepta un `Map`. Esa llamada lanza `TypeError` antes de escribir. El siguiente marcado solo se programa dentro del callback que corre si ese guardado termina bien. La progresión automática queda cortada en el primer estado que pasa por esa puerta.
-2. El inicio general nombra la campaña `Asignación automática`, y el selector solo toma contactos cuya lista se llama exactamente así. Las listas reales no coinciden. Ese inicio no puede elegir el contacto siguiente.
+1. Cada `phone:status` llama a `persistence.save` con un arreglo. `save` solo acepta un `Map` y lanza `TypeError` antes de escribir. El marcado siguiente vive en el callback de ese `commit`. Ese callback no corre en el camino directo. Sí puede correr hasta 10 s después: `retryPending` guarda el `Map` real y entonces ejecuta los recibos pendientes (`runtime-lifecycle.js:82-84`, `call-history-gate.js:47-55`). En un proceso vivo la cola no queda cortada en el primer estado; queda retrasada y el ACK sale con `persisted: false`.
+2. El inicio general nombra la campaña `Asignación automática`, y el selector solo toma contactos cuya lista se llama exactamente así. Las listas reales no coinciden. Ese inicio no puede elegir el contacto siguiente. El inicio por equipo no borra ese nombre: si el general ya corrió, el filtro sigue vacío también para el equipo.
 
-El patrón “funciona 10–20 veces y luego se congela” no quedó reproducido. Con el defecto 1, la cola automática se corta en el primer estado, no en la llamada 10. Si en producción se observan más llamadas, esa instancia no está ejecutando este `call-history-gate.js`, o hay otro proceso disparando el despacho. Eso queda como desconocido.
+El patrón “funciona 10–20 veces y luego se congela” no quedó reproducido. El defecto 1 no explica un corte exactamente en la llamada 10. Puede explicar pausas de unos 10 s más el tiempo de reescribir el JSON, y una parada real solo si el `save` del reintento también falla. La cesión de lista al desconectar sigue siendo la explicación de código más cercana a “un equipo sigue y el otro no”.
 
 Alcance leído: importación en `frontend/features/contacts/import/import-actions.js`, inicio general y por equipo, `backend/services/campaigns/campaign-manager.js`, `backend/services/calls/dispatcher.js`, `backend/shared/persistence.js`, `backend/services/calls/call-history-gate.js`, `backend/sockets/call-events.js`, `backend/sockets/utility-events.js` y `android-app/app/src/main/java/com/voipvc/bridge/BridgeService.kt`. Versión del paquete: `0.1.0`. No hay prueba automática de `pickNextContact` ni del argumento que `commit` pasa a `save`.
 
@@ -31,8 +31,10 @@ flowchart TD
   persist --> apk["Android placeCall y phone:command_ack"]
   apk --> status["phone:status dialing, ringing, in_call, ended o failed"]
   status --> gate["historyGate.commit guarda un arreglo, no el Map"]
-  gate -->|save ok| next["a los 1200 ms dispatchCampaignCalls de ese worker"]
-  gate -->|TypeError| stop["no hay siguiente marcado"]
+  gate -->|TypeError| ack["ACK persisted false; el recibo queda pendiente"]
+  ack --> retry["cada 10 s retryPending guarda el Map"]
+  retry -->|save ok y estado terminal| next["a los 1200 ms dispatchCampaignCalls de ese worker"]
+  retry -->|save falla| stop["no hay siguiente marcado hasta un reintento bueno"]
 ```
 
 Límites de exclusión que sí existen:
@@ -50,7 +52,7 @@ Límites de exclusión que sí existen:
 
 | ID | Severidad | Síntoma | Evidencia | Reproducción | Impacto | Confianza |
 | --- | --- | --- | --- | --- | --- | --- |
-| C1 | Crítica | La campaña no pasa a la llamada siguiente | `call-history-gate.js:39` pasa `[session]` a `save`. `persistence.js:202` hace `for (const [code, session] of sessionsMap)`. Un arreglo de un objeto lanza `TypeError` porque el objeto no es iterable. El siguiente despacho está en `call-events.js:282-283`, dentro del callback de `commit` (`call-history-gate.js:41`). | Aislada: el mismo `for...of` con un arreglo de un objeto lanza `TypeError`. No se levantó el servidor ni se hizo una llamada. | El ACK de estado sale con `persisted: false` (`call-events.js:293-296`). La asignación ya se mutó en memoria y el intento queda abierto en MySQL si el último `save` bueno fue el del marcado. Al reiniciar, `assignments[workerId]` sigue presente y `dispatcher.js:188` no le da otro contacto. | Confirmado por código y por la prueba de lenguaje. No reproducido con teléfonos. |
+| C1 | Crítica | Cada estado falla el guardado directo y el siguiente marcado espera el reintento | `call-history-gate.js:39` pasa `[session]` a `save`. `persistence.js:201` hace `for (const [code, session] of sessionsMap)`. Un arreglo de un objeto lanza `TypeError` porque el objeto no es iterable. El siguiente despacho está en `call-events.js:282-283`, dentro del callback de `commit` (`call-history-gate.js:41`). `retryPending` (`call-history-gate.js:47-55`) sí llama a `save(this.getSessions())` y luego `flush`. El intervalo es 10 s (`runtime-lifecycle.js:82-84`). | Reproducido el `TypeError` con el mismo `for...of` sobre un arreglo de un objeto. No se levantó el servidor ni se hizo una llamada. | El ACK sale al momento con `persisted: false` (`call-events.js:293-296`). Android no se detiene por ese ACK: solo limpia el tracking si `accepted` y `terminal` (`BridgeService.kt:499-506`), y también al observar `ended` o `failed` (`BridgeService.kt:1110-1112`). En proceso vivo el siguiente marcado sale tras el reintento bueno más 1200 ms. Al arrancar, las asignaciones abiertas pasan a `retry_pending` (`runtime-lifecycle.js:63-72` llama a `skipActiveContact`). Ya no quedan tomadas por un reinicio. | Confirmado por código y por la prueba de lenguaje. El retraso, no el corte eterno, es lo que este árbol hace. No reproducido con teléfonos. |
 | C2 | Crítica | El inicio general no marca, o marca cero | `campaign-controller.js:224-236` envía `listName = "Asignación automática"`. `campaigns.js:70-72` lo guarda. `campaign-manager.js:420` exige `contact.list === campaign.listName`. Los contactos llevan la lista del archivo (`import-actions.js:56-58`, `contacts-repository.js:370`). | No ejecutada. El predicado no tiene excepción para ese rótulo. | `dispatched.length` queda en 0. La UI dice que ningún equipo estaba disponible (`campaign-controller.js:250-252`), que no es la causa. | Confirmado por código. No reproducido en UI. |
 | C3 | Alta | Un Xiaomi se queda con la lista de otro | `dispatcher.js:175-179` borra `targetWorkerId` de pendientes cuyo worker no está en el conjunto conectado. `campaign-manager.js:417-418` activa `targetedMode` si cualquier contacto tiene dueño. `campaign-manager.js:427-435` entrega la lista entera sin dueño al primer worker que se queda sin contactos propios. | No ejecutada. | Un corte de socket, aunque sea corto, suelta la lista. El otro equipo la absorbe. El primero, al volver, ya no tiene contactos con su id. | Confirmado por código. La frecuencia del corte es hipótesis. |
 | C4 | Alta | Reintento distinto al que muestra el panel | El panel envía `maxAttempts: 2` (`campaign-controller.js:236`, `shift-actions.js:34`). `campaigns.js:72` escribe `maxAttempts: 1`. `campaign-manager.js:677-686`: si `attempts < maxAttempts` pasa a `retry_pending`; si no, a `failed`. | No ejecutada. | Un no contesta cierra el contacto en el primer intento. No explica por sí solo una pausa a mitad de lista. | Confirmado por código. |
@@ -58,7 +60,8 @@ Límites de exclusión que sí existen:
 | C6 | Media | El equipo queda en `dialing` aunque Android rechazó la orden | `phone:command_ack` solo registra y reenvía (`call-events.js:310-330`). No suelta la asignación ni pide otro contacto. Android rechaza si `activeCommandId` sigue puesto (`BridgeService.kt:640-643`). El backend ya puso `worker.callState = "dialing"` y la asignación (`dispatcher.js:196-212`). El filtro de `dispatcher.js:187-188` exige estado `idle`, `ended`, `failed` o `available` y asignación vacía. | No ejecutada. | El rechazo no recupera la cola. El teléfono local sí limpia el tracking al observar `ended` o `failed` (`BridgeService.kt:1098-1112`), así que el rechazo permanente depende de que ese estado físico no llegue. | Confirmado por código. |
 | C7 | Media | Al caer el socket no hay siguiente llamada | Si el worker sigue en `dialing`, `ringing` o `in_call` a los 12 s, `utility-events.js:184-197` marca `ended` y no llama a `dispatchCampaignCalls`. | No ejecutada. | El contacto puede cerrarse y el equipo quedarse en `idle` sin continuar la lista. | Confirmado por código. |
 | C8 | Baja | El mismo aparato en dos sesiones | El reemplazo de slot es por sesión (`pairing-lifecycle.js:19-31`). No hay índice global de `deviceId`. | No ejecutada. | Dos sesiones podrían ordenar el mismo Xiaomi. | Hipótesis. No hay evidencia de que ocurra en este árbol. |
-| C9 | Informativa | No hay tope 10–20 | El tope de campaña es 10000 (`campaigns.js:53`). El archivo de reportes recorta a 100 (`dispatcher.js:269-271`). Android usa 10 s sin estado Telecom (`BridgeService.kt:697-710`), 20 s y 40 s de marcado (`BridgeService.kt:1073-1085`) y latido de 10 s (`BridgeService.kt:1357-1382`). | Búsqueda estática. | Esos números son tiempos por llamada, no un contador de contactos. | Confirmado que no hay ese contador. |
+| C9 | Informativa | No hay tope 10–20 | El tope de campaña es 10000 (`campaigns.js:53`). El archivo de reportes recorta a 100 (`dispatcher.js:269-271`). Hay hasta 20 QR por sesión (`devices.js:75`), que es un tope de equipos, no de llamadas. Android usa 10 s sin estado Telecom (`BridgeService.kt:697-710`), 20 s y 40 s de marcado (`BridgeService.kt:1073-1085`) y latido de 10 s (`BridgeService.kt:1357-1382`). | Búsqueda estática. | Esos números son tiempos por llamada o cupos de equipos, no un contador de contactos. | Confirmado que no hay ese contador. |
+| C10 | Media | El bloqueo anual puede usar una foto vieja de intentos | `restrictions.js:12-21` arma la clave de caché con `Object.keys(runtime.persistence.records)`. `records` es un `Map`; `Object.keys` de un `Map` devuelve `[]`. La clave queda fija mientras no cambie el número de sesiones. `clearAllCallAttemptsCache` (`restrictions.js:24`) no tiene ningún llamador. | Reproducido: `Object.keys(new Map([["a",1]]))` tiene longitud 0. | `excludeCalledPending` (`contact-book.js:88-105`) puede no ver intentos nuevos y volver a marcar el mismo teléfono en otro contacto, o seguir usando la primera foto. No explica una parada a las 10–20 llamadas. | Confirmado por código. No ejecutado contra una campaña. |
 
 ## 4. Listas generales, listas exclusivas y 2 a 6 Xiaomi
 
@@ -66,7 +69,7 @@ Inicio general (`campaign-controller.js:212-246`): junta todos los contactos con
 
 Por el filtro de `campaign-manager.js:420`, ese inicio no selecciona contactos de listas reales. `targetedMode` ni siquiera llega a decidir.
 
-Inicio por equipo (`device-controls.js:96-121` y `devices.js:152-183`): manda solo la lista de ese slot y el backend les pone `targetWorkerId`. No cambia `listName`. En una campaña nueva, `listName` está vacío (`campaign-manager.js:59`) y el filtro deja pasar. Cada worker solo recibe contactos con su id (`campaign-manager.js:418`). Ese es el único camino de este árbol en el que dos listas pueden avanzar a la vez, y solo hasta el primer `phone:status`, por C1.
+Inicio por equipo (`device-controls.js:96-121` y `devices.js:152-183`): manda solo la lista de ese slot y el backend les pone `targetWorkerId`. No cambia `listName`. `listName` solo se escribe en `syncCampaignContacts` (`campaign-manager.js:258`), que corre desde `POST /campaign/start`. En una campaña nueva está vacío (`campaign-manager.js:59`) y el filtro deja pasar. Cada worker solo recibe contactos con su id (`campaign-manager.js:418`). Si antes se pulsó el inicio general, `listName` sigue siendo `Asignación automática` y el inicio por equipo también elige cero contactos. Con una campaña nueva, dos listas pueden avanzar a la vez. El estado no las corta para siempre: el siguiente marcado espera el `retryPending` de C1.
 
 Si cualquier contacto tiene dueño, los demás workers no toman contactos ajenos. La excepción es C3: al borrar el dueño de un desconectado, el siguiente worker que agota su lista se apropia de toda la lista libre, no de un contacto (`campaign-manager.js:432-435`). Con 2 a 6 teléfonos el efecto es el mismo: un solo worker absorbente y el resto sin elegibles. No hay una cola por dispositivo fuera de `assignments` y `targetWorkerId`.
 
@@ -81,7 +84,7 @@ Qué hace cada marcado y cada estado:
 1. `sendPersistedDial` clona la sesión y entra a `saveChain` (`dispatcher.js:40`, `persistence.js:197-217`).
 2. `saveNow` abre transacción, lee la fila, compara el JSON completo y hace `INSERT ... ON DUPLICATE KEY UPDATE` de toda la columna `data` (`persistence.js:250-274`).
 3. Los intentos sucios se escriben en `vc_call_attempts` con `SELECT ... FOR UPDATE` por intento (`call-history.js:115-118`).
-4. `phone:status` vuelve a pedir un guardado durable antes del recibo y del siguiente marcado (`call-events.js:256-283`). Ese guardado es C1: no llega a la transacción.
+4. `phone:status` vuelve a pedir un guardado durable antes del recibo y del siguiente marcado (`call-events.js:256-283`). Ese guardado es C1: no llega a la transacción. El reintento de los 10 s sí entra a `saveChain` con el `Map` completo y, si MySQL acepta la fila, dispara el callback.
 
 `historyGate.blocked` siempre devuelve `false` (`call-history-gate.js:12-14`). No frena el despacho. La frase de `dispatcher.js:164` no protege nada.
 
@@ -109,7 +112,7 @@ No implementar hasta aprobación explícita. Hace falta un respaldo externo veri
 
 Fase 1, sin cambiar la durabilidad del intento:
 
-- `commit` debe guardar `this.getSessions()` o un `Map` con el código real. Hoy el arreglo ni identifica la sesión ni es iterable como pares.
+- `commit` debe guardar `this.getSessions()` o un `Map` con el código real, y pasar el código en `changedCodes`. Hoy el arreglo ni identifica la sesión ni es iterable como pares. El reintento de 10 s no sustituye ese arreglo: llega tarde y reescribe todas las sesiones.
 - El siguiente marcado debe seguir esperando a que ese `save` confirme. No emitir `call:action` ni avanzar la cola si el guardado falla.
 - Tratar `Asignación automática` como “sin filtro de lista”. El filtro literal solo debe aplicarse cuando `listName` es una lista real, como `Pendientes del turno` si esa lista también existe en los contactos. Hoy `Pendientes del turno` tiene el mismo problema: los contactos conservan su lista original (`shift-actions.js:39`) y el filtro exige igualdad (`campaign-manager.js:420`).
 - Dejar de borrar `targetWorkerId` por no aparecer en el snapshot de conectados. Una desconexión no transfiere la lista. La apropiación de `campaign-manager.js:427-435` no debe correr mientras el dueño anterior pueda reconectar.
@@ -130,8 +133,8 @@ No se ejecutó ninguna. Resultados observados: solo el `TypeError` del bucle equ
 
 | Prueba | Esperado si el código sigue igual | Esperado después de la fase 1 |
 | --- | --- | --- |
-| 1 teléfono, 20 contactos, una lista, sin llamadas reales: simular `phone:status` `ended` | El `commit` falla y no hay segundo `call:action` | 20 marcados, un intento cada uno, sin duplicar `attemptId` |
-| 2 teléfonos, 2 listas, 20 contactos cada una | El inicio general marca 0. El inicio por equipo marca el primero de cada uno y se detiene en el primer estado | Cada lista avanza solo en su equipo |
+| 1 teléfono, 20 contactos, una lista, sin llamadas reales: simular `phone:status` `ended` | El `commit` falla. Si `retryPending` guarda el `Map`, el segundo `call:action` sale unos 10 s después. Si ese guardado falla, no hay segundo marcado | 20 marcados, un intento cada uno, sin duplicar `attemptId`, sin esperar el intervalo de reintento |
+| 2 teléfonos, 2 listas, 20 contactos cada una | El inicio general marca 0. Si el general ya corrió, el inicio por equipo también marca 0. En una campaña nueva, el inicio por equipo marca y el siguiente espera el reintento de 10 s | Cada lista avanza solo en su equipo |
 | 6 teléfonos | Misma parada, más espera en `saveChain` | Ningún equipo espera el estado de otro para elegir su propio contacto. La escritura sigue ordenada. |
 | Cortar el socket durante `dialing` y reconectar antes de 12 s | La lista puede quedar sin dueño y pasar al otro equipo | La lista sigue en el equipo original |
 | Perder el `ended` | El worker queda ocupado | Sigue ocupado hasta estado físico o hasta la gracia, y luego continúa sin duplicar |
@@ -151,7 +154,8 @@ Rollback: volver al build anterior del proceso Node. No hace falta migración de
 
 ## 10. Preguntas abiertas
 
-- ¿El proceso que hoy llama en producción tiene este `call-history-gate.js:39`? Si allí se completan más de una llamada automática, no es este archivo.
+- ¿El proceso que hoy llama en producción tiene este `call-history-gate.js:39` y este `retryPending` de 10 s? Más de una llamada automática no descarta este archivo: el reintento puede estar reanudando la cola.
+- ¿Las pausas entre llamadas se acercan a 10 s más el tiempo de `persistMs`? Eso encajaría con C1 más C5. Un corte seco, sin otro marcado aunque MySQL responda, no encaja con este árbol.
 - ¿El operador usa el botón general o el botón por equipo? El primero, en este árbol, no elige contactos.
 - Tamaño real de cada `sessions.data`, frecuencia de `UPDATE` y `binlog_format` durante una campaña. Sin eso, los 76 GB siguen siendo correlación.
 - Si el Xiaomi emite `ended` con el mismo `callId` de la asignación. Sin ese par, `updateActiveCallState` no suelta al worker (`campaign-manager.js:630` y `:636`).
@@ -167,7 +171,7 @@ Rollback: volver al build anterior del proceso Node. No hace falta migración de
 
 ## Cierre
 
-**Demostrado:** el guardado de `phone:status` no puede completar porque recibe un arreglo donde `save` exige un `Map`, y por eso la cola automática no programa la llamada siguiente. El inicio general filtra por el nombre `Asignación automática` y no por las listas importadas. El servidor fuerza un intento aunque el panel pide dos. Desconectar a un equipo puede soltar su lista y otro equipo se la queda entera. Todas las sesiones comparten `saveChain` y reescriben el JSON completo.
+**Demostrado:** el guardado directo de `phone:status` no puede completar porque recibe un arreglo donde `save` exige un `Map`. El marcado siguiente no sale en ese callback; puede salir cuando `retryPending` guarda el `Map`, cada 10 s. El inicio general filtra por el nombre `Asignación automática` y no por las listas importadas, y ese nombre no lo limpia el inicio por equipo. El servidor fuerza un intento aunque el panel pide dos. Desconectar a un equipo puede soltar su lista y otro equipo se la queda entera. Todas las sesiones comparten `saveChain` y reescriben el JSON completo. La caché de intentos no ve las claves de un `Map`. Un reinicio ya devuelve la asignación abierta a `retry_pending`.
 
 **No demostrado:** que el corte ocurra a las 10–20 llamadas, que los JSON grandes hayan generado los 76 GB, y que Shizuku, Vosk o la batería del Xiaomi sean la causa.
 

@@ -14,6 +14,7 @@ import { registerStatic } from "./static.js";
 import { registerReservations } from "./reservations.js";
 import { registerMessageTemplates } from "./message-templates.js";
 import { registerMessageFilterOptions } from "./message-filter-options.js";
+import { registerEmail } from "./email.js";
 
 // El orden mantiene autenticación y autorización antes de las rutas protegidas.
 export function registerRoutes(runtime, services) {
@@ -27,6 +28,7 @@ export function registerRoutes(runtime, services) {
   registerReservations(runtime, services);
   registerMessageTemplates(runtime);
   registerMessageFilterOptions(runtime);
+  registerEmail(runtime);
   registerCampaigns(runtime, services);
   registerServerInfo(runtime, services);
   registerApk(runtime, services);

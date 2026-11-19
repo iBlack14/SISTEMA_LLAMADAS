@@ -1292,3 +1292,184 @@
   color: #fff !important;
   box-shadow: 0 3px 10px rgba(216, 20, 130, .25) !important;
 }
+
+/* ============================================================
+   CORREO: UI magenta (opuesta a WhatsApp)
+   ============================================================ */
+#sendMessageModal.is-email-mode .send-message-card {
+  background: linear-gradient(155deg, #d91483 0%, #8e1ab2 100%) !important;
+  border-color: #8e1ab2 !important;
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .edit-close-btn {
+  background: rgba(48, 2, 68, .35) !important;
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-message-header {
+  background: rgba(48, 2, 68, .3) !important;
+  border-color: rgba(255, 255, 255, .25) !important;
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-message-header h3,
+#sendMessageModal.is-email-mode .send-message-header .send-message-eyebrow,
+#sendMessageModal.is-email-mode .send-message-header .contact-badge {
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-message-header .contact-badge {
+  background: rgba(255, 255, 255, .16) !important;
+  border-color: rgba(255, 255, 255, .45) !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-panel {
+  background: linear-gradient(180deg, rgba(72, 6, 103, .95), rgba(142, 26, 178, .92)) !important;
+  border-right-color: rgba(255, 255, 255, .25) !important;
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-heading h4,
+#sendMessageModal.is-email-mode .send-template-heading .send-message-eyebrow,
+#sendMessageModal.is-email-mode #sendTemplateIntro,
+#sendMessageModal.is-email-mode .send-template-count {
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-count {
+  background: rgba(255, 255, 255, .18) !important;
+  border-color: rgba(255, 255, 255, .5) !important;
+}
+
+#sendMessageModal.is-email-mode .send-modal-new-template-btn {
+  background: #fff !important;
+  color: #8e1ab2 !important;
+  border-color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-option {
+  background: rgba(255, 255, 255, .95) !important;
+  border-color: rgba(255, 255, 255, .6) !important;
+  color: #3b0a50 !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-option:hover,
+#sendMessageModal.is-email-mode .send-template-option.is-selected {
+  background: #fff !important;
+  border-color: #fff !important;
+  color: #3b0a50 !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-option.is-selected {
+  box-shadow: 0 0 0 2px #fff, 0 6px 16px rgba(38, 0, 58, .28) !important;
+}
+
+#sendMessageModal.is-email-mode .send-template-empty {
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .message-tabs {
+  background: rgba(48, 2, 68, .3) !important;
+  border-color: rgba(255, 255, 255, .25) !important;
+}
+
+#sendMessageModal.is-email-mode .message-tab {
+  color: rgba(255, 255, 255, .82) !important;
+}
+
+#sendMessageModal.is-email-mode .message-tab:hover {
+  background: rgba(255, 255, 255, .16) !important;
+  color: #fff !important;
+}
+
+#sendMessageModal.is-email-mode .message-tab.active {
+  background: #fff !important;
+  border-color: #fff !important;
+  color: #8e1ab2 !important;
+}
+
+#sendMessageModal.is-email-mode .message-content {
+  background: rgba(255, 255, 255, .97) !important;
+  color: #3b0a50 !important;
+}
+
+#sendMessageModal.is-email-mode .message-content label,
+#sendMessageModal.is-email-mode .message-char-count {
+  color: #6b147f !important;
+}
+
+#sendMessageModal.is-email-mode .message-content input,
+#sendMessageModal.is-email-mode .message-content textarea {
+  background: #fff !important;
+  color: #2b0b4a !important;
+  border-color: #d9b8e6 !important;
+}
+
+/* Adjuntos PDF/Word/Excel */
+#sendMessageModal .email-attachments-area {
+  padding: 12px;
+  border: 1px dashed #d9b8e6;
+  border-radius: 12px;
+  background: #fdfbff;
+}
+
+#sendMessageModal .sm-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+#sendMessageModal .sm-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #eadcf2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#sendMessageModal .sm-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b0a50;
+}
+
+#sendMessageModal .sm-file-size {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #7a5f8b;
+}
+
+#sendMessageModal .sm-file-remove {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #e2c9ef;
+  border-radius: 6px;
+  background: #f8f1fb;
+  color: #7a1f9c;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#sendMessageModal .sm-file-remove:hover {
+  border-color: #c41275;
+  background: #fbe6f4;
+  color: #a20e64;
+}
+
+#sendMessageModal .sm-file-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #6b5380;
+}

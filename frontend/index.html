@@ -24,11 +24,11 @@
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-contact-selector" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-email-footer2" />
+  <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-config-ui3" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
 
-  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261119-force"></script>
+  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261119-config-ui3"></script>
  <script>document.documentElement.classList.add("auth-pending");</script>
 
 </head>
@@ -46,6 +46,7 @@
       <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
       <a id="adminLink" class="viavox-nav-item" data-view="network" href="/nucleo-red" hidden>NÚCLEO DE RED</a>
       <a id="sidebarUsers" class="viavox-nav-item" data-view="users" href="/usuarios" hidden>USUARIOS</a>
+      <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion" hidden>CONFIGURACIÓN</a>
     </nav>
     <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
   </aside>
@@ -650,7 +651,8 @@
           <small class="muted template-footer-help">Se agregará al final del mensaje al usar la plantilla en Correo. Podrás editarlo aquí cuando quieras.</small>
         </div>
 
-        <!-- Zona de imagen adjunta de la plantilla -->
+        <!-- Zona de imagen adjunta de la plantilla (solo WhatsApp) -->
+        <div id="templateImageField">
         <label>Imagen de la plantilla (opcional)</label>
         <div id="templateImageDropZone" class="template-image-dropzone">
           <input type="file" id="templateImageFileInput" accept="image/*" style="display:none" />
@@ -668,6 +670,7 @@
               <button type="button" id="templateImageRemoveBtn" class="template-remove-img-btn">✕ Quitar imagen</button>
             </div>
           </div>
+        </div>
         </div>
       </div>
       <div class="modal-actions">
@@ -846,36 +849,20 @@
         <textarea id="sendEmailMessage" rows="6" placeholder="Escribe tu mensaje..."></textarea>
         <div class="message-char-count"><span id="emailCharCount">0</span> / 5000 caracteres</div>
 
-        <!-- Sección Imagen Adjunta para Correo -->
-        <div class="send-message-image-area">
+        <!-- Adjuntos para Correo: PDF, Word o Excel -->
+        <div class="send-message-image-area email-attachments-area">
           <div class="send-message-image-header">
             <span class="send-message-image-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              Imagen adjunta (opcional)
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              Adjuntos PDF, Word o Excel (opcional)
             </span>
-            <input type="file" id="sendEmailImageInput" accept="image/*" style="display:none;" />
+            <input type="file" id="sendEmailFilesInput" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none;" />
             <button type="button" id="sendEmailAttachBtn" class="sm-image-action-btn">
-              📷 Adjuntar / Cambiar imagen
+              📎 Adjuntar archivos
             </button>
           </div>
-
-          <div id="sendEmailImagePreviewWrap" class="sm-image-preview-wrap" style="display:none;">
-            <div class="sm-image-thumb-container">
-              <img id="sendEmailImageThumb" src="" alt="Vista previa adjunto" />
-            </div>
-            <div class="sm-image-meta">
-              <span class="sm-image-badge">✓ Imagen lista</span>
-              <span class="sm-image-tip">Puedes copiar la imagen para pegarla en tu cliente de correo.</span>
-              <div class="sm-image-controls">
-                <button type="button" id="sendEmailCopyImageBtn" class="sm-btn-copy" title="Copiar imagen al portapapeles">
-                  📋 Copiar imagen
-                </button>
-                <button type="button" id="sendEmailRemoveImageBtn" class="sm-btn-remove" title="Quitar imagen">
-                  ✕ Quitar
-                </button>
-              </div>
-            </div>
-          </div>
+          <div id="sendEmailFilesList" class="sm-file-list"></div>
+          <p class="sm-file-hint">Máximo 5 archivos · 10 MB por archivo · 20 MB en total.</p>
         </div>
 
         <button id="sendEmailBtn" type="button" class="button primary full-width">

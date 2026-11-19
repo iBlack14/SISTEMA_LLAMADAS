@@ -1,7 +1,7 @@
 ﻿import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js";
 
-const adminPaths = { network: "/nucleo-red", users: "/usuarios" };
+const adminPaths = { network: "/nucleo-red", users: "/usuarios", settings: "/configuracion" };
 const sectionForPath = path => Object.keys(panelPaths).find(view => panelPaths[view] === path)
   || Object.keys(adminPaths).find(view => adminPaths[view] === path)
   || (["/admin.html", "/legacy/admin"].includes(path) ? "network" : "calls");
@@ -18,7 +18,8 @@ const sidebarIconShapes = {
   blocked: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "m5.6 5.6 12.8 12.8" }]],
   messages: [["path", { d: "M20 11.5a7.5 7.5 0 0 1-7.5 7.5H7l-4 2 1.4-4A7.5 7.5 0 1 1 20 11.5Z" }], ["path", { d: "M8 11.5h.01M12 11.5h.01M16 11.5h.01" }]],
   network: [["circle", { cx: "12", cy: "5", r: "2.5" }], ["circle", { cx: "5", cy: "18", r: "2.5" }], ["circle", { cx: "19", cy: "18", r: "2.5" }], ["path", { d: "m10.8 7.2-4.6 8.6M13.2 7.2l4.6 8.6M7.5 18h9" }]],
-  users: [["path", { d: "M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }], ["circle", { cx: "10", cy: "7", r: "4" }], ["path", { d: "M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" }]]
+  users: [["path", { d: "M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }], ["circle", { cx: "10", cy: "7", r: "4" }], ["path", { d: "M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" }]],
+  settings: [["circle", { cx: "12", cy: "12", r: "3" }], ["path", { d: "M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.6.77 1 1.41 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z" }]]
 };
 const svgNamespace = "http://www.w3.org/2000/svg";
 for (const item of navigation.querySelectorAll("[data-view]")) {
@@ -51,6 +52,7 @@ let user = currentUser || null;
 let adminPromise;
 let adminNetwork;
 let adminUsers;
+let adminSettings;
 let initNetwork;
 let initUsers;
 let viewRequest = 0;
@@ -88,6 +90,7 @@ function setViewVisibility(view) {
   if (operational) operational.hidden = Boolean(adminPaths[view]);
   if (adminNetwork) adminNetwork.hidden = view !== "network";
   if (adminUsers) adminUsers.hidden = view !== "users";
+  if (adminSettings) adminSettings.hidden = view !== "settings";
 }
 
 async function loadAdminWorkspace() {
@@ -99,7 +102,7 @@ async function loadAdminWorkspace() {
     if (!response.ok) throw new Error("No se pudo cargar la sección administrativa.");
     const source = new DOMParser().parseFromString(await response.text(), "text/html");
     const workspace = document.getElementById("adminWorkspace");
-    const candidates = [source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("editUserDialog")];
+    const candidates = [source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("settingsView"), source.getElementById("editUserDialog")];
     if (candidates.some(item => !item)) throw new Error("La vista administrativa está incompleta.");
     workspace.replaceChildren(...candidates);
     workspace.addEventListener("click", event => {
@@ -111,10 +114,11 @@ async function loadAdminWorkspace() {
     });
     adminNetwork = candidates[0];
     adminUsers = candidates[1];
+    adminSettings = candidates[2];
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
     const networkCss = source.querySelector('link[rel="stylesheet"][href*="network.css"]');
-    stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261118-ui-call";
+    stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261119-config-ui3";
     stylesheet.dataset.adminStyles = "1";
     document.head.append(stylesheet);
   })().catch(error => {
@@ -146,7 +150,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   } else if (view === "messages") {
     const whatsapp = await import("../../features/messaging/whatsapp.js");
     whatsapp.syncMessagesView?.();
-    const templates = await import("../../features/messaging/message-templates.js?v=20261119-email-footer2");
+    const templates = await import("../../features/messaging/message-templates.js?v=20261119-config-ui3");
     templates.init?.();
   } else if (view === "reservations") {
     const reservations = await import("../../features/reservations/reservations-controller.js");
@@ -182,6 +186,10 @@ async function navigate(view, { history = true, scroll = true } = {}) {
       if (view === "users") {
         if (!initUsers) initUsers = (await import("../../features/admin/users/users-page.js")).initUsersPage;
         await initUsers?.();
+      }
+      if (view === "settings") {
+        const settings = await import("../../features/admin/settings/email-settings-page.js?v=20261119-config-ui3");
+        await settings.initEmailSettingsPage?.();
       }
     } catch (error) {
       const message = document.getElementById("accountError");
@@ -225,9 +233,11 @@ requireLogin().then(async authenticatedUser => {
   bindAccountControls();
   const networkLink = document.getElementById("adminLink");
   const usersLink = document.getElementById("sidebarUsers");
+  const settingsLink = document.getElementById("sidebarSettings");
   const isAdmin = user.role === "ADMINISTRADOR";
   if (networkLink) networkLink.hidden = !isAdmin;
   if (usersLink) usersLink.hidden = !isAdmin;
+  if (settingsLink) settingsLink.hidden = !isAdmin;
   document.documentElement.classList.remove("auth-pending");
   const initial = sectionForPath(location.pathname);
   await navigate(initial, { history: false, scroll: false });

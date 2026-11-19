@@ -42,6 +42,7 @@ yarn-error.log*
 .local-test/
 
 # Runtime data & backups
+backend/.smtp-secret
 server/backups/
 server/sessions.json
 server/*.call-history.json

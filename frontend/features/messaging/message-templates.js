@@ -3,7 +3,7 @@
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
 
-import { apiFetch } from '../auth/auth-session.js';
+import { apiFetch, requireLogin } from '../auth/auth-session.js';
 import { recordSendStatus } from './message-send-status.js';
 
 const STORAGE_KEY = 'voip_message_templates';
@@ -47,6 +47,11 @@ let pendingTemplateCategory = ''; // Categoría preseleccionada al crear desde u
 let currentSendTab = 'whatsapp'; // Pestaña activa del modal de envío
 let currentEditingImage = null; // Base64 o URL para templateModal
 let currentSendImage = null;    // Base64 o URL para sendMessageModal
+let emailAttachments = [];      // Archivos PDF/Word/Excel para envío SMTP
+const EMAIL_FILE_PATTERN = /\.(pdf|doc|docx|xls|xlsx)$/i;
+const EMAIL_MAX_FILES = 5;
+const EMAIL_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const EMAIL_MAX_TOTAL_SIZE = 20 * 1024 * 1024;
 let initializationPromise = null;
 let eventsBound = false;
 let currentSendContact = null;
@@ -380,7 +385,7 @@ function openTemplateModal(templateId = null, presetCategory = '', presetType = 
     if (messageInput) messageInput.value = template.message;
     if (footerInput) footerInput.value = template.footer || '';
 
-    if (template.image) {
+    if (template.image && template.type !== 'email') {
       currentEditingImage = template.image;
       if (previewImg) previewImg.src = template.image;
       if (previewWrap) previewWrap.style.display = 'flex';
@@ -412,9 +417,10 @@ function openTemplateModal(templateId = null, presetCategory = '', presetType = 
 }
 
 function updateTemplateFooterVisibility() {
-  const field = document.getElementById('templateFooterField');
-  if (!field) return;
-  field.style.display = currentEditingType === 'whatsapp' ? 'none' : '';
+  const footerField = document.getElementById('templateFooterField');
+  if (footerField) footerField.style.display = currentEditingType === 'whatsapp' ? 'none' : '';
+  const imageField = document.getElementById('templateImageField');
+  if (imageField) imageField.style.display = currentEditingType === 'email' ? 'none' : '';
 }
 
 function closeTemplateModal() {
@@ -577,12 +583,18 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
   const digits = String(contact?.phone || '').replace(/\D/g, '');
   const phone = digits.startsWith('51') || digits.length !== 9 ? digits : `51${digits}`;
   const email = String(contact?.email || contact?.correo || '').trim();
-  const template = templates.find(item => item.type === 'both' || item.type === initialTab) || templates[0];
-  const message = replaceVariables(template?.message || '', contact?.name || '', contact?.company || contact?.empresa || '');
-  const footer = replaceVariables(template?.footer || '', contact?.name || '', contact?.company || contact?.empresa || '');
+  const emailMode = initialTab === 'email';
+  // Correo no hereda plantillas de WhatsApp: se abre en blanco para redactar.
+  const template = emailMode
+    ? null
+    : (templates.find(item => item.type === 'both' || item.type === 'whatsapp') || templates[0]);
+  const contactNameValue = contact?.name || '';
+  const contactCompanyValue = contact?.company || contact?.empresa || '';
+  const message = replaceVariables(template?.message || '', contactNameValue, contactCompanyValue);
+  const footer = replaceVariables(template?.footer || '', contactNameValue, contactCompanyValue);
 
   modal.dataset.templateId = template?.id || '';
-  currentSendTab = initialTab === 'email' ? 'email' : 'whatsapp';
+  currentSendTab = emailMode ? 'email' : 'whatsapp';
   currentSendContact = contact;
   contactSendResolved = false;
   const contactName = document.getElementById('sendMessageContactName');
@@ -591,9 +603,9 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
     phone,
     email,
     message,
-    emailBody: composeEmailBody(message, footer),
-    subject: template?.name || '',
-    image: template?.image || null
+    emailBody: emailMode ? '' : composeEmailBody(message, footer),
+    subject: emailMode ? '' : (template?.name || ''),
+    image: emailMode ? null : (template?.image || null)
   });
   renderSendTemplateList(template?.id);
   switchSendTab(initialTab);
@@ -1091,6 +1103,15 @@ function refreshStfDropdowns() {
   syncClearBtn();
 }
 
+function emailModeHasTemplate(templateId) {
+  if (!templateId) return false;
+  const template = templates.find(item => item.id === templateId);
+  if (!template) return false;
+  return currentSendTab === 'email'
+    ? template.type === 'email'
+    : (template.type === 'whatsapp' || template.type === 'both');
+}
+
 function renderSendTemplateList(selectedId = '') {
   const list = document.getElementById('sendMessageTemplates');
   const count = document.getElementById('sendTemplateCount');
@@ -1108,12 +1129,13 @@ function renderSendTemplateList(selectedId = '') {
   const intro = document.getElementById('sendTemplateIntro');
   if (intro) {
     intro.textContent = emailMode
-      ? 'Plantillas corporativas: edita el contenido y el pie de página desde cada plantilla.'
+      ? 'Plantillas de correo sin imágenes. Edita el contenido y el pie de página; adjunta PDF, Word o Excel al enviar.'
       : 'Elige un texto para cargarlo en el mensaje.';
   }
 
+  // Correo empieza vacío: las plantillas de WhatsApp no se reutilizan aquí.
   const pool = templates.filter(t => emailMode
-    ? (t.type === 'email' || t.type === 'both')
+    ? t.type === 'email'
     : (t.type === 'whatsapp' || t.type === 'both'));
   if (!emailMode) refreshStfDropdowns();
   if (count) count.textContent = String(pool.length);
@@ -1123,7 +1145,7 @@ function renderSendTemplateList(selectedId = '') {
     const empty = document.createElement('p');
     empty.className = 'send-template-empty';
     empty.textContent = emailMode
-      ? 'No hay plantillas de correo. Haz clic en "+ Nueva" para crear una.'
+      ? 'Aún no hay plantillas de correo. Crea la primera con + Nueva.'
       : 'No hay plantillas en la base de datos. Haz clic en "+ Nueva" para crear una.';
     list.appendChild(empty);
     if (resultCount) resultCount.textContent = '0 plantillas';
@@ -1167,7 +1189,7 @@ function renderSendTemplateList(selectedId = '') {
     button.classList.toggle('is-email', emailMode);
     button.dataset.sendTemplateId = template.id;
 
-    const hasImage = Boolean(template.image);
+    const hasImage = !emailMode && Boolean(template.image);
     const typeLabel = template.type === 'email' ? 'Correo' :
       template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
     const footerSnippet = emailMode && template.footer
@@ -1240,10 +1262,11 @@ function setSendModalValues({ phone = '', email = '', message = '', emailBody = 
   const waMessage = document.getElementById('sendWhatsAppMessage');
   const emailMessage = document.getElementById('sendEmailMessage');
 
-  if (phoneInput && phone) phoneInput.value = phone;
-  if (emailInput && email) emailInput.value = email;
-  if (subjectInput && subject) subjectInput.value = subject;
-  if (waMessage) waMessage.value = message;
+  // Asignar también cadenas vacías para limpiar el modal al cambiar de canal.
+  if (phoneInput && phone !== undefined) phoneInput.value = phone;
+  if (emailInput && email !== undefined) emailInput.value = email;
+  if (subjectInput && subject !== undefined) subjectInput.value = subject;
+  if (waMessage && message !== undefined) waMessage.value = message;
   if (emailMessage) emailMessage.value = emailBody ?? message;
 
   updateCharCount(waMessage, document.getElementById('whatsappCharCount'), 1000);
@@ -1364,6 +1387,10 @@ function closeSendModal() {
   currentSendContact = null;
   contactSendResolved = true;
   currentSendImage = null;
+  emailAttachments = [];
+  renderEmailAttachments();
+  const filesInput = document.getElementById('sendEmailFilesInput');
+  if (filesInput) filesInput.value = '';
 }
 
 function switchSendTab(tab) {
@@ -1374,9 +1401,19 @@ function switchSendTab(tab) {
 
   if (!waTab || !emailTab || !waContent || !emailContent) return;
 
+  const modal = document.getElementById('sendMessageModal');
   const nextTab = tab === 'email' ? 'email' : 'whatsapp';
   const changed = currentSendTab !== nextTab;
   currentSendTab = nextTab;
+  modal?.classList.toggle('is-email-mode', nextTab === 'email');
+
+  if (changed && nextTab === 'email' && !emailModeHasTemplate(modal?.dataset.templateId || '')) {
+    const subjectInput = document.getElementById('sendEmailSubject');
+    const bodyInput = document.getElementById('sendEmailMessage');
+    if (subjectInput) subjectInput.value = '';
+    if (bodyInput) bodyInput.value = '';
+    updateCharCount(bodyInput, document.getElementById('emailCharCount'), 5000);
+  }
 
   if (nextTab === 'whatsapp') {
     waTab.classList.add('active');
@@ -1395,9 +1432,8 @@ function switchSendTab(tab) {
   }
 
   if (changed) {
-    const modal = document.getElementById('sendMessageModal');
     const selectedId = modal?.dataset.templateId || '';
-    if (selectedId) applySendTemplate(selectedId);
+    if (emailModeHasTemplate(selectedId)) applySendTemplate(selectedId);
     else renderSendTemplateList(selectedId);
   }
 }
@@ -1453,48 +1489,148 @@ async function sendWhatsApp() {
   closeSendModal();
 }
 
-function sendEmail() {
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function addEmailAttachments(fileList) {
+  const incoming = Array.from(fileList || []);
+  if (!incoming.length) return;
+
+  if (incoming.some(file => !EMAIL_FILE_PATTERN.test(file.name || ''))) {
+    showToast('Solo se permiten archivos PDF, Word o Excel.', 'warning');
+    return;
+  }
+  const oversized = incoming.find(file => file.size > EMAIL_MAX_FILE_SIZE);
+  if (oversized) {
+    showToast(`"${oversized.name}" supera el límite de 10 MB.`, 'warning');
+    return;
+  }
+
+  const room = EMAIL_MAX_FILES - emailAttachments.length;
+  if (room <= 0) {
+    showToast(`Máximo ${EMAIL_MAX_FILES} archivos adjuntos.`, 'warning');
+    return;
+  }
+  if (incoming.length > room) {
+    showToast(`Solo puedes agregar ${room} archivo(s) más.`, 'warning');
+  }
+
+  const accepted = incoming.slice(0, room);
+  const currentSize = emailAttachments.reduce((total, file) => total + file.size, 0);
+  const incomingSize = accepted.reduce((total, file) => total + file.size, 0);
+  if (currentSize + incomingSize > EMAIL_MAX_TOTAL_SIZE) {
+    showToast('Los archivos superan el límite total de 20 MB.', 'warning');
+    return;
+  }
+
+  emailAttachments = [...emailAttachments, ...accepted];
+  renderEmailAttachments();
+}
+
+function removeEmailAttachment(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= emailAttachments.length) return;
+  emailAttachments.splice(index, 1);
+  renderEmailAttachments();
+}
+
+function renderEmailAttachments() {
+  const list = document.getElementById('sendEmailFilesList');
+  if (!list) return;
+  list.replaceChildren();
+
+  emailAttachments.forEach((file, index) => {
+    const row = document.createElement('div');
+    row.className = 'sm-file-row';
+
+    const name = document.createElement('span');
+    name.className = 'sm-file-name';
+    name.textContent = file.name;
+    name.title = file.name;
+
+    const size = document.createElement('span');
+    size.className = 'sm-file-size';
+    size.textContent = formatFileSize(file.size);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'sm-file-remove';
+    remove.dataset.removeEmailFile = String(index);
+    remove.title = 'Quitar archivo';
+    remove.setAttribute('aria-label', `Quitar ${file.name}`);
+    remove.textContent = '✕';
+
+    row.append(name, size, remove);
+    list.appendChild(row);
+  });
+}
+
+async function sendEmail() {
   const emailInput = document.getElementById('sendEmailAddress');
   const subjectInput = document.getElementById('sendEmailSubject');
   const messageInput = document.getElementById('sendEmailMessage');
 
-  if (!emailInput || !messageInput) return;
+  if (!emailInput || !subjectInput || !messageInput) return;
 
   const email = emailInput.value.trim();
-  const subject = subjectInput ? subjectInput.value.trim() : 'Mensaje';
+  const subject = subjectInput.value.trim();
   const message = messageInput.value.trim();
 
-  if (!email) {
-    showToast('Por favor ingresa una dirección de email.', 'warning');
+  if (!email || !isValidEmail(email)) {
+    showToast('Por favor ingresa un correo válido.', 'warning');
     emailInput.focus();
     return;
   }
-
-  if (!isValidEmail(email)) {
-    showToast('Por favor ingresa un email válido.', 'warning');
-    emailInput.focus();
+  if (!subject) {
+    showToast('Por favor ingresa el asunto del correo.', 'warning');
+    subjectInput.focus();
     return;
   }
-
   if (!message) {
     showToast('Por favor ingresa un mensaje.', 'warning');
     messageInput.focus();
     return;
   }
 
-  if (currentSendImage) {
-    copyImageToClipboard(currentSendImage).then(copied => {
-      if (copied) {
-        showToast('📋 Imagen copiada al portapapeles para pegarla en tu correo.', 'info');
-      }
-    });
+  const button = document.getElementById('sendEmailBtn');
+  const originalLabel = button?.innerHTML;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Enviando correo...';
   }
 
-  const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-  window.location.href = mailtoUrl;
-  recordSendStatus(currentSendContact?.phone || email, 'sent', 'email');
-  contactSendResolved = true;
-  closeSendModal();
+  try {
+    await requireLogin();
+    const form = new FormData();
+    form.append('to', email);
+    form.append('subject', subject);
+    form.append('body', message);
+    emailAttachments.forEach(file => form.append('attachments', file, file.name));
+
+    const response = await apiFetch('/api/email/send', { method: 'POST', body: form });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || 'No se pudo enviar el correo.');
+    }
+
+    showToast('Correo enviado correctamente.', 'success');
+    recordSendStatus(currentSendContact?.phone || email, 'sent', 'email');
+    contactSendResolved = true;
+    emailAttachments = [];
+    renderEmailAttachments();
+    closeSendModal();
+  } catch (error) {
+    recordSendStatus(currentSendContact?.phone || email, 'failed', 'email');
+    contactSendResolved = true;
+    showToast(error.message || 'No se pudo enviar el correo.', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+    }
+  }
 }
 
 // ============================================================================
@@ -1744,28 +1880,17 @@ function bindEvents() {
     waRemoveBtn.addEventListener('click', removeSendImage);
   }
 
-  // Email image attach/copy/remove buttons
+  // Adjuntos de correo (PDF/Word/Excel) para envío SMTP
   const emailAttachBtn = document.getElementById('sendEmailAttachBtn');
-  const emailImageFileInput = document.getElementById('sendEmailImageInput');
-  const emailCopyBtn = document.getElementById('sendEmailCopyImageBtn');
-  const emailRemoveBtn = document.getElementById('sendEmailRemoveImageBtn');
-
-  if (emailAttachBtn && emailImageFileInput) {
-    emailAttachBtn.addEventListener('click', () => emailImageFileInput.click());
-    emailImageFileInput.addEventListener('change', () => {
-      if (emailImageFileInput.files && emailImageFileInput.files[0]) {
-        handleSendImageSelect(emailImageFileInput.files[0]);
-      }
+  const emailFilesInput = document.getElementById('sendEmailFilesInput');
+  if (emailAttachBtn && emailFilesInput) {
+    emailAttachBtn.addEventListener('click', () => emailFilesInput.click());
+    emailFilesInput.addEventListener('change', () => {
+      addEmailAttachments(emailFilesInput.files);
+      emailFilesInput.value = '';
     });
   }
-
-  if (emailCopyBtn) {
-    emailCopyBtn.addEventListener('click', copySendImage);
-  }
-
-  if (emailRemoveBtn) {
-    emailRemoveBtn.addEventListener('click', removeSendImage);
-  }
+  renderEmailAttachments();
 
   // Email send button
   const emailSendBtn = document.getElementById('sendEmailBtn');
@@ -1785,6 +1910,14 @@ function bindEvents() {
   // Selección y acciones en la lista lateral de plantillas en sendMessageModal
   if (sendModal) {
     sendModal.addEventListener('click', (event) => {
+      // 0. Quitar un adjunto del correo
+      const removeFileBtn = event.target.closest('[data-remove-email-file]');
+      if (removeFileBtn) {
+        event.stopPropagation();
+        removeEmailAttachment(Number(removeFileBtn.dataset.removeEmailFile));
+        return;
+      }
+
       // 1. Clic en botón editar plantilla en la tarjeta
       const editBtn = event.target.closest('[data-action="edit"]');
       if (editBtn) {
