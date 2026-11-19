@@ -973,12 +973,19 @@
   overflow-y: auto;
 }
 
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 55px;
   padding: 8px 10px;
   border: 1px solid transparent !important;
@@ -1039,6 +1046,39 @@
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-visual.stf-visual-missing {
   background: #fdeaee !important;
   color: #d43757 !important;
+}
+
+/* Botón para borrar categorías creadas con el "+" */
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-delete {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #f4b9c6 !important;
+  border-radius: 9px;
+  background: #fff0f3 !important;
+  color: #d43757 !important;
+  box-shadow: 0 2px 6px rgba(212, 55, 87, .14) !important;
+  cursor: pointer;
+  opacity: 1;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-delete svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-delete:hover,
+#sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-option-delete:focus-visible {
+  background: #d43757 !important;
+  border-color: #d43757 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(212, 55, 87, .35) !important;
+  transform: scale(1.08);
 }
 
 #sendMessageModal .stf-dropdown-menu.stf-rich-menu .stf-menu-option:hover,

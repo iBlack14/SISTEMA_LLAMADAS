@@ -146,7 +146,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   } else if (view === "messages") {
     const whatsapp = await import("../../features/messaging/whatsapp.js");
     whatsapp.syncMessagesView?.();
-    const templates = await import("../../features/messaging/message-templates.js");
+    const templates = await import("../../features/messaging/message-templates.js?v=20261119-delete-visible");
     templates.init?.();
   } else if (view === "reservations") {
     const reservations = await import("../../features/reservations/reservations-controller.js");

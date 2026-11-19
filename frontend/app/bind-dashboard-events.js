@@ -3,7 +3,7 @@ import { validateReportPeriod, isInReportPeriod, reportPeriodLabel } from '../fe
 import { refs, setStatus, setBadge, setAckBadge } from '../shared/ui/dom.js';
 import * as Contacts from '../features/contacts/contacts-repository.js';
 import * as WhatsApp from '../features/messaging/whatsapp.js';
-import { openContactSendModal } from '../features/messaging/message-templates.js';
+import { openContactSendModal } from '../features/messaging/message-templates.js?v=20261119-delete-visible';
 import { showPanelView } from './navigation/panel-navigation.js';
 
 /**

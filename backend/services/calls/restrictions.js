@@ -24,23 +24,8 @@ export function createRestrictions(runtime, services) {
   function clearAllCallAttemptsCache() {
     cachedAllCallAttempts.clear();
   }
-  // Use cached attempts if available and sessions haven't changed significantly
-  const cached = cachedAllCallAttempts();
-  if (cached) return cached;
-  
-  const rows = [...runtime.persistence.records.values()].map(entry => entry.row);
-  for (const session of runtime.sessions.values()) rows.push(...collectCallAttempts(session));
-  
-  // Cache the result
-  cachedAllCallAttempts.set(rows.hashCode || (rows.length + '-' + Date.now()), rows);
-  return rows;
-}
 
-function clearAllCallAttemptsCache() {
-  cachedAllCallAttempts.clear();
-}
-
-function globalBlockedNumbers() {
+  function globalBlockedNumbers() {
   const blocked = new Map();
   for (const session of runtime.sessions.values()) {
     for (const entry of session.blockedNumbers || []) {

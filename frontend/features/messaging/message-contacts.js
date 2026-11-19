@@ -1,4 +1,4 @@
-﻿import { openContactSendModal } from './message-templates.js';
+﻿import { openContactSendModal } from './message-templates.js?v=20261119-delete-visible';
 import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
