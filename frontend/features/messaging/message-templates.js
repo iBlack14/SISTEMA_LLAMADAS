@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sistema de plantillas de mensajes y mensajería
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
@@ -746,21 +746,23 @@ function renderSendTemplateList(selectedId = '') {
                       template.type === 'whatsapp' ? 'WhatsApp' : 'WhatsApp y Correo';
 
     button.innerHTML = `
-      <div class="send-template-option-top">
-        <strong title="${escapeHtml(template.name)}">${escapeHtml(template.name)}</strong>
-        <div class="send-template-actions">
-          <span class="btn-action edit" data-action="edit" data-id="${template.id}" title="Editar plantilla">&#x270F;&#xFE0F;</span>
-          <span class="btn-action delete" data-action="delete" data-id="${template.id}" title="Eliminar plantilla">&#x1F5D1;&#xFE0F;</span>
+      <div class="send-template-card-main">
+        ${hasImage ? `<img src="${escapeHtml(templateThumbUrl(template.image))}" class="send-template-mini-thumb" alt="" loading="lazy" decoding="async" />` : ""}
+        <div class="send-template-card-content">
+          <div class="send-template-option-top">
+            <strong class="send-template-title" title="${escapeHtml(template.name)}">${escapeHtml(template.name)}</strong>
+            <div class="send-template-actions">
+              <span class="btn-action edit" data-action="edit" data-id="${template.id}" title="Editar plantilla"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+              <span class="btn-action delete" data-action="delete" data-id="${template.id}" title="Eliminar plantilla"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+            </div>
+          </div>
+          <div class="send-template-snippet">${escapeHtml(template.message)}</div>
         </div>
       </div>
-      <div class="send-template-option-body">
-        ${hasImage ? `<img src="${escapeHtml(templateThumbUrl(template.image))}" class="send-template-mini-thumb" alt="" loading="lazy" decoding="async" />` : ''}
-        <span class="send-template-snippet">${escapeHtml(template.message)}</span>
-      </div>
       <div class="send-template-option-bottom">
-        <small class="template-category-tag">${escapeHtml(template.category || 'Otros')}</small>
+        <small class="template-category-tag">${escapeHtml(template.category || "Otros")}</small>
         <small class="type-tag">${typeLabel}</small>
-        ${hasImage ? '<span class="has-img-chip">&#x1F5BC;&#xFE0F; Con imagen</span>' : ''}
+        ${hasImage ? `<span class="has-img-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Con imagen</span>` : ""}
       </div>
     `;
 

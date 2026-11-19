@@ -1,4 +1,4 @@
-/* Message composer: keep this focused editor light against the app's dark theme. */
+﻿/* Message composer: keep this focused editor light against the app's dark theme. */
 #sendMessageModal .send-message-card {
   width: min(1120px, calc(100vw - 40px));
   max-width: 1120px;
@@ -506,46 +506,106 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  min-height: 112px;
+  min-height: auto;
   height: auto !important;
   max-height: none;
-  gap: 7px;
-  padding: 10px 11px;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #ebdcf5 !important;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #2b0b4a !important;
   overflow: hidden;
   white-space: normal;
   text-transform: none !important;
   letter-spacing: normal;
+  cursor: pointer;
+  transition: all 0.16s ease;
 }
 
-#sendMessageModal .send-template-option-top,
-#sendMessageModal .send-template-option-body,
-#sendMessageModal .send-template-option-bottom {
-  min-width: 0;
-  width: 100%;
+#sendMessageModal .send-template-option:hover {
+  border-color: #d81482 !important;
+  background: #fdf6fc !important;
+  box-shadow: 0 3px 10px rgba(216, 20, 130, 0.08) !important;
 }
 
-#sendMessageModal .send-template-option-body {
-  align-items: center;
+#sendMessageModal .send-template-option.is-selected {
+  border-color: #c41275 !important;
+  background: #fcf1fa !important;
+  box-shadow: 0 0 0 1.5px #c41275, 0 4px 12px rgba(196, 18, 117, 0.12) !important;
+}
+
+/* Contenedor principal: imagen mini a la izquierda, título y snippet a la derecha */
+#sendMessageModal .send-template-card-main {
+  display: flex;
+  align-items: flex-start;
   gap: 9px;
+  width: 100%;
+  min-width: 0;
 }
 
 #sendMessageModal .send-template-mini-thumb {
   box-sizing: border-box;
-  width: 44px;
-  height: 54px;
-  object-fit: contain;
-  background: #fff;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #f5f0fa;
+  border: 1px solid #ebdcf5;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+#sendMessageModal .send-template-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+#sendMessageModal .send-template-option-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+#sendMessageModal .send-template-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #241337;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
 #sendMessageModal .send-template-snippet {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #5d496e;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
 }
 
 #sendMessageModal .send-template-option-bottom {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 5px 8px;
+  gap: 4px 6px;
+  width: 100%;
+  min-width: 0;
+  padding-top: 2px;
 }
 
 @media (max-width: 760px) {
