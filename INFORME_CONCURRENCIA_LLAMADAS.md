@@ -12,8 +12,10 @@ El análisis de abajo documenta el estado encontrado antes de iniciar las correc
 - La caché de intentos se invalida con revisiones de los intentos/sesiones y conserva solo una fotografía, en vez de acumular todas las fotografías antiguas en memoria.
 - Los guardados dirigidos limpian la marca de sesión sucia solo si no apareció una mutación nueva mientras el guardado estaba en curso.
 - Los logs de persistencia ahora registran el tamaño serializado, el tiempo de construir el snapshot y la espera en la cola; la consulta de la libreta registra el tiempo de consulta y cálculo de progreso. Estos datos sirven para medir, pero no se han recolectado en producción.
+- En un mismo ciclo de despacho, se calcula una sola vez el historial de llamadas y la lista de bloqueos; cada teléfono recién asignado se agrega al filtro para conservar la prevención de duplicados entre equipos. La selección de pendiente/reintento ahora hace una pasada priorizada en vez de búsquedas separadas. Se agregaron logs lentos para `allCallAttempts()` y el ciclo de despacho (umbral 100 ms), sin números telefónicos ni IDs personales.
+- Las mutaciones locales de una sesión ahora pasan su código a `saveSoon()` y las rutas síncronas de sesión/campaña guardan solo esa sesión. Si se mezcla una mutación sin alcance único en la misma ventana de 150 ms, se mantiene el snapshot completo. La escritura de llamadas sigue esperando MySQL y `saveChain` continúa serializando transacciones para preservar el orden.
 
-No se ejecutaron pruebas, no se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios. El código posterior a esta actualización debe tratarse como pendiente de validación.
+No se ejecutaron pruebas, no se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios. Estas optimizaciones son solo locales y deben validarse con la matriz de pruebas antes de operar campañas.
 
 ## Preparación de migración relacional para EasyPanel
 

@@ -85,8 +85,7 @@ export function withProgress(book, attempts, globalAttempts = attempts, now = ne
   return result;
 }
 
-export function excludeCalledPending(campaign, attempts, now = new Date()) {
-  const called = annualPhoneBlocks(attempts, now);
+export function excludeCalledPendingFromBlocks(campaign, called) {
   const manualContacts = new Set((campaign.manualReportRetry?.contactIds || []).map(String));
   const assigned = new Set(Object.values(campaign.assignments || {}).map(row => row.contactId));
   for (const contact of campaign.contacts || []) {
@@ -103,6 +102,20 @@ export function excludeCalledPending(campaign, attempts, now = new Date()) {
       contact.callBlockReason = block.reason || "Número llamado anteriormente";
     }
   }
+}
+
+export function excludeCalledPending(campaign, attempts, now = new Date()) {
+  excludeCalledPendingFromBlocks(campaign, annualPhoneBlocks(attempts, now));
+}
+
+export function addAttemptPhoneBlock(blocks, phone, startedAt, now = new Date()) {
+  const key = phoneKey(phone);
+  if (!key) return;
+  const incoming = annualPhoneBlocks([{ phone, startedAt }], now).get(key);
+  if (!incoming) return;
+  const current = blocks.get(key);
+  if (current?.permanent || (current && Date.parse(current.lastCalledAt) >= Date.parse(incoming.lastCalledAt))) return;
+  blocks.set(key, incoming);
 }
 
 export function excludeBlockedPending(campaign, blockedNumbers = []) {

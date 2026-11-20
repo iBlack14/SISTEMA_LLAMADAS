@@ -151,7 +151,7 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     clearDeviceFromPairingSlots(session, worker?.id);
     socket.data.explicitLogout = true;
     session.updatedAt = Date.now();
-    saveSoon();
+    saveSoon(code);
     emitState(code);
     emitCampaignState(code);
     if (typeof acknowledge === "function") acknowledge({ ok: true });
@@ -202,7 +202,7 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
 
     if (!session.dashboardSocketId && !getConnectedPhoneWorkers(session).length && !hasPersistentCampaignData(session)) {
       sessions.delete(code);
-      saveSoon();
+      saveSoon(code);
       return;
     }
 

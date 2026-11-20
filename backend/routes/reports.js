@@ -209,7 +209,7 @@ runtime.app.post(
       requestedAt: new Date().toISOString()
     };
 
-    try { await runtime.persistence.save(runtime.sessions); }
+    try { await runtime.persistence.save(runtime.sessions, [code]); }
     catch { return res.status(503).json({ ok: false, error: "No se pudo guardar la selección en MySQL." }); }
     services.emitState(code);
     services.emitCampaignState(code);

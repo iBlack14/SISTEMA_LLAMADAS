@@ -117,7 +117,7 @@ function detachSocketFromCurrentSession(socket) {
     emitCampaignState(previousCode);
   }
 
-  services.saveSoon();
+  services.saveSoon(previousCode);
   socket.data.code = null;
   socket.data.role = null;
 }

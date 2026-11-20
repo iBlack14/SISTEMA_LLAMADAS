@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeCalledPendingFromBlocks, addAttemptPhoneBlock, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -119,7 +119,7 @@ function dispatchNextCampaignCallLegacy(code) {
   excludeBlockedPending(campaign, services.globalBlockedNumbers());
   const next = assignNextContact(session, worker || {});
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
 
   if (!next) {
     services.emitCampaignState(code);
@@ -142,14 +142,14 @@ function dispatchNextCampaignCallLegacy(code) {
       callId: getActiveAttemptId(session, worker.id),
       commandId: nanoid()
     });
-    services.saveSoon();
+    services.saveSoon(code);
     services.emitState(code);
     services.emitCampaignState(code);
   } else {
     console.log(`[CAMPAIGN] Omitido ${next.phone} (No hay worker)`);
     session.callState = "ended";
     markContactResult(session, next.id, "failed", { callbackReason: "Sin celular vinculado" });
-    services.saveSoon();
+    services.saveSoon(code);
     services.emitState(code);
     services.emitCampaignState(code);
   }
@@ -161,13 +161,17 @@ function dispatchNextCampaignCallLegacy(code) {
 }
 
 function dispatchCampaignCalls(code, onlyWorkerId = "") {
+  const dispatchStartedAt = Date.now();
   if (runtime.historyGate.blocked(code)) return [];
   const session = runtime.sessions.get(code);
   if (!session) return [];
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
-  excludeCalledPending(campaign, services.allCallAttempts());
-  excludeBlockedPending(campaign, services.globalBlockedNumbers());
+  const attempts = services.allCallAttempts();
+  const calledBlocks = annualPhoneBlocks(attempts);
+  const blockedNumbers = services.globalBlockedNumbers();
+  excludeCalledPendingFromBlocks(campaign, calledBlocks);
+  excludeBlockedPending(campaign, blockedNumbers);
 
   const dispatched = [];
   const connectedWorkers = services.getConnectedPhoneWorkers(session);
@@ -182,10 +186,13 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   );
 
   for (const worker of workers) {
-    excludeCalledPending(campaign, services.allCallAttempts());
-    excludeBlockedPending(campaign, services.globalBlockedNumbers());
+    excludeCalledPendingFromBlocks(campaign, calledBlocks);
+    excludeBlockedPending(campaign, blockedNumbers);
     const next = assignNextContact(session, worker);
     if (!next) continue;
+    // Preserve the old per-worker duplicate-phone guard without rescanning the
+    // full history after every assignment in this synchronous dispatch batch.
+    addAttemptPhoneBlock(calledBlocks, next.phone, next.lastAttemptAt);
     worker.callState = "dialing";
     worker.activeContactId = next.id;
     worker.lastCompanyName = next.name;
@@ -207,10 +214,14 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   }
 
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   services.emitCampaignState(code);
   if (dispatched.length) services.refreshGlobalCallRestrictions(code);
+  const dispatchCycleMs = Date.now() - dispatchStartedAt;
+  if (dispatchCycleMs >= 100) {
+    console.info(`[CALL_DISPATCH] cycle session=${String(code).slice(-2)} contacts=${campaign.contacts.length} workers=${workers.length} dispatched=${dispatched.length} attempts=${attempts.length} elapsedMs=${dispatchCycleMs}`);
+  }
   return dispatched;
 }
 

@@ -216,7 +216,7 @@ runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin
     session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
     session.updatedAt = Date.now();
     runtime.persistence.markContactBookDirty(code);
-    await runtime.persistence.save(runtime.sessions);
+    await runtime.persistence.save(runtime.sessions, [code]);
     if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision: session.contactBookRevision });
     return res.json({ ok: true, added, list: listName, total: book.contacts.length, revision: session.contactBookRevision });
   } catch (error) {

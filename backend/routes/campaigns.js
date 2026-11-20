@@ -89,7 +89,7 @@ startedCampaign.reportRubro = String(
     markPendingCampaignStarted(session, contacts);
   }
   session.updatedAt = Date.now();
-  try { await runtime.persistence.save(runtime.sessions); }
+  try { await runtime.persistence.save(runtime.sessions, [code]); }
   catch { return res.status(503).json({ok:false,error:"No se pudo guardar la campaña en MySQL."}); }
   services.emitCampaignState(code);
   const dispatched = services.dispatchCampaignCalls(code);
@@ -109,7 +109,7 @@ runtime.app.post("/api/session/:code/campaign/pause", async (req, res) => {
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
 
   pauseCampaign(session);
-  try { await runtime.persistence.save(runtime.sessions); }
+  try { await runtime.persistence.save(runtime.sessions, [code]); }
   catch { services.emitCampaignState(code); return res.status(503).json({ok:false,error:"Campaña pausada, pero falta confirmar el guardado en MySQL."}); }
   services.emitCampaignState(code);
   return res.json({ ok: true, code, campaign: getCampaignSnapshot(session) });
@@ -122,7 +122,7 @@ runtime.app.post("/api/session/:code/campaign/resume", async (req, res) => {
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
 
   resumeCampaign(session);
-  try { await runtime.persistence.save(runtime.sessions); }
+  try { await runtime.persistence.save(runtime.sessions, [code]); }
   catch { pauseCampaign(session); return res.status(503).json({ok:false,error:"No se confirmó la continuación en MySQL."}); }
   services.emitCampaignState(code);
   const dispatched = services.dispatchCampaignCalls(code);
@@ -136,7 +136,7 @@ runtime.app.post("/api/session/:code/campaign/dispatch", (req, res) => {
   if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
 
   const dispatched = services.dispatchCampaignCalls(code);
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   return res.json({ ok: true, code, dispatched: dispatched.length, campaign: getCampaignSnapshot(session) });
 });
@@ -160,7 +160,7 @@ runtime.app.post("/api/session/:code/campaign/stop", (req, res) => {
       });
     }
   }
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   services.emitState(code);
   return res.json({ ok: true, code, campaign: getCampaignSnapshot(session) });
@@ -186,7 +186,7 @@ runtime.app.post("/api/session/:code/campaign/skip", (req, res) => {
       commandId: nanoid()
     });
   }
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   if (ensureCampaign(session).status === "running") services.dispatchCampaignCalls(code);
   return res.json({ ok: true, code, skipped, campaign: getCampaignSnapshot(session) });
@@ -222,7 +222,7 @@ runtime.app.post("/api/session/:code/campaign/result", (req, res) => {
     runtime.io.to(hangupWorkerSocketId).emit("call:action", { action: "hangup", from: "dashboard", contactId });
   }
 
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   if (ensureCampaign(session).status === "running") {
     services.dispatchCampaignCalls(code);
@@ -247,7 +247,7 @@ runtime.app.post("/api/session/:code/campaign/callback", (req, res) => {
   });
   if (!contact) return res.status(404).json({ ok: false, error: "Contacto no encontrado" });
 
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   if (ensureCampaign(session).status === "running") {
     services.dispatchCampaignCalls(code);

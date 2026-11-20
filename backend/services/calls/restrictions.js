@@ -11,18 +11,25 @@ export function createRestrictions(runtime, services) {
   let cachedAllCallAttempts = [];
   
   function allCallAttempts() {
+    const startedAt = Date.now();
     // Use cached attempts if available
     const sessionRevision = [...runtime.sessions].map(([code, session]) =>
       `${code}:${session.updatedAt || 0}:${session.campaign?.updatedAt || 0}`
     ).join("|");
     const cacheKey = `${runtime.persistence.attemptsRevision || 0}-${sessionRevision}`;
-    if (cacheKey === cachedAllCallAttemptsKey) return cachedAllCallAttempts;
+    if (cacheKey === cachedAllCallAttemptsKey) {
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= 100) console.info(`[CALL_ATTEMPTS] cache=hit sessions=${runtime.sessions.size} rows=${cachedAllCallAttempts.length} elapsedMs=${elapsedMs}`);
+      return cachedAllCallAttempts;
+    }
     
     const rows = [...runtime.persistence.records.values()].map(entry => entry.row);
     for (const session of runtime.sessions.values()) rows.push(...collectCallAttempts(session));
     
     cachedAllCallAttemptsKey = cacheKey;
     cachedAllCallAttempts = rows;
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs >= 100) console.info(`[CALL_ATTEMPTS] cache=miss sessions=${runtime.sessions.size} rows=${rows.length} elapsedMs=${elapsedMs}`);
     return rows;
   }
   

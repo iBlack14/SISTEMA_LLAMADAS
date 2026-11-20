@@ -78,7 +78,7 @@ runtime.app.post("/api/session/:code/pairing-slots", (req, res) => {
   const slot = services.createPairingSlot(session.pairingSlots.length);
   session.pairingSlots.push(slot);
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   return res.json({ ok: true, code, slotId: slot.id });
 });
@@ -91,7 +91,7 @@ runtime.app.post("/api/pairing/token/:code", runtime.pairingRateLimit, (req, res
   // Generate fresh pairing token (rotated)
   session.pairingToken = nanoid(20);
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   return res.json({ ok: true, code, token: session.pairingToken });
 });
@@ -111,7 +111,7 @@ runtime.app.delete("/api/session/:code/pairing-slots/:slotId", (req, res) => {
   session.pairingSlots.splice(index, 1);
   session.pairingSlots.forEach((slot, slotIndex) => { slot.label = `EQUIPO ${slotIndex + 1}`; });
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   return res.json({ ok: true, code, slotId });
 });
@@ -125,7 +125,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/pause", (req, res) => {
   if (!worker) return res.status(404).json({ ok: false, error: "Telefono no encontrado" });
   const paused = Boolean(req.body?.paused);
   setWorkerPaused(session, workerId, paused);
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   services.emitState(code);
   if (!paused) services.dispatchCampaignCalls(code);
@@ -208,7 +208,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/switch-list", (req, res) 
   worker.lastCompanyName = "";
   worker.lastNumber = "";
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   services.emitCampaignState(code);
   if (ensureCampaign(session).status === "running") {
@@ -264,7 +264,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/call-contact", (req, res)
     commandId: nanoid()
   });
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   services.emitCampaignState(code);
   services.refreshGlobalCallRestrictions(code);
@@ -284,7 +284,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/stop-independent", (req, 
   worker.callState = "idle";
   worker.lastNumber = held?.phone || worker.lastNumber || "";
   worker.lastCompanyName = held?.name || worker.lastCompanyName || "";
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitCampaignState(code);
   services.emitState(code);
   return res.json({ ok: true, code, workerId, heldContact: held ? { id: held.id, name: held.name, phone: held.phone } : null, campaign: getCampaignSnapshot(session) });
@@ -314,7 +314,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/disconnect", (req, res) =
   services.syncSessionPhoneState(session);
 
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
   services.emitCampaignState(code);
 
@@ -398,7 +398,7 @@ runtime.app.post("/api/android/pair", runtime.pairingRateLimit, (req, res) => {
   }
   services.syncSessionPhoneState(session);
   session.updatedAt = Date.now();
-  services.saveSoon();
+  services.saveSoon(code);
   services.emitState(code);
 
   const baseUrl = services.getAndroidApiBaseUrl(req);

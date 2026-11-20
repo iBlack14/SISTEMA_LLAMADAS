@@ -60,7 +60,7 @@ runtime.app.post("/api/session/:code/message-contacts/update", async (req, res) 
         if (!previous.some(item => item.phone === phone)) throw Object.assign(new Error("Contacto no encontrado"),{status:404});
         session.messageContacts = previous.map(item => item.phone === phone ? {...item,name:name.trim(),updatedAt:new Date().toISOString()} : item);
       }
-      try { await runtime.persistence.save(runtime.sessions); }
+      try { await runtime.persistence.save(runtime.sessions, [code]); }
       catch (error) { session.messageContacts = previous; throw error; }
     });
     if (session.dashboardSocketId) runtime.io.to(session.dashboardSocketId).emit("messages:contacts", {contacts:session.messageContacts});
@@ -102,7 +102,7 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
       session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
       session.updatedAt = Date.now();
       runtime.persistence.markContactBookDirty(code);
-      await runtime.persistence.save(runtime.sessions);
+      await runtime.persistence.save(runtime.sessions, [code]);
       console.info(`[CONTACT_BOOK] PUT session=${code.slice(-2)} revision=${session.contactBookRevision} contacts=${previousContacts}->${book.contacts.length} lists=${previousLists}->${book.lists.length} persisted=mysql`);
       return session.contactBookRevision;
     });
@@ -180,7 +180,7 @@ runtime.app.post("/api/session/:code/turn/finalize", async (req, res) => {
   services.disconnectAllSessionPhones(session, "turn_finished");
   resetCampaignForShift(session);
   session.updatedAt = Date.now();
-  try { await runtime.persistence.save(runtime.sessions); }
+  try { await runtime.persistence.save(runtime.sessions, [code]); }
   catch { return res.status(503).json({ok:false,error:"No se confirmó el cierre de turno en MySQL."}); }
   services.emitState(code);
   services.emitCampaignState(code);
@@ -210,7 +210,7 @@ runtime.app.post("/api/session/:code/session/finalize", async (req, res) => {
   );
   session.pairingToken = nanoid(20);
   session.updatedAt = Date.now();
-  try { await runtime.persistence.save(runtime.sessions); }
+  try { await runtime.persistence.save(runtime.sessions, [code]); }
   catch { return res.status(503).json({ok:false,error:"No se confirmó el cierre de sesión en MySQL."}); }
   services.emitState(code);
   services.emitCampaignState(code);

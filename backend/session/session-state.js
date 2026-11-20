@@ -38,14 +38,29 @@ import {
 export function createSessionState(runtime, services) {
 let saveSoonTimer = null;
 let saveSoonPromise = null;
+let saveSoonPendingCodes = new Set();
+let saveSoonRequiresFullSnapshot = false;
 
-function saveSoon() {
+function saveSoon(code = "") {
+  if (code && runtime.sessions.has(code)) {
+    runtime.persistence.markSessionDirty(code);
+    saveSoonPendingCodes.add(code);
+  } else {
+    // An unscoped mutation must keep the previous full-snapshot behavior.
+    saveSoonRequiresFullSnapshot = true;
+  }
   if (saveSoonTimer) return saveSoonPromise;
   saveSoonPromise = new Promise((resolve) => {
     saveSoonTimer = setTimeout(() => {
       saveSoonTimer = null;
+      const pendingCodes = saveSoonPendingCodes;
+      const requiresFullSnapshot = saveSoonRequiresFullSnapshot;
+      saveSoonPendingCodes = new Set();
+      saveSoonRequiresFullSnapshot = false;
       const dirtyCodes = runtime.persistence.getDirtySessions();
-      runtime.persistence.save(runtime.sessions, dirtyCodes.size ? [...dirtyCodes] : null)
+      const changedCodes = new Set([...pendingCodes, ...dirtyCodes]);
+      runtime.persistence.save(runtime.sessions,
+        requiresFullSnapshot || !changedCodes.size ? null : [...changedCodes])
         .then(resolve)
         .catch(error => {
           // Re-add dirty codes on failure so they can be retried
@@ -63,7 +78,7 @@ function saveSoon() {
 function getOrCreateSession(code) {
   if (!runtime.sessions.has(code)) {
     runtime.sessions.set(code, services.normalizeSessionShape());
-    saveSoon();
+    saveSoon(code);
   }
 
   const session = runtime.sessions.get(code);

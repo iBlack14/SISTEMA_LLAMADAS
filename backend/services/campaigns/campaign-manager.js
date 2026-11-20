@@ -424,9 +424,16 @@ export function pickNextContact(session, workerId = "") {
   // Skip excluded numbers (emergencies, hospitals, police, etc.)
   const notExcluded = (contact) => !isExcludedNumber(contact.phone);
   // Complete the first round before retrying unanswered contacts.
-  let next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "pending")
-    || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "retry_pending")
-    || null;
+  const findPendingBeforeRetry = () => {
+    let firstRetry = null;
+    for (const contact of campaign.contacts) {
+      if (!eligible(contact) || !listFilter(contact) || !notExcluded(contact)) continue;
+      if (contact.status === "pending") return contact;
+      if (!firstRetry && contact.status === "retry_pending") firstRetry = contact;
+    }
+    return firstRetry;
+  };
+  let next = findPendingBeforeRetry();
   if (!next && normalizedWorkerId && targetedMode) {
     const unclaimed = campaign.contacts.find((contact) =>
       !contact.targetWorkerId && listFilter(contact) && notExcluded(contact) && ["pending", "retry_pending"].includes(contact.status)
@@ -436,9 +443,7 @@ export function pickNextContact(session, workerId = "") {
       campaign.contacts.forEach((contact) => {
         if (!contact.targetWorkerId && contact.list === nextList) contact.targetWorkerId = normalizedWorkerId;
       });
-      next = campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "pending")
-        || campaign.contacts.find((contact) => eligible(contact) && listFilter(contact) && notExcluded(contact) && contact.status === "retry_pending")
-        || null;
+      next = findPendingBeforeRetry();
     }
   }
   return next;

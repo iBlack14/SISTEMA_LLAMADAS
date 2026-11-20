@@ -69,7 +69,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
         session.pairingToken = nanoid(20);
       }
       session.blockedNumbers = services.globalBlockedNumbers();
-      saveSoon();
+      saveSoon(code);
       detachSocketFromCurrentSession(socket);
       session.updatedAt = Date.now();
       socket.data.code = code;
@@ -170,7 +170,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
       }
       session.activePhoneSocketId ||= worker.socketId;
       syncSessionPhoneState(session);
-      saveSoon();
+      saveSoon(normalizedCode);
     }
 
     session.updatedAt = Date.now();

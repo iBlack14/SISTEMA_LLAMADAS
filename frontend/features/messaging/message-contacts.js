@@ -1,4 +1,4 @@
-﻿import { openContactSendModal } from './message-templates.js?v=20261119-email-smtp';
+﻿import { openContactSendModal } from './message-templates.js?v=20261119-users-ui3';
 import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 

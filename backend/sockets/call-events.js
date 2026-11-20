@@ -101,7 +101,7 @@ export function registerCallEvents(runtime, services, socket) {
         worker.callState = "dialing";
       }
       session.updatedAt = Date.now();
-      saveSoon();
+      saveSoon(code);
 
       if (worker) {
         console.log(`[MANUAL] Marcado directo a ${phoneNumber} vía worker ${worker.name}`);
@@ -115,13 +115,13 @@ export function registerCallEvents(runtime, services, socket) {
           callId: getActiveAttemptId(session, worker.id),
           commandId: commandId || nanoid()
         });
-        saveSoon();
+        saveSoon(code);
         emitState(code);
         services.refreshGlobalCallRestrictions(code);
       } else {
         console.log(`[MANUAL] Intento fallido para ${phoneNumber} (No hay worker activo)`);
         session.callState = "failed";
-        saveSoon();
+        saveSoon(code);
         emitState(code);
       }
     }
@@ -138,7 +138,7 @@ export function registerCallEvents(runtime, services, socket) {
         });
       }
       session.callState = "ended";
-      saveSoon();
+      saveSoon(code);
     }
 
     if (action === "mute" || action === "unmute" || action === "speaker_on" || action === "speaker_off" || action === "answer") {
