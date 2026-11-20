@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { logCampaignWaiting, logOperationalCall } from "../campaigns/operational-log.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeCalledPendingFromBlocks, addAttemptPhoneBlock, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
   ensureCampaign,
@@ -151,7 +152,7 @@ function dispatchNextCampaignCallLegacy(code) {
   session.lastCompanyName = next.name;
 
   if (worker) {
-    console.log(`[CAMPAIGN] Marcado directo a ${next.phone} vía worker ${worker.name}`);
+    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code });
     sendPersistedDial(code, worker.socketId, {
       action: "dial",
       phoneNumber: next.phone,
@@ -165,9 +166,9 @@ function dispatchNextCampaignCallLegacy(code) {
     services.emitState(code);
     services.emitCampaignState(code);
   } else {
-    console.log(`[CAMPAIGN] Omitido ${next.phone} (No hay worker)`);
     session.callState = "ended";
     markContactResult(session, next.id, "failed", { callbackReason: "Sin celular vinculado" });
+    logOperationalCall({ campaign, contact: next, state: "failed", event: "CAMPAÑA", sessionCode: code, detail: "No se marcó porque no hay equipo conectado" });
     services.saveSoon(code);
     services.emitState(code);
     services.emitCampaignState(code);
@@ -229,7 +230,14 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
       callId: getActiveAttemptId(session, worker.id),
       commandId: nanoid()
     });
+    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code });
     dispatched.push({ workerId: worker.id, contactId: next.id });
+  }
+
+  if (!dispatched.length) {
+    const hasPending = campaign.contacts.some((contact) => ["pending", "retry_pending"].includes(contact.status));
+    const hasActive = campaign.contacts.some((contact) => ["dialing", "ringing", "in_call"].includes(contact.status));
+    if (hasPending && !hasActive) logCampaignWaiting({ campaign, workers: connectedWorkers, sessionCode: code });
   }
 
   session.updatedAt = Date.now();

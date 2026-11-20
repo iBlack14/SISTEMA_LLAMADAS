@@ -60,6 +60,8 @@ function isRoutineCallLog(args) {
   return first.startsWith("[CALL_DISPATCH]") ||
     first.startsWith("[PHONE_STATUS] duplicate-ignored") ||
     first.startsWith("[PHONE_STATUS] persisting-session-snapshot") ||
+    first.startsWith("[PHONE_STATUS] committed") ||
+    first.startsWith("[CALL_ACK]") ||
     first.startsWith("[CALL_ATTEMPTS] cache=hit");
 }
 

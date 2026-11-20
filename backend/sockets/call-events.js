@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import { nanoid } from "nanoid";
+import { logOperationalCall } from "../services/campaigns/operational-log.js";
 import { runtimeIdentity, runtimeLockName, probeRuntime, waitForRuntime } from "../services/workspace/runtime-instance.js";
 import { UserWorkspaces } from "../services/workspace/user-workspace.js";
 import { splitReportByList } from "../services/reports/report-lists.js";
@@ -281,6 +282,19 @@ export function registerCallEvents(runtime, services, socket) {
       queueMs: statusStartedAt - statusReceivedAt,
       persistMs: Date.now() - statusStartedAt
     });
+    if (callState) {
+      const loggedContact = updatedContact
+        || campaign.contacts.find((contact) => contact.id === String(contactId || worker?.activeContactId || ""))
+        || null;
+      logOperationalCall({
+        campaign,
+        worker,
+        contact: loggedContact,
+        state: callState,
+        event: "LLAMADA",
+        sessionCode: code
+      });
+    }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
     }
@@ -317,8 +331,18 @@ export function registerCallEvents(runtime, services, socket) {
     const session = sessions.get(code);
     if (!session) return;
 
-    const log = ok ? console.info : console.warn;
-    log(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} message=${String(message || "").slice(0,120)}`);
+    const worker = getPhoneWorkerBySocketId(session, socket.id);
+    const contact = worker ? getContactByWorker(session, worker.id) : null;
+    logOperationalCall({
+      campaign: ensureCampaign(session),
+      worker,
+      contact,
+      state: ok ? "accepted" : "rejected",
+      event: "ORDEN",
+      sessionCode: code,
+      detail: `${action || "acción desconocida"}${message ? `: ${String(message).slice(0, 120)}` : ""}`
+    });
+    console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)}`);
 
     const peerId = getPeer(session, "phone");
     if (!peerId) return;
