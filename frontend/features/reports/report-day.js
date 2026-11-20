@@ -1,4 +1,4 @@
-import { isInReportPeriod, reportPeriodLabel } from "./report-period.js";
+import { ALL_REPORTS_ID, isInReportPeriod, reportPeriodLabel } from "./report-period.js?v=20261119-all-reports-default1";
 
 // report-day: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportDay(reportState, reportActions) {
@@ -50,6 +50,7 @@ function renderDay() {
           <label class="report-filter-field" for="reportRangeRecord">
             <span>Fecha y rubro</span>
             <select id="reportRangeRecord">
+              <option value="${ALL_REPORTS_ID}" ${reportState.selectedReport === ALL_REPORTS_ID ? "selected" : ""}>Todos los reportes (${reportState.reports.length})</option>
               ${reportState.reports.map(report => `<option value="${reportState.esc(report.id)}" ${report.id === reportState.selectedReport ? "selected" : ""}>${reportState.esc(reportState.formatDetailedDate(report.date))} · ${reportState.esc(report.rubro)}${report.owner ? ` · ${reportState.esc(report.owner)}` : ""}</option>`).join("")}
             </select>
           </label>` : ""}
@@ -132,7 +133,10 @@ function renderDay() {
     const scopeSelect = reportState.$("reportScope");
     if (scopeSelect) scopeSelect.onchange = event => reportActions.setReportScope(event.target.value);
     if (reportState.$("reportRangeRecord")) reportState.$("reportRangeRecord").onchange = event => {
-      reportState.selectedReport = event.currentTarget.value;
+      reportState.selectedReport = event.currentTarget.value || ALL_REPORTS_ID;
+      reportState.showingDetailedReport = false;
+      reportState.detailedPendingOnly = false;
+      reportState.selectedContactIds.clear();
       renderDay();
     };
     if (!reportState.showingDetailedReport) {

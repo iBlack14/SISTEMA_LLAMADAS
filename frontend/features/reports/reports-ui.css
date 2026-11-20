@@ -1171,3 +1171,21 @@ body .panel #annualReport .report-row-call:hover {
   background: rgba(255, 91, 200, .24) !important;
   transform: translateY(-1px);
 }
+
+body .panel #annualReport .report-row-open {
+  min-height: 34px;
+  padding: 6px 11px;
+  border: 1px solid rgba(231, 192, 245, .28) !important;
+  border-radius: 9px !important;
+  background: rgba(255, 255, 255, .045) !important;
+  color: #f3d7ff !important;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: background-color .14s ease, border-color .14s ease;
+}
+
+body .panel #annualReport .report-row-open:hover {
+  border-color: rgba(255, 105, 211, .6) !important;
+  background: rgba(255, 255, 255, .09) !important;
+}

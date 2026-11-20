@@ -1,4 +1,4 @@
-import { reportPeriodLabel } from "./report-period.js";
+import { ALL_REPORTS_ID, reportPeriodLabel } from "./report-period.js?v=20261119-all-reports-default1";
 
 // report-calendar: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportCalendar(reportState, reportActions) {
@@ -281,7 +281,7 @@ async function showRange() {
       reportState.reports = allReports;
       reportState.viewedPeriod = period;
       reportState.selectedDate = "";
-      reportState.selectedReport = reportState.reports[0]?.id || "";
+      reportState.selectedReport = ALL_REPORTS_ID;
       reportState.reportSearchTerm = "";
       reportState.visibleRubrosStart = 0;
       reportState.showingDetailedReport = false;
@@ -311,7 +311,7 @@ async function showDay(date) {
 
   try {
     reportState.reports = await reportActions.fetchReports(date);
-    reportState.selectedReport = reportState.reports[0]?.id || "";
+    reportState.selectedReport = ALL_REPORTS_ID;
     reportState.showingDetailedReport = false;
     reportState.detailedPendingOnly = false;
     reportActions.renderDay();

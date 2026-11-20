@@ -8,6 +8,8 @@ export function validateReportPeriod(from, to) {
   return from > to ? "La fecha Hasta debe ser igual o posterior a Desde." : "";
 }
 
+export const ALL_REPORTS_ID = "__all_reports__";
+
 export function isInReportPeriod(date, period) {
   if (validateReportPeriod(period.from, period.to)) return false;
   if (!period.from && !period.to) return true;

@@ -2,15 +2,31 @@ import { apiFetch as fetch, currentUser } from "../auth/auth-session.js";
 import { buildDetailedReport } from "./detailed-report.js";
 import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel } from "../../../shared/reports/report-metrics.js";
 import { loadBrowserLibrary } from "../../shared/utils/browser-libraries.js";
+import { ALL_REPORTS_ID } from "./report-period.js?v=20261119-all-reports-default1";
 
 // report-detail-view: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportDetailView(reportState, reportActions) {
 function renderDetails() {
-    const report = reportState.reports.find(
+    const selectedReport = reportState.reports.find(
       item => item.id === reportState.selectedReport
     );
+    const allMode = reportState.selectedReport === ALL_REPORTS_ID || !selectedReport;
 
-    if (!report) return;
+    if (!reportState.reports.length) return;
+
+    const report = selectedReport || {
+      id: ALL_REPORTS_ID,
+      date: "",
+      rubro: "TODOS LOS RUBROS",
+      owner: "",
+      numbers: reportState.reports.reduce((sum, item) => sum + Number(item.numbers || 0), 0),
+      totalCalls: reportState.reports.reduce((sum, item) => sum + Number(item.totalCalls || 0), 0),
+      answered: reportState.reports.reduce((sum, item) => sum + Number(item.answered || 0), 0),
+      voicemail: reportState.reports.reduce((sum, item) => sum + Number(item.voicemail || 0), 0),
+      pending: reportState.reports.reduce((sum, item) => sum + Number(item.pending || 0), 0),
+      rows: reportState.reports.flatMap(item => item.rows || []),
+      calls: reportState.reports.flatMap(item => item.calls || [])
+    };
 
     if (reportState.selectionReportId !== report.id) {
       reportState.selectionReportId = report.id;
@@ -25,13 +41,14 @@ function renderDetails() {
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
     const term = normalizeSearchText(reportState.reportSearchTerm).trim();
-    const tableRows = (term
-      ? reportState.reports.flatMap(reportItem =>
+    const allTableRows = reportState.reports.flatMap(reportItem =>
         reportItem.rows.map(contact => ({ report: reportItem, contact }))
-      ).filter(({ report: reportItem, contact }) =>
+      );
+    const tableRows = (allMode || term
+      ? allTableRows.filter(({ report: reportItem, contact }) =>
         normalizeSearchText(
           `${reportItem.rubro} ${contact.name} ${contact.phone} ` +
-          `${contact.list || ""} ${contact.workerName || ""} ` +
+          `${reportItem.owner || ""} ${contact.list || ""} ${contact.workerName || ""} ` +
           `${contact.technicalResult || ""}`
         ).includes(term)
       )
@@ -54,14 +71,6 @@ function renderDetails() {
     const pageRows = tableRows.slice(
       reportState.tablePage * rowsPerPage,
       (reportState.tablePage + 1) * rowsPerPage
-    );
-
-    const rows = report.rows.filter(contact =>
-      normalizeSearchText(
-        `${report.rubro} ${contact.name} ${contact.phone} ` +
-        `${contact.list || ""} ${contact.workerName || ""} ` +
-        `${contact.technicalResult || ""}`
-      ).includes(term)
     );
 
     const equipmentCount = new Set(
@@ -89,10 +98,18 @@ function renderDetails() {
       return `${weekdays[date.getDay()]} ${match[3]}/` +
         `${monthNames[month - 1]}/${match[1]}`;
     };
+    const reportDateLabel = allMode && reportState.viewedPeriod
+      ? `${formatReportDate(reportState.viewedPeriod.from)} — ${formatReportDate(reportState.viewedPeriod.to)}`
+      : formatReportDate(reportState.selectedDate || report.date);
+    const aggregateOwner = reportState.reportScope === "all"
+      ? "Todos los usuarios"
+      : reportState.reportScope.startsWith("user:")
+        ? reportState.reportUsers.find(user => `user:${user.id}` === reportState.reportScope)?.username || "Usuario"
+        : currentUser?.username || "Mis reportes";
     const metrics = [
       ["RUBRO", report.rubro],
-      ...(report.owner ? [["USUARIO", report.owner]] : []),
-      ["FECHA", formatReportDate(report.date)],
+      ...(allMode ? [["USUARIO", aggregateOwner]] : report.owner ? [["USUARIO", report.owner]] : []),
+      ["FECHA", reportDateLabel],
       ["EQUIPOS USADOS", equipmentCount || "—"],
       ["NÚMEROS USADOS", report.numbers],
       ["LLAMADAS TOTALES", report.totalCalls],
@@ -655,7 +672,13 @@ function renderDetails() {
           </div>
         </section>
 
-        <section class="report-detail-card" aria-label="Llamadas del reporte">
+          <section class="report-detail-card" aria-label="Llamadas del reporte">
+          ${allMode ? `
+            <div class="report-detail-heading">
+              <h3>VISTA CONSOLIDADA</h3>
+              <p>Resumen de todos los rubros. Elige uno para ver su detalle y gestionar llamadas.</p>
+            </div>
+          ` : ""}
           ${term ? `
             <div class="report-detail-heading">
               <h3>RESULTADOS DE BÚSQUEDA (${tableRows.length})</h3>
@@ -667,6 +690,7 @@ function renderDetails() {
                 <tr>
                   <th class="report-select-cell"><input id="reportSelectAll" type="checkbox" aria-label="Seleccionar todos los números disponibles visibles" /></th>
                   <th>N.</th>
+                  ${allMode ? "<th>USUARIO</th>" : ""}
                   <th>BASE</th>
                   <th>EMPRESA</th>
                   <th>TELEFONO</th>
@@ -675,7 +699,7 @@ function renderDetails() {
                   <th>INT.</th>
                   <th>DURACION</th>
                   <th>RESULTADO</th>
-                  <th class="report-row-action-cell">LLAMAR</th>
+                  <th class="report-row-action-cell">${allMode ? "VER" : "LLAMAR"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -683,9 +707,10 @@ function renderDetails() {
                   <tr>
                     <td class="report-select-cell"><input type="checkbox" data-select-contact="${reportState.esc(String(contact.id))}"
                       aria-label="Seleccionar ${reportState.esc(contact.name)} ${reportState.esc(contact.phone)}"
-                      ${rowReport.id === report.id && canSelect(contact) ? "" : 'disabled title="Número bloqueado, inoperable o de otro rubro"'}
+                      ${!allMode && rowReport.id === report.id && canSelect(contact) ? "" : `disabled title="${allMode ? "Elige un rubro específico para seleccionar contactos" : "Número bloqueado, inoperable o de otro rubro"}"`}
                       ${rowReport.id === report.id && reportState.selectedContactIds.has(String(contact.id)) ? "checked" : ""} /></td>
                     <td>${reportState.tablePage * rowsPerPage + index + 1}</td>
+                    ${allMode ? `<td>${reportState.esc(rowReport.owner || "—")}</td>` : ""}
                     <td>${reportState.esc(contact.list || rowReport.rubro)}</td>
                     <td>${reportState.esc(contact.name)}</td>
                     <td>${reportState.esc(contact.phone)}</td>
@@ -697,14 +722,16 @@ function renderDetails() {
                       ${reportState.esc(status(contact))}
                     </td>
                     <td class="report-row-action-cell">
-                      ${canSelect(contact)
+                      ${allMode
+                        ? `<button type="button" class="report-row-open" data-open-report="${reportState.esc(rowReport.id)}">Ver rubro</button>`
+                        : canSelect(contact)
                         ? `<button type="button" class="report-row-call" data-call-report-contact="${reportState.esc(String(contact.id))}" data-call-report-id="${reportState.esc(rowReport.id)}" aria-label="Llamar a ${reportState.esc(contact.name)} ${reportState.esc(contact.phone)}">☎ Llamar</button>`
                         : `<span class="report-no-call">${contact.doNotCall || ["numero_inexistente", "numero_incorrecto"].includes(contact.technicalResult) ? "NO VOLVER A LLAMAR" : contact.manualBlocked ? "BLOQUEADO" : "INOPERABLE"}</span>`}
                     </td>
                   </tr>
                 `).join("") || `
                   <tr>
-                    <td colspan="11">Sin resultados</td>
+                    <td colspan="${allMode ? 12 : 11}">Sin resultados</td>
                   </tr>
                 `}
               </tbody>
@@ -717,16 +744,14 @@ function renderDetails() {
           </nav>
           <div class="report-footer">
             <div class="report-actions">
-              <button id="reportPdf" type="button">⬇ DESCARGAR REPORTE</button>
+              ${allMode ? "" : '<button id="reportPdf" type="button">⬇ DESCARGAR REPORTE</button>'}
               <button id="reportTotalPdf" class="secondary" type="button">
                 ⬇ DESCARGA TOTAL
               </button>
             </div>
             <div class="report-continue">
               <span id="reportSelectionCount" role="status">0 seleccionados</span>
-              <button id="reportDetailed" class="secondary" type="button">
-                DETALLADO
-              </button>
+              ${allMode ? "" : '<button id="reportDetailed" class="secondary" type="button">DETALLADO</button>'}
               <button
                 id="reportContinue" type="button" disabled
               >
@@ -1111,8 +1136,8 @@ function renderDetails() {
       }
     };
 
-    reportState.$("reportPdf").onclick = () =>
-      exportReportsToPdf([report], reportState.$("reportPdf"));
+    reportState.$("reportPdf")?.addEventListener("click", () =>
+      exportReportsToPdf([report], reportState.$("reportPdf")));
     reportState.$("reportTotalPdf").onclick = () =>
       exportReportsToPdf(reportState.reports, reportState.$("reportTotalPdf"));
 
@@ -1157,16 +1182,25 @@ function renderDetails() {
     };
 
     reportState.$("reportContinue").onclick = () => startReportCalls(report.id, [...reportState.selectedContactIds]);
+    reportState.$("reportDetails").querySelectorAll("[data-open-report]").forEach(button => {
+      button.onclick = () => {
+        reportState.selectedReport = button.dataset.openReport;
+        reportState.reportSearchTerm = "";
+        reportState.showingDetailedReport = false;
+        reportState.selectedContactIds.clear();
+        reportActions.renderDay();
+      };
+    });
     reportState.$("reportDetails").querySelectorAll("[data-call-report-contact]").forEach(button => {
       button.onclick = () => startReportCalls(button.dataset.callReportId, [button.dataset.callReportContact]);
     });
 
-    reportState.$("reportDetailed").onclick = () => {
+    reportState.$("reportDetailed")?.addEventListener("click", () => {
       reportState.showingDetailedReport = true;
       reportState.detailedPendingOnly = false;
       reportState.selectedDetailedTeam = "";
       reportActions.renderDay();
-    };
+    });
   }
 return { renderDetails };
 }
