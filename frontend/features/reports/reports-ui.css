@@ -1091,6 +1091,55 @@ body .panel #annualReport .report-rubros {
   gap: 12px;
 }
 
+/* En "Todos los reportes", usar el ancho completo para que no parezca
+   que solo existen las tres primeras tarjetas del usuario inicial. */
+body .panel #annualReport .report-tools-consolidated {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body .panel #annualReport .report-tools-consolidated .report-search-input {
+  width: min(100%, 640px);
+}
+
+body .panel #annualReport .report-consolidated-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(231, 192, 245, .18);
+  border-radius: 12px;
+}
+
+body .panel #annualReport .report-consolidated-heading h3,
+body .panel #annualReport .report-consolidated-heading p {
+  margin: 0;
+}
+
+body .panel #annualReport .report-consolidated-heading p {
+  margin-top: 5px;
+  color: var(--r-muted) !important;
+  font-size: 13px;
+}
+
+body .panel #annualReport .report-consolidated-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+@media (max-width: 700px) {
+  body .panel #annualReport .report-consolidated-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body .panel #annualReport .report-consolidated-actions > button {
+    flex: 1 1 180px;
+  }
+}
+
 body .panel #annualReport .report-rubros button,
 body .panel #annualReport .report-rubros button[data-team] {
   min-height: 88px;

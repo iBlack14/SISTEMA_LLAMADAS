@@ -64,7 +64,7 @@ function renderDay() {
           </label>` : ""}
        </div>
       </div>
-      <div class="report-tools ${reportState.showingDetailedReport ? "report-tools-teams" : ""}">
+      <div class="report-tools ${reportState.showingDetailedReport ? "report-tools-teams" : ""} ${consolidatedMode ? "report-tools-consolidated" : ""}">
         ${reportState.showingDetailedReport
           ? `<div class="report-rubros" aria-label="Equipos del reporte">
               ${detailedTeams.map((team, index) => `

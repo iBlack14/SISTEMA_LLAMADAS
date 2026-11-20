@@ -315,16 +315,14 @@ function renderDetails() {
                 ${reportState.detailedPendingOnly ? "VER TODO" : "PENDIENTE"}
               </button>
             </div>
-            <div class="report-continue report-detailed-campaign-actions">
-              <button id="detailedStop" class="secondary" type="button"
-                >
-                DETENER
-              </button>
-              <button id="detailedCallPending" type="button"
-                ${!report.pending ? "disabled" : ""}>
-                LLAMAR PENDIENTES
-              </button>
-            </div>
+            ${allMode ? "" : `
+              <div class="report-continue report-detailed-campaign-actions">
+                <button id="detailedStop" class="secondary" type="button">DETENER</button>
+                <button id="detailedCallPending" type="button" ${!report.pending ? "disabled" : ""}>
+                  LLAMAR PENDIENTES
+                </button>
+              </div>
+            `}
           </div>
         </section>
       `;
@@ -347,9 +345,10 @@ function renderDetails() {
         reportState.detailedPendingOnly = !reportState.detailedPendingOnly;
         renderDetailedReport();
       };
-      reportState.$("detailedStop").onclick = async () => {
+      const detailedStopButton = reportState.$("detailedStop");
+      if (detailedStopButton) detailedStopButton.onclick = async () => {
         if (!confirm("¿Detener la campaña y las llamadas activas?")) return;
-        const button = reportState.$("detailedStop");
+        const button = detailedStopButton;
         button.disabled = true;
         try {
           const response = await fetch(reportActions.endpoint("/campaign/stop"), {
@@ -369,7 +368,8 @@ function renderDetails() {
           button.disabled = false;
         }
       };
-      reportState.$("detailedCallPending").onclick = () => {
+      const detailedCallPendingButton = reportState.$("detailedCallPending");
+      if (detailedCallPendingButton) detailedCallPendingButton.onclick = () => {
         reportState.showingDetailedReport = false;
         reportState.detailedPendingOnly = false;
         reportActions.renderDay();
@@ -1149,8 +1149,11 @@ function renderDetails() {
 
     reportState.$("reportPdf")?.addEventListener("click", () =>
       exportReportsToPdf([report], reportState.$("reportPdf")));
-    reportState.$("reportTotalPdf").onclick = () =>
-      exportReportsToPdf(reportState.reports, reportState.$("reportTotalPdf"));
+    const downloadTotalReports = button => exportReportsToPdf(reportState.reports, button);
+    reportState.$("reportTotalPdf")?.addEventListener("click", event =>
+      downloadTotalReports(event.currentTarget));
+    reportState.$("reportTotalPdfTop")?.addEventListener("click", event =>
+      downloadTotalReports(event.currentTarget));
 
     const startReportCalls = async (targetReportId, contactIds) => {
       if (!contactIds.length || selectionSubmitting) return;
@@ -1206,12 +1209,14 @@ function renderDetails() {
       button.onclick = () => startReportCalls(button.dataset.callReportId, [button.dataset.callReportContact]);
     });
 
-    reportState.$("reportDetailed")?.addEventListener("click", () => {
+    const showDetailedReport = () => {
       reportState.showingDetailedReport = true;
       reportState.detailedPendingOnly = false;
       reportState.selectedDetailedTeam = "";
       reportActions.renderDay();
-    });
+    };
+    reportState.$("reportDetailed")?.addEventListener("click", showDetailedReport);
+    reportState.$("reportDetailedTop")?.addEventListener("click", showDetailedReport);
   }
 return { renderDetails };
 }
