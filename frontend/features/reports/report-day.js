@@ -36,8 +36,8 @@ function renderDay() {
   }
   if (reportState.showingDetailedReport) {
     if (!detailedTeams.length) detailedTeams.push("SIN EQUIPO");
-    if (!detailedTeams.includes(reportState.selectedDetailedTeam)) {
-      reportState.selectedDetailedTeam = detailedTeams[0];
+    if (reportState.selectedDetailedTeam && !detailedTeams.includes(reportState.selectedDetailedTeam)) {
+      reportState.selectedDetailedTeam = "";
     }
   }
 

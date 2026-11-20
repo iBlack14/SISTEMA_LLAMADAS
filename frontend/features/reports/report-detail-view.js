@@ -183,20 +183,21 @@ function renderDetails() {
         .sort((left, right) => left.localeCompare(right, "es", {
           numeric: true
         }));
+      const globalDetail = !reportState.selectedDetailedTeam;
       const teamIndex = Math.max(0, teamNames.indexOf(reportState.selectedDetailedTeam));
-      const teamLabel = /^EQUIPO\s+\d+$/i.test(reportState.selectedDetailedTeam)
+      const teamLabel = globalDetail ? "TODOS LOS EQUIPOS" : /^EQUIPO\s+\d+$/i.test(reportState.selectedDetailedTeam)
         ? reportState.selectedDetailedTeam.toUpperCase()
         : reportState.selectedDetailedTeam === "SIN EQUIPO"
           ? reportState.selectedDetailedTeam
           : `EQUIPO ${teamIndex + 1}`;
-      const modelName = report.teamModels?.[reportState.selectedDetailedTeam] ||
+      const modelName = globalDetail ? "Resumen global" : report.teamModels?.[reportState.selectedDetailedTeam] ||
         (/^EQUIPO\s+\d+$/i.test(reportState.selectedDetailedTeam)
           ? "MODELO NO REGISTRADO"
           : reportState.selectedDetailedTeam);
-      const equipmentHeading = reportState.selectedDetailedTeam === "SIN EQUIPO" ? "Equipo no registrado" :
+      const equipmentHeading = globalDetail ? "REPORTE DETALLADO GLOBAL" : reportState.selectedDetailedTeam === "SIN EQUIPO" ? "Equipo no registrado" :
         teamLabel === modelName ? teamLabel : `${teamLabel}: ${modelName}`;
       const teamCalls = (report.calls || []).filter(call =>
-        String(call.workerName || "").trim() === reportState.selectedDetailedTeam
+        globalDetail || String(call.workerName || "").trim() === reportState.selectedDetailedTeam
       );
       const teamShiftTypes = new Set(teamCalls.map(call => {
         if (!call.startedAt) return "";

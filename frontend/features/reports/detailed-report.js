@@ -61,8 +61,14 @@ export function buildDetailedReport(report, selectedTeam, pendingOnly = false) {
   }
   const rows = [...hourly.values()].map(row=>({...row,designated:designated.get(row.team)?.size || 0}))
     .sort((a,b)=>a.team.localeCompare(b.team,"es") || a.hour.localeCompare(b.hour,"es",{numeric:true}));
+  const selectedMetrics = selectedTeam
+    ? metrics(selectedTeam)
+    : [...totals.values()].reduce((sum, item) => {
+        for (const key of Object.keys(sum)) sum[key] += item[key];
+        return sum;
+      }, emptyMetrics());
   return {
-    rows: rows.filter(row=>row.team===selectedTeam && (!pendingOnly || row.pending>0)),
-    metrics: metrics(selectedTeam)
+    rows: rows.filter(row=>(!selectedTeam || row.team===selectedTeam) && (!pendingOnly || row.pending>0)),
+    metrics: selectedMetrics
   };
 }
