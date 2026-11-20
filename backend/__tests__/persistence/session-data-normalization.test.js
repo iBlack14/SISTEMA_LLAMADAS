@@ -65,3 +65,28 @@ test("reuses immutable shift-history rows when preparing ordinary session saves"
   assert.equal(nextSave.rows.some(row => row.type === "shift_unfinished"), false);
   assert.deepEqual(hydrateSessionData(nextSave.data, rows), session);
 });
+
+test("lazy shift hydration keeps summary counts while moving unfinished contacts to on-demand rows", () => {
+  const session = {
+    shiftManagement: {
+      current: null, pendingContacts: [], currentReport: [], closedContacts: [], sessionHistory: [],
+      history: [{
+        id: "turn-a", report: [{ attemptId: "attempt-a" }],
+        unfinishedContacts: [{ id: "contact-a", name: "A" }, { id: "contact-b", name: "B" }]
+      }]
+    }
+  };
+  const split = splitSessionData(session, { lazyShiftDetails: true });
+  const storedRows = split.rows.map(row => ({
+    entity_type: row.type, entity_id: row.id, position: row.position, row_data: row.value
+  }));
+  const lazy = hydrateSessionData(split.data, storedRows, { lazyShiftDetails: true });
+
+  assert.equal(split.shiftUnfinishedRows.length, 2);
+  assert.equal(storedRows.some(row => row.entity_type === "shift_unfinished"), false);
+  assert.equal(lazy.shiftManagement.history[0].unfinishedContactCount, 2);
+  assert.deepEqual(lazy.shiftManagement.history[0].unfinishedContacts, []);
+  assert.equal(lazy.shiftManagement.history[0]._unfinishedContactsLoaded, false);
+  assert.deepEqual(lazy.shiftManagement.history[0].report, [{ attemptId: "attempt-a" }]);
+  assert.equal(split.rows.find(row => row.type === "shift_history").value.unfinishedContactCount, 2);
+});

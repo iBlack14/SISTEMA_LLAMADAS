@@ -8,16 +8,19 @@ const parseJson = value => typeof value === "string" ? JSON.parse(value) : value
 const keyOf = (code, row) => JSON.stringify([code, row.attemptId]);
 const CONTACT_BOOK_MIGRATION_ID = "2026_11_19_normalize_contact_books_v1";
 const SESSION_DATA_MIGRATION_ID = "2026_11_20_normalize_session_data_v1";
+const SHIFT_DETAILS_MIGRATION_ID = "2026_11_20_normalize_shift_details_v1";
 
 // Large, frequently rewritten collections stay in memory for the existing
 // services/API, but are stored as independently updated MySQL rows.
 const SHIFT_HISTORY_ENTITY_TYPES = new Set(["shift_history", "shift_report", "shift_unfinished"]);
 
-export function splitSessionData(session = {}, { preserveShiftHistory = false } = {}) {
+export function splitSessionData(session = {}, { preserveShiftHistory = false, lazyShiftDetails = false } = {}) {
   const data = { ...session };
   delete data.dashboardSocketId; delete data.phoneSocketId; delete data.activePhoneSocketId; delete data.workerCursor;
   delete data.contactBook;
   const rows = [];
+  const shiftUnfinishedRows = [];
+  const shiftHistoryIds = (session.shiftManagement?.history || []).map(item => String(item.id || "")).filter(Boolean);
   const add = (type, id, position, value) => rows.push({ type, id: String(id || `${type}-${position}`), position, value });
   const campaign = data.campaign && { ...data.campaign };
   if (campaign) data.campaign = campaign;
@@ -38,10 +41,24 @@ export function splitSessionData(session = {}, { preserveShiftHistory = false } 
       delete shift[field];
     }
     for (const [position, item] of (preserveShiftHistory ? [] : (shift.history || []).entries())) {
-      const copy = { ...item }; delete copy.report; delete copy.unfinishedContacts;
+      const unfinishedContacts = item.unfinishedContacts || [];
+      const copy = { ...item };
+      if (lazyShiftDetails) copy.unfinishedContactCount = Number(item.unfinishedContactCount ?? unfinishedContacts.length);
+      delete copy.report; delete copy.unfinishedContacts; delete copy._unfinishedContactsLoaded;
       add("shift_history", item.id || position, position, copy);
       for (const [i, report] of (item.report || []).entries()) add("shift_report", `${item.id}:${report.attemptId || i}`, position * 100000 + i, report);
-      for (const [i, contact] of (item.unfinishedContacts || []).entries()) add("shift_unfinished", `${item.id}:${contact.id || i}`, position * 100000 + i, contact);
+      if (item._unfinishedContactsLoaded !== false) {
+        for (const [i, contact] of unfinishedContacts.entries()) {
+          const detailId = String(contact.id || i);
+          if (lazyShiftDetails) shiftUnfinishedRows.push({
+            shiftId: String(item.id || position), detailId,
+            contactId: String(contact.id || ""), listName: String(contact.list || ""),
+            name: String(contact.name || ""), phone: String(contact.phone || ""),
+            status: String(contact.status || ""), position: position * 100000 + i, contact
+          });
+          else add("shift_unfinished", `${item.id}:${detailId}`, position * 100000 + i, contact);
+        }
+      }
     }
     delete shift.history;
   }
@@ -52,10 +69,10 @@ export function splitSessionData(session = {}, { preserveShiftHistory = false } 
     for (const [i, attempt] of (archive.history || []).entries()) add("archive_attempt", `${archive.id}:${attempt.attemptId || i}`, position * 100000 + i, { archiveId: archive.id, attempt });
   }
   if (Array.isArray(data.reportArchive)) data.reportArchive = [];
-  return { data, rows };
+  return { data, rows, shiftUnfinishedRows, shiftHistoryIds };
 }
 
-export function hydrateSessionData(data, rows) {
+export function hydrateSessionData(data, rows, { lazyShiftDetails = false } = {}) {
   const session = structuredClone(data || {});
   const grouped = new Map();
   for (const row of rows || []) {
@@ -92,6 +109,11 @@ export function hydrateSessionData(data, rows) {
     for (const item of histories) {
       item.report = reportsByShift.get(String(item.id)) || [];
       item.unfinishedContacts = unfinishedByShift.get(String(item.id)) || [];
+      if (lazyShiftDetails) {
+        item.unfinishedContactCount = Number(item.unfinishedContactCount ?? item.unfinishedContacts.length);
+        item.unfinishedContacts = [];
+        item._unfinishedContactsLoaded = false;
+      }
     }
     shift.history = histories;
   }
@@ -157,6 +179,7 @@ this.env = env;
     this.contactBookVersions = new Map();
     this.contactBookStorageEnabled = false;
     this.sessionDataStorageEnabled = false;
+    this.shiftDetailsStorageEnabled = false;
     this.sessionEntityCache = new Map();
     this.sessionEntityTypesBySession = new Map();
     this.shiftHistorySourceRefs = new Map();
@@ -276,17 +299,25 @@ this.env = env;
         const [[sessionDataMigration]] = await this.pool.query(
           "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_DATA_MIGRATION_ID]);
         this.sessionDataStorageEnabled = Boolean(sessionDataMigration);
+        const [[shiftDetailsMigration]] = await this.pool.query(
+          "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
+        this.shiftDetailsStorageEnabled = Boolean(shiftDetailsMigration);
         mysqlSessionRows = sessions.length;
         const remote = Object.fromEntries(sessions.map(row => [row.id, parseJson(row.data)]));
         if (this.sessionDataStorageEnabled) {
-          const [entityRows] = await this.pool.query("SELECT session_code,entity_type,entity_id,position,row_data FROM vc_session_entities ORDER BY session_code,entity_type,position");
+          const entityQuery = this.shiftDetailsStorageEnabled
+            ? "SELECT session_code,entity_type,entity_id,position,row_data FROM vc_session_entities WHERE entity_type<>'shift_unfinished' ORDER BY session_code,entity_type,position"
+            : "SELECT session_code,entity_type,entity_id,position,row_data FROM vc_session_entities ORDER BY session_code,entity_type,position";
+          const [entityRows] = await this.pool.query(entityQuery);
           const entitiesBySession = new Map();
           for (const row of entityRows) {
             if (!entitiesBySession.has(row.session_code)) entitiesBySession.set(row.session_code, []);
             entitiesBySession.get(row.session_code).push(row);
             this.cacheSessionEntity(JSON.stringify([row.session_code,row.entity_type,row.entity_id]), JSON.stringify([Number(row.position),parseJson(row.row_data)]));
           }
-          for (const [code, data] of Object.entries(remote)) remote[code] = hydrateSessionData(data, entitiesBySession.get(code) || []);
+          for (const [code, data] of Object.entries(remote)) remote[code] = hydrateSessionData(data, entitiesBySession.get(code) || [], {
+            lazyShiftDetails: this.shiftDetailsStorageEnabled
+          });
         }
         // A pending local snapshot is an outbox and must be replayed, never discarded.
         chosen = this.pendingDatabase ? { ...remote, ...local } : sessions.length ? remote : local;
@@ -462,11 +493,84 @@ this.env = env;
     finally { connection.release(); }
   }
 
+  async normalizeShiftDetails() {
+    if (!this.databaseConfigured || !this.usingDb) throw new Error("La normalización de detalles requiere MySQL disponible.");
+    if (this.env.SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa restaurable con SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED=1 antes de migrar.");
+    const connection = await this.pool.getConnection();
+    try {
+      const [[sessionDataMigration]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_DATA_MIGRATION_ID]);
+      if (!sessionDataMigration) throw new Error("Primero debe estar aplicada la normalización de datos de sesión.");
+      const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
+      if (applied) { this.shiftDetailsStorageEnabled = true; return { applied: false, rows: 0 }; }
+      const [[oldCount]] = await connection.query("SELECT COUNT(*) AS count FROM vc_session_entities WHERE entity_type='shift_unfinished'");
+      const [[targetCount]] = await connection.query("SELECT COUNT(*) AS count FROM vc_shift_unfinished_contacts");
+      if (Number(targetCount.count) !== 0) throw new Error("La tabla de detalles ya contiene filas sin migración registrada; se cancela para evitar duplicados.");
+      await connection.beginTransaction();
+      await connection.query(`INSERT INTO vc_shift_unfinished_contacts
+        (session_code,shift_id,detail_id,contact_id,list_name,name,phone,status,position,contact_data)
+        SELECT session_code,
+          SUBSTRING_INDEX(entity_id,':',1),
+          SUBSTRING(entity_id,CHAR_LENGTH(SUBSTRING_INDEX(entity_id,':',1))+2),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(row_data,'$.id')),''),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(row_data,'$.list')),''),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(row_data,'$.name')),''),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(row_data,'$.phone')),''),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(row_data,'$.status')),''),
+          position,row_data
+        FROM vc_session_entities WHERE entity_type='shift_unfinished'`);
+      const [[newCount]] = await connection.query("SELECT COUNT(*) AS count FROM vc_shift_unfinished_contacts");
+      if (Number(newCount.count) !== Number(oldCount.count)) {
+        throw new Error(`Validación de filas falló: origen=${oldCount.count}, destino=${newCount.count}.`);
+      }
+      await connection.query(`UPDATE vc_session_entities h
+        LEFT JOIN (
+          SELECT session_code,shift_id,COUNT(*) AS detail_count
+          FROM vc_shift_unfinished_contacts GROUP BY session_code,shift_id
+        ) d ON d.session_code=h.session_code AND d.shift_id=h.entity_id
+        SET h.row_data=JSON_SET(h.row_data,'$.unfinishedContactCount',COALESCE(d.detail_count,0))
+        WHERE h.entity_type='shift_history'`);
+      await connection.query("DELETE FROM vc_session_entities WHERE entity_type='shift_unfinished'");
+      await connection.query("INSERT INTO vc_schema_migrations(migration_id) VALUES(?)", [SHIFT_DETAILS_MIGRATION_ID]);
+      await connection.commit();
+      this.shiftDetailsStorageEnabled = true;
+      console.info(`[SHIFT_DETAILS_MIGRATION] applied rows=${newCount.count}`);
+      return { applied: true, rows: Number(newCount.count) };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; }
+    finally { connection.release(); }
+  }
+
+  async restoreShiftDetailsToEntities() {
+    if (!this.databaseConfigured || !this.usingDb) throw new Error("La reversión de detalles requiere MySQL disponible.");
+    if (this.env.SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa antes de revertir.");
+    const connection = await this.pool.getConnection();
+    try {
+      const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
+      if (!applied) return { restored: 0 };
+      await connection.beginTransaction();
+      await connection.query(`INSERT INTO vc_session_entities(session_code,entity_type,entity_id,position,row_data)
+        SELECT session_code,'shift_unfinished',CONCAT(shift_id,':',detail_id),position,contact_data
+        FROM vc_shift_unfinished_contacts
+        ON DUPLICATE KEY UPDATE position=VALUES(position),row_data=VALUES(row_data)`);
+      const [[count]] = await connection.query("SELECT COUNT(*) AS count FROM vc_shift_unfinished_contacts");
+      await connection.query("DELETE FROM vc_shift_unfinished_contacts");
+      await connection.query("DELETE FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
+      await connection.commit();
+      this.shiftDetailsStorageEnabled = false;
+      this.sessionEntityCache.clear();
+      this.sessionEntityTypesBySession.clear();
+      this.shiftHistorySourceRefs.clear();
+      return { restored: Number(count.count) };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; }
+    finally { connection.release(); }
+  }
+
   async restoreSessionDataToJson() {
     if (!this.databaseConfigured || !this.usingDb) throw new Error("La reversión requiere MySQL disponible.");
     if (this.env.SESSION_DATA_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa antes de revertir.");
     const connection = await this.pool.getConnection();
     try {
+      const [[shiftDetailsMigration]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
+      if (shiftDetailsMigration) throw new Error("Revierte primero la normalización de detalles de turnos.");
       const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_DATA_MIGRATION_ID]);
       if (!applied) return { restored: 0 };
       const [sessions] = await connection.query("SELECT id,data FROM sessions");
@@ -570,6 +674,9 @@ this.env = env;
     const sessionEntities = {};
     const preservedEntityTypes = {};
     const shiftHistorySources = {};
+    const shiftUnfinishedContacts = {};
+    const shiftHistoryIds = {};
+    const shiftHistoryChanged = {};
     let snapshotBytes = 0;
     const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
@@ -580,11 +687,17 @@ this.env = env;
       if (this.sessionDataStorageEnabled) {
         const historyRef = session.shiftManagement?.history || null;
         const preserveShiftHistory = historyRef !== null && this.shiftHistorySourceRefs.get(code) === historyRef;
-        const split = splitSessionData(session, { preserveShiftHistory });
+        const split = splitSessionData(session, {
+          preserveShiftHistory,
+          lazyShiftDetails: this.shiftDetailsStorageEnabled
+        });
         data = split.data;
         sessionEntities[code] = split.rows;
         preservedEntityTypes[code] = preserveShiftHistory ? [...SHIFT_HISTORY_ENTITY_TYPES] : [];
         shiftHistorySources[code] = historyRef;
+        shiftUnfinishedContacts[code] = split.shiftUnfinishedRows;
+        shiftHistoryIds[code] = split.shiftHistoryIds;
+        shiftHistoryChanged[code] = !preserveShiftHistory;
       }
       if (contactBook && (!this.databaseOnly || !this.contactBookStorageEnabled)) {
         this.contactBookCache.set(code, contactBook);
@@ -615,6 +728,9 @@ this.env = env;
       sessionEntities,
       preservedEntityTypes,
       shiftHistorySources,
+      shiftUnfinishedContacts,
+      shiftHistoryIds,
+      shiftHistoryChanged,
       contactBooks,
       contactBookRevisions,
       snapshotBytes,
@@ -744,6 +860,28 @@ this.env = env;
             }
           }
         }
+        if (this.shiftDetailsStorageEnabled && metrics.shiftHistoryChanged?.[code]) {
+          for (const row of metrics.shiftUnfinishedContacts?.[code] || []) {
+            if (row.shiftId.length > 191 || row.detailId.length > 191 || row.contactId.length > 191 ||
+                row.listName.length > 255 || row.name.length > 255 || row.phone.length > 64 ||
+                row.status.length > 64 || row.position < 0 || row.position > 4294967295) {
+              throw new Error(`Detalle de turno fuera de límites en sesión ${code}, turno ${row.shiftId}.`);
+            }
+            await connection.query(`INSERT INTO vc_shift_unfinished_contacts
+              (session_code,shift_id,detail_id,contact_id,list_name,name,phone,status,position,contact_data)
+              VALUES(?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE
+              contact_id=VALUES(contact_id),list_name=VALUES(list_name),name=VALUES(name),phone=VALUES(phone),
+              status=VALUES(status),position=VALUES(position),contact_data=VALUES(contact_data)`,
+              [code,row.shiftId,row.detailId,row.contactId,row.listName,row.name,row.phone,row.status,row.position,JSON.stringify(row.contact)]);
+          }
+          const retainedShiftIds = metrics.shiftHistoryIds?.[code] || [];
+          if (retainedShiftIds.length) {
+            const placeholders = retainedShiftIds.map(() => "?").join(",");
+            await connection.query(`DELETE FROM vc_shift_unfinished_contacts WHERE session_code=? AND shift_id NOT IN (${placeholders})`, [code,...retainedShiftIds]);
+          } else {
+            await connection.query("DELETE FROM vc_shift_unfinished_contacts WHERE session_code=?", [code]);
+          }
+        }
         const [existing] = await connection.query(
           "SELECT data FROM sessions WHERE id=?", [code]);
         const existingData = existing[0]?.data;
@@ -842,6 +980,18 @@ this.env = env;
       .sort((a,b) => (Date.parse(a.startedAt) || 0) - (Date.parse(b.startedAt) || 0));
   }
 
+  async getShiftUnfinishedContacts(code, shiftId) {
+    await this.saveChain;
+    if (this.storageFailed || this.pendingDatabase || !this.usingDb) {
+      throw new Error("Hay escrituras pendientes; no se puede confirmar el detalle del turno.");
+    }
+    if (!this.shiftDetailsStorageEnabled) throw new Error("La carga diferida de turnos todavía no está activada.");
+    const [rows] = await this.pool.query(
+      `SELECT contact_data FROM vc_shift_unfinished_contacts
+       WHERE session_code=? AND shift_id=? ORDER BY position,detail_id`, [code,shiftId]);
+    return rows.map(row => parseJson(row.contact_data));
+  }
+
   async getContactProgress(code) {
     await this.saveChain;
     if (this.storageFailed) throw new Error("Hay escrituras pendientes; no se puede confirmar el progreso.");
@@ -874,7 +1024,8 @@ this.env = env;
     const file = path.join(this.backupDir, "call-history-" + stamp + "-" + label + ".json");
     let sessions = structuredClone(this.lastSnapshot);
     if (this.sessionDataStorageEnabled) {
-      sessions = Object.fromEntries(Object.entries(sessions).map(([code, data]) => {
+      const completeSessions = [];
+      for (const [code, data] of Object.entries(sessions)) {
         const rows = [];
         for (const [key, serialized] of this.sessionEntityCache) {
           const [sessionCode, entity_type, entity_id] = JSON.parse(key);
@@ -882,8 +1033,19 @@ this.env = env;
           const [position, row_data] = JSON.parse(serialized);
           rows.push({ entity_type, entity_id, row_data, position });
         }
-        return [code, hydrateSessionData(data, rows)];
-      }));
+        if (this.shiftDetailsStorageEnabled) {
+          // Backups remain complete even though runtime loading is lazy.
+          // This query is only used by the scheduled/manual backup path.
+          const [details] = await this.pool.query(`SELECT shift_id,detail_id,position,contact_data
+            FROM vc_shift_unfinished_contacts WHERE session_code=? ORDER BY shift_id,position,detail_id`, [code])
+          for (const detail of details) rows.push({
+            entity_type: "shift_unfinished", entity_id: `${detail.shift_id}:${detail.detail_id}`,
+            row_data: parseJson(detail.contact_data), position: Number(detail.position)
+          });
+        }
+        completeSessions.push([code, hydrateSessionData(data, rows)]);
+      }
+      sessions = Object.fromEntries(completeSessions);
     }
     for (const [code, book] of this.contactBookCache) {
       if (sessions[code]) sessions[code].contactBook = book;

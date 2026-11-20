@@ -67,6 +67,17 @@ export function collectCallAttempts(session) {
 }
 
 export const HISTORY_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS vc_shift_unfinished_contacts (
+    session_code VARCHAR(50) NOT NULL, shift_id VARCHAR(191) NOT NULL,
+    detail_id VARCHAR(191) NOT NULL, contact_id VARCHAR(191) NOT NULL DEFAULT '',
+    list_name VARCHAR(255) NOT NULL DEFAULT '', name VARCHAR(255) NOT NULL DEFAULT '',
+    phone VARCHAR(64) NOT NULL DEFAULT '', status VARCHAR(64) NOT NULL DEFAULT '',
+    position INT UNSIGNED NOT NULL DEFAULT 0, contact_data JSON NOT NULL,
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY(session_code,shift_id,detail_id),
+    INDEX vc_shift_unfinished_order(session_code,shift_id,position,detail_id),
+    INDEX vc_shift_unfinished_contact(session_code,contact_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_session_entities (
     session_code VARCHAR(50) NOT NULL, entity_type VARCHAR(48) NOT NULL, entity_id VARCHAR(191) NOT NULL,
     position INT UNSIGNED NOT NULL DEFAULT 0, row_data JSON NOT NULL,

@@ -246,10 +246,10 @@ export function getShiftSnapshot(session, date = new Date()) {
     current: management.current,
     pendingContacts: management.pendingContacts,
     currentReport: management.currentReport,
-    history: management.history.map(({ report, unfinishedContacts, ...record }) => ({
+    history: management.history.map(({ report, unfinishedContacts, unfinishedContactCount, _unfinishedContactsLoaded, ...record }) => ({
       ...record,
       reportCount: report?.length || 0,
-      unfinishedCount: unfinishedContacts?.length || 0
+      unfinishedCount: Number(unfinishedContactCount ?? unfinishedContacts?.length ?? 0)
     })),
     sessionId: management.sessionId,
     sessionStartedAt: management.sessionStartedAt,

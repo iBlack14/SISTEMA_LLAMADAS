@@ -159,7 +159,7 @@ runtime.app.get("/api/session/:code/turn", (req, res) => {
   return res.json({ ok: true, code, turn: getShiftSnapshot(session) });
 });
 
-runtime.app.get("/api/session/:code/turns/:turnId/report", (req, res) => {
+runtime.app.get("/api/session/:code/turns/:turnId/report", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   const turnId = String(req.params.turnId || "").trim();
   const session = runtime.sessions.get(code);
@@ -167,7 +167,19 @@ runtime.app.get("/api/session/:code/turns/:turnId/report", (req, res) => {
   const management = ensureShiftManagement(session);
   const turn = management.history.find((item) => item.id === turnId);
   if (!turn) return res.status(404).json({ ok: false, error: "Turno no encontrado" });
-  return res.json({ ok: true, code, turn });
+  let turnForResponse = turn;
+  if (turn._unfinishedContactsLoaded === false) {
+    try {
+      turnForResponse = {
+        ...turn,
+        unfinishedContacts: await runtime.persistence.getShiftUnfinishedContacts(code, turnId)
+      };
+    } catch {
+      return res.status(503).json({ ok: false, error: "No se pudo consultar el detalle del turno." });
+    }
+  }
+  const { _unfinishedContactsLoaded, unfinishedContactCount, ...visibleTurn } = turnForResponse;
+  return res.json({ ok: true, code, turn: visibleTurn });
 });
 
 runtime.app.post("/api/session/:code/turn/finalize", async (req, res) => {
