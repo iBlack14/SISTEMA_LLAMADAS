@@ -31,6 +31,7 @@ function renderCalendar() {
     const months = reportState.months.map((monthName, month) => {
       const firstDay = new Date(year, month, 1).getDay();
       const daysCount = new Date(year, month + 1, 0).getDate();
+      const monthReports = yearReports.filter(r => Number(r.date?.split("-")[1]) === month + 1).length;
 
       const blanks = Array.from(
         { length: firstDay },
@@ -65,7 +66,11 @@ function renderCalendar() {
 
       return `
         <article class="report-month" aria-label="${monthName} ${year}">
-          <h3>${monthName}</h3>
+          <header class="report-month-head">
+            <span class="report-month-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+            <h3>${monthName}</h3>
+            <span class="report-month-count" title="${monthReports} reporte(s) en ${monthName}">${monthReports}</span>
+          </header>
           <div class="report-days">
             ${["D", "L", "M", "M", "J", "V", "S"]
               .map(d => `<b>${d}</b>`).join("")}

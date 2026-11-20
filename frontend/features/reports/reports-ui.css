@@ -70,7 +70,7 @@
 
 #annualReport .calendar-nav button {
   min-width: 40px;
-  min-height: 38px;
+  min-height: 40px;
   padding: 6px 12px;
   border-radius: 10px !important;
   border-color: var(--r-line) !important;
@@ -79,9 +79,31 @@
   font-size: 20px;
 }
 
+#annualReport .calendar-nav #prevYear,
+#annualReport .calendar-nav #nextYear {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+#annualReport .calendar-nav #calendarTodayBtn {
+  padding: 6px 16px;
+  border-radius: 999px !important;
+  font-size: 14px;
+}
+
 #annualReport .calendar-nav button:hover {
-  border-color: var(--r-line-hi) !important;
-  background: rgba(255, 91, 200, .18) !important;
+  border-color: #d81482 !important;
+  background: linear-gradient(120deg, #d81482, #8e1ab2) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(180, 20, 120, .3) !important;
 }
 
 #annualReport #calendarRangeHint {
@@ -127,105 +149,166 @@
 /* Rejilla de meses */
 #annualReport .months-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 16px !important;
+  gap: 18px !important;
 }
 
 #annualReport .report-month {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--r-line);
-  border-radius: 16px;
-  background: var(--r-card);
-  box-shadow: 0 8px 22px rgba(12, 0, 24, .28);
-  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+  padding: 16px !important;
+  border: 1px solid #eadcf4 !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 22px rgba(58, 10, 84, .12) !important;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease !important;
 }
-
 #annualReport .report-month:hover {
   transform: translateY(-2px);
-  border-color: var(--r-line-hi);
-  background: var(--r-card-hi);
+  border-color: #d81482 !important;
+  box-shadow: 0 12px 28px rgba(58, 10, 84, .18) !important;
 }
 
+#annualReport .report-month-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f0e5f6;
+}
+#annualReport .report-month-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #d81482, #8e1ab2);
+  color: #ffffff;
+}
+#annualReport .report-month-icon svg {
+  width: 17px;
+  height: 17px;
+}
 #annualReport .report-month h3 {
-  margin: 0 0 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--r-line);
-  color: #f7d5ff !important;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  text-align: left;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: #3b0d57 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: .04em !important;
+  text-transform: uppercase !important;
+  text-align: left !important;
+  flex: 1 1 auto;
+}
+#annualReport .report-month-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f9e9f5 !important;
+  color: #a21077 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
 }
 
 #annualReport .report-days {
-  gap: 5px;
+  gap: 5px !important;
 }
 
 #annualReport .report-days b {
   padding-bottom: 4px;
-  color: var(--r-muted);
-  font-size: 11px;
-  font-weight: 700;
+  color: #9a86a8 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
 }
 
 /* Días: menos neón, más legibilidad */
 #annualReport .report-days button,
 #annualReport .report-month .report-days button,
 #annualReport .report-month .report-days button.has-report {
-  min-height: 34px;
-  aspect-ratio: 1.15 / 1;
-  border: 1px solid rgba(236, 198, 250, .32) !important;
-  border-radius: 9px !important;
-  background: rgba(255, 255, 255, .045) !important;
+  position: relative;
+  max-width: 50px !important;
+  max-height: 44px !important;
+  min-height: 36px !important;
+  aspect-ratio: 1.15 / 1 !important;
+  margin: 0 auto !important;
+  border: 1px solid #e8dcf0 !important;
+  border-radius: 10px !important;
+  background: #fbf8fd !important;
   box-shadow: none !important;
-  color: var(--r-text) !important;
-  font-size: 12px;
-  font-weight: 500;
-  transition: background .16s ease, border-color .16s ease, color .16s ease;
+  color: #4a2f5e !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  transition: background .16s ease, border-color .16s ease, color .16s ease !important;
 }
 
 #annualReport .report-days button:hover {
-  background: rgba(255, 91, 200, .2) !important;
-  border-color: var(--r-accent) !important;
+  background: #f9e9f5 !important;
+  border-color: #d81482 !important;
+  color: #8e1ab2 !important;
 }
 
 #annualReport .report-days button.has-report {
-  border-color: rgba(78, 224, 160, .62) !important;
-  background: rgba(78, 224, 160, .12) !important;
-  color: #a9f5cf !important;
-  font-weight: 700;
+  border-color: #d81482 !important;
+  background: #fff0f9 !important;
+  color: #a21077 !important;
+  font-weight: 700 !important;
+}
+
+#annualReport .report-days button.has-report::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d81482;
 }
 
 #annualReport .report-days button.is-today {
-  outline: 2px dashed var(--r-line-hi);
+  outline: 2px solid #d81482 !important;
   outline-offset: 1px;
 }
 
 #annualReport .report-month .report-days button.selected-date,
 #annualReport .report-month .report-days button.has-report.selected-date {
-  border-color: #ff9bdd !important;
-  background: #a3178c !important;
-  color: #fff !important;
-  font-weight: 700;
+  background: linear-gradient(120deg, #d81482, #8e1ab2) !important;
+  border-color: #8e1ab2 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
-#annualReport .report-month .report-days button.in-range:not(.selected-date) {
-  background: rgba(168, 85, 247, .45) !important;
-  border-color: #d8a6ff !important;
-  color: #fff !important;
+#annualReport .report-month .report-days button.in-range:not(.range-start):not(.range-end) {
+  background: #f6dff0 !important;
+  border-color: #d81482 !important;
+  color: #8e1ab2 !important;
+}
+
+#annualReport .report-month .report-days button.in-range.is-preview {
+  background: #fceaf6 !important;
+  border-color: #e879f9 !important;
+  outline: 2px dashed #e879f9 !important;
+  outline-offset: 1px;
 }
 
 #annualReport .report-month .report-days button.range-start,
 #annualReport .report-month .report-days button.range-end {
-  background: #8b2fd6 !important;
-  border-color: #ff9bdd !important;
-  box-shadow: 0 0 0 3px rgba(255, 91, 200, .22) !important;
-  color: #fff !important;
+  background: linear-gradient(120deg, #d81482, #8e1ab2) !important;
+  border-color: #8e1ab2 !important;
+  box-shadow: 0 3px 10px rgba(180, 20, 120, .28) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
 #annualReport .calendar-record-dot {
-  color: #7bf0b6;
+  color: #d81482;
   font-size: 12px;
 }
 

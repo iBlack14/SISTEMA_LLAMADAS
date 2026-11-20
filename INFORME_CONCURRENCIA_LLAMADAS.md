@@ -2,7 +2,7 @@
 
 ## Actualización posterior de correcciones locales
 
-El análisis de abajo documenta el estado encontrado antes de iniciar las correcciones. Con autorización del usuario se aplicaron cambios locales, aún no desplegados ni verificados con pruebas:
+El análisis de abajo documenta el estado encontrado antes de iniciar las correcciones. Con autorización del usuario se aplicaron cambios locales, aún no desplegados. Validación local ejecutada el 2026-11-19:
 
 - `CallHistoryGate.commit()` ahora pasa el `Map` de sesiones y el código afectado a persistencia; rechaza el commit si la sesión ya no existe.
 - Los nombres agregados `Asignación automática` y `Pendientes del turno` ya no se comparan como nombres literales de lista.
@@ -18,7 +18,12 @@ El análisis de abajo documenta el estado encontrado antes de iniciar las correc
 - Los snapshots de campaña omiten `attemptHistory` anidado y limitan `history` a los 100 intentos recientes; los reportes completos se cargan por el endpoint de intentos cuando el usuario abre o exporta reportes. El cálculo de bloqueos anuales se cachea mientras no cambie la foto de intentos y se invalida al alcanzar la expiración más próxima.
 - El progreso de la libreta lee de MySQL solo teléfono, duración y resultado del intento, en lugar de transferir y parsear cada `row_data` JSON; además reutiliza el mapa de bloqueos anuales cacheado.
 
-No se ejecutaron pruebas, no se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios. Estas optimizaciones son solo locales y deben validarse con la matriz de pruebas antes de operar campañas.
+- `npm test`: 86 aprobadas, 1 fallida, 1 omitida. El fallo está en `backend/__tests__/architecture/frontend.test.js`: espera 23 imports CSS y encuentra 1 en `frontend/shared/styles/base.css`. No está relacionado con las áreas modificadas aquí. La prueba omitida requiere `WORKSPACE_MYSQL_TEST=1`; no se activó porque esta validación no debía tocar ninguna base.
+- Pruebas enfocadas de campañas, reportes y red: 49/49 aprobadas. Se añadieron dos pruebas sintéticas para equivalencia entre progreso calculado desde intentos completos y desde el mapa compacto SQL, y para limitar/compactar snapshots de campaña: ambas pasan.
+- Android: `:app:assembleDebug testDebugUnitTest` con JDK 17 terminó con `BUILD SUCCESSFUL`; se generó `android-app/app/build/outputs/apk/debug/VOIP-VC-debug.apk` (aprox. 87 MB). Gradle reportó avisos de APIs obsoletas para Gradle 9, sin impedir este build.
+- `git diff --check` no reportó errores de whitespace. No se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios.
+
+Esta validación no mide latencia real con miles de contactos ni simula reconexiones Android/Socket.IO contra servicios vivos. Para comprobar estabilidad de llamadas se necesita después una restauración aislada del dump y una prueba de carga controlada, sin usar la BD productiva.
 
 ## Preparación de migración relacional para EasyPanel
 
