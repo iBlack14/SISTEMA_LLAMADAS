@@ -2,11 +2,15 @@ import { isAnsweredAttempt } from '../../../../shared/reports/report-metrics.js'
 
 /**
  * createAssignedListPdf: conserva los contratos y reglas existentes.
- * Dependencias: dashboardActions.buildCallReportPdf, dashboardActions.currentShiftSnapshot, dashboardActions.formatCallDuration, dashboardActions.getCampaignReportRows.
+ * Dependencias: dashboardActions.buildCallReportPdf, dashboardActions.currentShiftSnapshot, dashboardActions.formatCallDuration, dashboardActions.getCampaignReportRows, dashboardActions.loadUnifiedReportRows.
  * Se construye una vez por dashboard.
  */
 export function createAssignedListPdf(dashboardState, dashboardActions) {
 async function downloadAssignedListReport(listName) {
+  if (typeof dashboardActions.loadUnifiedReportRows === "function") {
+    const loaded = await dashboardActions.loadUnifiedReportRows();
+    if (!loaded) return;
+  }
   const rows = dashboardActions.getCampaignReportRows()
     .filter((item) => (item.list || "") === listName)
     .sort((left, right) => (new Date(left.startedAt || 0).getTime() || 0) - (new Date(right.startedAt || 0).getTime() || 0));

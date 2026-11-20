@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import mysql from "mysql2/promise";
 import { collectCallAttempts, mergeAttempt, HISTORY_SCHEMA, writeCallAttempts } from "../services/calls/call-history.js";
+import { phoneKey } from "../services/campaigns/contact-book.js";
 
 const parseJson = value => typeof value === "string" ? JSON.parse(value) : value;
 const keyOf = (code, row) => JSON.stringify([code, row.attemptId]);
@@ -577,6 +578,33 @@ this.env = env;
     return [...this.records.values()].filter(entry => entry.code === code).map(entry => ({ ...entry.row }))
       .filter(row => (!from || row.reportDate >= from) && (!to || row.reportDate <= to) && (!phone || row.phone === phone))
       .sort((a,b) => (Date.parse(a.startedAt) || 0) - (Date.parse(b.startedAt) || 0));
+  }
+
+  async getContactProgress(code) {
+    await this.saveChain;
+    if (this.storageFailed) throw new Error("Hay escrituras pendientes; no se puede confirmar el progreso.");
+    if (this.databaseConfigured && (!this.usingDb || this.pendingDatabase)) {
+      throw new Error("MySQL tiene escrituras pendientes; no se puede confirmar el progreso.");
+    }
+    const progress = new Map();
+    const add = row => {
+      const phone = phoneKey(row.phone);
+      if (!phone) return;
+      const state = progress.get(phone) || { count: 0, duration: 0, result: "" };
+      state.count += 1;
+      state.duration += Number(row.durationSeconds || 0);
+      state.result = row.technicalResult || state.result;
+      progress.set(phone, state);
+    };
+    if (this.databaseConfigured) {
+      const [rows] = await this.pool.query(
+        `SELECT phone,connected_seconds AS durationSeconds,technical_result AS technicalResult
+         FROM vc_call_attempts WHERE session_code=? ORDER BY started_at,attempt_id`, [code]);
+      for (const row of rows) add(row);
+    } else {
+      for (const entry of this.records.values()) if (entry.code === code) add(entry.row);
+    }
+    return progress;
   }
 
   async backup(label = "daily", payload = null) {

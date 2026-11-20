@@ -75,11 +75,12 @@ runtime.app.get("/api/session/:code/contact-book", async (req, res) => {
   const session = runtime.sessions.get(code);
   if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
   try {
-    const attempts = await runtime.persistence.getCallAttempts(code);
-    const book = session.contactBook ? withProgress(session.contactBook, attempts, services.allCallAttempts()) : null;
+    const progress = await runtime.persistence.getContactProgress(code);
+    const book = session.contactBook ? withProgress(session.contactBook, progress, services.annualBlocks()) : null;
     const totalMs = Date.now() - startedAt;
     const source = runtime.persistence.contactBookStorageEnabled ? "normalized-mysql" : "sessions.data";
-    console.info(`[CONTACT_BOOK] GET session=${code.slice(-2)} source=${source} revision=${session.contactBookRevision || 0} lists=${session.contactBook?.lists?.length || 0} contacts=${session.contactBook?.contacts?.length || 0} attempts=${attempts.length} totalMs=${totalMs}`);
+    const attempts = [...progress.values()].reduce((total, row) => total + row.count, 0);
+    console.info(`[CONTACT_BOOK] GET session=${code.slice(-2)} source=${source} revision=${session.contactBookRevision || 0} lists=${session.contactBook?.lists?.length || 0} contacts=${session.contactBook?.contacts?.length || 0} attempts=${attempts} totalMs=${totalMs}`);
     res.json({ok:true,revision:session.contactBookRevision || 0, book});
   } catch { res.status(503).json({ok:false,error:"No se pudo cargar la base desde MySQL."}); }
 });

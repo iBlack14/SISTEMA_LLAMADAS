@@ -58,17 +58,19 @@ export function annualPhoneBlocks(attempts, now = new Date()) {
 }
 
 export function withProgress(book, attempts, globalAttempts = attempts, now = new Date()) {
-  const byPhone = new Map();
-  for (const row of attempts) {
-    const phone = phoneKey(row.phone);
-    const state = byPhone.get(phone) || {count:0, duration:0, result:""};
-    state.count++;
-    state.duration += Number(row.durationSeconds || 0);
-    state.result = row.technicalResult || state.result;
-    byPhone.set(phone, state);
+  const byPhone = attempts instanceof Map ? attempts : new Map();
+  if (!(attempts instanceof Map)) {
+    for (const row of attempts) {
+      const phone = phoneKey(row.phone);
+      const state = byPhone.get(phone) || {count:0, duration:0, result:""};
+      state.count++;
+      state.duration += Number(row.durationSeconds || 0);
+      state.result = row.technicalResult || state.result;
+      byPhone.set(phone, state);
+    }
   }
   const result = structuredClone(book);
-  const blocks = annualPhoneBlocks(globalAttempts, now);
+  const blocks = globalAttempts instanceof Map ? globalAttempts : annualPhoneBlocks(globalAttempts, now);
   for (const contact of result.contacts) {
     const block = blocks.get(phoneKey(contact.phone));
     contact.doNotCall = Boolean(block?.permanent);

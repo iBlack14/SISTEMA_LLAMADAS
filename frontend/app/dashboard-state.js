@@ -32,7 +32,7 @@ let reportListFilter = "";
 let reportWorkerFilter = "";
 let reportResultFilter = "";
 const pendingCommandTimeouts = new Map();
-const PAGE_SIZE = 10000;
+const PAGE_SIZE = 100;
 const {
   session: DASHBOARD_SESSION_KEY,
   tokenPrefix: DASHBOARD_TOKEN_PREFIX,

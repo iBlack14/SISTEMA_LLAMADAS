@@ -9,6 +9,9 @@ import { collectCallAttempts } from "./call-history.js";
 export function createRestrictions(runtime, services) {
   let cachedAllCallAttemptsKey = "";
   let cachedAllCallAttempts = [];
+  let blockedAttemptsSnapshot = null;
+  let blockedNumbersByPhone = new Map();
+  let nextBlockExpiryAt = 0;
   
   function allCallAttempts() {
     const startedAt = Date.now();
@@ -36,6 +39,25 @@ export function createRestrictions(runtime, services) {
   function clearAllCallAttemptsCache() {
     cachedAllCallAttemptsKey = "";
     cachedAllCallAttempts = [];
+    blockedAttemptsSnapshot = null;
+    blockedNumbersByPhone = new Map();
+    nextBlockExpiryAt = 0;
+  }
+
+  function allAnnualBlocks() {
+    const attempts = allCallAttempts();
+    const now = Date.now();
+    if (attempts !== blockedAttemptsSnapshot || now >= nextBlockExpiryAt) {
+      blockedNumbersByPhone = annualPhoneBlocks(attempts, new Date(now));
+      blockedAttemptsSnapshot = attempts;
+      nextBlockExpiryAt = Infinity;
+      for (const block of blockedNumbersByPhone.values()) {
+        if (block.permanent) continue;
+        const expiry = Date.parse(block.nextAllowedAt);
+        if (Number.isFinite(expiry) && expiry < nextBlockExpiryAt) nextBlockExpiryAt = expiry;
+      }
+    }
+    return blockedNumbersByPhone;
   }
 
   function globalBlockedNumbers() {
@@ -89,11 +111,11 @@ function changeGlobalBlockedNumber(action, entry) {
 }
 
 function annualBlock(phone) {
-  return annualPhoneBlocks(allCallAttempts()).get(phoneKey(phone));
+  return allAnnualBlocks().get(phoneKey(phone));
 }
 
 function callRestrictions(session) {
-  const blocks = annualPhoneBlocks(allCallAttempts());
+  const blocks = allAnnualBlocks();
   const manualBlocks = new Map(globalBlockedNumbers().map(entry => [phoneKey(entry.phone), entry]));
   const contacts = [...(session.contactBook?.contacts || []),...(session.campaign?.contacts || [])];
   return Object.fromEntries(contacts.flatMap(contact => {
@@ -112,7 +134,7 @@ function blockedCallMessage(block) {
   return "Número llamado anteriormente. Disponible desde " +
     new Date(block.nextAllowedAt).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) + ".";
 }
-return { allCallAttempts, annualBlock, callRestrictions, blockedCallMessage,
+return { allCallAttempts, annualBlock, annualBlocks: allAnnualBlocks, callRestrictions, blockedCallMessage,
   globalBlockedNumbers, isGloballyBlocked, synchronizeGlobalBlockedNumbers, changeGlobalBlockedNumber,
   refreshGlobalCallRestrictions };
 }

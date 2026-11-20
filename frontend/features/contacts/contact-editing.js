@@ -11,9 +11,8 @@ function renderTabs() {
   const container = refs.contactsTabsEl;
   if (!container) return;
 
-  const lists = (Contacts.lists || []).filter((list) =>
-    Contacts.contacts.some((contact) => (contact.list || "Principal") === list)
-  );
+  const contactLists = new Set(Contacts.contacts.map(contact => contact.list || "Principal"));
+  const lists = (Contacts.lists || []).filter(list => contactLists.has(list));
   container.innerHTML = lists.map(list => `
     <div class="tab-item ${Contacts.activeList === list ? "active" : ""}" data-name="${dashboardActions.escHtml(list)}">
       <button type="button" class="contact-list-name" aria-pressed="${Contacts.activeList === list}" title="${dashboardActions.escHtml(list)}">${dashboardActions.escHtml(list)}</button>

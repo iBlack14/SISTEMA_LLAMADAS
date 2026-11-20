@@ -294,9 +294,28 @@ export function getCampaignSnapshot(session) {
     pausedAt: campaign.pausedAt,
     completedAt: campaign.completedAt,
     counts,
-    contacts: campaign.contacts,
+    // Frontend campaign views need only these fields. Keep nested per-contact
+    // attemptHistory out of every response; full attempts are queryable by API.
+    contacts: campaign.contacts.map(contact => ({
+      id: contact.id,
+      name: contact.name,
+      phone: contact.phone,
+      note: contact.note,
+      list: contact.list,
+      targetWorkerId: contact.targetWorkerId,
+      status: contact.status,
+      result: contact.result,
+      technicalResult: contact.technicalResult,
+      attempts: contact.attempts,
+      lastAttemptAt: contact.lastAttemptAt,
+      durationSeconds: contact.durationSeconds,
+      assignedWorkerId: contact.assignedWorkerId,
+      assignedWorkerName: contact.assignedWorkerName
+    })),
     callbacks: campaign.callbacks,
-    history: campaign.history
+    // Historical detail comes from /reports/attempts on demand. A short tail
+    // keeps current-call screens responsive while still showing recent activity.
+    history: campaign.history.slice(-100)
   };
 }
 

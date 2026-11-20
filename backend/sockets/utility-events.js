@@ -52,7 +52,7 @@ import {
 
 // Extraído del servidor original; conserva validaciones y contratos públicos.
 export function registerUtilityEvents(runtime, services, socket) {
-const { io, sessions, persistence } = runtime;
+const { io, sessions, persistence, network } = runtime;
 const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneState, emitCampaignState, hasPersistentCampaignData, emitState, emitMessageContacts } = services;
   socket.on("blocked-numbers:change", async (payload = {}) => {
     const code = socket.data.code;
@@ -154,6 +154,7 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     saveSoon(code);
     emitState(code);
     emitCampaignState(code);
+    network.notifyChanged();
     if (typeof acknowledge === "function") acknowledge({ ok: true });
   });
 
@@ -203,10 +204,12 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     if (!session.dashboardSocketId && !getConnectedPhoneWorkers(session).length && !hasPersistentCampaignData(session)) {
       sessions.delete(code);
       saveSoon(code);
+      network.notifyChanged();
       return;
     }
 
     emitState(code);
     emitCampaignState(code);
+    network.notifyChanged();
   });
 }

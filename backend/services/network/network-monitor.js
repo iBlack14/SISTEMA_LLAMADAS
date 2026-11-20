@@ -22,6 +22,35 @@ export class NetworkMonitor {
     this.chain = Promise.resolve();
     this.historyCache = new Map();
     this.historyRetryAfter = 0;
+    this.broadcastTimer = null;
+    this.broadcasting = false;
+    this.broadcastDirty = false;
+  }
+
+  // Publica el snapshot en cuanto cambia un estado. Nunca hay más de un
+  // snapshot en vuelo: los cambios que llegan mientras se publica se agrupan
+  // en un único aviso final. Esto evita saturar socket y MySQL con ráfagas.
+  notifyChanged() {
+    if (this.broadcasting) {
+      this.broadcastDirty = true;
+      return;
+    }
+    if (this.broadcastTimer) return;
+    this.broadcastTimer = setTimeout(() => {
+      this.broadcastTimer = null;
+      this.broadcasting = true;
+      this.snapshot()
+        .then(snapshot => this.broadcast?.(snapshot))
+        .catch(() => this.broadcast?.({ unavailable: true }))
+        .finally(() => {
+          this.broadcasting = false;
+          if (this.broadcastDirty) {
+            this.broadcastDirty = false;
+            this.notifyChanged();
+          }
+        });
+    }, 250);
+    this.broadcastTimer.unref?.();
   }
 
   async initialize() {
@@ -60,6 +89,7 @@ export class NetworkMonitor {
     const at = this.now();
     const state = displayState(payload.callState);
     const callId = String(payload.callId || "").trim() || null;
+    const changed = !previous || previous.state !== payload.callState || previous.callId !== callId;
     const newCall = activeStates.has(payload.callState) && callId && timing?.callId && callId !== timing.callId;
     const terminal = ["ended", "failed"].includes(payload.callState);
     const newTerminal = terminal && !["ended", "failed"].includes(previous?.state);
@@ -76,6 +106,7 @@ export class NetworkMonitor {
       lastActivity: activeStates.has(payload.callState) || ["ended", "failed"].includes(payload.callState)
         ? at : previous?.lastActivity || null
     });
+    if (changed) this.notifyChanged();
   }
 
   candidates() {

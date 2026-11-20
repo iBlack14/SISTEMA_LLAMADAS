@@ -78,6 +78,8 @@ function renderContacts() {
 
   const startIndex = (dashboardState.currentPage - 1) * dashboardState.PAGE_SIZE;
   const pageRows = contacts.slice(startIndex, startIndex + dashboardState.PAGE_SIZE);
+  const activeContactIds = new Set(Object.values(dashboardState.campaignState?.assignments || {})
+    .map(assignment => String(assignment.contactId || "")));
 
   const monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   function formatDate(contact) {
@@ -101,15 +103,13 @@ function renderContacts() {
     const callCount = Number(Contacts.calledCounts[c.id] || 0);
     const rowStatus = String(Contacts.contactRowStatus[c.id] || "").toLowerCase();
     const duration = Number(Contacts.callDurations[c.id] || 0);
-    const campaignContact = dashboardActions.getCampaignContactMap().get(c.id);
-
     const isThisActiveCall = (dashboardState.currentState === "in_call" || dashboardState.currentState === "ringing" || dashboardState.currentState === "dialing") && dashboardActions.normalizePhone(dashboardState.callCtx?.phone) === dashboardActions.normalizePhone(c.phone);
 
     if (callCount > 0) tr.classList.add("contact-row-called");
     if (duration > 0) tr.classList.add("contact-row-answered");
     if (["r", "lc", "sc"].includes(rowStatus)) tr.classList.add(`contact-row-status-${rowStatus}`);
 
-    const isCampaignActive = Object.values(dashboardState.campaignState?.assignments || {}).some((assignment) => assignment.contactId === c.id);
+    const isCampaignActive = activeContactIds.has(String(c.id));
     if (isCampaignActive || isThisActiveCall) {
         tr.classList.add(dashboardState.currentState === "in_call" ? "contact-row-active-in-call" : "contact-row-active-call");
     }

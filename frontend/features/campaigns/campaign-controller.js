@@ -31,9 +31,11 @@ function renderCampaignPanel() {
   dashboardActions.renderAssignedListsPanel();
   const campaignStatus = String(dashboardState.campaignState?.status || "idle");
   const assignmentsCount = Object.keys(dashboardState.campaignState?.assignments || {}).length;
-  const availableLists = Contacts.lists.filter((name) =>
-    Contacts.contacts.some((contact) => (contact.list || "Principal") === name && dashboardActions.normalizeValidPeruPhone(contact.phone))
-  );
+  const availableContactLists = new Set();
+  for (const contact of Contacts.contacts) {
+    if (dashboardActions.normalizeValidPeruPhone(contact.phone)) availableContactLists.add(contact.list || "Principal");
+  }
+  const availableLists = Contacts.lists.filter(name => availableContactLists.has(name));
   const availableWorkers = (dashboardState.latestSessionState?.phoneWorkers || []).filter((worker) => worker.connected && !worker.paused).length;
   if (refs.campaignStartBtn) {
     const campaignBusy = campaignStatus === "running" || assignmentsCount > 0;
@@ -212,9 +214,6 @@ async function startCampaignRunLegacy() {
 async function startCampaignRun() {
   const eligibleForGeneral = (contact) => !["completed", "failed", "awaiting_callback"].includes(String(contact.campaignStatus || ""))
     && contact.technicalResult !== "no_contactado";
-  const orderedLists = Contacts.lists.filter((name) => Contacts.contacts.some((contact) =>
-    (contact.list || "Principal") === name && dashboardActions.normalizeValidPeruPhone(contact.phone)
-  ));
   const listAssignments = dashboardActions.getPairingListAssignments();
   const workerByList = new Map(listAssignments.map(({ listName, slot }) => [listName, slot.deviceId]));
   const assignedListNames = new Set(workerByList.keys());
@@ -316,8 +315,9 @@ async function markContactDisposition(contactId, result) {
 
 function syncCampaignResultsToContacts() {
   const campaignContacts = Array.isArray(dashboardState.campaignState?.contacts) ? dashboardState.campaignState.contacts : [];
+  const contactsById = new Map(Contacts.contacts.map(contact => [String(contact.id), contact]));
   for (const result of campaignContacts) {
-    const local = Contacts.contacts.find((contact) => contact.id === result.id);
+    const local = contactsById.get(String(result.id));
     if (!local) continue;
     local.campaignStatus = result.status || "";
     local.campaignResult = result.result || "";

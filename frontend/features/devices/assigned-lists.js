@@ -7,6 +7,7 @@ import * as Contacts from '../contacts/contacts-repository.js';
  * Se construye una vez por dashboard.
  */
 export function createAssignedLists(dashboardState, dashboardActions) {
+const ASSIGNED_LIST_PAGE_SIZE = 100;
 function renderAssignedListsPanel() {
   const container = refs.assignedListsPanelEl;
   if (!container) {
@@ -19,9 +20,8 @@ function renderAssignedListsPanel() {
     .filter(({ listName }) => !hiddenRecords.has(String(listName)));
 
   // Obtener todas las listas disponibles
-  const availableLists = (Contacts.lists || []).filter((name) =>
-    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
-  );
+  const contactLists = new Set(Contacts.contacts.map(contact => contact.list || "Principal"));
+  const availableLists = (Contacts.lists || []).filter(name => name && contactLists.has(name));
 
   const history = Array.isArray(dashboardState.campaignState?.history) ? dashboardState.campaignState.history : [];
   const latestHistoryByContact = new Map();
@@ -32,6 +32,15 @@ function renderAssignedListsPanel() {
     if (!previous || Date.parse(entry.startedAt || 0) >= Date.parse(previous.startedAt || 0)) {
       latestHistoryByContact.set(key, entry);
     }
+  }
+  const campaignContactById = new Map((dashboardState.campaignState?.contacts || [])
+    .map(contact => [String(contact.id), contact]));
+  const contactsByList = new Map();
+  for (const contact of Contacts.contacts) {
+    if (!dashboardActions.normalizeValidPeruPhone(contact.phone)) continue;
+    const name = contact.list || "Principal";
+    if (!contactsByList.has(name)) contactsByList.set(name, []);
+    contactsByList.get(name).push(contact);
   }
 
   // Si no hay asignaciones, mostrar los slots vinculados para permitir asignar listas
@@ -72,18 +81,22 @@ function renderAssignedListsPanel() {
     const assignment = listAssignments.find(a => a.slotIndex === slotIndex);
     const listName = assignment?.listName || "";
     
-    const contacts = listName ? Contacts.contacts.filter((contact) =>
-      (contact.list || "Principal") === listName && dashboardActions.normalizeValidPeruPhone(contact.phone)
-    ) : [];
+    const contacts = listName ? contactsByList.get(listName) || [] : [];
     
-    const called = listName ? contacts.filter((contact) => Number(contact.attempts || 0) > 0 || latestHistoryByContact.has(String(contact.id))) : [];
-    const campaignContactById = new Map((dashboardState.campaignState?.contacts || []).map((contact) => [String(contact.id), contact]));
+    const calledIds = new Set(listName ? contacts.filter((contact) => Number(contact.attempts || 0) > 0 || latestHistoryByContact.has(String(contact.id))
+      || Number(campaignContactById.get(String(contact.id))?.attempts || 0) > 0).map(contact => String(contact.id)) : []);
+    const contactIndexById = new Map(contacts.map((contact, index) => [String(contact.id), index + 1]));
     const pending = listName ? contacts.filter((contact) => {
       const status = campaignContactById.get(String(contact.id))?.status || contact.campaignStatus || "";
-      return !called.includes(contact) || ["pending", "retry_pending", "held"].includes(status);
+      return !calledIds.has(String(contact.id)) || ["pending", "retry_pending", "held"].includes(status);
     }) : [];
     
     const finished = contacts.length > 0 && pending.length === 0;
+    dashboardState.assignedListPages ||= {};
+    const totalPages = Math.max(1, Math.ceil(pending.length / ASSIGNED_LIST_PAGE_SIZE));
+    const page = Math.min(totalPages, Math.max(1, Number(dashboardState.assignedListPages[slot.id] || 1)));
+    dashboardState.assignedListPages[slot.id] = page;
+    const visiblePending = pending.slice((page - 1) * ASSIGNED_LIST_PAGE_SIZE, page * ASSIGNED_LIST_PAGE_SIZE);
     const worker = (dashboardState.latestSessionState?.phoneWorkers || []).find(w => w.id === slot.deviceId);
     const isConnected = worker?.connected || false;
     const isBusy = ["dialing", "ringing", "in_call"].includes(worker?.callState);
@@ -93,9 +106,9 @@ function renderAssignedListsPanel() {
       `<option value="${dashboardActions.escHtml(name)}" ${name === listName ? 'selected' : ''}>${dashboardActions.escHtml(name)}</option>`
     ).join("");
 
-    const pendingRows = pending.map((contact) => `
+    const pendingRows = visiblePending.map((contact) => `
       <tr>
-        <td>${contacts.indexOf(contact) + 1}</td>
+        <td>${contactIndexById.get(String(contact.id)) || 0}</td>
         <td>${dashboardActions.escHtml(contact.name || "Sin nombre")}</td>
         <td><span class="pending-contact-phone"><span>${dashboardActions.escHtml(contact.phone || "-")}</span><img src="/features/calls/assets/call-status/contacto-pendiente.png" alt="Contacto pendiente" /></span></td>
         <td>${dashboardActions.contactActionButtons(contact, "assigned-pending")}</td>
@@ -126,6 +139,7 @@ function renderAssignedListsPanel() {
           <div class="assigned-list-table-wrap">
             <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contacto</th></tr></thead>
             <tbody>${pendingRows || `<tr><td colspan="4" class="assigned-list-none">No quedan contactos pendientes.</td></tr>`}</tbody></table>
+            ${totalPages > 1 ? `<div class="assigned-list-pagination"><button type="button" data-assigned-page="-1" data-slot-id="${dashboardActions.escHtml(slot.id)}" ${page <= 1 ? "disabled" : ""}>Anterior</button><span>Página ${page} de ${totalPages}</span><button type="button" data-assigned-page="1" data-slot-id="${dashboardActions.escHtml(slot.id)}" ${page >= totalPages ? "disabled" : ""}>Siguiente</button></div>` : ""}
           </div>
         </div>
         ` : `<div class="assigned-list-empty-state">Selecciona una lista y pulsa Iniciar</div>`}
@@ -147,6 +161,17 @@ function renderAssignedListsPanel() {
         const currentAssignment = listAssignments.find(a => a.slotIndex === slotIndex);
         await dashboardActions.assignWorkerList(slotId, workerId, newList, currentAssignment?.listName || "");
       }
+    });
+  });
+
+  container.querySelectorAll('[data-assigned-page]').forEach(button => {
+    button.addEventListener('click', () => {
+      const slotId = button.dataset.slotId;
+      const step = Number(button.dataset.assignedPage || 0);
+      if (!slotId || !step) return;
+      dashboardState.assignedListPages ||= {};
+      dashboardState.assignedListPages[slotId] = Math.max(1, Number(dashboardState.assignedListPages[slotId] || 1) + step);
+      renderAssignedListsPanel();
     });
   });
 

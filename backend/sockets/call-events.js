@@ -196,6 +196,7 @@ export function registerCallEvents(runtime, services, socket) {
       worker.detectedVoicemail = Boolean(detectedVoicemail);
       worker.detectedAnnouncement = detectedAnnouncement || "";
       worker.terminalConfirmed = Boolean(terminalConfirmed);
+      network.notifyChanged();
     }
     session.callState = callState || session.callState;
     if (typeof phoneNumber === "string" && phoneNumber.trim()) {

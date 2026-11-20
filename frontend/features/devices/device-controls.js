@@ -188,18 +188,25 @@ async function skipWorkerList(slotId, workerId, currentList) {
 }
 
 function getPairingListAssignments() {
-  const listNames = (Contacts.lists || []).filter((name) =>
-    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
+  const contactLists = new Set(Contacts.contacts.map(contact => contact.list || "Principal"));
+  const listNames = (Contacts.lists || []).filter(name =>
+    name && (name !== "Principal" || contactLists.has("Principal"))
   );
   const linkedSlots = dashboardState.pairingSlotsSnapshot.map((slot, slotIndex) => ({ slot, slotIndex }))
     .filter(({ slot }) => Boolean(slot?.deviceId));
   const linkedSlotIds = new Set(linkedSlots.map(({ slot }) => String(slot.id)));
   const campaignContacts = Array.isArray(dashboardState.campaignState?.contacts) ? dashboardState.campaignState.contacts : [];
-  const completedLists = new Set(listNames.filter((listName) => {
-    const contacts = campaignContacts.filter((contact) => String(contact.list || "Principal") === listName);
-    return contacts.length > 0 && contacts.every((contact) =>
-      ["completed", "failed", "awaiting_callback"].includes(String(contact.status || ""))
-    );
+  const campaignListCounts = new Map();
+  for (const contact of campaignContacts) {
+    const listName = String(contact.list || "Principal");
+    const counts = campaignListCounts.get(listName) || { total: 0, unfinished: 0 };
+    counts.total += 1;
+    if (!["completed", "failed", "awaiting_callback"].includes(String(contact.status || ""))) counts.unfinished += 1;
+    campaignListCounts.set(listName, counts);
+  }
+  const completedLists = new Set(listNames.filter(listName => {
+    const counts = campaignListCounts.get(listName);
+    return counts?.total > 0 && counts.unfinished === 0;
   }));
   const validLists = new Set(listNames.filter((listName) => !completedLists.has(listName)));
   const storageKey = `${dashboardState.PAIRING_LIST_ASSIGNMENTS_PREFIX}${dashboardState.sessionCode}`;
