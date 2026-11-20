@@ -49,7 +49,13 @@ export class CallHistoryGate {
     if (this.retrying || (!this.failed.size && this.persistence.status().mode !== "pending")) return;
     this.retrying = true;
     try {
-      await this.persistence.save(this.getSessions());
+      const pendingCodes = new Set([
+        ...this.failed,
+        ...(this.persistence.getPendingSessionCodes?.() || [])
+      ]);
+      // A transient failure in one user's session must not rebuild and enqueue
+      // every large session snapshot on the 10s recovery timer.
+      await this.persistence.save(this.getSessions(), pendingCodes.size ? [...pendingCodes] : null);
       for (const code of [...this.failed]) {
         this.failed.delete(code);
         this.flush(code);

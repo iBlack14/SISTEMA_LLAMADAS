@@ -443,6 +443,15 @@ this.env = env;
     return dirty;
   }
 
+  getPendingSessionCodes() {
+    const codes = new Set([...this.dirtySessions, ...this.dirtyContactBooks]);
+    for (const key of this.dirty) {
+      const entry = this.records.get(key);
+      if (entry?.code) codes.add(entry.code);
+    }
+    return [...codes];
+  }
+
   async saveNow(snapshot, changedCodes = null, metrics = {}) {
     for (const [code, session] of Object.entries(snapshot)) {
       for (const row of collectCallAttempts(session)) this.remember(code, row);

@@ -374,3 +374,21 @@ Se observa un problema adicional de entrega: la orden `WZe_j2JC` fue confirmada 
 Se añadió en el árbol local una marca temporal acotada de órdenes confirmadas: bloquea una emisión que termine tarde después del ACK/estado correlacionado y evita registrar la misma confirmación varias veces. **No desplegada ni probada todavía.** Las repeticiones observadas llevan el mismo intento/ID; el log no demuestra que Android haya marcado físicamente varias veces, pero sí muestra reenvíos y ACK contradictorios que hay que eliminar antes de considerar estable el envío.
 
 El worker `12d38c9c` se desconecta con una llamada asignada, la reserva se conserva, y luego el backend registra `reanudando orden pendiente`; esto confirma que la recuperación se activa, pero no garantiza que cada orden sea aceptada. Hubo al menos un rechazo de Android porque no podía confirmar llamada física activa. Mantener esa asignación para revisar el estado del teléfono; no liberarla a ciegas.
+
+## Persistencia del problema redo en MySQL (extracto adicional del 2026-11-20)
+
+El archivo adicional contiene 360 líneas, con **321 advertencias `MY-014089`** entre 13:29:27 y 15:47:27 UTC: en todas las líneas completas la capacidad está en 104857600 bytes (100 MiB) y completamente utilizada. Muestra inicios de MySQL a las 14:02:30 y 15:21:19 UTC; tras el segundo inicio MySQL estuvo `ready for connections` a las 15:21:26, pero el mismo aviso reaparece a las 15:21:48 (22 segundos después) y sigue hasta la última línea. También está el error de I/O `MY-013935` a las 15:01:28.
+
+Esto demuestra que **reiniciar MySQL no libera la causa de fondo**: la condición de redo lleno se reproduce casi inmediatamente y se mantiene. La presión sostenida de escritura y/o la incapacidad de completar checkpoints por demora de almacenamiento son explicaciones compatibles; el log no identifica por sí solo cuál de ambas domina. El extracto no muestra el motivo externo que disparó cada inicio ni confirma si el servicio cayó después de las 15:47:27.
+
+La prioridad es inspeccionar la latencia/errores y espacio del volumen MySQL junto con la carga de commits. Con un backup verificable y margen de disco confirmado, aumentar `innodb_redo_log_capacity` de 100 MiB puede amortiguar los picos (MySQL permite modificarlo en runtime en versiones actuales), pero no sustituye corregir un almacenamiento lento ni reducir la reescritura de snapshots de hasta ~49 MB descrita en el lote de aplicación. No se cambió el parámetro ni se reinició MySQL desde este entorno.
+
+## Trazado de escrituras desde el código local
+
+Se confirmó un origen de carga en el backend: cada evento `phone:status` modifica el estado de campaña y llama `historyGate.commit(code,...)`; este ejecuta `persistence.save(sessions,[code])` antes de reconocer el evento (`backend/sockets/call-events.js`, `backend/services/calls/call-history-gate.js`). `SessionPersistence.save()` serializa la sesión completa y `saveNow()` actualiza la fila `sessions.data` completa cuando el JSON cambió (`backend/shared/persistence.js`). Los estados `dialing`, `ringing/in_call` y terminales pueden por tanto reescribir una fila de decenas de MB varias veces durante cada llamada.
+
+Además, al fallar un guardado, el temporizador de recuperación de 10 segundos antes llamaba `save(sessions)` sin códigos, serializando de nuevo todas las sesiones. Se corrigió localmente para reintentar solo códigos fallidos o marcados dirty, con fallback al snapshot global solo si no hay códigos pendientes conocidos. Se añadieron y ejecutaron dos pruebas locales con persistencia simulada: reintento dirigido a la sesión pendiente y conservación del fallback. **Ambas pasan.**
+
+Precisión de métricas: `snapshotBytes` mide el JSON serializado en memoria por la llamada a `save()`, no bytes confirmados realmente escritos al disco ni al binlog; `saveNow()` puede omitir el `UPDATE` si el JSON existente es idéntico. Los cambios de `phone:status` sí mutan el estado y normalmente hacen distinto el JSON.
+
+No hay acceso SSH/EasyPanel disponible desde este entorno y el `.env` local no contiene credenciales MySQL completas. Por eso no se ejecutó una prueba de carga ni una consulta contra el VPS. Las dos pruebas son locales/simuladas; la confirmación final requiere medición read-only de MySQL en el VPS y una prueba controlada fuera de producción.
