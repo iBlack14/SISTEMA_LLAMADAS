@@ -1252,6 +1252,46 @@ body .panel #annualReport .report-row-open:hover {
   background: rgba(255, 255, 255, .09) !important;
 }
 
+/* Tarjetas de rubro del reporte: compactas y sin resaltar ninguna por defecto. */
+body .panel #annualReport .report-tools:not(.report-tools-teams) .report-rubros {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+}
+
+body .panel #annualReport .report-rubros button[data-rubro] {
+  grid-template-columns: 27px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 3px 8px;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 10px !important;
+}
+
+body .panel #annualReport .report-rubros button[data-rubro] .report-rubro-number {
+  grid-row: 1 / 3;
+  width: 25px;
+  height: 25px;
+  font-size: 12px;
+}
+
+body .panel #annualReport .report-rubros button[data-rubro] > span:nth-child(2) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-height: 1.2;
+  font-size: 13px;
+}
+
+body .panel #annualReport .report-rubros button[data-rubro] .report-rubro-owner {
+  margin-top: 0;
+  font-size: 10px;
+}
+
+body .panel #annualReport .report-rubros button[data-rubro]:not(.chosen) {
+  box-shadow: none !important;
+  transform: none;
+}
+
 /* Selector de equipos del detalle: compacto para campañas con muchos móviles. */
 body .panel #annualReport .report-tools-teams .report-rubros {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr));
@@ -1283,6 +1323,14 @@ body .panel #annualReport .report-rubros button[data-team] > span:nth-child(2) {
 }
 
 @media (max-width: 700px) {
+  body .panel #annualReport .report-tools:not(.report-tools-teams) .report-rubros {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  }
+
+  body .panel #annualReport .report-rubros button[data-rubro] {
+    min-height: 58px;
+  }
+
   body .panel #annualReport .report-tools-teams .report-rubros {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   }
