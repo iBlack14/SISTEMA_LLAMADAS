@@ -340,7 +340,7 @@ export function registerCallEvents(runtime, services, socket) {
       state: ok ? "accepted" : "rejected",
       event: "ORDEN",
       sessionCode: code,
-      detail: `${action || "acción desconocida"}${message ? `: ${String(message).slice(0, 120)}` : ""}`
+      detail: ok ? "" : `${action || "acción desconocida"}${message ? `: ${String(message).slice(0, 80)}` : ""}`
     });
     console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)}`);
 
