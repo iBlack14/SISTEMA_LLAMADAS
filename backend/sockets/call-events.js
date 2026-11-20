@@ -283,17 +283,22 @@ export function registerCallEvents(runtime, services, socket) {
       persistMs: Date.now() - statusStartedAt
     });
     if (callState) {
-      const loggedContact = updatedContact
-        || campaign.contacts.find((contact) => contact.id === String(contactId || worker?.activeContactId || ""))
-        || null;
-      logOperationalCall({
-        campaign,
-        worker,
-        contact: loggedContact,
-        state: callState,
-        event: "LLAMADA",
-        sessionCode: code
-      });
+      const finalizedContact = alreadyFinalized && contactId
+        ? campaign.contacts.find((contact) => contact.id === String(contactId))
+        : null;
+      if (updatedContact || finalizedContact || (!contactId && !callId && ["idle", "available"].includes(callState))) {
+        logOperationalCall({
+          campaign,
+          worker,
+          contact: updatedContact || finalizedContact,
+          state: callState,
+          event: "LLAMADA",
+          sessionCode: code
+        });
+      } else if (worker && callId && currentAttemptId && callId !== currentAttemptId) {
+        const currentContact = campaign.contacts.find((contact) => contact.id === worker.activeContactId);
+        console.warn(`[ESTADO_IGNORADO] ${String(worker.name || worker.deviceName || worker.id).replace(/[|\r\n]/g, " ")} | Llegó «${String(callState).replace(/[|\r\n]/g, " ")}» de otra llamada | Llamada actual: ${String(currentContact?.name || "sin contacto").replace(/[|\r\n]/g, " ")}`);
+      }
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
