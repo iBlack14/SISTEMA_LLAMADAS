@@ -180,7 +180,9 @@ function renderDay() {
       .querySelectorAll("[data-team]")
       .forEach(button => {
         button.onclick = () => {
-          reportState.selectedDetailedTeam = button.dataset.team;
+          reportState.selectedDetailedTeam = reportState.selectedDetailedTeam === button.dataset.team
+            ? ""
+            : button.dataset.team;
           renderDay();
         };
       });

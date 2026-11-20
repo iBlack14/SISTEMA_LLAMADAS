@@ -1,5 +1,5 @@
 import { apiFetch as fetch, currentUser } from "../auth/auth-session.js";
-import { buildDetailedReport } from "./detailed-report.js";
+import { buildDetailedReport } from "./detailed-report.js?v=20261119-global-detail-fix1";
 import { isAnsweredAttempt, isVoicemailAttempt, isInoperableAttempt, attemptResultLabel } from "../../../shared/reports/report-metrics.js";
 import { loadBrowserLibrary } from "../../shared/utils/browser-libraries.js";
 import { ALL_REPORTS_ID } from "./report-period.js?v=20261119-all-reports-default1";
@@ -272,7 +272,10 @@ function renderDetails() {
               <tbody>
                 ${detailedPageRows.map((row, index) => `
                   <tr>
-                    ${index === 0 ? `
+                    ${globalDetail ? `
+                      <td>${reportState.esc(row.team)}</td>
+                      <td>${row.designated}</td>
+                    ` : index === 0 ? `
                       <td rowspan="${detailedPageRows.length}">
                         ${reportState.esc(row.team)}
                       </td>
