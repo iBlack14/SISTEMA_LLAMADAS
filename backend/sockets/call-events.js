@@ -293,11 +293,12 @@ export function registerCallEvents(runtime, services, socket) {
           contact: updatedContact || finalizedContact,
           state: callState,
           event: "LLAMADA",
-          sessionCode: code
+          sessionCode: code,
+          username: session.ownerUsername
         });
       } else if (worker && callId && currentAttemptId && callId !== currentAttemptId) {
         const currentContact = campaign.contacts.find((contact) => contact.id === worker.activeContactId);
-        console.warn(`[ESTADO_IGNORADO] ${String(worker.name || worker.deviceName || worker.id).replace(/[|\r\n]/g, " ")} | Llegó «${String(callState).replace(/[|\r\n]/g, " ")}» de otra llamada | Llamada actual: ${String(currentContact?.name || "sin contacto").replace(/[|\r\n]/g, " ")}`);
+        console.warn(`[ESTADO_IGNORADO] Usuario: ${String(session.ownerUsername || "desconocido")} | Sesión: ${code} | ${String(worker.name || worker.deviceName || worker.id).replace(/[|\r\n]/g, " ")} | Llegó «${String(callState).replace(/[|\r\n]/g, " ")}» de otra llamada | Llamada actual: ${String(currentContact?.name || "sin contacto").replace(/[|\r\n]/g, " ")}`);
       }
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
@@ -345,6 +346,7 @@ export function registerCallEvents(runtime, services, socket) {
       state: ok ? "accepted" : "rejected",
       event: "ORDEN",
       sessionCode: code,
+      username: session.ownerUsername,
       detail: ok ? "" : `${action || "acción desconocida"}${message ? `: ${String(message).slice(0, 80)}` : ""}`
     });
     console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)}`);

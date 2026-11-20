@@ -152,7 +152,7 @@ function dispatchNextCampaignCallLegacy(code) {
   session.lastCompanyName = next.name;
 
   if (worker) {
-    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code });
+    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code, username: session.ownerUsername });
     sendPersistedDial(code, worker.socketId, {
       action: "dial",
       phoneNumber: next.phone,
@@ -168,7 +168,7 @@ function dispatchNextCampaignCallLegacy(code) {
   } else {
     session.callState = "ended";
     markContactResult(session, next.id, "failed", { callbackReason: "Sin celular vinculado" });
-    logOperationalCall({ campaign, contact: next, state: "failed", event: "CAMPAÑA", sessionCode: code, detail: "No se marcó porque no hay equipo conectado" });
+    logOperationalCall({ campaign, contact: next, state: "failed", event: "CAMPAÑA", sessionCode: code, username: session.ownerUsername, detail: "No se marcó porque no hay equipo conectado" });
     services.saveSoon(code);
     services.emitState(code);
     services.emitCampaignState(code);
@@ -230,14 +230,14 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
       callId: getActiveAttemptId(session, worker.id),
       commandId: nanoid()
     });
-    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code });
+    logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code, username: session.ownerUsername });
     dispatched.push({ workerId: worker.id, contactId: next.id });
   }
 
   if (!dispatched.length) {
     const hasPending = campaign.contacts.some((contact) => ["pending", "retry_pending"].includes(contact.status));
     const hasActive = campaign.contacts.some((contact) => ["dialing", "ringing", "in_call"].includes(contact.status));
-    if (hasPending && !hasActive) logCampaignWaiting({ campaign, workers: connectedWorkers, sessionCode: code });
+    if (hasPending && !hasActive) logCampaignWaiting({ campaign, workers: connectedWorkers, sessionCode: code, username: session.ownerUsername });
   }
 
   session.updatedAt = Date.now();

@@ -62,6 +62,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     try {
       const { code, session } = await workspaces.open(user, String(previousCode || "").toUpperCase());
       if (!socket.connected) return;
+      session.ownerUsername = String(user.username || "").trim().toLowerCase();
       // Reset pairing slots only on fresh workspace open (no previousCode = logout + new login)
       // This prevents stale QR slots from persisting after dashboard logout
       if (!previousCode) {
@@ -147,6 +148,10 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
       session.dashboardSocketId = socket.id;
       session.dashboardClientId = String(dashboardClientId || "").trim();
       socket.data.dashboardClientId = session.dashboardClientId;
+      if (socket.data.authUser?.username) {
+        session.ownerUsername = String(socket.data.authUser.username).trim().toLowerCase();
+        saveSoon(normalizedCode);
+      }
     }
     let rotatedPairingToken = "";
     if (role === "phone") {

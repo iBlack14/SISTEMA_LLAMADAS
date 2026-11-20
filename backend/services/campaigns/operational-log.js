@@ -27,7 +27,7 @@ const STATE_LABELS = Object.freeze({
 });
 const lastWaitingKeys = new WeakMap();
 
-export function logOperationalCall({ campaign, worker, contact, state, event = "LLAMADA", sessionCode = "", detail = "" }) {
+export function logOperationalCall({ campaign, worker, contact, state, event = "LLAMADA", sessionCode = "", username = "", detail = "" }) {
   const label = event === "ASIGNACION" && state === "dialing"
     ? "Orden enviada; esperando al equipo"
     : (event === "ORDEN" && state === "accepted"
@@ -36,6 +36,8 @@ export function logOperationalCall({ campaign, worker, contact, state, event = "
   const level = ["failed", "rejected"].includes(state) ? console.warn : console.info;
   const details = [
     `[${event}]`,
+    `Usuario: ${readable(username, "desconocido")}`,
+    `Sesión: ${readable(sessionCode, "sin sesión")}`,
     readable(worker?.name || worker?.deviceName || worker?.id, "sin equipo conectado"),
     label,
     readable(contact?.name || contact?.id, "sin contacto"),
@@ -47,7 +49,7 @@ export function logOperationalCall({ campaign, worker, contact, state, event = "
   level(details.join(" | "));
 }
 
-export function logCampaignWaiting({ campaign, workers = [], sessionCode = "" }) {
+export function logCampaignWaiting({ campaign, workers = [], sessionCode = "", username = "" }) {
   const contacts = Array.isArray(campaign?.contacts) ? campaign.contacts : [];
   const counts = { pending: 0, retry_pending: 0, dialing: 0, ringing: 0, in_call: 0, awaiting_callback: 0, completed: 0, failed: 0 };
   for (const item of contacts) if (counts[item.status] !== undefined) counts[item.status] += 1;
@@ -58,5 +60,5 @@ export function logCampaignWaiting({ campaign, workers = [], sessionCode = "" })
   if (campaign) lastWaitingKeys.set(campaign, key);
   const processed = contacts.filter((item) => item.attempts > 0
     || ["dialing", "ringing", "in_call", "awaiting_callback", "completed", "failed"].includes(item.status)).length;
-  console.warn(`[CAMPAÑA] ${reason === "sin_equipo_conectado" ? "Sin equipos conectados" : "Sin equipos disponibles"} | Progreso: ${processed}/${contacts.length} | Pendientes: ${counts.pending + counts.retry_pending} | En curso: ${counts.dialing + counts.ringing + counts.in_call}`);
+  console.warn(`[CAMPAÑA] Usuario: ${readable(username, "desconocido")} | Sesión: ${readable(sessionCode, "sin sesión")} | ${reason === "sin_equipo_conectado" ? "Sin equipos conectados" : "Sin equipos disponibles"} | Progreso: ${processed}/${contacts.length} | Pendientes: ${counts.pending + counts.retry_pending} | En curso: ${counts.dialing + counts.ringing + counts.in_call}`);
 }
