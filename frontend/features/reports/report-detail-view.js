@@ -16,7 +16,7 @@ function renderDetails() {
 
     const report = selectedReport || {
       id: ALL_REPORTS_ID,
-      date: "",
+      date: reportState.selectedDate || reportState.viewedPeriod?.from || reportState.reports[0]?.date || "",
       rubro: "TODOS LOS RUBROS",
       owner: "",
       numbers: reportState.reports.reduce((sum, item) => sum + Number(item.numbers || 0), 0),
@@ -24,8 +24,14 @@ function renderDetails() {
       answered: reportState.reports.reduce((sum, item) => sum + Number(item.answered || 0), 0),
       voicemail: reportState.reports.reduce((sum, item) => sum + Number(item.voicemail || 0), 0),
       pending: reportState.reports.reduce((sum, item) => sum + Number(item.pending || 0), 0),
-      rows: reportState.reports.flatMap(item => item.rows || []),
-      calls: reportState.reports.flatMap(item => item.calls || [])
+      rows: reportState.reports.flatMap(item => (item.rows || []).map(contact => ({
+        ...contact,
+        workerName: item.owner ? `${contact.workerName || "SIN EQUIPO"} · ${item.owner}` : contact.workerName
+      }))),
+      calls: reportState.reports.flatMap(item => (item.calls || []).map(call => ({
+        ...call,
+        workerName: item.owner ? `${call.workerName || "SIN EQUIPO"} · ${item.owner}` : call.workerName
+      })))
     };
 
     if (reportState.selectionReportId !== report.id) {
@@ -73,10 +79,11 @@ function renderDetails() {
       (reportState.tablePage + 1) * rowsPerPage
     );
 
-    const equipmentCount = new Set(
-      report.rows
-        .map(contact => String(contact.workerName || "").trim())
-        .filter(Boolean)
+    const equipmentCount = new Set(allMode
+      ? reportState.reports.flatMap(item => (item.rows || []).map(contact =>
+        String(contact.workerId || contact.workerName || "").trim()
+      ))
+      : report.rows.map(contact => String(contact.workerId || contact.workerName || "").trim())
     ).size;
     const formatReportDate = value => {
       const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
@@ -674,9 +681,15 @@ function renderDetails() {
 
           <section class="report-detail-card" aria-label="Llamadas del reporte">
           ${allMode ? `
-            <div class="report-detail-heading">
-              <h3>VISTA CONSOLIDADA</h3>
-              <p>Resumen de todos los rubros. Elige uno para ver su detalle y gestionar llamadas.</p>
+            <div class="report-detail-heading report-consolidated-heading">
+              <div>
+                <h3>VISTA CONSOLIDADA</h3>
+                <p>Resumen de todos los rubros. Elige uno para ver su detalle y gestionar llamadas.</p>
+              </div>
+              <div class="report-consolidated-actions">
+                <button id="reportDetailedTop" class="secondary" type="button">DETALLADO</button>
+                <button id="reportTotalPdfTop" type="button">⬇ DESCARGA TOTAL</button>
+              </div>
             </div>
           ` : ""}
           ${term ? `
@@ -745,9 +758,7 @@ function renderDetails() {
           <div class="report-footer">
             <div class="report-actions">
               ${allMode ? "" : '<button id="reportPdf" type="button">⬇ DESCARGAR REPORTE</button>'}
-              <button id="reportTotalPdf" class="secondary" type="button">
-                ⬇ DESCARGA TOTAL
-              </button>
+              ${allMode ? "" : '<button id="reportTotalPdf" class="secondary" type="button">⬇ DESCARGA TOTAL</button>'}
             </div>
             <div class="report-continue">
               <span id="reportSelectionCount" role="status">0 seleccionados</span>

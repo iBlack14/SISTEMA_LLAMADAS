@@ -4,6 +4,14 @@ import { ALL_REPORTS_ID, isInReportPeriod, reportPeriodLabel } from "./report-pe
 export function createReportDay(reportState, reportActions) {
 function renderDay() {
   const activeReport = reportState.reports.find(item => item.id === reportState.selectedReport);
+  const consolidatedMode = reportState.selectedReport === ALL_REPORTS_ID;
+  const detailedReports = consolidatedMode
+    ? reportState.reports
+    : activeReport ? [activeReport] : [];
+  const reportTeamLabel = (name, owner = "") => {
+    const team = String(name || "SIN EQUIPO").trim() || "SIN EQUIPO";
+    return consolidatedMode && owner ? `${team} · ${owner}` : team;
+  };
   const userFilterOptions = reportState.isAdmin ? `
     <option value="all" ${reportState.reportScope === "all" ? "selected" : ""}>Todos los usuarios</option>
     <option value="mine" ${reportState.reportScope === "mine" ? "selected" : ""}>Mis reportes</option>
@@ -12,16 +20,16 @@ function renderDay() {
       return `<option value="${reportState.esc(value)}" ${reportState.reportScope === value ? "selected" : ""}>${reportState.esc(user.username)}</option>`;
     }).join("")}
   ` : "";
-  const detailedTeams = reportState.showingDetailedReport && activeReport
-    ? Array.from(new Set([
-        ...(activeReport.rows || []).map(contact => contact.workerName),
-        ...(activeReport.calls || []).map(call => call.workerName)
-      ].map(name => String(name || "").trim()).filter(Boolean)))
+  const detailedTeams = reportState.showingDetailedReport && detailedReports.length
+    ? Array.from(new Set(detailedReports.flatMap(report => [
+        ...(report.rows || []).map(contact => reportTeamLabel(contact.workerName, report.owner)),
+        ...(report.calls || []).map(call => reportTeamLabel(call.workerName, report.owner))
+      ]).filter(Boolean)))
         .sort((left, right) => left.localeCompare(right, "es", {
           numeric: true
         }))
     : [];
-  if (reportState.showingDetailedReport && activeReport?.rows?.some(contact =>
+  if (!consolidatedMode && reportState.showingDetailedReport && activeReport?.rows?.some(contact =>
     !String(contact.workerName || "").trim() && !contact.lastCallAt
   )) {
     detailedTeams.push("SIN EQUIPO");
@@ -82,7 +90,6 @@ function renderDay() {
             </label>
             <div class="report-rubros" aria-label="Rubros del reporte">
               ${reportState.reports
-                .slice(reportState.visibleRubrosStart, reportState.visibleRubrosStart + reportState.rubrosPerPage)
                 .map((report, index) => `
                 <button
                   type="button"
