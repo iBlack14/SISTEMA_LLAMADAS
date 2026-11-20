@@ -78,7 +78,8 @@ runtime.app.get("/api/session/:code/contact-book", async (req, res) => {
     const attempts = await runtime.persistence.getCallAttempts(code);
     const book = session.contactBook ? withProgress(session.contactBook, attempts, services.allCallAttempts()) : null;
     const totalMs = Date.now() - startedAt;
-    console.info(`[CONTACT_BOOK] GET session=${code.slice(-2)} source=sessions.data.contactBook revision=${session.contactBookRevision || 0} lists=${session.contactBook?.lists?.length || 0} contacts=${session.contactBook?.contacts?.length || 0} attempts=${attempts.length} totalMs=${totalMs}`);
+    const source = runtime.persistence.contactBookStorageEnabled ? "normalized-mysql" : "sessions.data";
+    console.info(`[CONTACT_BOOK] GET session=${code.slice(-2)} source=${source} revision=${session.contactBookRevision || 0} lists=${session.contactBook?.lists?.length || 0} contacts=${session.contactBook?.contacts?.length || 0} attempts=${attempts.length} totalMs=${totalMs}`);
     res.json({ok:true,revision:session.contactBookRevision || 0, book});
   } catch { res.status(503).json({ok:false,error:"No se pudo cargar la base desde MySQL."}); }
 });
@@ -100,6 +101,7 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
       session.contactBook = book;
       session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
       session.updatedAt = Date.now();
+      runtime.persistence.markContactBookDirty(code);
       await runtime.persistence.save(runtime.sessions);
       console.info(`[CONTACT_BOOK] PUT session=${code.slice(-2)} revision=${session.contactBookRevision} contacts=${previousContacts}->${book.contacts.length} lists=${previousLists}->${book.lists.length} persisted=mysql`);
       return session.contactBookRevision;

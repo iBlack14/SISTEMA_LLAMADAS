@@ -15,6 +15,12 @@ El análisis de abajo documenta el estado encontrado antes de iniciar las correc
 
 No se ejecutaron pruebas, no se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios. El código posterior a esta actualización debe tratarse como pendiente de validación.
 
+## Preparación de migración relacional para EasyPanel
+
+Se preparó código local para separar `contactBook` de `sessions.data` mediante `vc_contact_book_meta` y `vc_contact_book_contacts`, conservando el orden de los contactos. La ejecución al arranque está desactivada por defecto; requiere `AUTO_NORMALIZE_CONTACT_BOOKS=1` y la confirmación `CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED=1`. Copia y eliminación del JSON ocurren en una sola transacción; se valida el conteo antes de confirmar. Se añadió `npm run rollback:contact-books`, que requiere la aplicación detenida y vuelve a insertar las libretas en `sessions.data` antes de limpiar las filas normalizadas.
+
+Esta migración no se ejecutó ni se probó contra una base. Tampoco se ha comprobado la restauración del dump. No configurar las variables ni desplegar la migración hasta restaurar `llamadas1 (1).sql` en una base separada y verificar su contenido. La ruta HTTP de la libreta todavía entrega la libreta completa; la paginación para acelerar la carga inicial del navegador queda como fase siguiente.
+
 ## Revisión local de `llamadas1 (1).sql`
 
 Se revisó el dump sin imprimir ni copiar valores personales: mide 49,075,922 bytes (46.8 MiB). Aproximadamente 46.27 MiB del texto de inserciones pertenecen a `sessions`; la sentencia de inserción más grande ocupa aproximadamente 23.74 MiB. El dump contiene 5 sentencias `INSERT` para esa tabla. Estas cifras describen el archivo SQL local, no el tamaño físico exacto de MySQL ni una medición de latencia.

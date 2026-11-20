@@ -5,6 +5,22 @@ import { collectCallAttempts, mergeAttempt, HISTORY_SCHEMA, writeCallAttempts } 
 
 const parseJson = value => typeof value === "string" ? JSON.parse(value) : value;
 const keyOf = (code, row) => JSON.stringify([code, row.attemptId]);
+const CONTACT_BOOK_MIGRATION_ID = "2026_11_19_normalize_contact_books_v1";
+
+function contactBookMetadata(book = {}) {
+  const { contacts, ...metadata } = book;
+  return metadata;
+}
+
+function contactBookRowValues(code, contact, position) {
+  const id = String(contact.id || "").trim();
+  const list = String(contact.list || "Principal");
+  const phone = String(contact.phone || "");
+  if (!id || id.length > 191 || list.length > 255 || phone.length > 64) {
+    throw new Error("Un contacto excede los límites de la tabla normalizada.");
+  }
+  return [code, id, list, phone, position, JSON.stringify(contact)];
+}
 
 /** Session compatibility plus an independent, durable and replayable attempt ledger. */
 export class SessionPersistence {
@@ -33,6 +49,11 @@ this.env = env;
     this.dirtySessions = new Set();
     this.dirtySessionVersions = new Map();
     this.attemptsRevision = 0;
+    this.contactBookCache = new Map();
+    this.normalizedContactBooks = new Set();
+    this.dirtyContactBooks = new Set();
+    this.contactBookVersions = new Map();
+    this.contactBookStorageEnabled = false;
     this.lastSnapshot = {};
     this.lastError = "";
     this.storageFailed = false;
@@ -123,11 +144,36 @@ this.env = env;
       try {
         const [sessions] = await this.pool.query("SELECT id, data FROM sessions");
         const [attempts] = await this.pool.query("SELECT session_code, row_data FROM vc_call_attempts");
+        const [bookMetadataRows] = await this.pool.query("SELECT session_code, revision, book_data FROM vc_contact_book_meta");
+        const [bookContactRows] = await this.pool.query("SELECT session_code, contact_id, contact_data FROM vc_contact_book_contacts ORDER BY session_code,position,contact_id");
+        const [[contactBookMigration]] = await this.pool.query(
+          "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [CONTACT_BOOK_MIGRATION_ID]);
+        this.contactBookStorageEnabled = Boolean(contactBookMigration);
         mysqlSessionRows = sessions.length;
         const remote = Object.fromEntries(sessions.map(row => [row.id, parseJson(row.data)]));
         // A pending local snapshot is an outbox and must be replayed, never discarded.
         chosen = this.pendingDatabase ? { ...remote, ...local } : sessions.length ? remote : local;
         loadSource = this.pendingDatabase ? "mysql+local-outbox" : sessions.length ? "mysql" : "mysql-empty";
+        const bookMetadata = new Map(bookMetadataRows.map(row => [row.session_code, {
+          revision: Number(row.revision || 0), data: parseJson(row.book_data)
+        }]));
+        const contactsBySession = new Map();
+        for (const row of bookContactRows) {
+          if (!contactsBySession.has(row.session_code)) contactsBySession.set(row.session_code, []);
+          contactsBySession.get(row.session_code).push(parseJson(row.contact_data));
+        }
+        for (const [code, session] of Object.entries(chosen)) {
+          const storedBook = bookMetadata.get(code);
+          if (storedBook) {
+            session.contactBook = {
+              ...storedBook.data,
+              contacts: contactsBySession.get(code) || []
+            };
+            session.contactBookRevision = storedBook.revision;
+            this.normalizedContactBooks.add(code);
+          }
+          if (session.contactBook) this.contactBookCache.set(code, session.contactBook);
+        }
         for (const entry of attempts) {
           const row = parseJson(entry.row_data);
           const key = keyOf(entry.session_code, row);
@@ -168,6 +214,118 @@ this.env = env;
     return result;
   }
 
+  async normalizeContactBooks(sessionsMap) {
+    if (!this.databaseConfigured || !this.usingDb) throw new Error("La normalización de contactos requiere MySQL disponible.");
+    const connection = await this.pool.getConnection();
+    let sessionCount = 0;
+    let contactCount = 0;
+    const normalizedCodes = [];
+    try {
+      const [[applied]] = await connection.query(
+        "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [CONTACT_BOOK_MIGRATION_ID]);
+      if (applied) {
+        this.contactBookStorageEnabled = true;
+        return { applied: false, sessions: 0, contacts: 0 };
+      }
+      if (this.env.CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED !== "1") {
+        throw new Error("Confirma una copia externa restaurable con CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED=1 antes de migrar.");
+      }
+
+      await connection.beginTransaction();
+      for (const [code, session] of sessionsMap) {
+        const book = session?.contactBook;
+        if (!book || !Array.isArray(book.contacts)) continue;
+        if (!this.normalizedContactBooks.has(code)) {
+          const metadata = contactBookMetadata(book);
+          await connection.query(
+            `INSERT INTO vc_contact_book_meta (session_code,revision,book_data) VALUES (?,?,?)
+             ON DUPLICATE KEY UPDATE revision=VALUES(revision),book_data=VALUES(book_data)`,
+            [code, Number(session.contactBookRevision || 0), JSON.stringify(metadata)]);
+          await connection.query("DELETE FROM vc_contact_book_contacts WHERE session_code=?", [code]);
+          const contacts = book.contacts;
+          for (let offset = 0; offset < contacts.length; offset += 200) {
+            const batch = contacts.slice(offset, offset + 200);
+            if (!batch.length) continue;
+            const values = batch.flatMap((contact, index) => contactBookRowValues(code, contact, offset + index));
+            const placeholders = batch.map(() => "(?,?,?,?,?,?)").join(",");
+            await connection.query(
+              `INSERT INTO vc_contact_book_contacts (session_code,contact_id,list_name,phone,position,contact_data) VALUES ${placeholders}`,
+              values);
+          }
+          normalizedCodes.push(code);
+          sessionCount++;
+          contactCount += contacts.length;
+        }
+
+        const [[storedCount]] = await connection.query(
+          "SELECT COUNT(*) AS count FROM vc_contact_book_contacts WHERE session_code=?", [code]);
+        if (Number(storedCount.count) !== book.contacts.length) {
+          throw new Error(`La sesión ${code} no pasó la validación de cantidad de contactos.`);
+        }
+
+        const { contactBook, dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...sessionData } = session;
+        const serialized = JSON.stringify(sessionData);
+        const [updated] = await connection.query("UPDATE sessions SET data=? WHERE id=?", [serialized, code]);
+        if (!updated.affectedRows) {
+          await connection.query("INSERT INTO sessions (id,data) VALUES (?,?)", [code, serialized]);
+        }
+      }
+      await connection.query("INSERT INTO vc_schema_migrations (migration_id) VALUES (?)", [CONTACT_BOOK_MIGRATION_ID]);
+      await connection.commit();
+      for (const code of normalizedCodes) {
+        this.normalizedContactBooks.add(code);
+        this.contactBookCache.set(code, sessionsMap.get(code).contactBook);
+      }
+      this.contactBookStorageEnabled = true;
+      console.info(`[CONTACT_BOOK_MIGRATION] applied sessions=${sessionCount} contacts=${contactCount}`);
+      return { applied: true, sessions: sessionCount, contacts: contactCount };
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async restoreContactBooksToSessionJson() {
+    if (!this.databaseConfigured || !this.usingDb) throw new Error("La reversión requiere MySQL disponible.");
+    const connection = await this.pool.getConnection();
+    let restored = 0;
+    try {
+      const [sessions] = await connection.query("SELECT id,data FROM sessions");
+      const [metadataRows] = await connection.query("SELECT session_code,revision,book_data FROM vc_contact_book_meta");
+      const [contactRows] = await connection.query("SELECT session_code,contact_data FROM vc_contact_book_contacts ORDER BY session_code,position,contact_id");
+      const metadata = new Map(metadataRows.map(row => [row.session_code, {
+        revision: Number(row.revision || 0), book: parseJson(row.book_data)
+      }]));
+      const contacts = new Map();
+      for (const row of contactRows) {
+        if (!contacts.has(row.session_code)) contacts.set(row.session_code, []);
+        contacts.get(row.session_code).push(parseJson(row.contact_data));
+      }
+      await connection.beginTransaction();
+      for (const row of sessions) {
+        const entry = metadata.get(row.id);
+        if (!entry) continue;
+        const session = parseJson(row.data) || {};
+        session.contactBook = { ...entry.book, contacts: contacts.get(row.id) || [] };
+        session.contactBookRevision = entry.revision;
+        await connection.query("UPDATE sessions SET data=? WHERE id=?", [JSON.stringify(session), row.id]);
+        restored++;
+      }
+      await connection.query("DELETE FROM vc_contact_book_contacts");
+      await connection.query("DELETE FROM vc_contact_book_meta");
+      await connection.query("DELETE FROM vc_schema_migrations WHERE migration_id=?", [CONTACT_BOOK_MIGRATION_ID]);
+      await connection.commit();
+      return { restored };
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   summarizeSessions(snapshot = {}) {
     const sessions = Object.values(snapshot || {});
     return sessions.reduce((summary, session) => {
@@ -203,12 +361,29 @@ this.env = env;
     const snapshotStartedAt = Date.now();
     const snapshot = {};
     const snapshotJson = {};
+    const contactBooks = {};
+    const contactBookRevisions = {};
+    const contactBookVersions = new Map();
     let snapshotBytes = 0;
     const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
       if (codesToSave && !codesToSave.has(code)) continue;
       if (collectCallAttempts(session).length) session.hasCallHistory = true;
-      const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...data } = session;
+      const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, contactBook, ...data } = session;
+      if (contactBook && (!this.databaseOnly || !this.contactBookStorageEnabled)) {
+        this.contactBookCache.set(code, contactBook);
+      }
+      const normalizedBook = this.databaseOnly && this.contactBookStorageEnabled && Boolean(contactBook) &&
+        (this.normalizedContactBooks.has(code) || this.dirtyContactBooks.has(code));
+      if (normalizedBook) {
+        if (this.dirtyContactBooks.has(code)) {
+          contactBooks[code] = JSON.parse(JSON.stringify(contactBook));
+          contactBookRevisions[code] = Number(session.contactBookRevision || 0);
+          contactBookVersions.set(code, this.contactBookVersions.get(code) || 0);
+        }
+      } else if (contactBook) {
+        data.contactBook = contactBook;
+      }
       const serialized = JSON.stringify(data);
       snapshotJson[code] = serialized;
       snapshotBytes += Buffer.byteLength(serialized);
@@ -221,12 +396,21 @@ this.env = env;
     const queuedAt = Date.now();
     const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes, {
       snapshotJson,
+      contactBooks,
+      contactBookRevisions,
       snapshotBytes,
       snapshotBuildMs,
       queueWaitMs: Date.now() - queuedAt
     })).then(result => {
       this.storageFailed = false;
       this.lastError = "";
+      for (const [code, book] of Object.entries(contactBooks)) {
+        this.normalizedContactBooks.add(code);
+        this.contactBookCache.set(code, book);
+      }
+      for (const [code, version] of contactBookVersions) {
+        if (this.contactBookVersions.get(code) === version) this.dirtyContactBooks.delete(code);
+      }
       for (const [code, version] of dirtyVersions) {
         if (this.dirtySessionVersions.get(code) === version) this.dirtySessions.delete(code);
       }
@@ -245,6 +429,11 @@ this.env = env;
     // Track which sessions have pending changes for targeted saves
     this.dirtySessions.add(code);
     this.dirtySessionVersions.set(code, (this.dirtySessionVersions.get(code) || 0) + 1);
+  }
+
+  markContactBookDirty(code) {
+    this.dirtyContactBooks.add(code);
+    this.contactBookVersions.set(code, (this.contactBookVersions.get(code) || 0) + 1);
   }
 
   getDirtySessions() {
@@ -274,6 +463,23 @@ this.env = env;
     const changed = [...this.dirty];
     try {
       await connection.beginTransaction();
+      for (const [code, book] of Object.entries(metrics.contactBooks || {})) {
+        const metadata = contactBookMetadata(book);
+        await connection.query(
+          `INSERT INTO vc_contact_book_meta (session_code,revision,book_data) VALUES (?,?,?)
+           ON DUPLICATE KEY UPDATE revision=VALUES(revision),book_data=VALUES(book_data)`,
+          [code, Number(metrics.contactBookRevisions?.[code] || 0), JSON.stringify(metadata)]);
+        await connection.query("DELETE FROM vc_contact_book_contacts WHERE session_code=?", [code]);
+        for (let offset = 0; offset < book.contacts.length; offset += 200) {
+          const batch = book.contacts.slice(offset, offset + 200);
+          if (!batch.length) continue;
+          const values = batch.flatMap((contact, index) => contactBookRowValues(code, contact, offset + index));
+          const placeholders = batch.map(() => "(?,?,?,?,?,?)").join(",");
+          await connection.query(
+            `INSERT INTO vc_contact_book_contacts (session_code,contact_id,list_name,phone,position,contact_data) VALUES ${placeholders}`,
+            values);
+        }
+      }
       // Only update sessions that actually changed
       const codesToUpdate = changedCodes ? new Set(changedCodes) : new Set(Object.keys(snapshot));
       for (const [code, data] of Object.entries(snapshot)) {
@@ -376,9 +582,13 @@ this.env = env;
   async backup(label = "daily", payload = null) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const file = path.join(this.backupDir, "call-history-" + stamp + "-" + label + ".json");
+    const sessions = structuredClone(this.lastSnapshot);
+    for (const [code, book] of this.contactBookCache) {
+      if (sessions[code]) sessions[code].contactBook = book;
+    }
     await this.atomicJson(file, payload || {
       version: 1, createdAt: new Date().toISOString(), pendingDatabase: this.pendingDatabase,
-      sessions: this.lastSnapshot, records: [...this.records.values()]
+      sessions, records: [...this.records.values()]
     });
     return file;
   }

@@ -56,6 +56,9 @@ async function bootstrap() {
   }
   // MySQL releases this dedicated connection's lock when the process exits.
   runtime.sessions = await runtime.persistence.load();
+  if (process.env.AUTO_NORMALIZE_CONTACT_BOOKS === "1") {
+    await runtime.persistence.normalizeContactBooks(runtime.sessions);
+  }
   runtime.auth.pool = runtime.persistence.pool;
   await runtime.auth.initialize();
   runtime.network.pool = runtime.persistence.pool;

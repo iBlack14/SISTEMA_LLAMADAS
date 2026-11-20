@@ -14,13 +14,29 @@ Consulta [la arquitectura](architecture/README.md) antes de modificar rutas o se
    No configures AUTH_LOCAL_ISOLATED.
 5. En Domains configura https://llamadas1-v1.tvxk4m.easypanel.host
    con puerto de destino 3000 y HTTPS.
-6. Despliega y revisa los logs. El servidor crea sus tablas si no existen.
-   No requiere migrar ni copiar datos de XAMPP.
-7. Abre una terminal interactiva del contenedor en /app y ejecuta:
+6. Si vas a normalizar una base existente, guarda primero el dump fuera de
+   EasyPanel y confirma que se restaura en una base MySQL separada. Después
+   configura `AUTO_NORMALIZE_CONTACT_BOOKS=1` y
+   `CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED=1`. La migración copia las libretas
+   a `vc_contact_book_meta` y `vc_contact_book_contacts` dentro de una
+   transacción; solo tras confirmar la copia elimina la libreta de
+   `sessions.data`. Si falla, el servidor no inicia y la transacción revierte.
+   Subir `llamadas1 (1).sql` junto con el código no importa ni restaura el dump:
+   se migra la base MySQL ya configurada en EasyPanel.
+7. Despliega y revisa los logs `[CONTACT_BOOK_MIGRATION]` y `/health`.
+   Conserva el dump hasta validar contactos y campañas.
+8. Abre una terminal interactiva del contenedor en /app y ejecuta:
    npm run auth:user:add -- admin ADMINISTRADOR
    Ingresa y confirma una contraseña de al menos 12 caracteres.
-8. Comprueba /health y /login. Inicia sesión, abre Núcleo de Red y revisa
+9. Comprueba /login. Inicia sesión, abre Núcleo de Red y revisa
    la reconexión de Socket.IO. No realices llamadas reales hasta preparar el ensayo.
+
+Rollback de la normalización: detén la aplicación, configura
+`CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED=1` y ejecuta
+`npm run rollback:contact-books`. El comando exige que el bloqueo MySQL esté
+libre, reconstruye `sessions.data.contactBook` dentro de una transacción y
+elimina las filas normalizadas solo al completar la copia. Después puede
+desplegarse la versión anterior.
 
 Los secretos, node_modules, bases locales y la APK no forman parte del paquete.
 El Dockerfile instala las dependencias de Node; no compila React.

@@ -67,6 +67,20 @@ export function collectCallAttempts(session) {
 }
 
 export const HISTORY_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS vc_contact_book_meta (
+    session_code VARCHAR(50) NOT NULL PRIMARY KEY, revision INT UNSIGNED NOT NULL DEFAULT 0,
+    book_data JSON NOT NULL, updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS vc_contact_book_contacts (
+    session_code VARCHAR(50) NOT NULL, contact_id VARCHAR(191) NOT NULL,
+    list_name VARCHAR(255) NOT NULL, phone VARCHAR(64) NOT NULL, position INT UNSIGNED NOT NULL,
+    contact_data JSON NOT NULL,
+    PRIMARY KEY(session_code, contact_id), INDEX vc_contact_book_list(session_code, list_name, position),
+    INDEX vc_contact_book_phone(session_code, phone)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS vc_schema_migrations (
+    migration_id VARCHAR(96) NOT NULL PRIMARY KEY, applied_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_call_contacts (
     session_code VARCHAR(50) NOT NULL, contact_id VARCHAR(191) NOT NULL,
     name VARCHAR(255) NOT NULL, phone VARCHAR(64) NOT NULL, list_name VARCHAR(255) NOT NULL,
