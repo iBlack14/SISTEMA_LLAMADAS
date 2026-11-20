@@ -78,10 +78,20 @@ export function hydrateSessionData(data, rows) {
     for (const field of ["pendingContacts", "currentReport", "closedContacts", "sessionHistory"]) shift[field] = list(`shift_${field}`);
     const histories = list("shift_history");
     const reports = entries("shift_report"), unfinished = entries("shift_unfinished");
+    const reportsByShift = new Map(), unfinishedByShift = new Map();
+    const groupByShift = (source, target) => {
+      for (const row of source) {
+        const separator = row.entity_id.indexOf(":");
+        const shiftId = separator < 0 ? row.entity_id : row.entity_id.slice(0, separator);
+        if (!target.has(shiftId)) target.set(shiftId, []);
+        target.get(shiftId).push(row.value);
+      }
+    };
+    groupByShift(reports, reportsByShift);
+    groupByShift(unfinished, unfinishedByShift);
     for (const item of histories) {
-      const prefix = `${item.id}:`;
-      item.report = reports.filter(row => row.entity_id.startsWith(prefix)).map(row => row.value);
-      item.unfinishedContacts = unfinished.filter(row => row.entity_id.startsWith(prefix)).map(row => row.value);
+      item.report = reportsByShift.get(String(item.id)) || [];
+      item.unfinishedContacts = unfinishedByShift.get(String(item.id)) || [];
     }
     shift.history = histories;
   }

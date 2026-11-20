@@ -48,7 +48,10 @@ test("reuses immutable shift-history rows when preparing ordinary session saves"
   const session = {
     shiftManagement: {
       current: { id: "current" }, pendingContacts: [], currentReport: [], closedContacts: [], sessionHistory: [],
-      history: [{ id: "shift-1", report: [{ attemptId: "a1" }], unfinishedContacts: [{ id: "c1" }, { id: "c2" }] }]
+      history: [
+        { id: "shift-1", report: [{ attemptId: "a1" }], unfinishedContacts: [{ id: "c1" }, { id: "c2" }] },
+        { id: "shift-2", report: [{ attemptId: "a2" }], unfinishedContacts: [{ id: "c3" }] }
+      ]
     },
     campaign: { status: "running", contacts: [{ id: "c1", name: "Updated in memory", attemptHistory: [] }], history: [] },
     reportArchive: []
