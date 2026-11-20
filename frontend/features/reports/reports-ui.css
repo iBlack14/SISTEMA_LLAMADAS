@@ -1036,18 +1036,40 @@ body .panel #annualReport .report-tools {
 }
 
 body .panel #annualReport .report-search-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: min(100%, 520px);
   min-width: 0;
   box-sizing: border-box;
-  padding: 5px;
-  border: 1px solid rgba(255, 57, 203, .55) !important;
-  border-radius: 999px;
-  background: rgba(34, 5, 51, .24) !important;
+  padding: 5px 13px;
+  border: 1px solid rgba(231, 192, 245, .25) !important;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .035) !important;
+}
+
+body .panel #annualReport .report-search-input > span {
+  flex: 0 0 auto;
+  font-size: 15px;
+  opacity: .8;
 }
 
 body .panel #annualReport .report-search-input input {
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+  min-height: 40px;
+  padding: 8px 2px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body .panel #annualReport .report-search-input:focus-within {
+  border-color: rgba(255, 105, 211, .72) !important;
+  box-shadow: 0 0 0 3px rgba(255, 105, 211, .1);
 }
 
 body .panel #annualReport .report-rubros {

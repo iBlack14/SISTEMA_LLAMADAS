@@ -120,10 +120,16 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
   }
   try {
     const usersQueryStartedAt = performance.now();
-    const [users] = await runtime.auth.pool.query(
-      "SELECT id,username FROM auth_users ORDER BY username");
+    const [users] = await runtime.auth.pool.query(`
+      SELECT u.id,u.username,w.session_code
+      FROM auth_users u
+      LEFT JOIN auth_user_workspaces w ON w.user_id=u.id
+      ORDER BY u.username`);
     const usersQueryMs = performance.now() - usersQueryStartedAt;
     const names = new Map(users.map(user => [String(user.id), user.username]));
+    const workspaceOwners = new Map(users
+      .filter(user => user.session_code)
+      .map(user => [String(user.session_code), String(user.id)]));
     if (userId && !names.has(userId)) {
       return res.status(400).json({ ok: false, error: "El usuario seleccionado no existe." });
     }
@@ -131,7 +137,7 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     const reportBuildStartedAt = performance.now();
     const reportContext = services.createReportContext();
     for (const [code, session] of runtime.sessions) {
-      const ownerId = String(session.ownerUserId || "");
+      const ownerId = workspaceOwners.get(code) || String(session.ownerUserId || "");
       if (!ownerId || (userId && ownerId !== userId)) continue;
       for (const report of services.reportData(session, from && to ? { from, to } : date, reportContext)) {
         reports.push({
@@ -164,8 +170,13 @@ runtime.app.get("/api/reports/calendar", runtime.auth.requireAdmin, async (req, 
   if (userId && !/^\d+$/.test(userId)) return res.status(400).json({ ok: false, error: "Usuario invalido" });
   try {
     const dates = {};
+    const [workspaceRows] = await runtime.auth.pool.query(
+      "SELECT user_id,session_code FROM auth_user_workspaces");
+    const workspaceOwners = new Map(workspaceRows.map(row =>
+      [String(row.session_code), String(row.user_id)]));
     for (const [code, session] of runtime.sessions) {
-      if (!session.ownerUserId || (userId && String(session.ownerUserId) !== userId)) continue;
+      const ownerId = workspaceOwners.get(code) || String(session.ownerUserId || "");
+      if (!ownerId || (userId && ownerId !== userId)) continue;
       const partial = services.calendarReportDates(session, year);
       for (const [date, count] of Object.entries(partial)) {
         dates[date] = (dates[date] || 0) + count;

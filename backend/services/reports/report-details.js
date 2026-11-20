@@ -1,13 +1,24 @@
 import { phoneKey } from "../campaigns/contact-book.js";
 
+function deviceLabel(name, workerId) {
+  const label = String(name || "").trim();
+  const id = String(workerId || "").trim();
+  const suffix = id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+  if (!suffix || ["WEBPHONE", "ANDROIDWORKER"].includes(id.replace(/[^a-z0-9]/gi, "").toUpperCase())) {
+    return label;
+  }
+  return `${label || "Equipo"} · ID ${suffix}`;
+}
+
 export function hydrateReportDetails(record, session, knownAttempts = new Map()) {
   const workers = new Map((session.phoneWorkers || []).map(worker => [String(worker.id), worker]));
   const calls = (record.history || []).map(attempt => {
     const saved = knownAttempts.get(attempt.attemptId) || {};
     const workerId = String(attempt.workerId || saved.workerId || "");
+    const workerName = String(attempt.workerName || saved.workerName || workers.get(workerId)?.name || "").trim();
     return {
       ...saved, ...attempt, workerId,
-      workerName: String(attempt.workerName || saved.workerName || workers.get(workerId)?.name || "").trim(),
+      workerName: deviceLabel(workerName, workerId),
       shiftLabel: attempt.shiftLabel || saved.shiftLabel || ""
     };
   });
@@ -24,10 +35,11 @@ export function hydrateReportDetails(record, session, knownAttempts = new Map())
   const contacts = (record.contacts || []).map(contact => {
     const call = latestById.get(String(contact.id)) || latestByPhone.get(phoneKey(contact.phone));
     const workerId = String(call?.workerId || contact.assignedWorkerId || contact.targetWorkerId || "");
+    const workerName = call?.workerName || contact.workerName || contact.assignedWorkerName || workers.get(workerId)?.name || "";
     return {
       ...contact,
       workerId,
-      workerName: call?.workerName || contact.workerName || contact.assignedWorkerName || workers.get(workerId)?.name || "",
+      workerName: call?.workerName || deviceLabel(workerName, workerId),
       attemptNumber: call?.attemptNumber || contact.attemptNumber || null,
       shiftLabel: call?.shiftLabel || contact.shiftLabel || "",
       answeredAt: call?.answeredAt || null,

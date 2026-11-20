@@ -75,7 +75,7 @@ function renderDay() {
               <input
                 id="reportSearch"
                 type="search"
-                placeholder="Buscar rubro, empresa o teléfono"
+                placeholder="Buscar rubro, empresa, teléfono o equipo / ID"
                 value="${reportState.esc(reportState.reportSearchTerm)}"
               />
             </label>

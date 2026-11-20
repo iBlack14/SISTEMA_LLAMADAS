@@ -2,7 +2,7 @@ import { showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser } from "../auth/auth-session.js";
 import { createReportData } from "./report-data.js?v=20261119-report-filter-fix1";
 import { createReportCalendar } from "./report-calendar.js?v=20261119-report-filter-fix1";
-import { createReportDay } from "./report-day.js";
+import { createReportDay } from "./report-day.js?v=20261119-device-filter1";
 import { createReportDetailView } from "./report-detail-view.js";
 
 // Una instancia del calendario y sus filtros por página.
