@@ -85,13 +85,13 @@ async function bootstrap() {
   setInterval(() => runtime.historyGate.retryPending().catch(error => {
     console.error("[HISTORY] Reintento pendiente:", error.code || "STORAGE_UNAVAILABLE");
   }), 10000).unref();
-  console.log(`[PERSISTENCE] Loaded ${runtime.sessions.size} sessions. Mode: ${runtime.persistence.status().mode}`);
+  console.log(`[ARRANQUE] Sesiones cargadas=${runtime.sessions.size} modo=${runtime.persistence.status().mode}`);
   await runtime.workspaces.sweep();
 
   const port = Number(process.env.PORT || 3000);
   const host = runtime.easypanel ? "0.0.0.0" : process.env.AUTH_LOCAL_ISOLATED === "1" ? process.env.HOST || "127.0.0.1" : "127.0.0.1";
   runtime.server.listen(port, host, () => {
-    console.log(`Call bridge listening on ${host}:${port}`);
+    console.log(`[ARRANQUE] API y llamadas escuchando en ${host}:${port}`);
   });
 }
 
