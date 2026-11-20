@@ -21,7 +21,6 @@ import { collectCallAttempts } from "../services/calls/call-history.js";
 import { CallHistoryGate } from "../services/calls/call-history-gate.js";
 import { normalizeMessageContacts, upsertMessageContact } from "../services/messaging/message-contacts.js";
 import {
-  ensureCampaign,
   getCampaignSnapshot,
   startCampaign,
   pauseCampaign,
@@ -29,7 +28,6 @@ import {
   assignNextContact,
   assignSpecificContact,
   ensureCampaignContact,
-  updateActiveCallState,
   markContactResult,
   skipActiveContact,
   holdActiveContact,
@@ -182,18 +180,14 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
         if (socket.data.explicitLogout) {
           removePhoneWorker(session, socket.id);
         } else if (worker.callState && ["dialing", "ringing", "in_call"].includes(worker.callState)) {
-          // Grace period for micro-cuts: give phone 12s to reconnect before marking call ended
+          // A socket timeout cannot prove the physical call ended. Keep the
+          // assignment until Android reports a correlated terminal state.
           const disconnectedWorkerId = worker.id;
           setTimeout(() => {
             const currentSession = sessions.get(code);
             const currentWorker = (currentSession?.phoneWorkers || []).find((w) => w.id === disconnectedWorkerId);
             if (currentWorker && !currentWorker.connected && ["dialing", "ringing", "in_call"].includes(currentWorker.callState)) {
-              updateActiveCallState(currentSession, "ended", currentWorker);
-              currentWorker.callState = "idle";
-              syncSessionPhoneState(currentSession);
-              saveSoon();
-              emitState(code);
-              emitCampaignState(code);
+              console.warn(`[PHONE_DISCONNECT] retaining assignment session=${String(code).slice(-2)} worker=${disconnectedWorkerId} reason=physical_terminal_unconfirmed`);
             }
           }, 12000);
         }

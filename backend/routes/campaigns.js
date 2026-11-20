@@ -69,7 +69,7 @@ runtime.app.post("/api/session/:code/campaign/start", async (req, res) => {
   syncPendingContacts(session, currentCampaign);
   startCampaign(session, contacts, {
     listName: req.body?.listName,
-    maxAttempts: 1
+    maxAttempts: req.body?.maxAttempts ?? 1
   });
 
 const startedCampaign = ensureCampaign(session);

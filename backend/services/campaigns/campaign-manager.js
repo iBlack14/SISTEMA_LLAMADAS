@@ -416,8 +416,11 @@ export function pickNextContact(session, workerId = "") {
   const normalizedWorkerId = String(workerId || "").trim();
   const targetedMode = campaign.contacts.some((contact) => Boolean(contact.targetWorkerId));
   const eligible = (contact) => !normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId;
-  // Filter by campaign listName if set
-  const listFilter = campaign.listName ? (contact) => (contact.list || "Principal") === campaign.listName : () => true;
+  // Aggregate campaign names do not correspond to a contact-book list.
+  const aggregateCampaign = ["Asignación automática", "Pendientes del turno"].includes(campaign.listName);
+  const listFilter = campaign.listName && !aggregateCampaign
+    ? (contact) => (contact.list || "Principal") === campaign.listName
+    : () => true;
   // Skip excluded numbers (emergencies, hospitals, police, etc.)
   const notExcluded = (contact) => !isExcludedNumber(contact.phone);
   // Complete the first round before retrying unanswered contacts.

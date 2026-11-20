@@ -178,7 +178,6 @@ export function registerCallEvents(runtime, services, socket) {
       socket.emit("phone:status_ack", { persisted: true, accepted: false, duplicate: true, callId: callId || "" });
       return;
     }
-    session.processedCallIds.add(idempotencyKey);
 
     const worker = getPhoneWorkerBySocketId(session, socket.id);
     const isExternalIncoming = Boolean(externalIncoming);
@@ -255,6 +254,8 @@ export function registerCallEvents(runtime, services, socket) {
     });
     // No successful receipt or next call until the transaction/outbox is durable.
     await historyGate.commit(code, [callId, contactId, callState, terminal].join("|"), () => {
+    // Mark the event as processed only after the state snapshot is durable.
+    session.processedCallIds.add(idempotencyKey);
     emitState(code);
     emitCampaignState(code);
     socket.emit("phone:status_ack", {

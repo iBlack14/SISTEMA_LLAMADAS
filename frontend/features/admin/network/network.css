@@ -2094,3 +2094,509 @@ footer {
   box-shadow: none !important;
 }
 
+/* ============================================================
+   VENDEDORES (/usuarios) · UI mejorada + ojito dentro del input
+   ============================================================ */
+#usersView {
+  max-width: 1040px;
+}
+
+#usersView .users-view-nav {
+  margin-bottom: 16px;
+}
+
+#usersView .users-view-card {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(231, 145, 255, .3);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(48, 9, 70, .97), rgba(24, 6, 38, .98));
+  box-shadow: 0 18px 46px rgba(14, 0, 26, .5);
+}
+
+#usersView .users-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
+  background: linear-gradient(120deg, #c41275 0%, #8e1ab2 100%);
+  color: #fff;
+}
+
+#usersView .users-view-header h2::before {
+  content: none;
+}
+
+#usersView .users-view-header-main {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+}
+
+#usersView .users-view-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, .45);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .16);
+}
+
+#usersView .users-view-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+#usersView .users-view-eyebrow {
+  display: block;
+  color: rgba(255, 255, 255, .8);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+#usersView .users-view-header h2 {
+  margin: 3px 0 4px;
+  color: #fff;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+#usersView .users-view-header p {
+  max-width: 520px;
+  color: rgba(255, 255, 255, .92);
+  font-size: 12.5px;
+}
+
+#usersView .users-count {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#usersView .notice {
+  margin: 18px 28px 0;
+}
+
+#usersView .user-form {
+  gap: 18px 20px;
+  margin: 0;
+  padding: 24px 28px 26px;
+  border-bottom: 1px solid rgba(231, 145, 255, .16);
+}
+
+#usersView .user-form h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fdf4ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#usersView .users-section-step {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #d91483, #8e1ab2);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+}
+
+#usersView .user-form label {
+  min-width: 0;
+  color: #f3e4fb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#usersView .user-form input,
+#usersView .user-form select {
+  box-sizing: border-box;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgba(231, 145, 255, .34) !important;
+  border-radius: 10px !important;
+  background: rgba(12, 2, 24, .62) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  color-scheme: dark;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+#usersView .user-form input::placeholder {
+  color: #b79cc6 !important;
+  -webkit-text-fill-color: #b79cc6 !important;
+}
+
+#usersView .user-form input:focus,
+#usersView .user-form select:focus {
+  border-color: #ff70dc !important;
+  box-shadow: 0 0 0 3px rgba(255, 112, 220, .18) !important;
+  outline: none;
+}
+
+#usersView .user-form select option {
+  background: #1b0730;
+  color: #fff;
+}
+
+#usersView .user-form small {
+  margin-top: 6px;
+  color: #cbb0da;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+#usersView .user-form-actions {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#usersView .button.primary,
+.users-dialog .button.primary {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid #e46ac1 !important;
+  border-radius: 10px !important;
+  background: linear-gradient(135deg, #d91483, #8e1ab2) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(196, 18, 117, .28) !important;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#usersView .button.primary:hover,
+.users-dialog .button.primary:hover {
+  box-shadow: 0 8px 20px rgba(196, 18, 117, .38) !important;
+}
+
+#usersView .button.secondary,
+.users-dialog .button.secondary {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(231, 145, 255, .38) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: #f6e9ff !important;
+  box-shadow: none !important;
+  font-size: 12.5px;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#usersView .button.secondary:hover,
+.users-dialog .button.secondary:hover {
+  border-color: #ff70dc !important;
+  background: rgba(217, 20, 131, .14) !important;
+  color: #fff !important;
+}
+
+/* El ojito debe quedar EXACTAMENTE dentro del cuadro de la contraseña. */
+#usersView .password-field,
+.users-dialog .password-field {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+
+#usersView .password-field input,
+.users-dialog .password-field input {
+  margin-top: 0 !important;
+  padding-right: 46px !important;
+}
+
+#usersView .password-toggle,
+.users-dialog .password-toggle {
+  position: absolute !important;
+  top: 1px !important;
+  right: 1px !important;
+  bottom: 1px !important;
+  left: auto !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 42px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 9px 9px 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  color: #e7a8ff !important;
+  line-height: 1;
+}
+
+#usersView .password-toggle:hover,
+.users-dialog .password-toggle:hover {
+  background: transparent !important;
+  color: #ff70dc !important;
+}
+
+#usersView .password-toggle svg,
+.users-dialog .password-toggle svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+#usersView .password-toggle .icon-eye-off,
+.users-dialog .password-toggle .icon-eye-off {
+  display: none;
+}
+
+#usersView .password-toggle[aria-pressed="true"] .icon-eye,
+.users-dialog .password-toggle[aria-pressed="true"] .icon-eye {
+  display: none;
+}
+
+#usersView .password-toggle[aria-pressed="true"] .icon-eye-off,
+.users-dialog .password-toggle[aria-pressed="true"] .icon-eye-off {
+  display: block;
+}
+
+#usersView .users-list {
+  padding: 24px 28px 28px;
+}
+
+#usersView .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+#usersView .section-heading h3 {
+  color: #fdf4ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#usersView .users-table-scroll {
+  max-height: 430px;
+  border: 1px solid rgba(231, 145, 255, .22);
+  border-radius: 12px;
+  background: rgba(10, 1, 20, .34);
+}
+
+#usersView table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#usersView th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 14px;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .16) !important;
+  background: linear-gradient(90deg, #8e1ab2, #c41275) !important;
+  color: #fff !important;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+#usersView td {
+  padding: 12px 14px;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(231, 145, 255, .12) !important;
+  color: #f2e5fa;
+  font-size: 12.5px;
+  vertical-align: middle;
+}
+
+#usersView tbody tr:hover td {
+  background: rgba(217, 20, 131, .1);
+}
+
+#usersView tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+#usersView .users-table-actions .button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 11.5px;
+}
+
+#usersView .users-badge {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#usersView .users-badge.role-admin {
+  border: 1px solid rgba(255, 156, 224, .5);
+  background: rgba(217, 20, 131, .2);
+  color: #ffc4ec;
+}
+
+#usersView .users-badge.role-seller {
+  border: 1px solid rgba(180, 140, 255, .4);
+  background: rgba(142, 26, 178, .22);
+  color: #dcc4ff;
+}
+
+#usersView .users-badge.state-active {
+  border: 1px solid rgba(70, 226, 158, .42);
+  background: rgba(26, 169, 104, .16);
+  color: #8ff0c2;
+}
+
+#usersView .users-badge.state-inactive {
+  border: 1px solid rgba(255, 170, 170, .35);
+  background: rgba(180, 40, 60, .16);
+  color: #ffbcc6;
+}
+
+.users-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid rgba(231, 145, 255, .3);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #36104e, #1b0730);
+  color: #fdf4ff;
+  box-shadow: 0 24px 60px rgba(10, 0, 20, .7);
+}
+
+.users-dialog::backdrop {
+  background: rgba(8, 0, 16, .7);
+  backdrop-filter: blur(3px);
+}
+
+.users-dialog .user-form {
+  margin: 0;
+  padding: 26px 28px;
+  border: 0;
+}
+
+.users-dialog .users-dialog-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -26px -28px 0;
+  padding: 22px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
+  background: linear-gradient(120deg, #c41275, #8e1ab2);
+}
+
+.users-dialog .users-dialog-header h2 {
+  margin: 0 0 4px;
+  color: #fff;
+  font-size: 20px;
+}
+
+.users-dialog .users-dialog-header p {
+  margin: 0;
+  color: rgba(255, 255, 255, .88);
+  font-size: 12px;
+}
+
+.users-dialog .notice {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.users-dialog .user-form label {
+  color: #f3e4fb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.users-dialog .user-form input,
+.users-dialog .user-form select {
+  box-sizing: border-box;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgba(231, 145, 255, .34) !important;
+  border-radius: 10px !important;
+  background: rgba(12, 2, 24, .62) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+.users-dialog .user-form input:focus,
+.users-dialog .user-form select:focus {
+  border-color: #ff70dc !important;
+  box-shadow: 0 0 0 3px rgba(255, 112, 220, .18) !important;
+  outline: none;
+}
+
+.users-dialog .user-form small {
+  color: #cbb0da;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  #usersView .users-view-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  #usersView .user-form,
+  #usersView .users-list,
+  .users-dialog .user-form {
+    padding: 20px;
+  }
+
+  #usersView .user-form,
+  .users-dialog .user-form {
+    grid-template-columns: 1fr;
+  }
+
+  #usersView .notice {
+    margin: 16px 20px 0;
+  }
+
+  .users-dialog .users-dialog-header {
+    margin: -20px -20px 0;
+    padding: 18px 20px;
+  }
+}
+

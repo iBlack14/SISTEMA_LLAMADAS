@@ -35,8 +35,9 @@ export class CallHistoryGate {
   async commit(code, key, afterCommit) {
     this.receipts.set(JSON.stringify([code,key]), { code, afterCommit });
     try {
-      const session = this.getSessions().get(code);
-      await this.persistence.save(session ? [session] : []);
+      const sessions = this.getSessions();
+      if (!sessions.has(code)) throw new Error("La sesión ya no está disponible para confirmar el estado.");
+      await this.persistence.save(sessions, [code]);
       this.failed.delete(code);
       this.flush(code);
     } catch (error) {

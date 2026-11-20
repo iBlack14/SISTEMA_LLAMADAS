@@ -114,17 +114,26 @@ function bindUsers() {
         body.replaceChildren();
         for (const account of data.users) {
           const row = document.createElement("tr");
+          const cells = [];
           for (const value of [
             account.username,
-            account.company || "—",
             account.role === "ADMINISTRADOR" ? "Administrador" : "Vendedor",
             account.active ? "Activo" : "Inactivo",
             formatDate(account.createdAt)
           ]) {
             const cell = document.createElement("td");
             cell.textContent = value;
+            cells.push(cell);
             row.appendChild(cell);
           }
+          const roleBadge = document.createElement("span");
+          roleBadge.className = "users-badge " + (account.role === "ADMINISTRADOR" ? "role-admin" : "role-seller");
+          roleBadge.textContent = cells[1].textContent;
+          cells[1].replaceChildren(roleBadge);
+          const stateBadge = document.createElement("span");
+          stateBadge.className = "users-badge " + (account.active ? "state-active" : "state-inactive");
+          stateBadge.textContent = cells[2].textContent;
+          cells[2].replaceChildren(stateBadge);
           const actions = document.createElement("td");
           actions.className = "users-table-actions";
           const editButton = document.createElement("button");
@@ -141,6 +150,8 @@ function bindUsers() {
         status.textContent = data.users.length ? "" : "No hay vendedores registrados.";
         status.hidden = Boolean(data.users.length);
       }
+      const count = document.getElementById("usersCount");
+      if (count) count.textContent = `${data.users.length} ${data.users.length === 1 ? "vendedor" : "vendedores"}`;
     } catch (cause) {
       if (request !== requestNumber) return;
       if (status) status.textContent = "No se pudo cargar la lista.";
@@ -159,7 +170,6 @@ function bindUsers() {
     showEditError("");
     editForm.elements.id.value = account.id;
     editForm.elements.username.value = account.username;
-    editForm.elements.company.value = account.company || "";
     editForm.elements.role.value = account.role;
     editForm.elements.active.value = account.active ? "1" : "0";
     hidePasswords(editForm);
@@ -210,7 +220,6 @@ function bindUsers() {
       }
       const payload = {
         username: values.username.value.trim(),
-        company: values.company.value.trim() || null,
         role: values.role.value,
         password: values.password.value,
         passwordConfirmation: values.passwordConfirmation.value
@@ -227,7 +236,7 @@ function bindUsers() {
         form.reset();
         hidePasswords(form);
         if (message) {
-          message.textContent = "Vendedor " + data.user.username + " creado" + (data.user.company ? " en " + data.user.company : "") + " con acceso de " + (data.user.role === "ADMINISTRADOR" ? "administrador." : "ventas.");
+          message.textContent = "Vendedor " + data.user.username + " creado con acceso de " + (data.user.role === "ADMINISTRADOR" ? "administrador." : "ventas.");
           message.hidden = false;
         }
         await loadUsers();
@@ -264,7 +273,6 @@ function bindUsers() {
       }
       const payload = {
         username: values.username.value.trim(),
-        company: values.company.value.trim() || null,
         role: values.role.value,
         active: values.active.value === "1",
         password,

@@ -171,13 +171,6 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
 
   const dispatched = [];
   const connectedWorkers = services.getConnectedPhoneWorkers(session);
-  const connectedWorkerIds = new Set(connectedWorkers.map((worker) => String(worker.id)));
-  for (const contact of campaign.contacts || []) {
-    if (contact.targetWorkerId && !connectedWorkerIds.has(String(contact.targetWorkerId))
-        && ["pending", "retry_pending"].includes(String(contact.status))) {
-      contact.targetWorkerId = "";
-    }
-  }
   const workers = connectedWorkers.filter((worker) =>
     (!onlyWorkerId || worker.id === onlyWorkerId)
     &&

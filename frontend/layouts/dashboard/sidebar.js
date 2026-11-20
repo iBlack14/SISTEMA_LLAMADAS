@@ -118,7 +118,7 @@ async function loadAdminWorkspace() {
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
     const networkCss = source.querySelector('link[rel="stylesheet"][href*="network.css"]');
-    stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261119-config-ui3";
+    stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261119-users-ui2";
     stylesheet.dataset.adminStyles = "1";
     document.head.append(stylesheet);
   })().catch(error => {
@@ -150,7 +150,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   } else if (view === "messages") {
     const whatsapp = await import("../../features/messaging/whatsapp.js");
     whatsapp.syncMessagesView?.();
-    const templates = await import("../../features/messaging/message-templates.js?v=20261119-config-ui3");
+    const templates = await import("../../features/messaging/message-templates.js?v=20261119-users-ui2");
     templates.init?.();
   } else if (view === "reservations") {
     const reservations = await import("../../features/reservations/reservations-controller.js");
@@ -188,7 +188,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         await initUsers?.();
       }
       if (view === "settings") {
-        const settings = await import("../../features/admin/settings/email-settings-page.js?v=20261119-config-ui3");
+        const settings = await import("../../features/admin/settings/email-settings-page.js?v=20261119-users-ui2");
         await settings.initEmailSettingsPage?.();
       }
     } catch (error) {

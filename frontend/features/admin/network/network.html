@@ -9,13 +9,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/features/admin/network/network.css?v=20261119-config-ui3">
+  <link rel="stylesheet" href="/features/admin/network/network.css?v=20261119-users-ui2">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261117-sidebar-flow">
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <script type="module" src="/layouts/dashboard/sidebar.js?v=20261117-sidebar-flow"></script>
   <script src="/socket.io/socket.io.js" defer></script>
-  <script type="module" src="/features/admin/network/network-page.js?v=20261119-config-ui3"></script>
+  <script type="module" src="/features/admin/network/network-page.js?v=20261119-users-ui2"></script>
 </head>
 <body>
   <button type="button" class="viavox-menu-toggle" aria-controls="viavoxSidebar" aria-expanded="false">☰ MENÚ</button>
@@ -111,27 +111,33 @@
       </div>
       <div class="users-view-card">
         <div class="users-view-header">
-          <div>
-            <h2 id="usersTitle">Vendedores</h2>
-            <p>Gestiona las cuentas de tu equipo. Cada vendedor accede solo a sus llamadas y contactos.</p>
+          <div class="users-view-header-main">
+            <span class="users-view-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5A3.5 3.5 0 0 0 12.5 15h-5A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10" cy="8" r="3.2"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 5.2a3.2 3.2 0 0 1 0 5.6"/></svg>
+            </span>
+            <div>
+              <span class="users-view-eyebrow">ADMINISTRACIÓN DE CUENTAS</span>
+              <h2 id="usersTitle">Vendedores</h2>
+              <p>Gestiona las cuentas de tu equipo. Cada vendedor accede solo a sus llamadas y contactos.</p>
+            </div>
           </div>
+          <span id="usersCount" class="users-count" role="status">—</span>
         </div>
         <p id="usersMessage" class="notice" role="status" hidden></p>
         <p id="usersError" class="notice error" role="alert" hidden></p>
         <form id="createUserForm" class="user-form">
-          <h3>Crear vendedor</h3>
+          <h3><span class="users-section-step" aria-hidden="true">＋</span> Crear vendedor</h3>
           <label for="newUsername">Usuario<input id="newUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="usernameHint"><small id="usernameHint">Letras, números, punto, guion o guion bajo.</small></label>
-          <label for="newUserCompany">Empresa<input id="newUserCompany" name="company" maxlength="120" placeholder="Nombre de la empresa (opcional)" autocomplete="off"></label>
           <label for="newUserRole">Acceso<select id="newUserRole" name="role"><option value="EMPLEADO">Vendedor · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Todo el sistema</option></select></label>
           <label for="newUserPassword">Contraseña<span class="password-field"><input id="newUserPassword" name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="passwordHint"><button type="button" class="password-toggle" data-password-toggle="newUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span><small id="passwordHint">Mínimo 12 caracteres.</small></label>
           <label for="newUserConfirmation">Confirmar contraseña<span class="password-field"><input id="newUserConfirmation" name="passwordConfirmation" type="password" required minlength="12" maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle" data-password-toggle="newUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span></label>
           <div class="user-form-actions"><button id="createUserButton" class="button primary" type="submit">Crear vendedor</button></div>
         </form>
         <section class="users-list" aria-labelledby="usersListTitle">
-          <div class="section-heading"><h3 id="usersListTitle">Vendedores registrados</h3><button id="usersRefresh" class="button secondary" type="button">Actualizar</button></div>
+          <div class="section-heading"><h3 id="usersListTitle">Vendedores registrados</h3><button id="usersRefresh" class="button secondary" type="button">↻ Actualizar</button></div>
           <p id="usersLoading" class="muted" role="status">Cargando…</p>
           <div class="users-table-scroll" tabindex="0" role="region" aria-label="Vendedores registrados">
-            <table><thead><tr><th scope="col">Vendedor</th><th scope="col">Empresa</th><th scope="col">Acceso</th><th scope="col">Estado</th><th scope="col">Fecha creación</th><th scope="col">Acciones</th></tr></thead><tbody id="usersRows"></tbody></table>
+            <table><thead><tr><th scope="col">Vendedor</th><th scope="col">Acceso</th><th scope="col">Estado</th><th scope="col">Fecha creación</th><th scope="col">Acciones</th></tr></thead><tbody id="usersRows"></tbody></table>
           </div>
         </section>
       </div>
@@ -237,7 +243,6 @@
         <p id="editUserError" class="notice error" role="alert" hidden></p>
         <input id="editUserId" name="id" type="hidden">
         <label for="editUsername">Usuario<input id="editUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false"><small>Letras, números, punto, guion o guion bajo.</small></label>
-        <label for="editUserCompany">Empresa<input id="editUserCompany" name="company" maxlength="120" placeholder="Nombre de la empresa (opcional)" autocomplete="off"></label>
         <label for="editUserRole">Acceso<select id="editUserRole" name="role"><option value="EMPLEADO">Vendedor · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Todo el sistema</option></select></label>
         <label for="editUserActive">Estado<select id="editUserActive" name="active"><option value="1">Activo</option><option value="0">Inactivo</option></select></label>
         <label for="editUserPassword">Nueva contraseña<span class="password-field"><input id="editUserPassword" name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="editPasswordHint"><button type="button" class="password-toggle" data-password-toggle="editUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span><small id="editPasswordHint">Déjala vacía para mantener la actual. Mínimo 12 caracteres.</small></label>
@@ -246,6 +251,6 @@
       </form>
     </dialog>
   </main>
-  <script type="module" src="/features/admin/users/users-page.js?v=20261114-admin-pages"></script>
+  <script type="module" src="/features/admin/users/users-page.js?v=20261119-users-ui2"></script>
 </body>
 </html>

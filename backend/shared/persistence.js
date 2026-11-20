@@ -30,6 +30,9 @@ this.env = env;
     this.saveChain = Promise.resolve();
     this.records = new Map();
     this.dirty = new Set();
+    this.dirtySessions = new Set();
+    this.dirtySessionVersions = new Map();
+    this.attemptsRevision = 0;
     this.lastSnapshot = {};
     this.lastError = "";
     this.storageFailed = false;
@@ -76,6 +79,7 @@ this.env = env;
     const row = mergeAttempt(previous?.row, incoming);
     if (JSON.stringify(previous?.row) !== JSON.stringify(row)) {
       this.records.set(key, { code, row });
+      this.attemptsRevision += 1;
       if (dirty) this.dirty.add(key);
     }
   }
@@ -196,17 +200,36 @@ this.env = env;
 
   save(sessionsMap, changedCodes = null) {
     // Capture immediately, before another reset/delete can mutate the live Map.
+    const snapshotStartedAt = Date.now();
     const snapshot = {};
+    const snapshotJson = {};
+    let snapshotBytes = 0;
     const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
       if (codesToSave && !codesToSave.has(code)) continue;
       if (collectCallAttempts(session).length) session.hasCallHistory = true;
       const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...data } = session;
-      snapshot[code] = JSON.parse(JSON.stringify(data));
+      const serialized = JSON.stringify(data);
+      snapshotJson[code] = serialized;
+      snapshotBytes += Buffer.byteLength(serialized);
+      snapshot[code] = JSON.parse(serialized);
     }
-    const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes)).then(result => {
+    const snapshotBuildMs = Date.now() - snapshotStartedAt;
+    const dirtyVersions = new Map(Object.keys(snapshot)
+      .filter(code => this.dirtySessions.has(code))
+      .map(code => [code, this.dirtySessionVersions.get(code) || 0]));
+    const queuedAt = Date.now();
+    const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes, {
+      snapshotJson,
+      snapshotBytes,
+      snapshotBuildMs,
+      queueWaitMs: Date.now() - queuedAt
+    })).then(result => {
       this.storageFailed = false;
       this.lastError = "";
+      for (const [code, version] of dirtyVersions) {
+        if (this.dirtySessionVersions.get(code) === version) this.dirtySessions.delete(code);
+      }
       return result;
     }, error => {
       this.storageFailed = true;
@@ -220,17 +243,17 @@ this.env = env;
 
   markSessionDirty(code) {
     // Track which sessions have pending changes for targeted saves
-    this.dirtySessions = this.dirtySessions || new Set();
     this.dirtySessions.add(code);
+    this.dirtySessionVersions.set(code, (this.dirtySessionVersions.get(code) || 0) + 1);
   }
 
   getDirtySessions() {
-    const dirty = this.dirtySessions || new Set();
+    const dirty = this.dirtySessions;
     this.dirtySessions = new Set();
     return dirty;
   }
 
-  async saveNow(snapshot, changedCodes = null) {
+  async saveNow(snapshot, changedCodes = null, metrics = {}) {
     for (const [code, session] of Object.entries(snapshot)) {
       for (const row of collectCallAttempts(session)) this.remember(code, row);
     }
@@ -258,7 +281,7 @@ this.env = env;
         const [existing] = await connection.query(
           "SELECT data FROM sessions WHERE id=?", [code]);
         const existingData = existing[0]?.data;
-        if (existingData && JSON.stringify(existingData) === JSON.stringify(data)) continue;
+        if (existingData && JSON.stringify(existingData) === metrics.snapshotJson?.[code]) continue;
         await connection.query(
           "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
           [code, JSON.stringify(data)]);
@@ -280,7 +303,7 @@ this.env = env;
       const logSignature = `${summary.sessions}:${summary.contactBooks}:${summary.lists}:${summary.contacts}:${this.records.size}`;
       const now = Date.now();
       if (logSignature !== this.lastWriteLogSignature || now - this.lastWriteLogAt >= 30000) {
-        console.info(`[PERSISTENCE] MySQL snapshot committed target=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size}`);
+        console.info(`[PERSISTENCE] MySQL snapshot committed target=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size} snapshotBytes=${metrics.snapshotBytes || 0} snapshotBuildMs=${metrics.snapshotBuildMs || 0} queueWaitMs=${metrics.queueWaitMs || 0}`);
         this.lastWriteLogSignature = logSignature;
         this.lastWriteLogAt = now;
       }
