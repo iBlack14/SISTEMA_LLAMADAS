@@ -342,10 +342,12 @@ export function registerCallEvents(runtime, services, socket) {
     if (action === "dial" && worker) {
       const assignment = session.campaign?.assignments?.[worker.id];
       if (assignment?.attemptId && String(commandId || "") === `campaign-${assignment.attemptId}`) {
-        acknowledgeDialDelivery?.(code, worker.id, commandId, assignment.attemptId);
-        const contact = session.campaign?.contacts?.find(item => item.id === assignment.contactId);
-        const deliveryLog = `[CALL_DELIVERY] Android ${ok ? "confirmó" : "rechazó"} la orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} contacto=${String(contact?.name || "sin nombre").slice(0, 40)} intento=${String(assignment.attemptId).slice(-8)}${ok ? "" : ` motivo=${String(message || "sin detalle").replace(/[|\r\n]/g, " ").slice(0, 100)}`}`;
-        (ok ? console.info : console.error)(deliveryLog);
+        const firstConfirmation = acknowledgeDialDelivery?.(code, worker.id, commandId, assignment.attemptId);
+        if (firstConfirmation) {
+          const contact = session.campaign?.contacts?.find(item => item.id === assignment.contactId);
+          const deliveryLog = `[CALL_DELIVERY] Android ${ok ? "confirmó" : "rechazó"} la orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} contacto=${String(contact?.name || "sin nombre").slice(0, 40)} intento=${String(assignment.attemptId).slice(-8)}${ok ? "" : ` motivo=${String(message || "sin detalle").replace(/[|\r\n]/g, " ").slice(0, 100)}`}`;
+          (ok ? console.info : console.error)(deliveryLog);
+        }
       }
     }
     const contact = worker ? getContactByWorker(session, worker.id) : null;

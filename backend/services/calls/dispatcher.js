@@ -32,6 +32,14 @@ import {
  */
 export function createDispatcher(runtime, services) {
 const dialDeliveries = new Map();
+const confirmedDialDeliveries = new Set();
+
+function rememberConfirmedDial(key) {
+  confirmedDialDeliveries.add(key);
+  if (confirmedDialDeliveries.size > 10000) {
+    confirmedDialDeliveries.delete(confirmedDialDeliveries.values().next().value);
+  }
+}
 
 function dialDeliveryKey(code, workerId, commandId) {
   return `${code}:${workerId}:${commandId}`;
@@ -79,10 +87,14 @@ function scheduleDialDelivery(code, workerId, payload, retry = 0) {
 
 function acknowledgeDialDelivery(code, workerId, commandId, callId) {
   const key = dialDeliveryKey(code, workerId, commandId);
-  const delivery = dialDeliveries.get(key);
-  if (!delivery || (callId && String(delivery.payload.callId) !== String(callId))) return false;
+  const normalizedCallId = String(callId || "");
+  const assignment = runtime.sessions.get(code)?.campaign?.assignments?.[workerId];
+  if (!normalizedCallId || String(commandId || "") !== `campaign-${normalizedCallId}`
+    || assignment?.attemptId !== normalizedCallId) return false;
+  const wasConfirmed = confirmedDialDeliveries.has(key);
+  rememberConfirmedDial(key);
   stopDialDelivery(code, workerId, commandId);
-  return true;
+  return !wasConfirmed;
 }
 
 function resumeAssignedDial(code, workerId) {
@@ -157,6 +169,11 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
   const commandId = String(payload.commandId || "").slice(-8);
   const callId = String(payload.callId || "").slice(-8);
   const target = runtime.io.sockets?.sockets?.get(socketId);
+  const deliveryKey = dialDeliveryKey(code, workerId, String(payload.commandId || ""));
+  if (payload.action === "dial" && confirmedDialDeliveries.has(deliveryKey)) {
+    console.info(`[CALL_DELIVERY] reenvío omitido: Android ya confirmó sesión=${sessionId} equipo=${String(workerId).slice(-8)} intento=${callId}`);
+    return;
+  }
   if (!target?.connected) {
     console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=worker_disconnected command=${commandId} call=${callId} retry=${retry}`);
     if (Date.now() - startedAt < 30000) scheduleDialRetry(code, workerId, payload, retry, startedAt);
