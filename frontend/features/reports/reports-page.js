@@ -1,7 +1,7 @@
 import { showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser } from "../auth/auth-session.js";
-import { createReportData } from "./report-data.js?v=20261119-calendar-fast";
-import { createReportCalendar } from "./report-calendar.js?v=20261119-calendar-fast";
+import { createReportData } from "./report-data.js?v=20261119-report-filter-fix1";
+import { createReportCalendar } from "./report-calendar.js?v=20261119-report-filter-fix1";
 import { createReportDay } from "./report-day.js";
 import { createReportDetailView } from "./report-detail-view.js";
 

@@ -24,11 +24,15 @@ function endpoint(path) {
   ).href;
 }
 
-async function fetchReports(date = "") {
+async function fetchReports(date = "", period = null) {
     const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
     const viewAll = isAdmin && reportState.reportScope !== "mine";
     const params = new URLSearchParams();
     if (date) params.set("date", date);
+    if (period?.from && period?.to) {
+      params.set("from", period.from);
+      params.set("to", period.to);
+    }
     if (viewAll && String(reportState.reportScope).startsWith("user:")) {
       params.set("userId", String(reportState.reportScope).slice(5));
     }

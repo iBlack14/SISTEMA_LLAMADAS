@@ -1,4 +1,4 @@
-import { isInReportPeriod, reportPeriodLabel } from "./report-period.js";
+import { reportPeriodLabel } from "./report-period.js";
 
 // report-calendar: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportCalendar(reportState, reportActions) {
@@ -176,9 +176,12 @@ function renderCalendar() {
           paintCalendarRange();
         };
       });
-    reportState.$("reportRangeOpen").onclick = showRange;
-    reportState.$("reportRangeFabOpen").onclick = showRange;
-    reportState.$("reportRangeClear").onclick = () => {
+    const rangeOpenButton = reportState.$("reportRangeOpen");
+    const rangeFabOpenButton = reportState.$("reportRangeFabOpen");
+    const rangeClearButton = reportState.$("reportRangeClear");
+    if (rangeOpenButton) rangeOpenButton.onclick = showRange;
+    if (rangeFabOpenButton) rangeFabOpenButton.onclick = showRange;
+    if (rangeClearButton) rangeClearButton.onclick = () => {
       reportState.calendarRange = { from: "", to: "" };
       reportState.hoverDate = "";
       paintCalendarRange();
@@ -237,8 +240,10 @@ function paintCalendarRange() {
           ? `Rango a confirmar: ${reportPeriodLabel(active)}. Clic para confirmar.`
           : `Desde ${reportPeriodLabel({from, to: from})}. Ahora elige la fecha final.`)
         : `Rango seleccionado: ${reportPeriodLabel(reportState.calendarRange)}. Doble clic para abrir un día.`;
-    reportState.$("reportRangeOpen").disabled = !from || !to;
-    reportState.$("reportRangeClear").disabled = !from;
+    const rangeOpenButton = reportState.$("reportRangeOpen");
+    const rangeClearButton = reportState.$("reportRangeClear");
+    if (rangeOpenButton) rangeOpenButton.disabled = !from || !to;
+    if (rangeClearButton) rangeClearButton.disabled = !from;
 
     const fab = reportState.$("reportRangeFab");
     if (fab) {
@@ -272,8 +277,8 @@ async function showRange() {
     const rangeOpenButton = reportState.$("reportRangeOpen");
     if (rangeOpenButton) rangeOpenButton.disabled = true;
     try {
-      const allReports = await reportActions.fetchReports();
-      reportState.reports = allReports.filter(report => isInReportPeriod(report.date, period));
+      const allReports = await reportActions.fetchReports("", period);
+      reportState.reports = allReports;
       reportState.viewedPeriod = period;
       reportState.selectedDate = "";
       reportState.selectedReport = reportState.reports[0]?.id || "";

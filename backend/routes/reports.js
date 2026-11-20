@@ -71,8 +71,15 @@ runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
   }
 
   const date = String(req.query.date || "");
+  const from = String(req.query.from || "");
+  const to = String(req.query.to || "");
 
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if ((date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) ||
+      (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) ||
+      (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) ||
+      Boolean(from) !== Boolean(to) ||
+      (from && to && from > to) ||
+      (date && (from || to))) {
     return res.status(400).json({
       ok: false,
       error: "Fecha invalida"
@@ -81,7 +88,7 @@ runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
 
   return res.json({
     ok: true,
-    reports: services.reportData(session, date)
+    reports: services.reportData(session, from && to ? { from, to } : date)
   });
 });
 
@@ -99,8 +106,15 @@ runtime.app.get("/api/session/:code/reports/calendar", (req, res) => {
 runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const date = String(req.query.date || "");
+  const from = String(req.query.from || "");
+  const to = String(req.query.to || "");
   const userId = String(req.query.userId || "");
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if ((date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) ||
+      (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) ||
+      (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) ||
+      Boolean(from) !== Boolean(to) ||
+      (from && to && from > to) ||
+      (date && (from || to))) {
     return res.status(400).json({ ok: false, error: "Fecha invalida" });
   }
   try {
@@ -111,10 +125,11 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
       return res.status(400).json({ ok: false, error: "El usuario seleccionado no existe." });
     }
     const reports = [];
+    const reportContext = services.createReportContext();
     for (const [code, session] of runtime.sessions) {
       const ownerId = String(session.ownerUserId || "");
       if (!ownerId || (userId && ownerId !== userId)) continue;
-      for (const report of services.reportData(session, date)) {
+      for (const report of services.reportData(session, from && to ? { from, to } : date, reportContext)) {
         reports.push({
           ...report,
           id: `${code}-${report.id}`,

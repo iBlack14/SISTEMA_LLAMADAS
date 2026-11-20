@@ -1,23 +1,32 @@
 import { splitReportByList } from "./report-lists.js";
 import { hydrateReportDetails } from "./report-details.js";
 import { isAnsweredAttempt, isVoicemailAttempt, attemptResultLabel } from "../../../shared/reports/report-metrics.js";
-import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
+import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, phoneKey } from "../campaigns/contact-book.js";
 import { collectReportAttempts } from "./report-attempts.js";
 
 /**
  * createReportData: conserva los contratos y reglas existentes.
- * Dependencias: services.allCallAttempts, services.archiveCurrentCampaign.
+ * Dependencias: services.annualBlocks, services.archiveCurrentCampaign.
  * Se construye una vez por proceso.
  */
 export function createReportData(runtime, services) {
-function reportData(session, date) {
-  services.archiveCurrentCampaign(session);
-  const restrictions = annualPhoneBlocks(services.allCallAttempts());
-  const knownAttempts = new Map(collectReportAttempts(session).map(attempt => [attempt.attemptId, attempt]));
+function createReportContext() {
+  const restrictions = services.annualBlocks();
   const blocked = new Set(services.globalBlockedNumbers().map(entry => phoneKey(entry.phone)));
+  return { restrictions, blocked };
+}
+
+function reportData(session, date, context = createReportContext()) {
+  services.archiveCurrentCampaign(session);
+  const { restrictions, blocked } = context;
+  const knownAttempts = new Map(collectReportAttempts(session).map(attempt => [attempt.attemptId, attempt]));
+
+  const matchesDate = typeof date === "object" && date
+    ? record => (!date.from || record.date >= date.from) && (!date.to || record.date <= date.to)
+    : record => !date || record.date === date;
 
   return (session.reportArchive || [])
-    .filter(r => !date || r.date === date)
+    .filter(matchesDate)
     .flatMap(splitReportByList)
     .map(record => hydrateReportDetails(record, session, knownAttempts))
     .map(r => {
@@ -89,5 +98,5 @@ function reportData(session, date) {
     }
     return dates;
   }
-  return { reportData, calendarReportDates };
+  return { reportData, calendarReportDates, createReportContext };
 }
