@@ -1012,7 +1012,7 @@
       const apiBase = window.location.origin;
       window.VOIP_VC_API_BASE = apiBase;
 
-      window.loadSocketLibrary().then(() => import("/app/bootstrap.js")).then(resolve, error => {
+      window.loadSocketLibrary().then(() => import("/app/bootstrap.js?v=20261119-users-ui3")).then(resolve, error => {
         console.error("No se pudo cargar Socket.IO desde", `${apiBase}/socket.io/socket.io.js`);
         const statusText = document.getElementById("statusText");
         if (statusText) {

@@ -23,6 +23,26 @@ Se preparó código local para separar `contactBook` de `sessions.data` mediante
 
 Esta migración no se ejecutó ni se probó contra una base. Tampoco se ha comprobado la restauración del dump. No configurar las variables ni desplegar la migración hasta restaurar `llamadas1 (1).sql` en una base separada y verificar su contenido. La ruta HTTP de la libreta todavía entrega la libreta completa; la paginación para acelerar la carga inicial del navegador queda como fase siguiente.
 
+## Cuellos adicionales: navegador, eventos y reportes
+
+Auditoría estática adicional; no se midió con perfiles de navegador ni con tráfico de producción.
+
+| Prioridad | Hallazgo confirmado por código | Posible impacto |
+| --- | --- | --- |
+| Alta | `frontend/app/dashboard-state.js` fija `PAGE_SIZE = 10000`; `contacts-view.js` filtra todos los contactos y crea hasta 10,000 filas de DOM. Cada render además recorre todos los contactos para el contador y los recordatorios. | Pausas de UI, uso alto de memoria y render lento con listas grandes, aunque la libreta ya esté normalizada en MySQL. |
+| Alta | `campaign:state` incluye la campaña completa: `getCampaignSnapshot()` devuelve `contacts`, `callbacks` e `history`, y `emitCampaignState()` la difunde al room. El navegador recibe el evento, sincroniza resultados y vuelve a renderizar contactos. | Payload repetido grande por evento y trabajo de UI durante llamadas; posible demora al manejar controles del panel. No prueba por sí solo que el backend deje de despachar. |
+| Alta | `syncCampaignResultsToContacts()` busca cada resultado con `Contacts.contacts.find(...)`, lo que puede comparar cada contacto de campaña contra toda la libreta. También `contacts-view.js` llama `getCampaignContactMap()` dentro del bucle de filas y descarta el resultado; esa función vuelve a construir el mapa completo. | Trabajo cuadrático potencial cuando hay muchos contactos, repetido al llegar eventos de campaña. La llamada al mapa es trabajo inútil confirmado; el costo efectivo depende de tamaños reales. |
+| Media-alta | `emitState()` incluye `callRestrictions`; `callRestrictions()` vuelve a ejecutar `annualPhoneBlocks(allCallAttempts())` y recorre contactos de libreta/campaña. `refreshGlobalCallRestrictions()` emite estado a las otras sesiones. | Un cambio de estado puede volver a recorrer el historial global y multiplicar el cálculo por sesiones; candidato directo a retrasar la ruta de eventos en backend. Falta medir duración y frecuencia real. |
+| Media | `GET /api/session/:code/contact-book` consulta todo el historial de intentos de esa sesión, obtiene también intentos globales y genera progreso de la libreta completa. En las rutas de red la respuesta se pagina después de filtrar la libreta completa en memoria. | La migración del JSON reduce escrituras, pero no vuelve paginada la lectura ni reduce por sí sola el procesamiento de progreso. |
+| Media | `/api/reports/all` ejecuta `reportData()` sesión por sesión; cada llamada vuelve a calcular bloqueos anuales sobre los intentos globales. En continuar reporte, `annualBlock()` se invoca para cada contacto candidato. | Los reportes administrativos pueden tardar mucho al crecer historial × sesiones × contactos; efecto distinto del despacho de llamadas. |
+| Baja-media | `startCampaignRun()` calcula `orderedLists` buscando contactos por cada lista, pero no usa la variable después. | Recorrido innecesario de contactos al iniciar; su costo crece con cantidad de listas y contactos. |
+
+El monitor de red usa una cola de snapshots, refresca historiales cacheados cada 5 segundos y publica cada 30 segundos por defecto. Solo registra hasta 10 equipos, así que parece de menor prioridad que el render de contactos y los eventos completos, salvo que el panel administrativo también se sienta lento.
+
+### Siguiente medición recomendada
+
+Registrar tamaño en bytes y duración al serializar `campaign:state` y `state:changed`; duración de `callRestrictions()`; duración del handler del evento `campaign:state` en navegador; y cantidad de contactos renderizados por actualización. Comparar con 100, 1,000 y 10,000 contactos en una base restaurada de prueba. Después priorizar virtualización/paginación de tabla, índices `Map` reutilizados en el navegador y carga SQL paginada real. No se debe saltar el guardado duradero de intentos ni emitir llamadas antes del commit.
+
 ## Revisión local de `llamadas1 (1).sql`
 
 Se revisó el dump sin imprimir ni copiar valores personales: mide 49,075,922 bytes (46.8 MiB). Aproximadamente 46.27 MiB del texto de inserciones pertenecen a `sessions`; la sentencia de inserción más grande ocupa aproximadamente 23.74 MiB. El dump contiene 5 sentencias `INSERT` para esa tabla. Estas cifras describen el archivo SQL local, no el tamaño físico exacto de MySQL ni una medición de latencia.

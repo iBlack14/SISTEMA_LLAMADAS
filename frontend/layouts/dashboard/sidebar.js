@@ -1,5 +1,5 @@
 ﻿import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
-import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js";
+import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js?v=20261119-users-ui3";
 
 const adminPaths = { network: "/nucleo-red", users: "/usuarios", settings: "/configuracion" };
 const sectionForPath = path => Object.keys(panelPaths).find(view => panelPaths[view] === path)
