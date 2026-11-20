@@ -2,6 +2,8 @@ import { isInReportPeriod, reportPeriodLabel } from "./report-period.js";
 
 // report-calendar: comparte el estado del módulo de reportes sin crear conexiones.
 export function createReportCalendar(reportState, reportActions) {
+let marksRequest = 0;
+
 async function showCalendar() {
    reportActions.clearDayNavigation();
    reportState.viewedPeriod = null;

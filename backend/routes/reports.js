@@ -78,6 +78,16 @@ runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
   });
 });
 
+// Marcas del calendario: solo fecha y conteo, sin hidratar reportes completos.
+runtime.app.get("/api/session/:code/reports/calendar", (req, res) => {
+  const code = String(req.params.code || "").toUpperCase().trim();
+  const session = runtime.sessions.get(code);
+  if (!session) return res.status(404).json({ ok: false, error: "Sesion no encontrada" });
+  const year = String(req.query.year || "");
+  if (year && !/^\d{4}$/.test(year)) return res.status(400).json({ ok: false, error: "Año invalido" });
+  return res.json({ ok: true, dates: services.calendarReportDates(session, year) });
+});
+
 // Vista de administrador: consolida los reportes de todas las cuentas.
 runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -109,6 +119,26 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     return res.json({ ok: true, reports, storage: runtime.persistence.status() });
   } catch {
     return res.status(503).json({ ok: false, error: "No se pudieron cargar los reportes de todos los usuarios." });
+  }
+});
+
+// Marcas del calendario de todas las cuentas, sin el costo de reportData completo.
+runtime.app.get("/api/reports/calendar", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const year = String(req.query.year || "");
+  if (year && !/^\d{4}$/.test(year)) return res.status(400).json({ ok: false, error: "Año invalido" });
+  try {
+    const dates = {};
+    for (const [code, session] of runtime.sessions) {
+      if (!session.ownerUserId) continue;
+      const partial = services.calendarReportDates(session, year);
+      for (const [date, count] of Object.entries(partial)) {
+        dates[date] = (dates[date] || 0) + count;
+      }
+    }
+    return res.json({ ok: true, dates });
+  } catch {
+    return res.status(503).json({ ok: false, error: "No se pudieron cargar las fechas del calendario." });
   }
 });
 

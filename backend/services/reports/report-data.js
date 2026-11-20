@@ -76,5 +76,18 @@ function reportData(session, date) {
       };
     });
 }
-return { reportData };
+
+  // Solo fechas y conteos para el calendario anual: evita hidratar intentos,
+  // bloqueos y detalles de cada reporte, que es lo que encarece /api/reports/all.
+  function calendarReportDates(session, year = "") {
+    const dates = {};
+    const prefix = year ? `${year}-` : "";
+    for (const record of (session.reportArchive || []).flatMap(splitReportByList)) {
+      const date = String(record.date || "");
+      if (!date || (prefix && !date.startsWith(prefix))) continue;
+      dates[date] = (dates[date] || 0) + 1;
+    }
+    return dates;
+  }
+  return { reportData, calendarReportDates };
 }

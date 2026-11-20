@@ -55,6 +55,30 @@ async function fetchReports(date = "") {
     return data.reports || [];
   }
 
+  // El calendario solo necesita fechas y conteos: este endpoint evita cargar
+  // el detalle completo de todos los reportes antes de dibujar los meses.
+  async function fetchCalendarDates(year = "") {
+    const query = year ? `?year=${encodeURIComponent(year)}` : "";
+    const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
+    const viewAll = isAdmin && reportState.reportScope !== "mine";
+    const url = viewAll
+      ? `/api/reports/calendar${query}`
+      : endpoint("/reports/calendar" + query);
+    if (!viewAll) {
+      const context = reportSession();
+      if (!context.code || !context.token) {
+        throw Error("Tu espacio de llamadas aún se está conectando. Espera unos segundos y pulsa Reintentar.");
+      }
+    }
+    const response = await fetch(url, {
+      method: "GET",
+      headers: viewAll ? {} : { "X-Dashboard-Token": dashboardToken() }
+    });
+    const data = await response.json();
+    if (!response.ok) throw Error(data.error || "Error consultando el calendario");
+    return data.dates || {};
+  }
+
 function showError(error) {
     reportState.$("dailyReportMount").innerHTML = `
       <p class="report-error">${reportState.esc(error.message || error)}</p>
@@ -63,5 +87,5 @@ function showError(error) {
 
     reportState.$("retryReports").onclick = reportActions.showCalendar;
   }
-return { reportSession, sessionCode, dashboardToken, endpoint, fetchReports, showError };
+return { reportSession, sessionCode, dashboardToken, endpoint, fetchReports, fetchCalendarDates, showError };
 }
