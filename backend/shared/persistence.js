@@ -11,13 +11,16 @@ const SESSION_DATA_MIGRATION_ID = "2026_11_20_normalize_session_data_v1";
 
 // Large, frequently rewritten collections stay in memory for the existing
 // services/API, but are stored as independently updated MySQL rows.
-export function splitSessionData(session = {}) {
-  const data = structuredClone(session);
+const SHIFT_HISTORY_ENTITY_TYPES = new Set(["shift_history", "shift_report", "shift_unfinished"]);
+
+export function splitSessionData(session = {}, { preserveShiftHistory = false } = {}) {
+  const data = { ...session };
   delete data.dashboardSocketId; delete data.phoneSocketId; delete data.activePhoneSocketId; delete data.workerCursor;
   delete data.contactBook;
   const rows = [];
   const add = (type, id, position, value) => rows.push({ type, id: String(id || `${type}-${position}`), position, value });
-  const campaign = data.campaign;
+  const campaign = data.campaign && { ...data.campaign };
+  if (campaign) data.campaign = campaign;
   if (campaign) {
     for (const [position, contact] of (campaign.contacts || []).entries()) {
       const copy = { ...contact }; delete copy.attemptHistory;
@@ -27,13 +30,14 @@ export function splitSessionData(session = {}) {
     for (const [position, item] of (campaign.history || []).entries()) add("campaign_history", item.attemptId || position, position, item);
     delete campaign.contacts; delete campaign.history;
   }
-  const shift = data.shiftManagement;
+  const shift = data.shiftManagement && { ...data.shiftManagement };
+  if (shift) data.shiftManagement = shift;
   if (shift) {
     for (const field of ["pendingContacts", "currentReport", "closedContacts", "sessionHistory"]) {
       for (const [position, item] of (shift[field] || []).entries()) add(`shift_${field}`, item.id || item.attemptId || position, position, item);
       delete shift[field];
     }
-    for (const [position, item] of (shift.history || []).entries()) {
+    for (const [position, item] of (preserveShiftHistory ? [] : (shift.history || []).entries())) {
       const copy = { ...item }; delete copy.report; delete copy.unfinishedContacts;
       add("shift_history", item.id || position, position, copy);
       for (const [i, report] of (item.report || []).entries()) add("shift_report", `${item.id}:${report.attemptId || i}`, position * 100000 + i, report);
@@ -144,6 +148,8 @@ this.env = env;
     this.contactBookStorageEnabled = false;
     this.sessionDataStorageEnabled = false;
     this.sessionEntityCache = new Map();
+    this.sessionEntityTypesBySession = new Map();
+    this.shiftHistorySourceRefs = new Map();
     this.lastSnapshot = {};
     this.lastError = "";
     this.storageFailed = false;
@@ -159,6 +165,24 @@ this.env = env;
       attempts: this.records.size,
       lastError: this.lastError
     };
+  }
+
+  cacheSessionEntity(key, value) {
+    this.sessionEntityCache.set(key, value);
+    const [code, type] = JSON.parse(key);
+    if (!this.sessionEntityTypesBySession.has(code)) this.sessionEntityTypesBySession.set(code, new Map());
+    const byType = this.sessionEntityTypesBySession.get(code);
+    if (!byType.has(type)) byType.set(type, new Set());
+    byType.get(type).add(key);
+  }
+
+  forgetSessionEntity(key) {
+    this.sessionEntityCache.delete(key);
+    const [code, type] = JSON.parse(key);
+    const byType = this.sessionEntityTypesBySession.get(code);
+    byType?.get(type)?.delete(key);
+    if (byType?.get(type)?.size === 0) byType.delete(type);
+    if (byType?.size === 0) this.sessionEntityTypesBySession.delete(code);
   }
 
   async atomicJson(file, data) {
@@ -250,7 +274,7 @@ this.env = env;
           for (const row of entityRows) {
             if (!entitiesBySession.has(row.session_code)) entitiesBySession.set(row.session_code, []);
             entitiesBySession.get(row.session_code).push(row);
-            this.sessionEntityCache.set(JSON.stringify([row.session_code,row.entity_type,row.entity_id]), JSON.stringify([Number(row.position),parseJson(row.row_data)]));
+            this.cacheSessionEntity(JSON.stringify([row.session_code,row.entity_type,row.entity_id]), JSON.stringify([Number(row.position),parseJson(row.row_data)]));
           }
           for (const [code, data] of Object.entries(remote)) remote[code] = hydrateSessionData(data, entitiesBySession.get(code) || []);
         }
@@ -266,6 +290,7 @@ this.env = env;
           contactsBySession.get(row.session_code).push(parseJson(row.contact_data));
         }
         for (const [code, session] of Object.entries(chosen)) {
+          if (this.sessionDataStorageEnabled) this.shiftHistorySourceRefs.set(code, session.shiftManagement?.history || null);
           const storedBook = bookMetadata.get(code);
           if (storedBook) {
             session.contactBook = {
@@ -418,7 +443,8 @@ this.env = env;
       await connection.commit();
       this.sessionDataStorageEnabled = true;
       for (const [code, session] of sessionsMap) {
-        for (const row of splitSessionData(session).rows) this.sessionEntityCache.set(JSON.stringify([code,row.type,row.id]), JSON.stringify([row.position,row.value]));
+        for (const row of splitSessionData(session).rows) this.cacheSessionEntity(JSON.stringify([code,row.type,row.id]), JSON.stringify([row.position,row.value]));
+        this.shiftHistorySourceRefs.set(code, session.shiftManagement?.history || null);
       }
       console.info(`[SESSION_DATA_MIGRATION] applied sessions=${sessions} entities=${entities}`);
       return { applied: true, sessions, entities };
@@ -447,6 +473,8 @@ this.env = env;
       await connection.commit();
       this.sessionDataStorageEnabled = false;
       this.sessionEntityCache.clear();
+      this.sessionEntityTypesBySession.clear();
+      this.shiftHistorySourceRefs.clear();
       return { restored: sessions.length };
     } catch (error) { await connection.rollback().catch(() => {}); throw error; }
     finally { connection.release(); }
@@ -530,6 +558,8 @@ this.env = env;
     const contactBookRevisions = {};
     const contactBookVersions = new Map();
     const sessionEntities = {};
+    const preservedEntityTypes = {};
+    const shiftHistorySources = {};
     let snapshotBytes = 0;
     const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
@@ -538,9 +568,13 @@ this.env = env;
       const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, contactBook, ...rawData } = session;
       let data = rawData;
       if (this.sessionDataStorageEnabled) {
-        const split = splitSessionData(session);
+        const historyRef = session.shiftManagement?.history || null;
+        const preserveShiftHistory = historyRef !== null && this.shiftHistorySourceRefs.get(code) === historyRef;
+        const split = splitSessionData(session, { preserveShiftHistory });
         data = split.data;
         sessionEntities[code] = split.rows;
+        preservedEntityTypes[code] = preserveShiftHistory ? [...SHIFT_HISTORY_ENTITY_TYPES] : [];
+        shiftHistorySources[code] = historyRef;
       }
       if (contactBook && (!this.databaseOnly || !this.contactBookStorageEnabled)) {
         this.contactBookCache.set(code, contactBook);
@@ -569,6 +603,8 @@ this.env = env;
     const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes, {
       snapshotJson,
       sessionEntities,
+      preservedEntityTypes,
+      shiftHistorySources,
       contactBooks,
       contactBookRevisions,
       snapshotBytes,
@@ -670,13 +706,14 @@ this.env = env;
         if (!codesToUpdate.has(code)) continue;
         if (this.sessionDataStorageEnabled) {
           const rows = metrics.sessionEntities?.[code] || [];
-          const currentKeys = new Set();
+          const currentKeysByType = new Map();
           for (const row of rows) {
             const key = JSON.stringify([code,row.type,row.id]);
             if (row.type.length > 48 || row.id.length > 191 || row.position < 0 || row.position > 4294967295) {
               throw new Error(`Entidad fuera de límites en sesión ${code}: ${row.type}/${row.id.slice(0,40)}.`);
             }
-            currentKeys.add(key);
+            if (!currentKeysByType.has(row.type)) currentKeysByType.set(row.type, new Set());
+            currentKeysByType.get(row.type).add(key);
             const serialized = JSON.stringify(row.value);
             const cached = JSON.stringify([row.position,row.value]);
             if (this.sessionEntityCache.get(key) === cached) continue;
@@ -685,11 +722,16 @@ this.env = env;
               [code,row.type,row.id,row.position,serialized]);
             entityCacheChanges.set(key,cached);
           }
-          for (const key of [...this.sessionEntityCache.keys()]) {
-            const parsed = JSON.parse(key);
-            if (parsed[0] !== code || currentKeys.has(key)) continue;
-            await connection.query("DELETE FROM vc_session_entities WHERE session_code=? AND entity_type=? AND entity_id=?", parsed);
-            entityCacheDeletes.add(key);
+          const preserved = new Set(metrics.preservedEntityTypes?.[code] || []);
+          for (const [type, existingKeys] of this.sessionEntityTypesBySession.get(code) || []) {
+            if (preserved.has(type)) continue;
+            const currentKeys = currentKeysByType.get(type) || new Set();
+            for (const key of existingKeys) {
+              if (currentKeys.has(key)) continue;
+              const parsed = JSON.parse(key);
+              await connection.query("DELETE FROM vc_session_entities WHERE session_code=? AND entity_type=? AND entity_id=?", parsed);
+              entityCacheDeletes.add(key);
+            }
           }
         }
         const [existing] = await connection.query(
@@ -709,8 +751,9 @@ this.env = env;
       }
       for (const [code, rows] of bySession) await writeCallAttempts(connection, code, rows);
       await connection.commit();
-      for (const key of entityCacheDeletes) this.sessionEntityCache.delete(key);
-      for (const [key,value] of entityCacheChanges) this.sessionEntityCache.set(key,value);
+      for (const key of entityCacheDeletes) this.forgetSessionEntity(key);
+      for (const [key,value] of entityCacheChanges) this.cacheSessionEntity(key,value);
+      for (const [code, ref] of Object.entries(metrics.shiftHistorySources || {})) this.shiftHistorySourceRefs.set(code,ref);
       for (const key of changed) this.dirty.delete(key);
       this.pendingDatabase = false;
       this.usingDb = true;

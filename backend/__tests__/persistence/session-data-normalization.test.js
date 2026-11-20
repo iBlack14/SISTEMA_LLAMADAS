@@ -43,3 +43,22 @@ test("normalizes large session collections into rows and rebuilds the original A
   delete expected.contactBook;
   assert.deepEqual(hydrated, expected);
 });
+
+test("reuses immutable shift-history rows when preparing ordinary session saves", () => {
+  const session = {
+    shiftManagement: {
+      current: { id: "current" }, pendingContacts: [], currentReport: [], closedContacts: [], sessionHistory: [],
+      history: [{ id: "shift-1", report: [{ attemptId: "a1" }], unfinishedContacts: [{ id: "c1" }, { id: "c2" }] }]
+    },
+    campaign: { status: "running", contacts: [{ id: "c1", name: "Updated in memory", attemptHistory: [] }], history: [] },
+    reportArchive: []
+  };
+  const savedHistoryRows = splitSessionData(session).rows.filter(row => ["shift_history", "shift_report", "shift_unfinished"].includes(row.type));
+  const nextSave = splitSessionData(session, { preserveShiftHistory: true });
+  const rows = [
+    ...nextSave.rows.map(row => ({ entity_type: row.type, entity_id: row.id, position: row.position, row_data: row.value })),
+    ...savedHistoryRows.map(row => ({ entity_type: row.type, entity_id: row.id, position: row.position, row_data: row.value }))
+  ];
+  assert.equal(nextSave.rows.some(row => row.type === "shift_unfinished"), false);
+  assert.deepEqual(hydrateSessionData(nextSave.data, rows), session);
+});

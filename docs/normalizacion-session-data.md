@@ -2,6 +2,8 @@
 
 La aplicación mantiene el mismo formato de campaña en memoria para que las rutas, sockets y pantallas sigan funcionando. Con esta migración, MySQL guarda por separado los contactos activos, intentos de contacto, historial de campaña, reportes archivados y sus filas, además de los datos del turno. La fila `sessions.data` queda para el estado operativo pequeño. Los cambios se escriben por entidad; no se reescribe el conjunto completo de contactos en cada evento.
 
+Las filas de turnos finalizados son inmutables mientras no cambie la lista de turnos. Los guardados comunes reutilizan esas filas y no las vuelven a clonar, recorrer ni comparar. Al cerrar un turno nuevo se reconcilia el historial actualizado. Este ajuste de rendimiento no requiere otra migración SQL.
+
 ## Migración
 
 1. Crear y verificar una copia externa restaurable de la base.
