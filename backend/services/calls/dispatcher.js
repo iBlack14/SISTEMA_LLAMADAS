@@ -31,6 +31,78 @@ import {
  * Se construye una vez por proceso.
  */
 export function createDispatcher(runtime, services) {
+const dialDeliveries = new Map();
+
+function dialDeliveryKey(code, workerId, commandId) {
+  return `${code}:${workerId}:${commandId}`;
+}
+
+function stopDialDelivery(code, workerId, commandId) {
+  const key = dialDeliveryKey(code, workerId, commandId);
+  const delivery = dialDeliveries.get(key);
+  if (delivery?.timer) clearTimeout(delivery.timer);
+  dialDeliveries.delete(key);
+}
+
+function scheduleDialDelivery(code, workerId, payload, retry = 0) {
+  const commandId = String(payload.commandId || "");
+  const key = dialDeliveryKey(code, workerId, commandId);
+  const existing = dialDeliveries.get(key);
+  if (existing?.timer) clearTimeout(existing.timer);
+  const delay = Math.min(5000 * (2 ** Math.min(retry, 3)), 30000);
+  const delivery = { timer: null, payload, retry };
+  delivery.timer = setTimeout(() => {
+    if (dialDeliveries.get(key) !== delivery) return;
+    const session = runtime.sessions.get(code);
+    const assignment = session?.campaign?.assignments?.[workerId];
+    if (!assignment || assignment.attemptId !== payload.callId || assignment.contactId !== payload.contactId
+      || runtime.persistence.hasFinishedAttempt(code, payload.callId, payload.contactId)) {
+      stopDialDelivery(code, workerId, commandId);
+      return;
+    }
+    if (session.campaign.status !== "running") {
+      scheduleDialDelivery(code, workerId, payload, retry + 1);
+      return;
+    }
+    const worker = session.phoneWorkers?.find(item => String(item.id) === String(workerId));
+    if (!worker?.connected || !worker.socketId) {
+      console.warn(`[CALL_DELIVERY] pendiente sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} contacto=${String(payload.contactName || "sin nombre").slice(0, 40)} motivo=equipo_desconectado reintento=${retry + 1}`);
+      scheduleDialDelivery(code, workerId, payload, retry + 1);
+      return;
+    }
+    console.warn(`[CALL_DELIVERY] sin confirmación Android; reenviando orden sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} intento=${String(payload.callId).slice(-8)} reintento=${retry + 1}`);
+    worker.socketId && runtime.io.to(worker.socketId).emit("call:action", payload);
+    scheduleDialDelivery(code, workerId, payload, retry + 1);
+  }, delay);
+  dialDeliveries.set(key, delivery);
+}
+
+function acknowledgeDialDelivery(code, workerId, commandId, callId) {
+  const key = dialDeliveryKey(code, workerId, commandId);
+  const delivery = dialDeliveries.get(key);
+  if (!delivery || (callId && String(delivery.payload.callId) !== String(callId))) return false;
+  stopDialDelivery(code, workerId, commandId);
+  return true;
+}
+
+function resumeAssignedDial(code, workerId) {
+  const session = runtime.sessions.get(code);
+  const assignment = session?.campaign?.assignments?.[workerId];
+  const worker = session?.phoneWorkers?.find(item => String(item.id) === String(workerId));
+  const contact = assignment && session?.campaign?.contacts?.find(item => item.id === assignment.contactId);
+  if (!assignment || !worker?.connected || !worker.socketId || !contact || contact.status !== "dialing") return false;
+  const callId = String(assignment.attemptId || contact.currentAttemptId || "");
+  if (!callId) return false;
+  const payload = {
+    action: "dial", phoneNumber: contact.phone || "", contactId: contact.id,
+    contactName: contact.name || "", companyName: contact.name || "",
+    callId, commandId: `campaign-${callId}`
+  };
+  console.warn(`[CALL_DELIVERY] reanudando orden pendiente sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} contacto=${String(contact.name || "sin nombre").slice(0, 40)} progreso=${contact.attempts || 1}`);
+  sendPersistedDial(code, worker.socketId, payload);
+  return true;
+}
+
 async function sendPersistedDial(code, socketId, payload, retry = 0, startedAt = Date.now()) {
   const sessionId = String(code).slice(-2);
   const commandId = String(payload.commandId || "").slice(-8);
@@ -97,6 +169,9 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
   // that otherwise reports invalid_ack/ack-timeout for every successful dial.
   target.emit("call:action", payload);
   console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} retry=${retry} targetConnected=true`);
+  if (payload.action === "dial" && workerId && String(payload.commandId || "").startsWith("campaign-")) {
+    scheduleDialDelivery(code, workerId, payload);
+  }
 }
 
 function scheduleDialRetry(code, workerId, payload, retry, startedAt, waitCount = 0) {
@@ -160,7 +235,7 @@ function dispatchNextCampaignCallLegacy(code) {
       companyName: next.name,
       contactName: next.name,
       callId: getActiveAttemptId(session, worker.id),
-      commandId: nanoid()
+      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`
     });
     services.saveSoon(code);
     services.emitState(code);
@@ -228,7 +303,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
       companyName: next.name,
       contactName: next.name,
       callId: getActiveAttemptId(session, worker.id),
-      commandId: nanoid()
+      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`
     });
     logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code, username: session.ownerUsername });
     dispatched.push({ workerId: worker.id, contactId: next.id });
@@ -305,5 +380,5 @@ function archiveCurrentCampaign(session) {
     archive[index] = record;
   }
 }
-return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign };
+return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign, acknowledgeDialDelivery, resumeAssignedDial };
 }

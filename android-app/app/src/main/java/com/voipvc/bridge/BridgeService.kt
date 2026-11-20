@@ -537,7 +537,16 @@ class BridgeService : Service() {
                     val contactName = data.optString("contactName")
                     val imageUrl = data.optString("imageUrl")
                     val contactId = data.optString("contactId")
-                    val result = if (commandId.isNotBlank() && commandId == lastDialCommandId) {
+                    val result = if (commandId.isNotBlank() && commandId == activeCommandId && callId == activeCallId) {
+                        val physicallyActive = isActuallyInCall()
+                        Log.w(TAG, "[DIAL] orden repetida; no se vuelve a marcar command=${commandId.takeLast(8)} call=${callId.takeLast(8)} physicalCall=$physicallyActive")
+                        if (physicallyActive) {
+                            emitPhoneStatus(lastCallState.ifBlank { "dialing" }, "command_duplicate", correlateCampaign = true)
+                            DialResult(true, "La llamada de esta orden ya está activa")
+                        } else {
+                            DialResult(false, "La orden ya existe, pero Android no confirma una llamada activa; requiere revisar el teléfono")
+                        }
+                    } else if (commandId.isNotBlank() && commandId == lastDialCommandId) {
                         Log.w(TAG, "[DIAL] duplicate command ignored command=${commandId.takeLast(8)}")
                         lastDialAck
                     } else {

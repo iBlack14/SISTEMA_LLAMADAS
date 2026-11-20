@@ -299,3 +299,46 @@ Rollback: volver al build anterior del proceso Node. No hace falta migración de
 **Prioridad siguiente:** validar en una restauración aislada con fallos de MySQL, reconexión y reinicio durante llamada; medir el tamaño/duración de snapshots y eventos. Después reducir los payloads completos de `campaign:state`/`state:changed` y el trabajo de sincronización del navegador.
 
 **No tocar todavía:** no purgar binlogs ni sesiones, no desplegar migraciones sobre la base que opera EasyPanel sin respaldo externo restaurable confirmado, y no liberar asignaciones activas solo por timeout.
+
+## Incidente EasyPanel del 2026-11-20, 09:02–09:33
+
+Alcance: 327 líneas de logs compartidas por el usuario y revisión estática del árbol local. En esa etapa inicial no se accedió a EasyPanel ni a MySQL, no se hicieron llamadas y no se modificó lógica de llamadas. La corrección local posterior se documenta abajo.
+
+### Hallazgos
+
+| Hallazgo | Evidencia observada | Conclusión y confianza |
+| --- | --- | --- |
+| venta2 / sesión `OYWPAR` perdió sus equipos | A las 09:15:28 y 09:17:08 la campaña reporta “Sin equipos disponibles”. Las líneas de desconexión llevan `session=AR`, que corresponde al sufijo de `OYWPAR`; registran dos workers con asignación retenida por no confirmar el fin físico (09:18:51 y 09:19:06), y otra desconexión a las 09:29:48. | **Confirmado:** el servidor dejó esos sockets desconectados/no disponibles y retuvo las reservas. La causa física de la desconexión (red, app Android, cambio de socket/sesión) no aparece en estos logs. Código: `backend/sockets/utility-events.js:166-193`; `backend/session/worker-manager.js:8-9`; `backend/services/calls/dispatcher.js:193-207`. |
+| venta1 / sesión `3LKDCX`, Xiaomi `2312CRNCCL` quedó con una reserva sin confirmar | Asignó `Geoandina E.I.R.L.` a las 09:16:40. En las 327 líneas posteriores hasta las 09:33:31 no aparece `[ORDEN]` ni un estado `[LLAMADA]` para ese contacto; mientras tanto, `Xiaomi 25028RN03L` sí siguió avanzando hasta el contacto 30. | **Confirmado por el log:** la asignación no tiene confirmación visible y el equipo dejó de aportar eventos de campaña. **No confirmado:** si el evento no llegó al teléfono, si se perdió el ACK o si el socket cambió. Código: `backend/services/calls/dispatcher.js:34-54,83-123,183-241`; `backend/sockets/call-events.js:332-360`. |
+| Una reserva puede quedar activa indefinidamente si se pierde la confirmación | `sendPersistedDial()` espera el guardado antes de emitir. Si el socket no está conectado, hay reintentos hasta 30 s; si el socket sí está conectado, `emitDialWithAck()` emite `call:action` sin observar el ACK de aplicación. `phone:command_ack` solo se registra y se reenvía al dashboard; no inicia una recuperación de la reserva. | **Mecanismo de atasco confirmado por código; causa concreta de Geoandina no demostrada.** Código: `backend/services/calls/dispatcher.js:34-123`; `backend/sockets/call-events.js:332-360`; Android emite el evento en `BridgeService.kt:1458-1474`. |
+| La cola global de persistencia puede demorar las órdenes | El lote informa 177 snapshots, `queueWaitMs` máximo de 39,062 ms y 70 esperas de al menos 5 s. `saveChain` serializa guardados globalmente y el despacho espera `persistence.save()` antes del emit. | **Cuello de botella confirmado y contribución plausible a retrasos; no demuestra que causó las desconexiones o el ACK faltante.** Código: `backend/shared/persistence.js:398-425`; `backend/services/calls/dispatcher.js:34-54`. |
+| El backend no tuvo una caída global durante todo el lote | Hubo un `SIGTERM` a las 09:03:12 y volvió a escuchar a las 09:03:30. Después, venta1 siguió completando llamadas hasta el final del archivo, 09:33:31. | **Confirmado:** hubo un reinicio inicial, pero la evidencia posterior muestra que el proceso estaba operativo. No identifica quién envió el `SIGTERM`. |
+
+### Diagnóstico
+
+Hay dos síntomas distintos: venta2 dejó de tener workers conectados; venta1 conservó al menos una asignación (`Geoandina`) sin confirmación mientras el otro Xiaomi siguió llamando. La falla más probable del flujo de venta1 es una orden sin confirmación de Android que deja el contacto reservado. La cola MySQL pudo retrasar ese envío, pero no hay correlación de `commandId` en los logs de nivel `info` para probarlo. El historial no demuestra que un mismo dispositivo físico estuviera conectado a ambas sesiones; los nombres `Xiaomi ...` no son IDs únicos.
+
+### Siguiente evidencia necesaria y precauciones
+
+1. Para un incidente controlado, guardar temporalmente logs `debug` de `[CALL_DISPATCH]` desde `persist-before-dial` hasta `sent`, `retry-waiting` o fallo, junto con `sessionCode`, `workerId`, `contactId`, `callId` y `commandId`. El nivel `info` del lote no muestra esas trazas.
+2. Revisar en Android si recibió la orden `Geoandina` y si `phone:command_ack` fue emitido; correlacionar por `commandId`. Confirmar físicamente el estado antes de reintentar para evitar una llamada duplicada.
+3. Mantener las asignaciones de llamadas sin terminal físico confirmado. No liberarlas solo por timeout.
+4. Medir y reducir la serialización de snapshots grandes antes de cambiar la durabilidad del intento. No emitir órdenes antes del commit.
+
+No se ejecutaron pruebas ni se hicieron cambios de aplicación en esta revisión. El árbol local no se verificó contra el build desplegado en EasyPanel.
+
+## Corrección local para órdenes de campaña sin confirmación
+
+En respuesta al incidente, el árbol local recibió una corrección de entrega y recuperación. **No está desplegada** y no se ejecutaron llamadas ni pruebas automatizadas.
+
+- Las órdenes de campaña usan ahora un `commandId` estable derivado del `attemptId`. Al reconectar un teléfono, el backend inspecciona la asignación persistida y vuelve a emitir el mismo intento pendiente; no reserva otro contacto para ese equipo.
+- Cuando el teléfono está conectado pero no confirma, el backend reintenta la misma orden con espera creciente (de 5 a 30 segundos). Los eventos correlacionados `phone:command_ack` y `phone:status` detienen el reintento. Si el teléfono está desconectado, la reserva se conserva; si la campaña está pausada, el temporizador no emite órdenes.
+- Android reconoce una repetición de la misma orden y del mismo intento. Si confirma una llamada física activa, informa el estado existente y no vuelve a marcar. Si no puede confirmar llamada física, rechaza la orden duplicada para evitar un segundo marcado a ciegas.
+- Se añadieron logs de confirmación/rechazo con sesión, equipo, contacto, intento y motivo de rechazo. No incluyen el número telefónico.
+
+### Límites y validación pendiente
+
+- Un ACK negativo detiene los reintentos automáticos y conserva la asignación para intervención; no se libera automáticamente porque no se ha probado el estado físico del teléfono.
+- La recuperación tras reinicio del backend funciona al reconectar un teléfono con una asignación activa `dialing`. No se probó con el sistema ni con APK desplegados; la versión local podría diferir de EasyPanel.
+- Pendiente validar en un entorno aislado la pérdida de ACK, desconexión/reconexión, reinicio durante el marcado, terminal perdido y pausa de campaña. Verificar cero llamadas duplicadas y que el contacto continúe al siguiente solo con un estado terminal confirmado.
+- Sin aprobación de despliegue, respaldo externo verificable y plan de rollback no aplicar esta corrección a producción ni reemplazar el APK operativo.

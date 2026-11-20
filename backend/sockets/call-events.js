@@ -56,7 +56,7 @@ import {
 // Extraído del servidor original; conserva validaciones y contratos públicos.
 export function registerCallEvents(runtime, services, socket) {
   const { io, sessions, historyGate, persistence, network } = runtime;
-  const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState } = services;
+  const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState, acknowledgeDialDelivery } = services;
   socket.on("call:action", ({ action, phoneNumber, companyName, contactName, imageUrl, commandId, contactId, workerId }) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -170,6 +170,8 @@ export function registerCallEvents(runtime, services, socket) {
     const { callState, phoneNumber, contactName, companyName, contactId, callId, commandId, micMuted, speakerOn, lineLabel, lastError, externalIncoming, terminalConfirmed, detectedVoicemail, detectedAnnouncement } = payload;
     const session = sessions.get(code);
     if (!session) return;
+    const worker = getPhoneWorkerBySocketId(session, socket.id);
+    if (commandId && worker) acknowledgeDialDelivery?.(code, worker.id, commandId, callId);
 
     // Idempotency: track processed callId+state to avoid duplicate processing
     if (!(session.processedCallIds instanceof Set)) session.processedCallIds = new Set();
@@ -180,7 +182,6 @@ export function registerCallEvents(runtime, services, socket) {
       return;
     }
 
-    const worker = getPhoneWorkerBySocketId(session, socket.id);
     const isExternalIncoming = Boolean(externalIncoming);
     // Independent of commands/optimistic campaign state: only an Android event is evidence.
     const currentAttemptId = worker ? getActiveAttemptId(session, worker.id) : "";
@@ -338,6 +339,15 @@ export function registerCallEvents(runtime, services, socket) {
     if (!session) return;
 
     const worker = getPhoneWorkerBySocketId(session, socket.id);
+    if (action === "dial" && worker) {
+      const assignment = session.campaign?.assignments?.[worker.id];
+      if (assignment?.attemptId && String(commandId || "") === `campaign-${assignment.attemptId}`) {
+        acknowledgeDialDelivery?.(code, worker.id, commandId, assignment.attemptId);
+        const contact = session.campaign?.contacts?.find(item => item.id === assignment.contactId);
+        const deliveryLog = `[CALL_DELIVERY] Android ${ok ? "confirmó" : "rechazó"} la orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} contacto=${String(contact?.name || "sin nombre").slice(0, 40)} intento=${String(assignment.attemptId).slice(-8)}${ok ? "" : ` motivo=${String(message || "sin detalle").replace(/[|\r\n]/g, " ").slice(0, 100)}`}`;
+        (ok ? console.info : console.error)(deliveryLog);
+      }
+    }
     const contact = worker ? getContactByWorker(session, worker.id) : null;
     logOperationalCall({
       campaign: ensureCampaign(session),

@@ -55,7 +55,7 @@ import {
 // Extraído del servidor original; conserva validaciones y contratos públicos.
 export function registerWorkspaceEvents(runtime, services, socket) {
 const { io, sessions, workspaces } = runtime;
-const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneState, emitCampaignState, detachSocketFromCurrentSession, dispatchCampaignCalls, getOrCreateSession, emitState, emitMessageContacts } = services;
+const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneState, emitCampaignState, detachSocketFromCurrentSession, dispatchCampaignCalls, getOrCreateSession, emitState, emitMessageContacts, resumeAssignedDial } = services;
   const openWorkspace = async ({ dashboardClientId, previousCode } = {}) => {
     const user = socket.data.authUser;
     if (!user) return;
@@ -205,7 +205,10 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
                 }
                 session.lastPhoneDisconnectAt = null;
             }
-            setTimeout(() => dispatchCampaignCalls(normalizedCode), 1000);
+            setTimeout(() => {
+              resumeAssignedDial?.(normalizedCode, worker.id);
+              dispatchCampaignCalls(normalizedCode);
+            }, 1000);
         }
     }
   });
