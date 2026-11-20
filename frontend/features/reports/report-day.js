@@ -87,8 +87,8 @@ function renderDay() {
                 <button
                   type="button"
                   data-rubro="${reportState.esc(report.id)}"
-                  class="${report.id === reportState.selectedReport ? "chosen" : ""}"
-                  aria-pressed="${report.id === reportState.selectedReport}"
+                  class="${reportState.selectedReport !== ALL_REPORTS_ID && report.id === reportState.selectedReport ? "chosen" : ""}"
+                  aria-pressed="${reportState.selectedReport !== ALL_REPORTS_ID && report.id === reportState.selectedReport}"
                 >
                   <span class="report-rubro-number">${reportState.visibleRubrosStart + index + 1}</span>
                   <span>${reportState.esc(report.rubro)}${reportState.viewedPeriod ? ` · ${reportState.esc(reportState.formatDetailedDate(report.date))}` : ""}</span>

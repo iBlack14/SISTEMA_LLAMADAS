@@ -797,15 +797,27 @@ body .panel #annualReport .report-filter-field select {
   font: inherit;
   font-size: 13px;
   appearance: none;
+  color-scheme: dark;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f3d7ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
 
+body .panel #annualReport .report-filter-field select option {
+  background-color: #40145a;
+  color: #f8eafa;
+}
+
+body .panel #annualReport .report-filter-field select option:checked,
+body .panel #annualReport .report-filter-field select option:hover {
+  background: #76206f linear-gradient(#76206f, #76206f);
+  color: #fff;
+}
+
 body .panel #annualReport .report-filter-field select:focus-visible {
-  outline: 2px solid #ff81da;
-  outline-offset: 2px;
+  outline: 0;
   border-color: var(--r-accent) !important;
+  box-shadow: 0 0 0 3px rgba(255, 129, 218, .16);
 }
 
 body .panel #annualReport .report-tools {
@@ -994,10 +1006,11 @@ body .panel #annualReport .report-metrics {
   align-items: stretch;
 }
 
-body .panel #annualReport .report-rubros button:hover {
-  border-color: rgba(255, 105, 211, .58) !important;
-  background: rgba(255, 255, 255, .075) !important;
-  box-shadow: 0 5px 14px rgba(13, 0, 22, .16);
+body .panel #annualReport .report-rubros button:not(.chosen):hover {
+  border-color: rgba(255, 105, 211, .5) !important;
+  background: rgba(255, 255, 255, .055) !important;
+  background-image: none !important;
+  box-shadow: 0 3px 10px rgba(13, 0, 22, .12);
   transform: translateY(-1px);
 }
 
