@@ -269,7 +269,8 @@ async function showRange() {
     if (period.from === period.to) {
       return showDay(period.from);
     }
-    reportState.$("reportRangeOpen").disabled = true;
+    const rangeOpenButton = reportState.$("reportRangeOpen");
+    if (rangeOpenButton) rangeOpenButton.disabled = true;
     try {
       const allReports = await reportActions.fetchReports();
       reportState.reports = allReports.filter(report => isInReportPeriod(report.date, period));

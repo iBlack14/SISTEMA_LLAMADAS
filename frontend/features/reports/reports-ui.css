@@ -874,7 +874,10 @@ body .panel #annualReport .report-rubros .report-rubro-owner {
 }
 
 body .panel #annualReport .report-table-wrap {
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: #9553aa #321044;
