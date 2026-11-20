@@ -105,6 +105,7 @@ runtime.app.get("/api/session/:code/reports/calendar", (req, res) => {
 // Vista de administrador: consolida los reportes de todas las cuentas.
 runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const requestStartedAt = performance.now();
   const date = String(req.query.date || "");
   const from = String(req.query.from || "");
   const to = String(req.query.to || "");
@@ -118,13 +119,16 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     return res.status(400).json({ ok: false, error: "Fecha invalida" });
   }
   try {
+    const usersQueryStartedAt = performance.now();
     const [users] = await runtime.auth.pool.query(
       "SELECT id,username FROM auth_users ORDER BY username");
+    const usersQueryMs = performance.now() - usersQueryStartedAt;
     const names = new Map(users.map(user => [String(user.id), user.username]));
     if (userId && !names.has(userId)) {
       return res.status(400).json({ ok: false, error: "El usuario seleccionado no existe." });
     }
     const reports = [];
+    const reportBuildStartedAt = performance.now();
     const reportContext = services.createReportContext();
     for (const [code, session] of runtime.sessions) {
       const ownerId = String(session.ownerUserId || "");
@@ -142,6 +146,9 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) ||
       String(a.owner).localeCompare(String(b.owner), "es") ||
       String(a.rubro).localeCompare(String(b.rubro), "es"));
+    const reportBuildMs = performance.now() - reportBuildStartedAt;
+    const totalMs = performance.now() - requestStartedAt;
+    res.setHeader("Server-Timing", `users;dur=${usersQueryMs.toFixed(1)}, reports;dur=${reportBuildMs.toFixed(1)}, total;dur=${totalMs.toFixed(1)}`);
     return res.json({ ok: true, reports, users: users.map(user => ({ id: String(user.id), username: user.username })), storage: runtime.persistence.status() });
   } catch {
     return res.status(503).json({ ok: false, error: "No se pudieron cargar los reportes de todos los usuarios." });

@@ -929,10 +929,10 @@ body .panel #annualReport .report-rubros button:hover,
 body .panel #annualReport .report-rubros button:focus-visible {
   position: relative;
   grid-template-columns: 34px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-content: stretch;
+  grid-template-rows: auto auto;
+  align-content: start;
   gap: 7px 10px;
-  min-height: 104px;
+  min-height: 78px;
   padding: 12px;
   border: 1px solid rgba(231, 192, 245, .24) !important;
   border-radius: 12px !important;
@@ -960,6 +960,7 @@ body .panel #annualReport .report-rubros button > span:nth-child(2) {
 
 body .panel #annualReport .report-rubros .report-rubro-number {
   display: grid;
+  grid-row: 1;
   place-items: center;
   width: 30px;
   height: 30px;
@@ -972,6 +973,9 @@ body .panel #annualReport .report-rubros .report-rubro-number {
 }
 
 body .panel #annualReport .report-rubros .report-rubro-owner {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 3px;
   overflow: hidden;
   color: #cfb4dc !important;
   font-size: 11px;
@@ -979,6 +983,15 @@ body .panel #annualReport .report-rubros .report-rubro-owner {
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+body .panel #annualReport .report-rubros button[data-team] {
+  min-height: 68px;
+}
+
+body .panel #annualReport .report-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr));
+  align-items: stretch;
 }
 
 body .panel #annualReport .report-rubros button:hover {
