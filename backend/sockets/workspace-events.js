@@ -154,12 +154,14 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
       }
     }
     let rotatedPairingToken = "";
+    let joinedWorkerId = "";
     if (role === "phone") {
       const worker = upsertPhoneWorker(session, {
         socketId: socket.id,
         deviceId: deviceId || "web-phone",
         deviceName: deviceName || "Android bridge"
       });
+      joinedWorkerId = worker.id;
       if (pairingSlot) {
         bindDeviceToPairingSlot(session, pairingSlot, {
           deviceId: deviceId || worker.id,
@@ -206,7 +208,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
                 session.lastPhoneDisconnectAt = null;
             }
             setTimeout(() => {
-              resumeAssignedDial?.(normalizedCode, worker.id);
+              resumeAssignedDial?.(normalizedCode, joinedWorkerId);
               dispatchCampaignCalls(normalizedCode);
             }, 1000);
         }

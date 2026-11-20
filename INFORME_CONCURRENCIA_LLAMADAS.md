@@ -342,3 +342,13 @@ En respuesta al incidente, el árbol local recibió una corrección de entrega y
 - La recuperación tras reinicio del backend funciona al reconectar un teléfono con una asignación activa `dialing`. No se probó con el sistema ni con APK desplegados; la versión local podría diferir de EasyPanel.
 - Pendiente validar en un entorno aislado la pérdida de ACK, desconexión/reconexión, reinicio durante el marcado, terminal perdido y pausa de campaña. Verificar cero llamadas duplicadas y que el contacto continúe al siguiente solo con un estado terminal confirmado.
 - Sin aprobación de despliegue, respaldo externo verificable y plan de rollback no aplicar esta corrección a producción ni reemplazar el APK operativo.
+
+## Caídas del backend observadas el 2026-11-20, 10:09–10:16
+
+El nuevo lote confirma que la versión de backend subida a EasyPanel se cae al conectarse un teléfono: `workspace-events.js:209` evalúa `worker.id`, pero `worker` solo existe dentro del bloque anterior de `role === "phone"`. Node registra `ReferenceError: worker is not defined` y termina el proceso. El reinicio recarga cinco sesiones desde MySQL y vuelve a escuchar; el mismo error se repite al siguiente ingreso de teléfono. Esto explica los reinicios y puede interrumpir las llamadas mientras el backend está caído.
+
+La causa fue una referencia fuera de alcance añadida al cambio de recuperación de órdenes. Se corrigió en el árbol local usando el ID del equipo guardado antes del temporizador. **La corrección aún debe desplegarse** para que deje de ocurrir en EasyPanel.
+
+El lote también muestra instantáneas completas de hasta ~47 MB, `snapshotBuildMs` de ~700 ms y una `queueWaitMs` observada de 3520 ms. Es un factor de demora adicional, pero no causó el `ReferenceError`. El contador de intentos permaneció en 511 en las líneas compartidas; el archivo no contiene eventos de llamadas suficientes para concluir qué pasó con cada teléfono o contacto.
+
+No se hicieron cambios directamente en EasyPanel ni se ejecutaron llamadas. Antes de probar campañas en producción hay que desplegar este arreglo de alcance junto con el flujo de reintento, luego confirmar en logs que ya no aparecen `ReferenceError`/reinicios y validar una llamada controlada.
