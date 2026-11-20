@@ -18,6 +18,8 @@
     "backup:history": "node backend/scripts/migrate-call-history.js --backup-only",
     "restore:history": "node backend/scripts/migrate-call-history.js --restore",
     "rollback:contact-books": "node backend/scripts/rollback-contact-book-normalization.js",
+    "migrate:session-data": "node backend/scripts/normalize-session-data.js",
+    "rollback:session-data": "node backend/scripts/rollback-session-data-normalization.js",
     "dev": "node --watch backend/index.js",
     "start:web": "node backend/index.js",
     "dev:web": "node --watch backend/index.js",

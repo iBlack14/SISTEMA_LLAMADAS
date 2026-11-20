@@ -1,5 +1,32 @@
 # Informe de concurrencia de llamadas
 
+## Evidencia nueva y limpieza del VPS (2026-11-20)
+
+La inspección y limpieza fueron autorizadas por el usuario. Se hizo respaldo lógico externo de la base antes de purgar binlogs. No se reiniciaron servicios ni se cambiaron filas de la aplicación.
+
+### Hallazgos confirmados
+
+- Antes de limpiar, el disco raíz tenía 94 GB usados de 96 GB (**98%**, 2.4 GB libres); 86 `binlog.*` sumaban unos 84 GB. Una purga inicial de 24 horas liberó solo ~1.3 GB; tras conservar seis horas, se observaron unos 35 GB de binlogs dentro de esa ventana. Finalmente, con la copia ya verificada en el VPS y sin réplicas, se purgó con SQL hasta conservar solo el binlog activo. Resultado: 11 GB usados de 96 (**11%**, 86 GB libres), dos archivos binlog de unos 8 KB en total.
+- Configuración inicial: `log_bin=ON`, `binlog_format=ROW`, `binlog_row_image=FULL`, `max_binlog_size=1 GiB`, `binlog_expire_logs_seconds=259200` (3 días), `innodb_redo_log_capacity=100 MiB`. Con autorización, `binlog_expire_logs_seconds` quedó persistido en **21600 segundos (6 horas)**. `SHOW REPLICAS` y `SHOW REPLICA STATUS` devolvieron cero antes de purgar. La retención limita el crecimiento futuro, pero la generación observada requiere seguimiento.
+- Respaldo lógico `llamadas1`: 62,020,458 bytes; `mysqldump` terminó con código 0, incluye 17 `CREATE TABLE`, marcador `Dump completed` y SHA-256 `C9B6C73816057ADB8418B7FF9DE2C77508B5AF366D701C1AF5079F7756A7A983`. Copia en el VPS: `/root/backups/llamadas1/llamadas1.sql` (modo 600, directorio 700); el hash coincide con la copia externa. El manifiesto incluye instrucciones y huellas. No se probó importar el dump: Docker Desktop local no estaba iniciado. El snapshot SQL corresponde a 2026-11-20 20:44:23 UTC; no incluye coordenadas para PITR desde binlogs.
+- El contenedor MySQL mostró `Innodb_log_waits=0` y dos hilos ejecutándose en el instante de la consulta. Son valores puntuales; no invalidan las advertencias históricas `[MY-014089]` en las que el escritor de redo llegó al límite de 100 MiB.
+- El código dentro del contenedor actual mantiene el flujo `phone:status` → `await historyGate.commit(...)` y actualiza el JSON completo de `sessions.data`. La imagen en producción no es byte por byte igual al workspace local (los SHA-256 de `call-events.js`, `persistence.js` y `call-history-gate.js` difieren); no se debe asumir que un cambio local ya está desplegado.
+- La imagen actual tampoco contiene la optimización local `getPendingSessionCodes()` para limitar los reintentos de `retryPending()` a sesiones sucias. Esa optimización reduce reconstrucciones en el temporizador de recuperación, pero por sí sola no elimina el snapshot completo que se persiste por cada `phone:status`.
+- Estado guardado al consultar: `venta1` figura **paused**, con 1,911 contactos (30 completados) y cero workers conectados. `venta2` figura **running**, con 5,525 contactos (190 completados, 221 fallidos) y un worker conectado en `ringing`; su último `updatedAt` guardado fue 2026-11-20 18:28:04Z. Otras dos sesiones guardadas figuran `running`, pero sin workers conectados. Esos estados provienen de snapshots en MySQL y pueden estar desactualizados; no prueban el estado físico actual del Xiaomi.
+- `docker logs` no devolvió líneas de la app en la ventana reciente consultada. Por ello no hay evidencia de ese flujo de logs para fijar el último ACK o identificar quién pausó `venta1`; tampoco se debe interpretar el resultado vacío como prueba de que no hubo eventos si EasyPanel los recoge por otra vía.
+
+### Causa más probable de la presión y relación con la parada
+
+La ruta de `phone:status` modifica campos de sesión y espera el commit durable antes de enviar `phone:status_ack`; para un estado terminal, el siguiente despacho se programa después de ese commit. `CallHistoryGate` serializa eventos de una sesión y `SessionPersistence.save()` encadena escrituras con un `saveChain` global. `saveNow()` reemplaza `sessions.data` completo cuando detecta cambios. Como MySQL usa binlog por filas con imagen `FULL`, cada cambio de una fila JSON de hasta 32 MB puede producir mucho más binlog que el tamaño final de la tabla. La combinación encaja con los 84 GB observados, aunque no se midió una tasa de escritura ni cada evento de MySQL para cerrar la atribución exacta.
+
+La presión del disco y las esperas del redo pueden alargar o fallar el commit que confirma los estados de Android y retrasa el siguiente marcado. Esto es un mecanismo demostrado por el orden del código y coherente con las advertencias y el tamaño de los binlogs; falta correlacionar un incidente concreto con `queueWaitMs`, `persistMs`, ACK y el historial horario de los binlogs. Para el snapshot actual de `venta1`, además, el motivo inmediato por el que no inicia es que la campaña está pausada y no tiene workers conectados. Para `venta2`, un estado guardado `ringing` sin terminal puede retener ese worker; hay que cotejarlo con Android antes de liberarlo o volver a marcar.
+
+### Estado posterior a la limpieza y pendientes
+
+- La purga se hizo por SQL de MySQL, que actualiza su índice; no se borraron archivos manualmente. Los contenedores de llamadas y MySQL siguieron arriba. No se alteró `innodb_redo_log_capacity`, no se desplegó código ni se ejecutó migración.
+- El dump tiene cierre correcto y checksum, pero la importación de prueba queda pendiente. No se modificó la política de usuarios/grants de MySQL.
+- Siguiente corrección: identificar el commit exacto de la imagen EasyPanel; probar restauración del dump en una instancia aislada; capturar el estado físico del worker `ringing`; diseñar persistencia incremental pequeña que conserve el intento durable y medir escritura/latencia antes de desplegar. Revisar el espacio nuevamente durante carga, porque el origen de los binlogs sigue activo en el código.
+
 ## Estado para continuar los fixes
 
 Este informe es el resumen único de lo corregido y lo que falta. Los cambios descritos son locales; no están desplegados en EasyPanel ni se probaron contra la base productiva.
