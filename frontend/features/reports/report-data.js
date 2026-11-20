@@ -25,16 +25,17 @@ function endpoint(path) {
 }
 
 async function fetchReports(date = "") {
-    const query = date
-      ? `?date=${encodeURIComponent(date)}`
-      : "";
     const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
     const viewAll = isAdmin && reportState.reportScope !== "mine";
-
-    // El administrador puede consultar todas las cuentas; el empleado solo la suya.
-    const url = viewAll
-      ? `/api/reports/all${query}`
-      : endpoint("/reports/daily" + query);
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    if (viewAll && String(reportState.reportScope).startsWith("user:")) {
+      params.set("userId", String(reportState.reportScope).slice(5));
+    }
+    const queryString = params.toString();
+    const query = queryString ? `?${queryString}` : "";
+    // El administrador puede filtrar por usuario; empleado y vista personal conservan su propia sesión.
+    const url = viewAll ? `/api/reports/all${query}` : endpoint("/reports/daily" + query);
     if (!viewAll) {
       const context = reportSession();
       if (!context.code || !context.token) {
@@ -52,6 +53,8 @@ async function fetchReports(date = "") {
       throw Error(data.error || "Error consultando reportes");
     }
 
+    if (Array.isArray(data.users)) reportState.reportUsers = data.users;
+
     return data.reports || [];
   }
 
@@ -61,9 +64,14 @@ async function fetchReports(date = "") {
     const query = year ? `?year=${encodeURIComponent(year)}` : "";
     const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
     const viewAll = isAdmin && reportState.reportScope !== "mine";
-    const url = viewAll
-      ? `/api/reports/calendar${query}`
-      : endpoint("/reports/calendar" + query);
+    const params = new URLSearchParams();
+    if (year) params.set("year", year);
+    if (viewAll && String(reportState.reportScope).startsWith("user:")) {
+      params.set("userId", String(reportState.reportScope).slice(5));
+    }
+    const filteredQueryString = params.toString();
+    const filteredQuery = filteredQueryString ? `?${filteredQueryString}` : "";
+    const url = viewAll ? `/api/reports/calendar${filteredQuery}` : endpoint("/reports/calendar" + query);
     if (!viewAll) {
       const context = reportSession();
       if (!context.code || !context.token) {

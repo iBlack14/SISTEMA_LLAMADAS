@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import compression from "compression";
 import { selectPendingReportContacts } from "../services/reports/report-selection.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks } from "../services/campaigns/contact-book.js";
 import {
@@ -31,6 +32,12 @@ import {
  * Se construye una vez por proceso.
  */
 export function registerReports(runtime, services) {
+// Se registra antes de las rutas de reportes: la compresión global de estáticos
+// se instala después y no alcanza a estas respuestas JSON grandes.
+runtime.app.use(
+  ["/api/reports/all", "/api/session/:code/reports/daily"],
+  compression({ threshold: 1024 })
+);
 runtime.app.get("/api/session/:code/reports/attempts", async (req, res) => {
   const code = String(req.params.code || "").toUpperCase().trim();
   const session = runtime.sessions.get(code);
@@ -92,6 +99,7 @@ runtime.app.get("/api/session/:code/reports/calendar", (req, res) => {
 runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const date = String(req.query.date || "");
+  const userId = String(req.query.userId || "");
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ ok: false, error: "Fecha invalida" });
   }
@@ -99,10 +107,13 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     const [users] = await runtime.auth.pool.query(
       "SELECT id,username FROM auth_users ORDER BY username");
     const names = new Map(users.map(user => [String(user.id), user.username]));
+    if (userId && !names.has(userId)) {
+      return res.status(400).json({ ok: false, error: "El usuario seleccionado no existe." });
+    }
     const reports = [];
     for (const [code, session] of runtime.sessions) {
       const ownerId = String(session.ownerUserId || "");
-      if (!ownerId) continue;
+      if (!ownerId || (userId && ownerId !== userId)) continue;
       for (const report of services.reportData(session, date)) {
         reports.push({
           ...report,
@@ -116,7 +127,7 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     reports.sort((a, b) => String(b.date).localeCompare(String(a.date)) ||
       String(a.owner).localeCompare(String(b.owner), "es") ||
       String(a.rubro).localeCompare(String(b.rubro), "es"));
-    return res.json({ ok: true, reports, storage: runtime.persistence.status() });
+    return res.json({ ok: true, reports, users: users.map(user => ({ id: String(user.id), username: user.username })), storage: runtime.persistence.status() });
   } catch {
     return res.status(503).json({ ok: false, error: "No se pudieron cargar los reportes de todos los usuarios." });
   }
@@ -126,11 +137,13 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
 runtime.app.get("/api/reports/calendar", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const year = String(req.query.year || "");
+  const userId = String(req.query.userId || "");
   if (year && !/^\d{4}$/.test(year)) return res.status(400).json({ ok: false, error: "Año invalido" });
+  if (userId && !/^\d+$/.test(userId)) return res.status(400).json({ ok: false, error: "Usuario invalido" });
   try {
     const dates = {};
     for (const [code, session] of runtime.sessions) {
-      if (!session.ownerUserId) continue;
+      if (!session.ownerUserId || (userId && String(session.ownerUserId) !== userId)) continue;
       const partial = services.calendarReportDates(session, year);
       for (const [date, count] of Object.entries(partial)) {
         dates[date] = (dates[date] || 0) + count;

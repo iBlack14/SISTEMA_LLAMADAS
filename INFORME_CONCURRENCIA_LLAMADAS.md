@@ -1,5 +1,39 @@
 # Informe de concurrencia de llamadas
 
+## Estado para continuar los fixes
+
+Este informe es el resumen único de lo corregido y lo que falta. Los cambios descritos son locales; no están desplegados en EasyPanel ni se probaron contra la base productiva.
+
+### Corregido localmente
+
+- Las campañas agregadas aceptan contactos de sus listas reales y el backend respeta `maxAttempts` del panel.
+- El estado de un worker desconectado ya no libera contactos asignados sin confirmar el fin físico de la llamada. Se evita ceder la lista silenciosamente a otro Xiaomi.
+- La finalización espera persistencia antes de confirmar al teléfono y avanzar la cola; la caché de intentos se invalida por revisiones.
+- Si MySQL falla antes de emitir una orden, el despacho reintenta el guardado con backoff y mantiene el mismo `callId`/`commandId`. La orden solo se emite después del guardado. Si el worker está desconectado, conserva la reserva y espera su reconexión.
+- Los guardados locales de una sola sesión se acotan a esa sesión; se redujeron recorridos de contactos, el DOM de la libreta y las respuestas con historial de campaña. El progreso de la libreta puede consultar columnas compactas de intentos SQL.
+- Se preparó la normalización de contactos a tablas MySQL con validación transaccional y rollback. **No se ejecutó**; no se migró a Supabase. MySQL sigue siendo el almacenamiento actual.
+
+### Validación conocida
+
+- Suite completa, ejecutada tras deduplicar: 89 aprobadas, 1 fallida y 1 omitida. La falla restante es el test de arquitectura CSS (espera 23 imports, encuentra 1); la omitida requiere conexión MySQL.
+- Campañas: 20/20 pruebas enfocadas pasan, incluidas simulaciones de fallo/reintento de persistencia y reconexión. Contratos HTTP y campañas combinados: 22/22; incluyen las redirecciones de las rutas de imagen antiguas.
+- Android: el build y `testDebugUnitTest` pasaron previamente con JDK 17; este último cambio solo toca backend e informe.
+- No se conectó a ninguna base, no se enviaron órdenes a teléfonos y no se hicieron llamadas reales.
+
+### Pendiente prioritario
+
+1. Restaurar el dump en una base aislada y medir fallos/recuperación de MySQL, tamaño y duración de cada guardado.
+2. Simular reconexión y reinicio del backend mientras Android está en `dialing` y `in_call`; confirmar reconciliación por `callId` sin duplicar una llamada.
+3. Medir campañas de 100, 1,000 y 10,000 contactos. `campaign:state` todavía envía la campaña completa y la web vuelve a recorrer los contactos; falta reducir esos payloads y completar paginación real desde servidor.
+4. Confirmar respaldo restaurable y rollback antes de habilitar la migración de contactos en EasyPanel. No desplegarla solo por tener el código preparado.
+5. Verificar que el árbol local y la versión desplegada coincidan. Todavía no hay datos de latencia productiva que prueben cuánto explican estos cuellos.
+
+### Limpieza realizada
+
+- Se revisaron carpetas de pruebas: las siete suites Node se ejecutan con `npm test`; `android-app/app/src/test` corresponde a pruebas Gradle. No encontré carpetas de pruebas claramente abandonadas y las conservé.
+- Revisión y deduplicación: de 71 flyers/miniaturas se encontró un solo par idéntico (`tienda-virtual-de-muebles-moderna.webp` / `tiendas-de-muebles.webp`, más sus miniaturas). Se retiró del catálogo la variante redundante y se borraron sus dos archivos, ahorrando 269,328 bytes (aprox. 263 KiB). Se añadieron redirecciones de las dos rutas antiguas a los assets canónicos para mantener imágenes de plantillas que ya estén guardadas en MySQL (`backend/routes/static.js`); la base no se modificó. El dump SQL no está disponible aquí para contar cuántas filas antiguas usan esa ruta. El logo, iconos de llamada e iconos Android tienen referencias activas.
+- Se eliminó solo `.screenshots/.tmp`, que estaba vacío. Se conservaron `.local-test/sessions.json` y `android-app/import-backup` por si contienen datos de trabajo o recuperación.
+
 ## Actualización posterior de correcciones locales
 
 El análisis de abajo documenta el estado encontrado antes de iniciar las correcciones. Con autorización del usuario se aplicaron cambios locales, aún no desplegados. Validación local ejecutada el 2026-11-19:

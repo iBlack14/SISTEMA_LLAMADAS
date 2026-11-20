@@ -42,6 +42,16 @@ test("HTTP contracts, authentication, shared assets and Android pairing remain c
     "/shared/reports/report-metrics.js", "/shared/assets/images/logo-vc-color.png"
   ]) assert.equal((await fetch(base + resource)).status, 200, resource);
 
+  for (const [legacy, canonical] of [
+    ["/features/messaging/campaign-2027/tienda-virtual-de-muebles-moderna.webp", "/features/messaging/campaign-2027/tiendas-de-muebles.webp"],
+    ["/features/messaging/campaign-2027/thumbs/tienda-virtual-de-muebles-moderna.webp", "/features/messaging/campaign-2027/thumbs/tiendas-de-muebles.webp"]
+  ]) {
+    const response = await fetch(base + legacy, { redirect: "manual" });
+    assert.equal(response.status, 302, legacy);
+    assert.equal(response.headers.get("location"), canonical);
+    assert.equal((await fetch(base + canonical)).status, 200, canonical);
+  }
+
   const response = await fetch(base + "/api/android/pair", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
   });

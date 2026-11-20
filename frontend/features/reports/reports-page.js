@@ -42,6 +42,7 @@ reportState.formatDetailedDate = value => {
   };
 reportState.isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMINISTRADOR";
 reportState.reportScope = reportState.isAdmin ? "all" : "mine";
+reportState.reportUsers = [];
 reportState.year = new Date().getFullYear();
 reportState.hoverDate = "";
 reportState.selectedDate = "";

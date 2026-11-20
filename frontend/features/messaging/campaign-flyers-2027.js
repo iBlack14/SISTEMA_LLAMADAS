@@ -280,11 +280,6 @@ export const CAMPAIGN_FLYERS_2027 = Object.freeze([
     "category": "Comercio y servicios"
   },
   {
-    "name": "Tienda Virtual de Muebles Moderna",
-    "image": "/features/messaging/campaign-2027/tienda-virtual-de-muebles-moderna.webp",
-    "category": "Tecnología y web"
-  },
-  {
     "name": "TIENDAS DE MUEBLES",
     "image": "/features/messaging/campaign-2027/tiendas-de-muebles.webp",
     "category": "Hogar y construcción"

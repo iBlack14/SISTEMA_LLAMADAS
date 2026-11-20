@@ -4,6 +4,14 @@ import { isInReportPeriod, reportPeriodLabel } from "./report-period.js";
 export function createReportDay(reportState, reportActions) {
 function renderDay() {
   const activeReport = reportState.reports.find(item => item.id === reportState.selectedReport);
+  const userFilterOptions = reportState.isAdmin ? `
+    <option value="all" ${reportState.reportScope === "all" ? "selected" : ""}>Todos los usuarios</option>
+    <option value="mine" ${reportState.reportScope === "mine" ? "selected" : ""}>Mis reportes</option>
+    ${(reportState.reportUsers || []).map(user => {
+      const value = `user:${user.id}`;
+      return `<option value="${reportState.esc(value)}" ${reportState.reportScope === value ? "selected" : ""}>${reportState.esc(user.username)}</option>`;
+    }).join("")}
+  ` : "";
   const detailedTeams = reportState.showingDetailedReport && activeReport
     ? Array.from(new Set([
         ...(activeReport.rows || []).map(contact => contact.workerName),
@@ -27,21 +35,25 @@ function renderDay() {
 
   reportState.$("dailyReportMount").innerHTML = `
     <div class="report-day-toolbar">
-      <div class="report-day-title">
+      <div class="report-toolbar-top">
+       <div class="report-day-title">
         <h2>REPORTE DE LLAMADAS</h2>
         <p id="reportPeriodSummary">${reportState.esc(reportPeriodLabel(reportState.viewedPeriod || {from: reportState.selectedDate, to: reportState.selectedDate}))}</p>
+       </div>
+       <div class="report-filter-controls">
         ${reportState.isAdmin ? `
-          <label class="report-scope-select" for="reportScope">Ver
-            <select id="reportScope">
-              <option value="all" ${reportState.reportScope === "all" ? "selected" : ""}>Todos los usuarios</option>
-              <option value="mine" ${reportState.reportScope === "mine" ? "selected" : ""}>Solo mis reportes</option>
-            </select>
+          <label class="report-filter-field" for="reportScope">
+            <span>Usuario</span>
+            <select id="reportScope" aria-label="Filtrar reportes por usuario">${userFilterOptions}</select>
           </label>` : ""}
         ${reportState.viewedPeriod && reportState.reports.length ? `
-          <label for="reportRangeRecord">Fecha y rubro</label>
-          <select id="reportRangeRecord">
-            ${reportState.reports.map(report => `<option value="${reportState.esc(report.id)}" ${report.id === reportState.selectedReport ? "selected" : ""}>${reportState.esc(reportState.formatDetailedDate(report.date))} · ${reportState.esc(report.rubro)}</option>`).join("")}
-          </select>` : ""}
+          <label class="report-filter-field" for="reportRangeRecord">
+            <span>Fecha y rubro</span>
+            <select id="reportRangeRecord">
+              ${reportState.reports.map(report => `<option value="${reportState.esc(report.id)}" ${report.id === reportState.selectedReport ? "selected" : ""}>${reportState.esc(reportState.formatDetailedDate(report.date))} · ${reportState.esc(report.rubro)}${report.owner ? ` · ${reportState.esc(report.owner)}` : ""}</option>`).join("")}
+            </select>
+          </label>` : ""}
+       </div>
       </div>
       <div class="report-tools ${reportState.showingDetailedReport ? "report-tools-teams" : ""}">
         ${reportState.showingDetailedReport
@@ -184,7 +196,10 @@ function renderDayNavigation() {
     `);
   }
 async function setReportScope(scope) {
-  reportState.reportScope = scope === "all" ? "all" : "mine";
+  const nextScope = String(scope || "");
+  reportState.reportScope = ["all", "mine"].includes(nextScope) || /^user:\d+$/.test(nextScope)
+    ? nextScope
+    : "all";
   reportState.selectedReport = "";
   reportState.showingDetailedReport = false;
   reportState.detailedPendingOnly = false;

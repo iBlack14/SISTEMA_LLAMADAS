@@ -4,6 +4,18 @@ import compression from "compression";
 export function registerStatic(runtime) {
   const { app, auth, paths, instanceIdentity } = runtime;
 
+  // Legacy user templates may still reference the duplicate flyer filename.
+  // Redirect both the full image and its preview to the canonical asset.
+  app.get([
+    "/features/messaging/campaign-2027/tienda-virtual-de-muebles-moderna.webp",
+    "/features/messaging/campaign-2027/thumbs/tienda-virtual-de-muebles-moderna.webp"
+  ], (req, res) => {
+    const canonical = req.path.includes("/thumbs/")
+      ? "/features/messaging/campaign-2027/thumbs/tiendas-de-muebles.webp"
+      : "/features/messaging/campaign-2027/tiendas-de-muebles.webp";
+    return res.redirect(302, canonical);
+  });
+
   // Compresión gzip/deflate para respuestas HTTP (CSS, JS, JSON, HTML)
   app.use(compression({
     level: 6,
