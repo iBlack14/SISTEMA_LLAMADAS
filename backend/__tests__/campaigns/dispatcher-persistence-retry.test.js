@@ -83,3 +83,35 @@ test("a persistence retry is cancelled if the assignment no longer belongs to th
     globalThis.setTimeout = originalSetTimeout;
   }
 });
+
+test("a disconnected worker keeps the same reservation until it reconnects", async () => {
+  const pendingTimers = [];
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay) => {
+    pendingTimers.push({ callback, delay });
+    return { unref() {} };
+  };
+  try {
+    const state = setup(async () => ({ committed: true }));
+    state.session.phoneWorkers[0].connected = false;
+    state.session.phoneWorkers[0].socketId = null;
+    state.runtime.io.sockets.sockets.get("socket-1").connected = false;
+
+    await state.dispatcher.sendPersistedDial(state.code, "socket-1", state.payload);
+    assert.equal(state.sent.length, 0);
+    assert.equal(pendingTimers[0].delay, 1000);
+
+    pendingTimers.shift().callback();
+    assert.equal(pendingTimers[0].delay, 2000);
+    state.session.phoneWorkers[0].connected = true;
+    state.session.phoneWorkers[0].socketId = "socket-1";
+    state.runtime.io.sockets.sockets.get("socket-1").connected = true;
+    pendingTimers.shift().callback();
+
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].event, "call:action");
+    assert.equal(state.sent[0].data.commandId, state.payload.commandId);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+});

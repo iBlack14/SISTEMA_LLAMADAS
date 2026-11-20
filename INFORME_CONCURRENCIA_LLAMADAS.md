@@ -19,8 +19,8 @@ El análisis de abajo documenta el estado encontrado antes de iniciar las correc
 - El progreso de la libreta lee de MySQL solo teléfono, duración y resultado del intento, en lugar de transferir y parsear cada `row_data` JSON; además reutiliza el mapa de bloqueos anuales cacheado.
 - Si falla el guardado previo al marcado, el mismo `callId`/`commandId` queda reservado y reintenta persistencia con backoff exponencial hasta guardar o hasta que cambie/finalice la asignación. La orden solo se emite tras guardar. La espera por un worker desconectado también conserva la reserva y reintenta con backoff, sin liberar la llamada por timeout.
 
-- `npm test`: 88 aprobadas, 1 fallida, 1 omitida. El fallo está en `backend/__tests__/architecture/frontend.test.js`: espera 23 imports CSS y encuentra 1 en `frontend/shared/styles/base.css`. No está relacionado con esta corrección. La prueba omitida requiere `WORKSPACE_MYSQL_TEST=1`; no se activó porque esta validación no debía tocar ninguna base.
-- Pruebas enfocadas de campañas: 19/19 aprobadas. La simulación nueva inyecta dos fallos de persistencia, comprueba backoff de 1 y 2 segundos y verifica que la orden salga una sola vez con el mismo identificador después del guardado; también verifica que una asignación cancelada no se envíe. Las pruebas sintéticas de progreso compacto y snapshots siguen pasando.
+- `npm test`: 89 aprobadas, 1 fallida, 1 omitida. El fallo está en `backend/__tests__/architecture/frontend.test.js`: espera 23 imports CSS y encuentra 1 en `frontend/shared/styles/base.css`. No está relacionado con esta corrección. La prueba omitida requiere `WORKSPACE_MYSQL_TEST=1`; no se activó porque esta validación no debía tocar ninguna base.
+- Pruebas enfocadas de campañas: 20/20 aprobadas. Las simulaciones de despacho inyectan dos fallos de persistencia, comprueban backoff de 1 y 2 segundos, orden persistir-antes-de-emitir y conservación de IDs, cancelación tras cambiar la asignación, y reintento al reconectarse el worker. También pasan las pruebas sintéticas de progreso compacto y snapshots.
 - Android: `:app:assembleDebug testDebugUnitTest` con JDK 17 terminó con `BUILD SUCCESSFUL`; se generó `android-app/app/build/outputs/apk/debug/VOIP-VC-debug.apk` (aprox. 87 MB). Gradle reportó avisos de APIs obsoletas para Gradle 9, sin impedir este build.
 - `git diff --check` no reportó errores de whitespace. No se hicieron llamadas reales, no se conectó a MySQL y no se desplegaron estos cambios.
 
@@ -141,7 +141,7 @@ La matriz C1–C10 de arriba pertenece a una revisión anterior y no debe tomars
 
 ### Hallazgo nuevo: fallo del guardado previo al envío puede dejar una reserva huérfana
 
-**Confirmado por código, sin reproducción con MySQL:** `dispatchCampaignCalls()` asigna el contacto al worker y establece estados `dialing` antes de invocar `sendPersistedDial()` (`backend/services/calls/dispatcher.js:188-213`). Si `persistence.save()` falla, `sendPersistedDial()` captura el error, muestra `call:error` y termina sin emitir `call:action` (`dispatcher.js:38-56`). No libera ni revierte la asignación. Las llamadas de reintento de `scheduleDialRetry()` solo cubren al worker desconectado (`dispatcher.js:60-103`), no el error de persistencia. Un siguiente despacho excluye al worker porque tiene asignación activa (`dispatcher.js:176-186`). El reintento general de persistencia cada 10 segundos no tiene recibo asociado al envío de esa orden (`runtime-lifecycle.js:85-87`).
+**Defecto confirmado por código y corregido localmente:** `dispatchCampaignCalls()` reserva al worker antes de guardar (`backend/services/calls/dispatcher.js:188-213`). Antes, si `persistence.save()` fallaba, no se emitía `call:action` y la reserva quedaba activa sin un reintento ligado a ella. Ahora `sendPersistedDial()` agenda reintentos de persistencia con backoff y conserva el mismo `commandId`/`callId`; cancela el reintento si cambia la asignación o el intento ya finalizó (`dispatcher.js:33-80`). Si el equipo está desconectado antes del envío, la reserva se conserva y el despacho espera su reconexión con backoff (`dispatcher.js:101-121`). Pruebas sintéticas reproducen ambos caminos; falta probar fallos de MySQL y reconexión contra un entorno integrado.
 
 El impacto esperado era una campaña que dejaba de avanzar en ese worker tras una falla temporal de MySQL, aunque Android nunca recibiera la orden. **Corregido localmente:** se conserva “persistir antes de marcar”; los errores previos al emit programan un reintento con backoff hasta que el intento ya no esté asignado o el historial indique que terminó. La orden conserva `commandId`/`callId` y solo sale después del guardado exitoso. La prueba sintética cubre varios fallos seguidos, recuperación, orden de persistencia/emisión y cancelación. No se validó con una transacción MySQL real.
 
@@ -239,27 +239,29 @@ Rollback: volver al build anterior del proceso Node. No hace falta migración de
 
 ## 10. Preguntas abiertas
 
-- ¿El proceso que hoy llama en producción tiene este `call-history-gate.js:39` y este `retryPending` de 10 s? Más de una llamada automática no descarta este archivo: el reintento puede estar reanudando la cola.
-- ¿Las pausas entre llamadas se acercan a 10 s más el tiempo de `persistMs`? Eso encajaría con C1 más C5. Un corte seco, sin otro marcado aunque MySQL responda, no encaja con este árbol.
-- ¿El operador usa el botón general o el botón por equipo? El primero, en este árbol, no elige contactos.
+- ¿El proceso que opera en EasyPanel coincide con esta versión local, incluyendo el reintento de orden de despacho añadido ahora?
+- ¿Cuánto tardan `save`, `phone:status`, `callRestrictions` y la recepción/render de `campaign:state` con 100, 1,000 y 10,000 contactos? Necesitamos logs comparables antes/después.
+- ¿Se reproduce una llamada activa durante reinicio del backend y cuál evento llega primero al reconectar: el estado físico de Android o una nueva reserva?
+- ¿Los ACK negativos siempre se acompañan de `phone:status` terminal correlacionado? Probar pérdida del status, desconexión durante error y reconexión.
+- ¿Puede un mismo `deviceId` vincularse a dos sesiones reales? El árbol no mantiene un registro global para impedirlo.
 - Tamaño real de cada `sessions.data`, frecuencia de `UPDATE` y `binlog_format` durante una campaña. Sin eso, los 76 GB siguen siendo correlación.
 - Si el Xiaomi emite `ended` con el mismo `callId` de la asignación. Sin ese par, `updateActiveCallState` no suelta al worker (`campaign-manager.js:630` y `:636`).
 
 ## 11. Checklist de aceptación
 
 - Cero llamadas duplicadas: un `attemptId` activo por contacto y un `commandId` no reutilizado para un `placeCall` nuevo.
-- Cero contactos perdidos: un `pending` o `retry_pending` sigue elegible para su worker después de un fallo de guardado, y no pasa a otra lista.
+- Cero contactos perdidos: un `pending` o `retry_pending` sigue elegible después de fallos de guardado y no pasa a otra lista sin reasignación explícita.
 - Progreso independiente: el estado de un Xiaomi no borra el `targetWorkerId` de otro ni elige contactos de su lista.
-- Sin bloqueo indefinido: un terminal confirmado, o la gracia de desconexión, siempre programa el siguiente marcado de ese worker. Un `commit` fallido no deja la asignación tomada en memoria y abierta en MySQL.
+- Sin bloqueo indefinido: un terminal confirmado programa el siguiente marcado; ante desconexión no se libera la asignación hasta reconciliar el estado físico. Toda reserva pendiente tiene un mecanismo de recuperación observable.
 - El panel y el servidor usan el mismo `maxAttempts`.
 - Ningún marcado sale antes de que MySQL confirme el intento.
 
 ## Cierre
 
-**Demostrado:** el guardado directo de `phone:status` no puede completar porque recibe un arreglo donde `save` exige un `Map`. El marcado siguiente no sale en ese callback; puede salir cuando `retryPending` guarda el `Map`, cada 10 s. El inicio general filtra por el nombre `Asignación automática` y no por las listas importadas, y ese nombre no lo limpia el inicio por equipo. El servidor fuerza un intento aunque el panel pide dos. Desconectar a un equipo puede soltar su lista y otro equipo se la queda entera. Todas las sesiones comparten `saveChain` y reescriben el JSON completo. La caché de intentos no ve las claves de un `Map`. Un reinicio ya devuelve la asignación abierta a `retry_pending`.
+**Demostrado por el árbol actual:** campaña general acepta listas reales; el panel conserva `maxAttempts`; la caché de intentos usa revisiones; los contactos no se liberan automáticamente al desconectar; y `saveChain` sigue serializando guardados. Una falla de `save` previo al emit ahora mantiene la asignación, reintenta con backoff y solo emite después de persistir. Las pruebas locales inyectadas verifican la recuperación y la cancelación segura.
 
-**No demostrado:** que el corte ocurra a las 10–20 llamadas, que los JSON grandes hayan generado los 76 GB, y que Shizuku, Vosk o la batería del Xiaomi sean la causa.
+**No demostrado:** latencia y carga reales contra MySQL, causalidad de los binlogs, recuperación de una llamada activa durante reinicio, pérdidas de ACK/status en dispositivos o que los síntomas observados en producción correspondan exactamente a este árbol.
 
-**Corregir primero:** el argumento de `commit`, el filtro del rótulo general y la cesión de lista al desconectar.
+**Prioridad siguiente:** validar en una restauración aislada con fallos de MySQL, reconexión y reinicio durante llamada; medir el tamaño/duración de snapshots y eventos. Después reducir los payloads completos de `campaign:state`/`state:changed` y el trabajo de sincronización del navegador.
 
-**No tocar todavía:** binlogs, borrado de sesiones, la APK, ni la regla de esperar el guardado antes de marcar.
+**No tocar todavía:** no purgar binlogs ni sesiones, no desplegar migraciones sobre la base que opera EasyPanel sin respaldo externo restaurable confirmado, y no liberar asignaciones activas solo por timeout.

@@ -7,25 +7,35 @@ let marksRequest = 0;
 async function showCalendar() {
    reportActions.clearDayNavigation();
    reportState.viewedPeriod = null;
+   reportState.selectedReport = "";
 
- try {
-    reportState.reports = await reportActions.fetchReports();
+   // El calendario se dibuja de inmediato; las marcas llegan después.
+   renderCalendar();
+   try {
+     await loadCalendarDates();
+   } catch (error) {
+     reportActions.showError(error);
+   }
+}
 
-    reportState.selectedReport = "";
-
-    renderCalendar();
-  } catch (error) {
-    reportActions.showError(error);
-  }
+async function loadCalendarDates(year = reportState.year) {
+   const request = ++marksRequest;
+   const dates = await reportActions.fetchCalendarDates(year);
+   if (request !== marksRequest) return;
+   reportState.calendarDates = dates;
+   renderCalendar();
 }
 
 function renderCalendar() {
-    // Filtrar reportes por el año actual del calendario
-    const yearReports = reportState.reports.filter(r => {
+    // Las marcas llegan del endpoint ligero; mientras tanto se usa lo ya cargado.
+    const marks = reportState.calendarDates;
+    const yearReports = (reportState.reports || []).filter(r => {
       const reportYear = r.date ? parseInt(r.date.split('-')[0]) : 0;
       return reportYear === reportState.year;
     });
-    const dates = new Set(yearReports.map(r => r.date));
+    const dates = new Set(marks
+      ? Object.keys(marks).filter(date => marks[date] > 0)
+      : yearReports.map(r => r.date).filter(Boolean));
     const year = reportState.year;
     const todayValue = dateToValue(new Date());
     const selected = reportState.calendarRange;
@@ -33,7 +43,10 @@ function renderCalendar() {
     const months = reportState.months.map((monthName, month) => {
       const firstDay = new Date(year, month, 1).getDay();
       const daysCount = new Date(year, month + 1, 0).getDate();
-      const monthReports = yearReports.filter(r => Number(r.date?.split("-")[1]) === month + 1).length;
+      const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}-`;
+      const monthReports = marks
+        ? Object.entries(marks).reduce((sum, [date, count]) => sum + (date.startsWith(monthPrefix) ? count : 0), 0)
+        : yearReports.filter(r => r.date?.startsWith(monthPrefix)).length;
 
       const blanks = Array.from(
         { length: firstDay },
@@ -115,11 +128,13 @@ function renderCalendar() {
       const today = new Date();
       reportState.year = today.getFullYear();
       reportState.hoverDate = "";
+      reportState.calendarDates = null;
       renderCalendar();
       const target = reportState.$("dailyReportMount")
         .querySelector(`[data-date="${dateToValue(today)}"]`);
       target?.focus();
       target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      loadCalendarDates().catch(error => reportActions.showError(error));
     };
 
     reportState.$("monthsGrid").onmouseleave = () => {
@@ -174,7 +189,9 @@ function renderCalendar() {
 function shiftCalendarYear(offset) {
     reportState.year += offset;
     reportState.hoverDate = "";
+    reportState.calendarDates = null;
     renderCalendar();
+    loadCalendarDates().catch(error => reportActions.showError(error));
   }
 
 function dateToValue(date) {

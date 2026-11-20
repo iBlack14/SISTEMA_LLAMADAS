@@ -144,7 +144,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   if (!adminPaths[view]) await window.startOperationalDashboard?.();
   if (request !== viewRequest) return;
   if (view === "reports") {
-    const reports = await import("../../features/reports/reports-page.js?v=20261119-calendar-months");
+    const reports = await import("../../features/reports/reports-page.js?v=20261119-calendar-fast");
     if (request !== viewRequest) return;
     reports.showCalendar?.();
   } else if (view === "messages") {
