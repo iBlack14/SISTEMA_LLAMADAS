@@ -19,6 +19,8 @@
     "restore:history": "node backend/scripts/migrate-call-history.js --restore",
     "rollback:contact-books": "node backend/scripts/rollback-contact-book-normalization.js",
     "migrate:session-data": "node backend/scripts/normalize-session-data.js",
+    "migrate:session-rows": "node backend/scripts/normalize-session-rows.js",
+    "rollback:session-rows": "node backend/scripts/normalize-session-rows.js --rollback",
     "rollback:session-data": "node backend/scripts/rollback-session-data-normalization.js",
     "migrate:shift-details": "node backend/scripts/normalize-shift-details.js",
     "rollback:shift-details": "node backend/scripts/rollback-shift-details-normalization.js",

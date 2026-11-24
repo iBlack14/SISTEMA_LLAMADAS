@@ -58,7 +58,7 @@ class VoicemailSetupActivity : AppCompatActivity() {
             val matchText = if (VoicemailDetector.lastMatch.isNotBlank())
                 "\n\nÚltima locución detectada:\n" + VoicemailDetector.lastMatch else ""
             val testHint = if (enabled && connected && !stateText.startsWith("Escuchando", ignoreCase = true) && matchText.isBlank())
-                "\n\nPara probarla, inicia una llamada saliente. El detector escucha solo durante esa llamada y no guarda grabaciones."
+                "\n\nPara probarla, inicia una llamada saliente. El detector escucha solo durante esa llamada. El panel de voz conserva el audio de campañas contestadas cuando Android permite capturarlo."
                 else ""
             statusText.text = stateText + testHint + matchText
             // Highlight status box: green=connected, yellow=connecting, default=idle/error
@@ -168,7 +168,7 @@ class VoicemailSetupActivity : AppCompatActivity() {
             }
         }
         column.addView(statusText)
-        column.addView(text("El audio se analiza solo durante llamadas salientes para reconocer las locuciones. No se guardan grabaciones.", 12f).apply {
+        column.addView(text("El detector analiza audio durante llamadas salientes. Las grabaciones de llamadas contestadas se consultan desde el panel de voz de administración.", 12f).apply {
             setPadding(dp(2), dp(10), dp(2), dp(4))
         })
         fun button(label: String, primary: Boolean = false, action: () -> Unit): MaterialButton {

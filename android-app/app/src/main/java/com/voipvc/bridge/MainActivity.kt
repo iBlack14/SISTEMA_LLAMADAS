@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
         voicemailReminderChecked = true
         voicemailReminderDialog = showBrandedConfirmationDialog(
             title = "Autoriza la detección de buzón",
-            message = issue + "\n\nPermite el acceso al audio para reconocer las locuciones y solicitar el corte. No se guardan grabaciones.",
+            message = issue + "\n\nPermite el acceso al audio para reconocer las locuciones y solicitar el corte.",
             negativeLabel = "Ahora no",
             positiveLabel = "Configurar y autorizar",
             onPositive = { openVoicemailSetup(true) }

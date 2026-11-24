@@ -67,6 +67,11 @@ export function collectCallAttempts(session) {
 }
 
 export const HISTORY_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS vc_session_state (
+    session_code VARCHAR(50) NOT NULL, state_key VARCHAR(64) NOT NULL, state_value JSON NOT NULL,
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY(session_code,state_key), INDEX vc_session_state_key(state_key,session_code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_shift_unfinished_contacts (
     session_code VARCHAR(50) NOT NULL, shift_id VARCHAR(191) NOT NULL,
     detail_id VARCHAR(191) NOT NULL, contact_id VARCHAR(191) NOT NULL DEFAULT '',
@@ -144,7 +149,8 @@ export const HISTORY_SCHEMA = [
     audio_data MEDIUMBLOB NOT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     PRIMARY KEY(session_code, attempt_id),
-    INDEX vc_recording_phone(session_code, phone)
+    INDEX vc_recording_phone(session_code, phone),
+    INDEX vc_recording_created(created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 ];
 

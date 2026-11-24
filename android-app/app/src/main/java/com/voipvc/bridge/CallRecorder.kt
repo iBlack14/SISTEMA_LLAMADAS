@@ -5,9 +5,11 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.HttpURLConnection
@@ -31,6 +33,7 @@ class CallRecorder(private val context: Context) {
     }
 
     private val recording = AtomicBoolean(false)
+    val isRecording: Boolean get() = recording.get()
     private val lock = Any()
 
     private var codec: MediaCodec? = null
@@ -41,10 +44,7 @@ class CallRecorder(private val context: Context) {
     private var outputFile: File? = null
 
     private var currentAttemptId = ""
-    private var currentContactId = ""
-    private var currentPhone = ""
-
-    fun start(attemptId: String, contactId: String, phone: String) {
+    fun start(attemptId: String) {
         if (attemptId.isBlank()) return
         synchronized(lock) {
             if (recording.get() && currentAttemptId == attemptId) return
@@ -52,7 +52,8 @@ class CallRecorder(private val context: Context) {
 
             try {
                 val dir = File(context.cacheDir, "recordings").apply { mkdirs() }
-                val file = File(dir, "${attemptId.replace(Regex("[^a-zA-Z0-9_-]"), "_")}.m4a")
+                val file = File.createTempFile("call-", ".m4a", dir)
+                outputFile = file
 
                 val format = MediaFormat.createAudioFormat(MIME_TYPE, SAMPLE_RATE, CHANNEL_COUNT).apply {
                     setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
@@ -61,6 +62,7 @@ class CallRecorder(private val context: Context) {
                 }
 
                 val encoder = MediaCodec.createEncoderByType(MIME_TYPE)
+                codec = encoder
                 encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 encoder.start()
 
@@ -73,8 +75,6 @@ class CallRecorder(private val context: Context) {
                 presentationTimeUs = 0L
                 outputFile = file
                 currentAttemptId = attemptId
-                currentContactId = contactId
-                currentPhone = phone
                 recording.set(true)
                 Log.i(TAG, "Grabación iniciada attempt=$attemptId")
             } catch (e: Exception) {
@@ -125,8 +125,6 @@ class CallRecorder(private val context: Context) {
     ) {
         val fileToUpload: File?
         val attemptId: String
-        val contactId: String
-        val phone: String
 
         synchronized(lock) {
             if (!recording.getAndSet(false)) return
@@ -146,8 +144,6 @@ class CallRecorder(private val context: Context) {
             }
             fileToUpload = outputFile
             attemptId = currentAttemptId
-            contactId = currentContactId
-            phone = currentPhone
             releaseResourcesLocked(deleteFile = false)
         }
 
@@ -159,7 +155,16 @@ class CallRecorder(private val context: Context) {
         }
 
         scope.launch(Dispatchers.IO) {
-            uploadFile(fileToUpload, baseUrl, sessionCode, pairingToken, attemptId, contactId, phone, durationSeconds)
+            try {
+                val delays = longArrayOf(0, 1000, 3000, 8000, 16000)
+                for (waitMs in delays) {
+                    delay(waitMs)
+                    val code = uploadFile(fileToUpload, baseUrl, sessionCode, pairingToken, attemptId, durationSeconds)
+                    if (code in 200..299 || (code != 0 && code != 409 && code != 429 && code < 500)) break
+                }
+            } finally {
+                fileToUpload.delete()
+            }
         }
     }
 
@@ -169,7 +174,8 @@ class CallRecorder(private val context: Context) {
         val bufferInfo = MediaCodec.BufferInfo()
         val timeoutUs = if (endOfStream) 5000L else 0L
 
-        while (true) {
+        val deadline = SystemClock.elapsedRealtime() + 200
+        while (!endOfStream || SystemClock.elapsedRealtime() < deadline) {
             val outputIndex = encoder.dequeueOutputBuffer(bufferInfo, timeoutUs)
             when {
                 outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
@@ -214,8 +220,6 @@ class CallRecorder(private val context: Context) {
         }
         outputFile = null
         currentAttemptId = ""
-        currentContactId = ""
-        currentPhone = ""
     }
 
     private fun uploadFile(
@@ -224,27 +228,26 @@ class CallRecorder(private val context: Context) {
         sessionCode: String,
         pairingToken: String,
         attemptId: String,
-        contactId: String,
-        phone: String,
         durationSeconds: Int
-    ) {
+    ): Int {
+        var connection: HttpURLConnection? = null
         try {
             val cleanBase = baseUrl.trimEnd('/')
             val encodedAttempt = URLEncoder.encode(attemptId, "UTF-8")
-            val encodedContact = URLEncoder.encode(contactId, "UTF-8")
-            val encodedPhone = URLEncoder.encode(phone, "UTF-8")
-            val targetUrl = "$cleanBase/api/session/$sessionCode/recordings/$encodedAttempt" +
-                "?contactId=$encodedContact&phone=$encodedPhone&durationSeconds=$durationSeconds"
+            val targetUrl = "$cleanBase/api/session/$sessionCode/recordings/$encodedAttempt"
 
             val conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
+                instanceFollowRedirects = false
                 doOutput = true
                 connectTimeout = 15000
                 readTimeout = 30000
                 setRequestProperty("Content-Type", "audio/mp4")
                 setRequestProperty("X-Pairing-Token", pairingToken)
+                setRequestProperty("X-Duration-Seconds", durationSeconds.toString())
                 setFixedLengthStreamingMode(file.length())
             }
+            connection = conn
 
             file.inputStream().use { input ->
                 conn.outputStream.use { output ->
@@ -253,16 +256,17 @@ class CallRecorder(private val context: Context) {
             }
 
             val code = conn.responseCode
-            conn.disconnect()
             if (code in 200..299) {
                 Log.i(TAG, "Grabación subida OK attempt=$attemptId bytes=${file.length()}")
             } else {
                 Log.w(TAG, "Error subiendo grabación HTTP $code attempt=$attemptId")
             }
+            return code
         } catch (e: Exception) {
-            Log.e(TAG, "Fallo subiendo grabación attempt=$attemptId: ${e.message}")
+            Log.w(TAG, "Fallo subiendo grabación: ${e.javaClass.simpleName}")
+            return 0
         } finally {
-            file.delete()
+            connection?.disconnect()
         }
     }
 }

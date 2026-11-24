@@ -1,6 +1,58 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hydrateSessionData, splitSessionData } from "../../shared/persistence.js";
+import { hydrateSessionData, SessionPersistence, splitSessionData } from "../../shared/persistence.js";
+
+test("commits changed session fields and the call ledger without touching the legacy table", async () => {
+  const queries = [];
+  let rejectCommit = true;
+  const connection = {
+    async query(sql, values) {
+      queries.push({ sql, values });
+      return [[]];
+    },
+    async beginTransaction() {},
+    async commit() {
+      if (rejectCommit) throw new Error("simulated commit failure");
+    },
+    async rollback() {},
+    release() {}
+  };
+  const storage = new SessionPersistence(undefined, {
+    env: { DB_HOST: "unused", DB_USER: "unused", DB_NAME: "unused" }
+  });
+  storage.pool = { getConnection: async () => connection };
+  storage.schemaReady = true;
+  storage.sessionDataStorageEnabled = true;
+  storage.sessionRowsStorageEnabled = true;
+  storage.contactBookStorageEnabled = true;
+  const session = {
+    callState: "dialing",
+    optional: "null",
+    campaign: {
+      contacts: [{ id: "c1", attemptHistory: [{ id: "a1", startedAt: "2026-11-24T15:00:00.000Z" }] }],
+      history: []
+    }
+  };
+  const sessions = new Map([["TEST01", session]]);
+
+  await assert.rejects(storage.save(sessions, ["TEST01"]), /simulated commit failure/);
+  assert.equal(storage.sessionStateCache.size, 0);
+  rejectCommit = false;
+  queries.length = 0;
+  await storage.save(sessions, ["TEST01"]);
+  assert.ok(queries.some(({ sql, values }) => sql.startsWith("INSERT INTO vc_call_attempts") && values[1] === "a1"));
+  assert.ok(queries.some(({ sql, values }) => sql.startsWith("INSERT INTO vc_session_state") && values.includes('"null"')));
+
+  queries.length = 0;
+  session.callState = "ringing";
+  delete session.optional;
+  await storage.save(sessions, ["TEST01"]);
+  assert.deepEqual(queries.map(({ values }) => values), [
+    ["TEST01", "callState", '"ringing"'],
+    ["TEST01", "optional"]
+  ]);
+  assert.ok(queries.every(({ sql }) => /^(INSERT INTO|DELETE FROM) vc_session_state/.test(sql)));
+});
 
 test("normalizes large session collections into rows and rebuilds the original API shape", () => {
   const session = {

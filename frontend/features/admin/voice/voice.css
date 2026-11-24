@@ -1,0 +1,60 @@
+#voiceView {
+  --voice-panel: #24143a;
+  --voice-border: #58367a;
+  --voice-text: #fbf5ff;
+  --voice-muted: #d1bedd;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.4vw, 36px);
+  display: grid;
+  gap: 16px;
+  color: var(--voice-text);
+  color-scheme: dark;
+}
+#voiceView[hidden], #voiceView [hidden] { display: none !important; }
+#voiceView .voice-intro, #voiceView .voice-results > header, #voiceView .voice-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+#voiceView .voice-intro { padding: 12px 0; border-bottom: 1px solid var(--voice-border); }
+#voiceView h1 { margin: 0 0 6px; font-size: clamp(26px, 3vw, 42px); line-height: 1.1; letter-spacing: -.035em; }
+#voiceView h2 { margin: 0; font-size: 17px; }
+#voiceView p { margin: 0; color: var(--voice-muted); font-size: 13px; }
+#voiceView .voice-access { padding: 6px 10px; border: 1px solid #8254a7; border-radius: 8px; font-size: 12px; background: #382052; }
+#voiceView .voice-filters, #voiceView .voice-results, #voiceView .voice-player {
+  border: 1px solid var(--voice-border);
+  border-radius: 12px;
+  background: var(--voice-panel);
+  padding: 16px;
+}
+#voiceView .voice-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); align-items: end; gap: 12px; }
+#voiceView .voice-filters label { display: grid; gap: 6px; color: var(--voice-muted); font-size: 12px; font-weight: 600; }
+#voiceView .voice-filters input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 41px; padding: 8px 9px; border: 1px solid #765292; border-radius: 9px; background: #180e27; color: var(--voice-text); font: inherit; }
+#voiceView .voice-filter-actions, #voiceView .voice-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#voiceView button { min-height: 36px; padding: 7px 12px; border: 1px solid #925cc0; border-radius: 8px; background: #7132a4; color: #fff; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+#voiceView .voice-secondary { background: #332049; }
+#voiceView button:hover:not(:disabled), #voiceView button[aria-pressed="true"] { background: #8440b3; }
+#voiceView button:disabled { opacity: .46; cursor: default; }
+#voiceView :focus-visible { outline: 2px solid #e7a7ff; outline-offset: 2px; }
+#voiceView .voice-player { border-color: #8e54bc; background: linear-gradient(120deg, #341d4d, #28123e); }
+#voiceView .voice-player p { margin-top: 4px; overflow-wrap: anywhere; }
+#voiceView audio { flex: 1 1 260px; max-width: 450px; width: 100%; min-width: 0; }
+#voiceView .voice-table-scroll { overflow: auto; margin-top: 12px; border: 1px solid var(--voice-border); border-radius: 8px; }
+#voiceView table { width: 100%; min-width: 700px; border-collapse: collapse; }
+#voiceView th, #voiceView td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #4a2e65; font-size: 13px; }
+#voiceView th { background: #41255c; color: #eee0fa; }
+#voiceView td { color: var(--voice-text); }
+#voiceView tbody tr:nth-child(even) { background: #2c1a42; }
+#voiceView tbody tr:hover { background: #38214e; }
+#voiceView tbody tr:last-child td { border-bottom: 0; }
+#voiceView td small { display: block; margin-top: 4px; color: var(--voice-muted); font-size: 11px; }
+#voiceView .voice-play { white-space: nowrap; }
+#voiceView .voice-pagination { justify-content: flex-end; margin-top: 12px; color: var(--voice-muted); font-size: 12px; }
+@media (max-width: 520px) {
+  #voiceView .voice-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #voiceView .voice-filters label:first-child, #voiceView .voice-filter-actions { grid-column: 1 / -1; }
+  #voiceView .voice-pagination { justify-content: space-between; }
+}

@@ -22,11 +22,11 @@ export function registerRoutes(runtime, services) {
   registerHttpMiddleware(runtime, services);
   registerNetwork(runtime, services);
   registerPages(runtime, services);
+  registerRecordings(runtime);
   registerSessionAccess(runtime, services);
   registerDevices(runtime, services);
   registerSessions(runtime, services);
   registerReports(runtime, services);
-  registerRecordings(runtime, services);
   registerReservations(runtime, services);
   registerMessageTemplates(runtime);
   registerMessageFilterOptions(runtime);

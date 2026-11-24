@@ -1,4 +1,5 @@
 import { runtimeIdentity, runtimeLockName, probeRuntime, waitForRuntime } from "../services/workspace/runtime-instance.js";
+import { startRecordingRetention } from "../services/calls/call-recordings.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -29,6 +30,7 @@ import {
  * Se construye una vez por proceso.
  */
 export function createRuntimeLifecycle(runtime, services) {
+let recordingRetentionTimer;
 async function bootstrap() {
   const running = await probeRuntime(runtime.instancePort, runtime.instanceIdentity);
   if (running === "same") { runtime.alreadyRunning(); process.exit(0); }
@@ -81,6 +83,7 @@ async function bootstrap() {
     await runtime.persistence.save(runtime.sessions);
   }
   runtime.persistence.startBackups();
+  recordingRetentionTimer = startRecordingRetention(runtime.persistence.pool);
   runtime.network.start();
   setInterval(() => runtime.historyGate.retryPending().catch(error => {
     console.error("[HISTORY] Reintento pendiente:", error.code || "STORAGE_UNAVAILABLE");
@@ -98,6 +101,7 @@ async function bootstrap() {
 async function gracefulShutdown(signal) {
   if (runtime.shuttingDown) return;
   runtime.shuttingDown = true;
+  clearInterval(recordingRetentionTimer);
   console.log(`[SHUTDOWN] ${signal}: guardando sesiones...`);
   try { await runtime.persistence.save(runtime.sessions); }
   catch (error) { console.error("No se pudieron guardar las sesiones al cerrar:", error); }

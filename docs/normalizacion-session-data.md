@@ -1,6 +1,6 @@
 # Persistencia normalizada de campañas
 
-La aplicación mantiene el mismo formato de campaña en memoria para que las rutas, sockets y pantallas sigan funcionando. Con esta migración, MySQL guarda por separado los contactos activos, intentos de contacto, historial de campaña, reportes archivados y sus filas, además de los datos del turno. La fila `sessions.data` queda para el estado operativo pequeño. Los cambios se escriben por entidad; no se reescribe el conjunto completo de contactos en cada evento.
+La aplicación mantiene el mismo formato de campaña en memoria para que las rutas, sockets y pantallas sigan funcionando. MySQL guarda por separado los contactos activos, intentos de contacto, historial de campaña, reportes archivados y sus filas, además de los datos del turno. Con la normalización inicial, `sessions.data` conserva los campos restantes. La migración a `vc_session_state` traslada esos campos a filas por sesión y clave.
 
 Las filas de turnos finalizados son inmutables mientras no cambie la lista de turnos. Los guardados comunes reutilizan esas filas y no las vuelven a clonar, recorrer ni comparar. Al cerrar un turno nuevo se reconcilia el historial actualizado. Este ajuste de rendimiento no requiere otra migración SQL.
 
@@ -23,6 +23,15 @@ Después de desplegar esta versión, crear y verificar una copia externa recient
 
 ## Reversión
 
-Para revertir detalles de turnos, detener la aplicación y ejecutar `npm run rollback:shift-details` con `SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED=1`; esto los devuelve a `vc_session_entities`. Para volver a sesiones JSON, primero revertir los detalles de turnos y después ejecutar `npm run rollback:session-data` con `SESSION_DATA_MIGRATION_BACKUP_VERIFIED=1`.
+Para revertir detalles de turnos, detener la aplicación y ejecutar `npm run rollback:shift-details` con `SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED=1`. Esto los devuelve a `vc_session_entities`. Para volver a sesiones JSON, revertir primero `vc_session_state` si está activo, luego los detalles de turnos y finalmente ejecutar `npm run rollback:session-data` con `SESSION_DATA_MIGRATION_BACKUP_VERIFIED=1`.
 
 No ejecutar la migración en producción hasta ensayarla en una restauración aislada y comparar conteos y reportes antes/después. Este cambio de código, por sí solo, no altera la base ni despliega una versión.
+
+## Activar el estado por filas en preproducción
+
+1. Verificar una copia restaurable de MySQL y detener la aplicación que escribe en esa base.
+2. Ejecutar `npm run migrate:session-rows` con `SESSION_ROWS_MIGRATION_BACKUP_VERIFIED=1` y las variables `DB_*` del mismo despliegue. El comando aplica las migraciones de contactos, colecciones y turnos que falten. Comprueba el contenido de cada sesión antes de registrar el cambio de almacenamiento. Cada migración tiene su propia transacción y el comando puede volver a ejecutarse.
+3. Arrancar la versión nueva. Verificar listas y contactos, reportes, vinculación de equipos y recuperación tras reiniciar. Probar dos equipos con listas distintas y medir el tiempo entre confirmación del guardado y despacho de la llamada. Revisar los tiempos de preparación y espera de guardado en los logs.
+4. Para revertir, detener la aplicación y ejecutar `npm run rollback:session-rows` con la misma variable de respaldo. Este comando reconstruye `sessions.data` con el estado actual, incluidas las sesiones creadas después de migrar. Los pasos anteriores de normalización siguen activos.
+
+Tras activar esta migración, el arranque y los guardados habituales usan `vc_session_state` para los campos de sesión. El guardado escribe solo los campos que cambiaron desde el último commit. La tabla anterior se conserva para la transición. Algunos valores dentro de las filas siguen representándose como JSON en MySQL. La cola de guardado y la reconstrucción de objetos en memoria siguen formando parte del tiempo que debe medirse en el VPS.

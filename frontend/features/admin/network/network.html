@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261117-sidebar-flow">
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
-  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261119-users-ui3"></script>
+  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261124-voice-retention"></script>
   <script src="/socket.io/socket.io.js" defer></script>
   <script type="module" src="/features/admin/network/network-page.js?v=20261119-users-ui3"></script>
 </head>
@@ -28,6 +28,7 @@
       <a class="viavox-nav-item" data-view="reservations" href="/reservas">RESERVA DE CONTACTO</a>
       <a class="viavox-nav-item" data-view="blocked" href="/bloqueos">PANEL DE BLOQUEOS</a>
       <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
+      <a id="sidebarVoice" class="viavox-nav-item" data-view="voice" href="/voz" hidden>PANEL DE VOZ</a>
       <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion" hidden>CONFIGURACIÓN</a>
     </nav>
     <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
@@ -151,6 +152,38 @@
     </section>
 
 <!-- CONFIGURACIÓN SMTP (SOLO ADMIN) -->
+    <section id="voiceView" aria-labelledby="voiceTitle" hidden>
+      <header class="voice-intro">
+        <div><h1 id="voiceTitle">Panel de voz</h1><p>Las grabaciones de llamadas contestadas están disponibles durante 7 días.</p></div>
+        <span class="voice-access">Solo administradores</span>
+      </header>
+      <form class="voice-filters" aria-label="Filtros de grabaciones">
+        <label>Buscar por nombre o teléfono<input name="search" type="search" maxlength="100" placeholder="Inicio del nombre o número"></label>
+        <label>Desde<input name="from" type="date"></label>
+        <label>Hasta<input name="to" type="date"></label>
+        <label>Lista<input name="list" maxlength="255" placeholder="Nombre exacto"></label>
+        <label>Equipo<input name="worker" maxlength="255" placeholder="Nombre o ID exacto"></label>
+        <div class="voice-filter-actions"><button type="submit">Aplicar filtros</button><button type="reset" class="voice-secondary">Limpiar</button></div>
+      </form>
+      <section class="voice-player" aria-labelledby="voicePlayerTitle" hidden>
+        <div><h2 id="voicePlayerTitle">Reproducción</h2><p class="voice-playing-detail"></p></div>
+        <audio controls preload="none" aria-labelledby="voicePlayerTitle" controlslist="nodownload"></audio>
+      </section>
+      <section class="voice-results" aria-labelledby="voiceResultsTitle">
+        <header><h2 id="voiceResultsTitle">Grabaciones</h2><p class="voice-status" role="status"></p></header>
+        <div class="voice-table-scroll" role="region" tabindex="0" aria-label="Resultados de grabaciones">
+          <table>
+            <thead><tr><th scope="col">Contacto</th><th scope="col">Fecha en Lima</th><th scope="col">Lista y equipo</th><th scope="col">Duración</th><th scope="col">Resultado</th><th scope="col">Audio</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <nav class="voice-pagination" aria-label="Páginas de grabaciones">
+          <button type="button" class="voice-secondary voice-prev" disabled>Anterior</button>
+          <span class="voice-page">Página 1</span>
+          <button type="button" class="voice-secondary voice-next" disabled>Siguiente</button>
+        </nav>
+      </section>
+    </section>
     <section id="settingsView" class="settings-view-section" aria-labelledby="settingsTitle" hidden>
       <div class="settings-shell">
         <header class="settings-header">

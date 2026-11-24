@@ -4,7 +4,8 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import mysql from "mysql2/promise";
+import { SessionPersistence } from "../shared/persistence.js";
+import { runtimeLockName } from "../services/workspace/runtime-instance.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../..", ".env") });
@@ -40,7 +41,6 @@ const RESULTS = [
 
 let phoneSeq = 920000000 + Math.floor(Math.random() * 70000000);
 const nextPhone = () => String(phoneSeq++).slice(0, 9);
-const sqlDate = value => value ? value.replace("T", " ").replace("Z", "") : null;
 
 function buildReport(date, index) {
   const rubroData = RUBROS[index % RUBROS.length];
@@ -120,24 +120,6 @@ function buildReport(date, index) {
   };
 }
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
-
-const [rows] = await pool.query("SELECT id, data FROM sessions WHERE id = ?", [CODE]);
-if (!rows.length) {
-  console.error(`Sesión ${CODE} no existe en MySQL.`);
-  await pool.end();
-  process.exit(1);
-}
-
-const data = typeof rows[0].data === "string" ? JSON.parse(rows[0].data) : rows[0].data;
-data.reportArchive = data.reportArchive || [];
-
 const dates = [
   "2026-08-14", "2026-08-28",
   "2026-09-11", "2026-09-25",
@@ -145,34 +127,37 @@ const dates = [
   "2026-11-03", "2026-11-06"
 ];
 
-let added = 0;
-const allAttempts = [];
-for (let i = 0; i < dates.length; i++) {
-  const { archive, attempts } = buildReport(dates[i], i);
-  const idx = data.reportArchive.findIndex(r => r.id === archive.id);
-  if (idx >= 0) data.reportArchive[idx] = archive;
-  else { data.reportArchive.push(archive); added++; }
-  allAttempts.push(...attempts);
+const storage = new SessionPersistence();
+const lockName = runtimeLockName(process.env);
+let lockConnection;
+try {
+  if (!await storage.initDb()) throw new Error("No se pudo conectar a MySQL.");
+  lockConnection = await storage.pool.getConnection();
+  const [[legacyLock]] = await lockConnection.query("SELECT IS_USED_LOCK('sistema_llamadas_runtime') AS owner");
+  if (legacyLock.owner) throw new Error("Detén la aplicación antes de cargar datos de prueba.");
+  const [[lock]] = await lockConnection.query("SELECT GET_LOCK(?,0) AS acquired", [lockName]);
+  if (Number(lock.acquired) !== 1) throw new Error("La aplicación está usando la base.");
+  const sessions = await storage.load();
+  const session = sessions.get(CODE);
+  if (!session) throw new Error(`Sesión ${CODE} no existe en MySQL.`);
+  session.reportArchive ||= [];
+  let added = 0;
+  for (const [index, date] of dates.entries()) {
+    const { archive, attempts } = buildReport(date, index);
+    const position = session.reportArchive.findIndex(report => report.id === archive.id);
+    if (position >= 0) session.reportArchive[position] = archive;
+    else {
+      session.reportArchive.push(archive);
+      added++;
+    }
+    for (const attempt of attempts) storage.remember(CODE, attempt);
+  }
+  await storage.save(sessions, [CODE]);
+  console.log(`${session.reportArchive.length} reportes guardados en MySQL (${added} nuevos).`);
+} finally {
+  if (lockConnection) {
+    await lockConnection.query("SELECT RELEASE_LOCK(?)", [lockName]).catch(() => {});
+    lockConnection.release();
+  }
+  await storage.close();
 }
-
-await pool.query("UPDATE sessions SET data = ? WHERE id = ?", [JSON.stringify(data), CODE]);
-console.log(`Sesión ${CODE}: ${data.reportArchive.length} reportes en archivo (${added} nuevos).`);
-
-let inserted = 0;
-for (const row of allAttempts) {
-  await pool.query(
-    `INSERT INTO vc_call_attempts
-      (session_code,attempt_id,contact_id,campaign_id,shift_id,worker_id,phone,report_date,
-       started_at,connected_at,ended_at,waiting_seconds,connected_seconds,total_seconds,
-       technical_result,commercial_result,row_data)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON DUPLICATE KEY UPDATE row_data=VALUES(row_data)`,
-    [CODE, row.attemptId, row.contactId, row.campaignId, row.shiftId, row.workerId,
-     row.phone, row.reportDate, sqlDate(row.startedAt), sqlDate(row.answeredAt), sqlDate(row.endedAt),
-     row.waitingSeconds, row.durationSeconds, row.totalSeconds,
-     row.technicalResult, row.disposition, JSON.stringify(row)]
-  );
-  inserted++;
-}
-console.log(`${inserted} intentos escritos en vc_call_attempts.`);
-await pool.end();

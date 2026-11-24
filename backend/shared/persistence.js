@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import mysql from "mysql2/promise";
 import { collectCallAttempts, mergeAttempt, HISTORY_SCHEMA, writeCallAttempts } from "../services/calls/call-history.js";
 import { phoneKey } from "../services/campaigns/contact-book.js";
@@ -9,6 +10,28 @@ const keyOf = (code, row) => JSON.stringify([code, row.attemptId]);
 const CONTACT_BOOK_MIGRATION_ID = "2026_11_19_normalize_contact_books_v1";
 const SESSION_DATA_MIGRATION_ID = "2026_11_20_normalize_session_data_v1";
 const SHIFT_DETAILS_MIGRATION_ID = "2026_11_20_normalize_shift_details_v1";
+const SESSION_ROWS_MIGRATION_ID = "2026_11_24_session_state_rows_v1";
+const LEGACY_SESSIONS_SCHEMA = `CREATE TABLE IF NOT EXISTS sessions (
+  id VARCHAR(50) PRIMARY KEY, data JSON NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
+
+function decodeSessionState(rows) {
+  return Object.fromEntries(rows
+    .filter(row => row.state_key !== "")
+    .map(row => [row.state_key, JSON.parse(row.state_value)]));
+}
+
+function encodeSessionState(data) {
+  const entries = Object.entries(data);
+  if (entries.some(([key]) => !key || [...key].length > 64)) {
+    throw new Error("Clave inválida en el estado de sesión.");
+  }
+  // Preserve an empty session as a row, too.
+  return new Map(entries.length
+    ? entries.map(([key, value]) => [key, JSON.stringify(value)])
+    : [["", "null"]]);
+}
 
 // Large, frequently rewritten collections stay in memory for the existing
 // services/API, but are stored as independently updated MySQL rows.
@@ -179,6 +202,8 @@ this.env = env;
     this.contactBookVersions = new Map();
     this.contactBookStorageEnabled = false;
     this.sessionDataStorageEnabled = false;
+    this.sessionRowsStorageEnabled = false;
+    this.sessionStateCache = new Map();
     this.shiftDetailsStorageEnabled = false;
     this.sessionEntityCache = new Map();
     this.sessionEntityTypesBySession = new Map();
@@ -258,11 +283,10 @@ this.env = env;
       if (!this.pool) this.pool = this.poolFactory(this.poolConfig);
       await this.pool.query("SELECT 1");
       if (!this.schemaReady) {
-        await this.pool.query(`CREATE TABLE IF NOT EXISTS sessions (
-          id VARCHAR(50) PRIMARY KEY, data JSON NOT NULL,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
         for (const ddl of HISTORY_SCHEMA) await this.pool.query(ddl);
+        const [[migration]] = await this.pool.query(
+          "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+        if (!migration) await this.pool.query(LEGACY_SESSIONS_SCHEMA);
         this.schemaReady = true;
       }
       this.usingDb = true;
@@ -289,7 +313,29 @@ this.env = env;
     let mysqlSessionRows = null;
     if (await this.initDb()) {
       try {
-        const [sessions] = await this.pool.query("SELECT id, data FROM sessions");
+        const [[sessionRowsMigration]] = await this.pool.query(
+          "SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+        const sessionRowsEnabled = Boolean(sessionRowsMigration);
+        let sessions;
+        if (sessionRowsEnabled) {
+          const [stateRows] = await this.pool.query(
+            "SELECT session_code,state_key,CAST(state_value AS CHAR CHARACTER SET utf8mb4) AS state_value FROM vc_session_state");
+          const states = new Map();
+          for (const row of stateRows) {
+            if (!states.has(row.session_code)) states.set(row.session_code, []);
+            states.get(row.session_code).push(row);
+          }
+          sessions = [...states].map(([id, rows]) => {
+            const data = decodeSessionState(rows);
+            this.sessionStateCache.set(id, encodeSessionState(data));
+            return { id, data };
+          });
+          this.sessionRowsStorageEnabled = true;
+        } else {
+          const [legacyRows] = await this.pool.query("SELECT id, data FROM sessions");
+          sessions = legacyRows;
+          this.sessionRowsStorageEnabled = false;
+        }
         const [attempts] = await this.pool.query("SELECT session_code, row_data FROM vc_call_attempts");
         const [bookMetadataRows] = await this.pool.query("SELECT session_code, revision, book_data FROM vc_contact_book_meta");
         const [bookContactRows] = await this.pool.query("SELECT session_code, contact_id, contact_data FROM vc_contact_book_contacts ORDER BY session_code,position,contact_id");
@@ -396,6 +442,7 @@ this.env = env;
         this.contactBookStorageEnabled = true;
         return { applied: false, sessions: 0, contacts: 0 };
       }
+      await this.requireLegacySessionState(connection);
       if (this.env.CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED !== "1") {
         throw new Error("Confirma una copia externa restaurable con CONTACT_BOOK_MIGRATION_BACKUP_VERIFIED=1 antes de migrar.");
       }
@@ -432,12 +479,10 @@ this.env = env;
           throw new Error(`La sesión ${code} no pasó la validación de cantidad de contactos.`);
         }
 
-        const { contactBook, dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, ...sessionData } = session;
-        const serialized = JSON.stringify(sessionData);
-        const [updated] = await connection.query("UPDATE sessions SET data=? WHERE id=?", [serialized, code]);
-        if (!updated.affectedRows) {
-          await connection.query("INSERT INTO sessions (id,data) VALUES (?,?)", [code, serialized]);
-        }
+        // Update the stored document without reinserting collections that load()
+        // hydrated from their own tables.
+        await connection.query(
+          "UPDATE sessions SET data=JSON_REMOVE(data,'$.contactBook') WHERE id=?", [code]);
       }
       await connection.query("INSERT INTO vc_schema_migrations (migration_id) VALUES (?)", [CONTACT_BOOK_MIGRATION_ID]);
       await connection.commit();
@@ -464,6 +509,7 @@ this.env = env;
     try {
       const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_DATA_MIGRATION_ID]);
       if (applied) { this.sessionDataStorageEnabled = true; return { applied: false, sessions: 0, entities: 0 }; }
+      await this.requireLegacySessionState(connection);
       await connection.beginTransaction();
       for (const [code, session] of sessionsMap) {
         const { data, rows } = splitSessionData(session);
@@ -539,6 +585,73 @@ this.env = env;
     finally { connection.release(); }
   }
 
+  async normalizeSessionRows() {
+    if (!this.databaseConfigured || !this.usingDb) throw new Error("La normalización de sesiones requiere MySQL disponible.");
+    if (this.env.SESSION_ROWS_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa restaurable antes de migrar las sesiones.");
+    const connection = await this.pool.getConnection();
+    let stateRows = 0;
+    try {
+      const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+      if (applied) { this.sessionRowsStorageEnabled = true; return { applied: false, sessions: 0, stateRows: 0 }; }
+      const [dependencies] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id IN (?,?)",
+        [CONTACT_BOOK_MIGRATION_ID, SESSION_DATA_MIGRATION_ID]);
+      if (dependencies.length !== 2) throw new Error("Aplica primero las migraciones de contactos y colecciones de sesión.");
+      await connection.beginTransaction();
+      const [sessions] = await connection.query("SELECT id FROM sessions");
+      const [[target]] = await connection.query("SELECT COUNT(*) AS total FROM vc_session_state");
+      if (Number(target.total) !== 0) throw new Error("vc_session_state contiene filas sin migración registrada.");
+      for (const { id: code } of sessions) {
+        const [[legacy]] = await connection.query("SELECT data FROM sessions WHERE id=?", [code]);
+        const data = parseJson(legacy.data);
+        const entries = [...encodeSessionState(data)];
+        for (let offset = 0; offset < entries.length; offset += 200) {
+          const batch = entries.slice(offset, offset + 200);
+          const placeholders = batch.map(() => "(?,?,?)").join(",");
+          await connection.query(`INSERT INTO vc_session_state(session_code,state_key,state_value) VALUES ${placeholders}
+            ON DUPLICATE KEY UPDATE state_value=VALUES(state_value)`,
+            batch.flatMap(([key,value]) => [code,key,value]));
+          stateRows += batch.length;
+        }
+        const [stored] = await connection.query(
+          "SELECT state_key,CAST(state_value AS CHAR CHARACTER SET utf8mb4) AS state_value FROM vc_session_state WHERE session_code=?", [code]);
+        if (stored.length !== entries.length || !isDeepStrictEqual(decodeSessionState(stored), data)) {
+          throw new Error("La comparación entre origen y destino falló durante la migración.");
+        }
+      }
+      await connection.query("INSERT INTO vc_schema_migrations(migration_id) VALUES(?)", [SESSION_ROWS_MIGRATION_ID]);
+      await connection.commit();
+      this.sessionRowsStorageEnabled = true;
+      this.sessionStateCache.clear();
+      return { applied: true, sessions: sessions.length, stateRows };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; }
+    finally { connection.release(); }
+  }
+
+  async restoreSessionRows() {
+    if (this.env.SESSION_ROWS_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa antes de revertir.");
+    const connection = await this.pool.getConnection();
+    try {
+      const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+      if (!applied) return { restored: 0 };
+      await connection.query(LEGACY_SESSIONS_SCHEMA);
+      await connection.beginTransaction();
+      const [sessions] = await connection.query("SELECT DISTINCT session_code FROM vc_session_state");
+      for (const { session_code: code } of sessions) {
+        const [rows] = await connection.query(
+          "SELECT state_key,CAST(state_value AS CHAR CHARACTER SET utf8mb4) AS state_value FROM vc_session_state WHERE session_code=?", [code]);
+        await connection.query("INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
+          [code, JSON.stringify(decodeSessionState(rows))]);
+      }
+      await connection.query("DELETE FROM vc_session_state");
+      await connection.query("DELETE FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+      await connection.commit();
+      this.sessionRowsStorageEnabled = false;
+      this.sessionStateCache.clear();
+      return { restored: sessions.length };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; }
+    finally { connection.release(); }
+  }
+
   async restoreShiftDetailsToEntities() {
     if (!this.databaseConfigured || !this.usingDb) throw new Error("La reversión de detalles requiere MySQL disponible.");
     if (this.env.SHIFT_DETAILS_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa antes de revertir.");
@@ -569,6 +682,7 @@ this.env = env;
     if (this.env.SESSION_DATA_MIGRATION_BACKUP_VERIFIED !== "1") throw new Error("Confirma una copia externa antes de revertir.");
     const connection = await this.pool.getConnection();
     try {
+      await this.requireLegacySessionState(connection);
       const [[shiftDetailsMigration]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SHIFT_DETAILS_MIGRATION_ID]);
       if (shiftDetailsMigration) throw new Error("Revierte primero la normalización de detalles de turnos.");
       const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_DATA_MIGRATION_ID]);
@@ -599,6 +713,7 @@ this.env = env;
     const connection = await this.pool.getConnection();
     let restored = 0;
     try {
+      await this.requireLegacySessionState(connection);
       const [sessions] = await connection.query("SELECT id,data FROM sessions");
       const [metadataRows] = await connection.query("SELECT session_code,revision,book_data FROM vc_contact_book_meta");
       const [contactRows] = await connection.query("SELECT session_code,contact_data FROM vc_contact_book_contacts ORDER BY session_code,position,contact_id");
@@ -631,6 +746,11 @@ this.env = env;
     } finally {
       connection.release();
     }
+  }
+
+  async requireLegacySessionState(connection) {
+    const [[applied]] = await connection.query("SELECT migration_id FROM vc_schema_migrations WHERE migration_id=?", [SESSION_ROWS_MIGRATION_ID]);
+    if (applied) throw new Error("Revierte primero la migración vc_session_state.");
   }
 
   summarizeSessions(snapshot = {}) {
@@ -677,11 +797,14 @@ this.env = env;
     const shiftUnfinishedContacts = {};
     const shiftHistoryIds = {};
     const shiftHistoryChanged = {};
+    const callAttempts = {};
     let snapshotBytes = 0;
     const codesToSave = changedCodes ? new Set(changedCodes) : null;
     for (const [code, session] of sessionsMap) {
       if (codesToSave && !codesToSave.has(code)) continue;
-      if (collectCallAttempts(session).length) session.hasCallHistory = true;
+      const attempts = collectCallAttempts(session);
+      if (attempts.length) session.hasCallHistory = true;
+      callAttempts[code] = structuredClone(attempts);
       const { dashboardSocketId, phoneSocketId, activePhoneSocketId, workerCursor, contactBook, ...rawData } = session;
       let data = rawData;
       if (this.sessionDataStorageEnabled) {
@@ -702,10 +825,9 @@ this.env = env;
       if (contactBook && (!this.databaseOnly || !this.contactBookStorageEnabled)) {
         this.contactBookCache.set(code, contactBook);
       }
-      const normalizedBook = this.databaseOnly && this.contactBookStorageEnabled && Boolean(contactBook) &&
-        (this.normalizedContactBooks.has(code) || this.dirtyContactBooks.has(code));
+      const normalizedBook = this.databaseOnly && this.contactBookStorageEnabled && Boolean(contactBook);
       if (normalizedBook) {
-        if (this.dirtyContactBooks.has(code)) {
+        if (!this.normalizedContactBooks.has(code) || this.dirtyContactBooks.has(code)) {
           contactBooks[code] = JSON.parse(JSON.stringify(contactBook));
           contactBookRevisions[code] = Number(session.contactBookRevision || 0);
           contactBookVersions.set(code, this.contactBookVersions.get(code) || 0);
@@ -731,6 +853,7 @@ this.env = env;
       shiftUnfinishedContacts,
       shiftHistoryIds,
       shiftHistoryChanged,
+      callAttempts,
       contactBooks,
       contactBookRevisions,
       snapshotBytes,
@@ -788,7 +911,7 @@ this.env = env;
 
   async saveNow(snapshot, changedCodes = null, metrics = {}) {
     for (const [code, session] of Object.entries(snapshot)) {
-      for (const row of collectCallAttempts(session)) this.remember(code, row);
+      for (const row of metrics.callAttempts?.[code] ?? collectCallAttempts(session)) this.remember(code, row);
     }
     this.lastSnapshot = snapshot;
     if (this.databaseConfigured) this.pendingDatabase = true;
@@ -802,11 +925,12 @@ this.env = env;
     await this.atomicJson(this.filePath, snapshot);
     }
     if (!this.databaseConfigured) return { committed: true, mode: "local" };
-    if (!await this.initDb()) throw new Error("MySQL no disponible; guardado pendiente.");
+    if (!this.schemaReady && !await this.initDb()) throw new Error("MySQL no disponible; guardado pendiente.");
     const connection = await this.pool.getConnection();
     const changed = [...this.dirty];
     const entityCacheChanges = new Map();
     const entityCacheDeletes = new Set();
+    const stateCacheChanges = new Map();
     try {
       await connection.beginTransaction();
       for (const [code, book] of Object.entries(metrics.contactBooks || {})) {
@@ -862,7 +986,6 @@ this.env = env;
             const currentKeys = currentKeysByType.get(type) || new Set();
             for (const key of existingKeys) {
               if (currentKeys.has(key)) continue;
-              const parsed = JSON.parse(key);
               entityCacheDeletes.add(key);
             }
           }
@@ -897,13 +1020,32 @@ this.env = env;
             await connection.query("DELETE FROM vc_shift_unfinished_contacts WHERE session_code=?", [code]);
           }
         }
-        const [existing] = await connection.query(
-          "SELECT data FROM sessions WHERE id=?", [code]);
-        const existingData = existing[0]?.data;
-        if (existingData && JSON.stringify(existingData) === metrics.snapshotJson?.[code]) continue;
-        await connection.query(
-          "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
-          [code, JSON.stringify(data)]);
+        if (this.sessionRowsStorageEnabled) {
+          const next = encodeSessionState(data);
+          const stored = this.sessionStateCache.get(code) || new Map();
+          const changedState = [...next].filter(([key,value]) => stored.get(key) !== value);
+          for (let offset = 0; offset < changedState.length; offset += 200) {
+            const batch = changedState.slice(offset, offset + 200);
+            const placeholders = batch.map(() => "(?,?,?)").join(",");
+            await connection.query(`INSERT INTO vc_session_state(session_code,state_key,state_value) VALUES ${placeholders}
+              ON DUPLICATE KEY UPDATE state_value=VALUES(state_value)`,
+              batch.flatMap(([key,value]) => [code,key,value]));
+          }
+          const staleKeys = [...stored.keys()].filter(key => !next.has(key));
+          for (let offset = 0; offset < staleKeys.length; offset += 200) {
+            const batch = staleKeys.slice(offset, offset + 200);
+            await connection.query(`DELETE FROM vc_session_state WHERE session_code=? AND state_key IN (${batch.map(() => "?").join(",")})`, [code,...batch]);
+          }
+          stateCacheChanges.set(code, next);
+        } else {
+          const [existing] = await connection.query("SELECT data FROM sessions WHERE id=?", [code]);
+          const existingData = existing[0]?.data;
+          if (!existingData || JSON.stringify(existingData) !== metrics.snapshotJson?.[code]) {
+            await connection.query(
+              "INSERT INTO sessions (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)",
+              [code, JSON.stringify(data)]);
+          }
+        }
       }
       const bySession = new Map();
       for (const key of changed) {
@@ -914,6 +1056,7 @@ this.env = env;
       }
       for (const [code, rows] of bySession) await writeCallAttempts(connection, code, rows);
       await connection.commit();
+      for (const [code, state] of stateCacheChanges) this.sessionStateCache.set(code, state);
       for (const key of entityCacheDeletes) this.forgetSessionEntity(key);
       for (const [key,value] of entityCacheChanges) this.cacheSessionEntity(key,value);
       for (const [code, ref] of Object.entries(metrics.shiftHistorySources || {})) this.shiftHistorySourceRefs.set(code,ref);

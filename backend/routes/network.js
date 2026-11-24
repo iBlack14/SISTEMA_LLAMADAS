@@ -27,16 +27,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
     }
     const users = [...usersById.values()];
     const activeCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
-    const booksByCode = new Map();
-    if (activeCodes.length) {
-      const [sessionRows] = await runtime.auth.pool.query(
-        `SELECT id,data FROM sessions WHERE id IN (${activeCodes.map(() => "?").join(",")})`, activeCodes);
-      for (const sessionRow of sessionRows) {
-        const activeSession = runtime.sessions.get(sessionRow.id);
-        const stored = typeof sessionRow.data === "string" ? JSON.parse(sessionRow.data) : sessionRow.data;
-        booksByCode.set(sessionRow.id, activeSession?.contactBook || stored?.contactBook || null);
-      }
-    }
+    const booksByCode = new Map(activeCodes.map(code => [code, runtime.sessions.get(code)?.contactBook]));
     for (const row of rows) {
       if (!row.session_code) continue;
       const book = booksByCode.get(row.session_code);
@@ -101,12 +92,7 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
     const books = new Map();
     for (const code of sessionCodes) {
-      let book = runtime.sessions.get(code)?.contactBook;
-      if (!book) {
-        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
-        const stored = sessionRows[0]?.data;
-        book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
-      }
+      const book = runtime.sessions.get(code)?.contactBook;
       if (book) books.set(code, book);
     }
     const contactsFromBooks = sessionCodes.flatMap(code => (books.get(code)?.contacts || [])
@@ -149,12 +135,7 @@ runtime.app.get("/api/users/me/contact-book", async (req, res) => {
     const sessionCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
     const books = new Map();
     for (const code of sessionCodes) {
-      let book = runtime.sessions.get(code)?.contactBook;
-      if (!book) {
-        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
-        const stored = sessionRows[0]?.data;
-        book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored)?.contactBook : null;
-      }
+      const book = runtime.sessions.get(code)?.contactBook;
       if (book) books.set(code, book);
     }
     const contactsFromBooks = sessionCodes.flatMap(code => (books.get(code)?.contacts || [])
@@ -245,13 +226,6 @@ runtime.app.get("/api/users/:id/message-contacts", runtime.auth.requireAdmin, as
       const session = runtime.sessions.get(code);
       if (session?.messageContacts?.length) {
         allContacts.push(...session.messageContacts.map(c => ({ ...c, sessionCode: code })));
-      } else {
-        const [sessionRows] = await runtime.auth.pool.query("SELECT data FROM sessions WHERE id=?", [code]);
-        const stored = sessionRows[0]?.data;
-        const book = stored ? (typeof stored === "string" ? JSON.parse(stored) : stored) : null;
-        if (book?.messageContacts?.length) {
-          allContacts.push(...book.messageContacts.map(c => ({ ...c, sessionCode: code })));
-        }
       }
     }
     return res.json({ ok: true, username: rows[0].username, contacts: allContacts });

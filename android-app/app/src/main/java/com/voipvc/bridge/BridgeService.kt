@@ -300,6 +300,7 @@ class BridgeService : Service() {
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
         stopAudio()
+        callRecorder.cancel()
         unregisterCallMonitor()
         unregisterReceiver(telecomStateReceiver)
         try {
@@ -1103,18 +1104,19 @@ class BridgeService : Service() {
             }
             "in_call" -> {
                 startAudio()
-                if (activeCallId.isNotBlank()) {
+                if (belongsToCampaign && activeCallId.isNotBlank() && isStreaming.get()) {
                     if (callAnsweredAtElapsedMs == 0L) callAnsweredAtElapsedMs = SystemClock.elapsedRealtime()
-                    callRecorder.start(activeCallId, activeContactId, campaignPhoneNumber.ifBlank { currentPhoneNumber })
+                    callRecorder.start(activeCallId)
                 }
                 launchCallUi()
-                setStatus("🔊 En llamada")
+                setStatus(if (callRecorder.isRecording) "🔴 En llamada · Grabando audio" else "🔊 En llamada")
             }
             "ended", "failed", "idle" -> {
                 dialAttemptToken += 1
                 hangupVerificationToken += 1
                 stopAudio()
-                if (callAnsweredAtElapsedMs > 0L && activeCallId.isNotBlank()) {
+                if (belongsToCampaign && !detectedVoicemail && detectedAnnouncement.isBlank() &&
+                    callAnsweredAtElapsedMs > 0L && activeCallId.isNotBlank()) {
                     val elapsedSec = ((SystemClock.elapsedRealtime() - callAnsweredAtElapsedMs) / 1000L).toInt().coerceAtLeast(1)
                     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     val baseUrl = prefs.getString(PREF_SOCKET_URL, "").orEmpty()

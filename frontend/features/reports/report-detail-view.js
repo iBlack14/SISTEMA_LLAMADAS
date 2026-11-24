@@ -705,14 +705,6 @@ function renderDetails() {
               <h3>RESULTADOS DE BÚSQUEDA (${tableRows.length})</h3>
             </div>
           ` : ""}
-          <div id="reportAudioPlayerBar" class="report-audio-player-bar" hidden>
-            <div class="report-audio-player-meta">
-              <span class="report-audio-player-badge">Grabación</span>
-              <strong id="reportAudioPlayerLabel">—</strong>
-            </div>
-            <audio id="reportAudioPlayer" controls preload="metadata"></audio>
-            <button id="reportAudioPlayerClose" type="button" class="secondary" aria-label="Cerrar reproductor">✕</button>
-          </div>
           <div id="report-detail-table" class="report-table-wrap">
             <table>
               <thead>
@@ -749,9 +741,6 @@ function renderDetails() {
                     <td>${reportState.esc(formatDuration(contact.durationSeconds))}</td>
                     <td class="report-result ${statusClass(contact)}">
                       <span class="report-result-badge">${reportState.esc(status(contact))}</span>
-                      ${contact.hasRecording && contact.attemptId && (contact.sessionCode || rowReport.sessionCode)
-                        ? `<button type="button" class="report-play-recording-btn" data-play-recording="${reportState.esc(String(contact.attemptId))}" data-recording-session="${reportState.esc(String(contact.sessionCode || rowReport.sessionCode))}" data-recording-label="${reportState.esc(`${contact.name || "Contacto"} · ${contact.phone || ""}`)}" title="Reproducir grabación de la llamada">▶ Audio</button>`
-                        : ""}
                     </td>
                     <td class="report-row-action-cell">
                       ${allMode
@@ -1226,30 +1215,6 @@ function renderDetails() {
     });
     reportState.$("reportDetails").querySelectorAll("[data-call-report-contact]").forEach(button => {
       button.onclick = () => startReportCalls(button.dataset.callReportId, [button.dataset.callReportContact]);
-    });
-
-    const audioBar = reportState.$("reportAudioPlayerBar");
-    const audioEl = reportState.$("reportAudioPlayer");
-    const audioLabel = reportState.$("reportAudioPlayerLabel");
-    reportState.$("reportAudioPlayerClose")?.addEventListener("click", () => {
-      if (audioEl) { audioEl.pause(); audioEl.removeAttribute("src"); audioEl.load(); }
-      if (audioBar) audioBar.hidden = true;
-    });
-    reportState.$("reportDetails").querySelectorAll("[data-play-recording]").forEach(button => {
-      button.onclick = () => {
-        if (!audioBar || !audioEl) return;
-        const attemptId = button.dataset.playRecording;
-        const sessionCode = button.dataset.recordingSession;
-        const label = button.dataset.recordingLabel || "Llamada contestada";
-        if (!attemptId || !sessionCode) return;
-        const url = `/api/session/${encodeURIComponent(sessionCode)}/recordings/${encodeURIComponent(attemptId)}`;
-        if (audioLabel) audioLabel.textContent = label;
-        audioBar.hidden = false;
-        if (audioEl.getAttribute("src") !== url) {
-          audioEl.src = url;
-        }
-        audioEl.play().catch(() => {});
-      };
     });
 
     const showDetailedReport = () => {

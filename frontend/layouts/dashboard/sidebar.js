@@ -1,7 +1,7 @@
 ﻿import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js?v=20261119-users-ui3";
 
-const adminPaths = { network: "/nucleo-red", users: "/usuarios", settings: "/configuracion" };
+const adminPaths = { network: "/nucleo-red", users: "/usuarios", settings: "/configuracion", voice: "/voz" };
 const sectionForPath = path => Object.keys(panelPaths).find(view => panelPaths[view] === path)
   || Object.keys(adminPaths).find(view => adminPaths[view] === path)
   || (["/admin.html", "/legacy/admin"].includes(path) ? "network" : "calls");
@@ -19,6 +19,7 @@ const sidebarIconShapes = {
   messages: [["path", { d: "M20 11.5a7.5 7.5 0 0 1-7.5 7.5H7l-4 2 1.4-4A7.5 7.5 0 1 1 20 11.5Z" }], ["path", { d: "M8 11.5h.01M12 11.5h.01M16 11.5h.01" }]],
   network: [["circle", { cx: "12", cy: "5", r: "2.5" }], ["circle", { cx: "5", cy: "18", r: "2.5" }], ["circle", { cx: "19", cy: "18", r: "2.5" }], ["path", { d: "m10.8 7.2-4.6 8.6M13.2 7.2l4.6 8.6M7.5 18h9" }]],
   users: [["path", { d: "M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }], ["circle", { cx: "10", cy: "7", r: "4" }], ["path", { d: "M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" }]],
+  voice: [["path", { d: "M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4" }]],
   settings: [["circle", { cx: "12", cy: "12", r: "3" }], ["path", { d: "M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.6.77 1 1.41 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z" }]]
 };
 const svgNamespace = "http://www.w3.org/2000/svg";
@@ -53,6 +54,7 @@ let adminPromise;
 let adminNetwork;
 let adminUsers;
 let adminSettings;
+let adminVoice;
 let initNetwork;
 let initUsers;
 let viewRequest = 0;
@@ -91,6 +93,10 @@ function setViewVisibility(view) {
   if (adminNetwork) adminNetwork.hidden = view !== "network";
   if (adminUsers) adminUsers.hidden = view !== "users";
   if (adminSettings) adminSettings.hidden = view !== "settings";
+  if (adminVoice) {
+    adminVoice.hidden = view !== "voice";
+    if (adminVoice.hidden) adminVoice.querySelector("audio")?.pause();
+  }
 }
 
 async function loadAdminWorkspace() {
@@ -102,7 +108,7 @@ async function loadAdminWorkspace() {
     if (!response.ok) throw new Error("No se pudo cargar la sección administrativa.");
     const source = new DOMParser().parseFromString(await response.text(), "text/html");
     const workspace = document.getElementById("adminWorkspace");
-    const candidates = [source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("settingsView"), source.getElementById("editUserDialog")];
+    const candidates = [source.getElementById("networkView"), source.getElementById("usersView"), source.getElementById("settingsView"), source.getElementById("editUserDialog"), source.getElementById("voiceView")];
     if (candidates.some(item => !item)) throw new Error("La vista administrativa está incompleta.");
     workspace.replaceChildren(...candidates);
     workspace.addEventListener("click", event => {
@@ -115,12 +121,17 @@ async function loadAdminWorkspace() {
     adminNetwork = candidates[0];
     adminUsers = candidates[1];
     adminSettings = candidates[2];
+    adminVoice = candidates[4];
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
     const networkCss = source.querySelector('link[rel="stylesheet"][href*="network.css"]');
     stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261119-users-ui3";
     stylesheet.dataset.adminStyles = "1";
     document.head.append(stylesheet);
+    const voiceStylesheet = document.createElement("link");
+    voiceStylesheet.rel = "stylesheet";
+    voiceStylesheet.href = "/features/admin/voice/voice.css";
+    document.head.append(voiceStylesheet);
   })().catch(error => {
     adminPromise = null;
     throw error;
@@ -144,7 +155,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   if (!adminPaths[view]) await window.startOperationalDashboard?.();
   if (request !== viewRequest) return;
   if (view === "reports") {
-    const reports = await import("../../features/reports/reports-page.js?v=20261119-calendar-fast");
+    const reports = await import("../../features/reports/reports-page.js?v=20261124-voice-retention");
     if (request !== viewRequest) return;
     reports.showCalendar?.();
   } else if (view === "messages") {
@@ -194,6 +205,11 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         const settings = await import("../../features/admin/settings/email-settings-page.js?v=20261119-users-ui3");
         await settings.initEmailSettingsPage?.();
       }
+      if (view === "voice") {
+        const voice = await import("../../features/admin/voice/voice.js");
+        if (request !== viewRequest) return;
+        await voice.openVoicePanel(adminVoice);
+      }
     } catch (error) {
       const message = document.getElementById("accountError");
       if (message) message.textContent = error.message || "No se pudo abrir esta sección.";
@@ -214,6 +230,7 @@ navigation.addEventListener("click", event => {
   const link = event.target.closest("[data-view]");
   if (!link) return;
   if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (link.dataset.view === "voice" && !document.getElementById("adminWorkspace")) return;
   if (link.id === "reportNavBtn" || link.id === "blockedNumbersOpen") return;
   event.preventDefault();
   navigate(link.dataset.view);
@@ -241,6 +258,8 @@ requireLogin().then(async authenticatedUser => {
   if (networkLink) networkLink.hidden = !isAdmin;
   if (usersLink) usersLink.hidden = !isAdmin;
   if (settingsLink) settingsLink.hidden = !isAdmin;
+  const voiceLink = document.getElementById("sidebarVoice");
+  if (voiceLink) voiceLink.hidden = !isAdmin;
   document.documentElement.classList.remove("auth-pending");
   const initial = sectionForPath(location.pathname);
   await navigate(initial, { history: false, scroll: false });
