@@ -13,6 +13,7 @@ import { showPanelView } from './navigation/panel-navigation.js';
  */
 export function createBindDashboardEvents(dashboardState, dashboardActions) {
 function bindEvents() {
+  window.addEventListener("contacts:lists-refresh", () => dashboardActions.renderTabs());
   const blockedNameInput = document.getElementById("blockedContactName");
   const blockedPhoneInput = document.getElementById("blockedContactPhone");
   const blockedNumbersBody = document.getElementById("blockedNumbersBody");
@@ -141,6 +142,24 @@ function bindEvents() {
   if (refs.addSaveBtn) refs.addSaveBtn.onclick = dashboardActions.saveModalContact;
   if (refs.addPhoneInput) refs.addPhoneInput.onkeydown = (event) => { if (event.key === "Enter") dashboardActions.saveModalContact(); };
   if (refs.importFileEl) refs.importFileEl.onchange = (e) => dashboardActions.handleImportFiles(e.target.files);
+  const contactSearch = document.getElementById("filterInput");
+  if (contactSearch) contactSearch.addEventListener("input", () => { dashboardState.currentPage = 1; dashboardActions.renderContacts(); });
+  const listSearch = document.getElementById("contactsListSearch");
+  if (listSearch) listSearch.addEventListener("input", () => dashboardActions.renderTabs());
+  const importToggle = document.getElementById("contactsImportToggle");
+  if (importToggle) importToggle.addEventListener("click", () => {
+    const panel = document.getElementById("contactsImportPanel");
+    const opening = panel?.hidden !== false;
+    if (panel) panel.hidden = !opening;
+    importToggle.setAttribute("aria-expanded", String(opening));
+    if (opening) document.getElementById("importFile")?.focus();
+  });
+  const listToggle = document.getElementById("contactsListsToggle");
+  if (listToggle) listToggle.addEventListener("click", () => {
+    const panel = document.getElementById("contactsTabs");
+    const opening = panel?.classList.toggle("is-mobile-open");
+    listToggle.setAttribute("aria-expanded", String(Boolean(opening)));
+  });
   if (refs.importConfirm) refs.importConfirm.onclick = dashboardActions.addImportedContacts;
   if (refs.importCancel) refs.importCancel.onclick = dashboardActions.resetImportPreview;
   if (refs.prevPageBtn) refs.prevPageBtn.onclick = () => {

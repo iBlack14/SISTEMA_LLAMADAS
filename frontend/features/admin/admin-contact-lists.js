@@ -187,8 +187,11 @@ async function loadContacts() {
   $("adminListsNext").disabled = true;
   try {
     const query = new URLSearchParams({ list, offset: String(pageOffset), limit: String(pageSize) });
-    // Use "me" for current user's session
-    const apiUserId = userId === "mine" ? "me" : userId;
+    // The admin contact-book endpoint expects the numeric ID, including for the current admin.
+    const apiUserId = userId === "mine"
+      ? (currentUser?.id || window.VOIP_VC_AUTH_USER?.id)
+      : userId;
+    if (!apiUserId) throw new Error("No se pudo identificar al usuario actual.");
     const response = await apiFetch(`/api/users/${encodeURIComponent(apiUserId)}/contact-book?${query}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los contactos.");
@@ -229,12 +232,15 @@ async function loadContacts() {
 function onImportFileChange(event) {
   const file = event.target.files?.[0];
   const btn = $("adminListsImportBtn");
+  const label = $("adminListsFileLabel");
   if (file) {
     btn.disabled = false;
-    btn.textContent = `⬆️ Importar ${file.name}`;
+    btn.textContent = "Revisar contactos";
+    if (label) label.textContent = `📄 ${file.name}`;
   } else {
     btn.disabled = true;
-    btn.textContent = "⬆️ Importar contactos";
+    btn.textContent = "Continuar";
+    if (label) label.textContent = "📁 Elegir archivo";
   }
 }
 
@@ -279,8 +285,10 @@ function showImportPreview() {
       }
       importPreviewData = contacts.map(c => ({ ...c, list }));
       renderImportPreview();
+      status.textContent = "";
       $("adminListsImportPreview").style.display = "block";
-      status.textContent = `${contacts.length} contactos detectados. Revisa y confirma.`;
+      $("adminListsPreviewSummary").textContent = `${contacts.length} contactos detectados · ${file.name}`;
+      status.textContent = "Revisa la vista previa y confirma para guardar los contactos.";
     } catch (error) {
       console.error("[IMPORT] Parse error:", error);
       status.textContent = "Error al leer archivo: " + error.message;
@@ -340,7 +348,10 @@ function hideImportPreview() {
   $("adminListsImportPreview").style.display = "none";
   $("adminListsImportFile").value = "";
   $("adminListsImportBtn").disabled = true;
-  $("adminListsImportBtn").textContent = "⬆️ Importar contactos";
+  $("adminListsImportBtn").textContent = "Continuar";
+  if ($("adminListsFileLabel")) $("adminListsFileLabel").textContent = "📁 Elegir archivo";
+  const status = $("adminListsStatus");
+  if (status && status.textContent.startsWith("Revisa la vista previa")) status.textContent = "";
 }
 
 async function confirmImport() {

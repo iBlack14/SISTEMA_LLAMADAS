@@ -53,8 +53,8 @@ function renderDetails() {
     const tableRows = (allMode || term
       ? allTableRows.filter(({ report: reportItem, contact }) =>
         normalizeSearchText(
-          `${reportItem.rubro} ${contact.name} ${contact.phone} ` +
-          `${reportItem.owner || ""} ${contact.list || ""} ${contact.workerName || ""} ` +
+          `${reportItem.rubro} ${contact.name} ${contact.phone} ${contact.id || ""} ` +
+          `${reportItem.owner || ""} ${contact.list || ""} ${contact.workerName || ""} ${contact.workerId || ""} ` +
           `${contact.technicalResult || ""}`
         ).includes(term)
       )
@@ -113,17 +113,15 @@ function renderDetails() {
       : reportState.reportScope.startsWith("user:")
         ? reportState.reportUsers.find(user => `user:${user.id}` === reportState.reportScope)?.username || "Usuario"
         : currentUser?.username || "Mis reportes";
+    const contextOwner = allMode ? aggregateOwner : report.owner || aggregateOwner;
     const metrics = [
-      ["RUBRO", report.rubro],
-      ...(allMode ? [["USUARIO", aggregateOwner]] : report.owner ? [["USUARIO", report.owner]] : []),
-      ["FECHA", reportDateLabel],
-      ["EQUIPOS USADOS", equipmentCount || "—"],
-      ["NÚMEROS USADOS", report.numbers],
-      ["LLAMADAS TOTALES", report.totalCalls],
-      ["CONTESTADAS", report.answered],
-      ["BUZONES", report.voicemail ?? report.rows.filter(isVoicemailAttempt).length],
-      ["INOPERABLES", report.rows.filter(isInoperableAttempt).length],
-      ["PENDIENTES", report.pending]
+      ["LLAMADAS TOTALES", report.totalCalls, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16.5v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 1.12 3.8 2 2 0 0 1 3.1 1.6h3a2 2 0 0 1 2 1.72c.12.9.34 1.78.65 2.62a2 2 0 0 1-.45 2.11L7 9.35a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.11-.45c.84.31 1.72.53 2.62.65A2 2 0 0 1 21 16.5Z"/></svg>'],
+      ["CONTESTADAS", report.answered, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>'],
+      ["BUZONES", report.voicemail ?? report.rows.filter(isVoicemailAttempt).length, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 13h4l2 3h6l2-3h4"/></svg>'],
+      ["INOPERABLES", report.rows.filter(isInoperableAttempt).length, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>'],
+      ["PENDIENTES", report.pending, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
+      ["EQUIPOS USADOS", equipmentCount || "—", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 5h6m-5 14h4"/></svg>'],
+      ["NÚMEROS USADOS", report.numbers, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 6 21M18 3l-2 18M3 9h18M2 15h18"/></svg>']
     ];
 
     const status = attemptResultLabel;
@@ -672,11 +670,17 @@ function renderDetails() {
 
     reportState.$("reportDetails").innerHTML = `
       <section class="report-content-panel" aria-label="Detalle del reporte">
+        <div class="report-context" aria-label="Contexto del reporte">
+          <div><span>Rubro</span><strong title="${reportState.esc(report.rubro)}">${reportState.esc(report.rubro)}</strong></div>
+          <div><span>Usuario</span><strong title="${reportState.esc(contextOwner)}">${reportState.esc(contextOwner)}</strong></div>
+          <div><span>Fecha del reporte</span><strong>${reportState.esc(reportDateLabel)}</strong></div>
+        </div>
         <section class="report-summary" aria-label="Resumen del reporte">
           <div class="report-metrics">
-            ${metrics.map(([name, value]) => `
-              <div class="report-metric">
-                <span class="report-metric-label">${reportState.esc(name)}:</span>
+            ${metrics.map(([name, value, icon]) => `
+              <div class="report-metric" data-metric="${reportState.esc(name)}">
+                <span class="report-metric-icon" aria-hidden="true">${icon}</span>
+                <span class="report-metric-label">${reportState.esc(name)}</span>
                 <strong class="report-metric-value">${reportState.esc(value)}</strong>
               </div>
             `).join("")}
@@ -687,12 +691,12 @@ function renderDetails() {
           ${allMode ? `
             <div class="report-detail-heading report-consolidated-heading">
               <div>
-                <h3>VISTA CONSOLIDADA</h3>
+                <h3>Vista Consolidada</h3>
                 <p>Resumen de todos los rubros. Elige uno para ver su detalle y gestionar llamadas.</p>
               </div>
               <div class="report-consolidated-actions">
-                <button id="reportDetailedTop" class="secondary" type="button">DETALLADO</button>
-                <button id="reportTotalPdfTop" type="button">⬇ DESCARGA TOTAL</button>
+                <button id="reportDetailedTop" class="secondary" type="button"><span aria-hidden="true">▤</span> Detallado</button>
+                <button id="reportTotalPdfTop" type="button"><span aria-hidden="true">↓</span> Descargar total</button>
               </div>
             </div>
           ` : ""}
@@ -706,15 +710,15 @@ function renderDetails() {
               <thead>
                 <tr>
                   <th class="report-select-cell"><input id="reportSelectAll" type="checkbox" aria-label="Seleccionar todos los números disponibles visibles" /></th>
-                  <th>N.</th>
+                  <th>N.º</th>
                   ${allMode ? "<th>USUARIO</th>" : ""}
-                  <th>BASE</th>
-                  <th>EMPRESA</th>
-                  <th>TELEFONO</th>
+                  <th>BASE (RUBRO)</th>
+                  <th class="report-company-cell">EMPRESA</th>
+                  <th>TELÉFONO</th>
                   <th>EQUIPO</th>
                   <th>HORA LIMA</th>
                   <th>INT.</th>
-                  <th>DURACION</th>
+                  <th>DURACIÓN</th>
                   <th>RESULTADO</th>
                   <th class="report-row-action-cell">${allMode ? "VER" : "LLAMAR"}</th>
                 </tr>
@@ -729,18 +733,18 @@ function renderDetails() {
                     <td>${reportState.tablePage * rowsPerPage + index + 1}</td>
                     ${allMode ? `<td>${reportState.esc(rowReport.owner || "—")}</td>` : ""}
                     <td>${reportState.esc(contact.list || rowReport.rubro)}</td>
-                    <td>${reportState.esc(contact.name)}</td>
+                    <td class="report-company-cell">${reportState.esc(contact.name)}</td>
                     <td>${reportState.esc(contact.phone)}</td>
                     <td>${reportState.esc(contact.workerName || "—")}</td>
                     <td>${reportState.esc(limaDateTime(contact.lastCallAt))}</td>
                     <td>${reportState.esc(contact.attemptNumber || "—")}</td>
                     <td>${reportState.esc(formatDuration(contact.durationSeconds))}</td>
                     <td class="report-result ${statusClass(contact)}">
-                      ${reportState.esc(status(contact))}
+                      <span class="report-result-badge">${reportState.esc(status(contact))}</span>
                     </td>
                     <td class="report-row-action-cell">
                       ${allMode
-                        ? `<button type="button" class="report-row-open" data-open-report="${reportState.esc(rowReport.id)}">Ver rubro</button>`
+                        ? `<button type="button" class="report-row-open" data-open-report="${reportState.esc(rowReport.id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Ver rubro</button>`
                         : canSelect(contact)
                         ? `<button type="button" class="report-row-call" data-call-report-contact="${reportState.esc(String(contact.id))}" data-call-report-id="${reportState.esc(rowReport.id)}" aria-label="Llamar a ${reportState.esc(contact.name)} ${reportState.esc(contact.phone)}">☎ Llamar</button>`
                         : `<span class="report-no-call">${contact.doNotCall || ["numero_inexistente", "numero_incorrecto"].includes(contact.technicalResult) ? "NO VOLVER A LLAMAR" : contact.manualBlocked ? "BLOQUEADO" : "INOPERABLE"}</span>`}
@@ -756,7 +760,7 @@ function renderDetails() {
           </div>
           <nav class="report-pagination" aria-label="Paginación de llamadas">
             <button id="reportPrevPage" class="secondary" type="button" ${reportState.tablePage === 0 ? "disabled" : ""}>← ANTERIOR</button>
-            <span id="reportPageInfo">Página ${reportState.tablePage + 1} de ${totalPages} · ${tableRows.length} registros</span>
+            <span id="reportPageInfo">${tableRows.length ? `Mostrando ${reportState.tablePage * rowsPerPage + 1}–${reportState.tablePage * rowsPerPage + pageRows.length} de ${tableRows.length}` : "0 registros"} · Página ${reportState.tablePage + 1} de ${totalPages}</span>
             <button id="reportNextPage" class="secondary" type="button" ${reportState.tablePage >= totalPages - 1 ? "disabled" : ""}>SIGUIENTE →</button>
           </nav>
           <div class="report-footer">

@@ -16,6 +16,12 @@ function showImportSaveFeedback(message, isError = false) {
   feedback.textContent = message;
   feedback.hidden = !message;
   feedback.dataset.error = String(isError);
+  const notice = document.getElementById("contactsImportNotice");
+  if (notice) {
+    notice.textContent = message;
+    notice.dataset.error = String(isError);
+    notice.hidden = !message;
+  }
 }
 
 async function addImportedContacts() {
@@ -118,7 +124,9 @@ function listNameFromFile(fileName) {
 async function handleImportFiles(fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) return;
-  refs.importFileNameEl.textContent = files.length === 1 ? files[0].name : `${files.length} archivos seleccionados`;
+  refs.importFileNameEl.textContent = files.length === 1
+    ? `Archivo elegido: ${files[0].name}`
+    : `Archivos elegidos: ${files.length}`;
 
   const results = await Promise.all(files.map(async (file) => {
     try {

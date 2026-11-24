@@ -171,6 +171,9 @@ async function navigate(view, { history = true, scroll = true } = {}) {
     if (section) section.hidden = true;
     if (contacts) contacts.hidden = false;
     if (data) data.hidden = false;
+    const listSearch = document.getElementById("contactsListSearch");
+    if (listSearch) listSearch.value = "";
+    window.dispatchEvent(new Event("contacts:lists-refresh"));
   }
   setViewVisibility(view);
   setActive(view);

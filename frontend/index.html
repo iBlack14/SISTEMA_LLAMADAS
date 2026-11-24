@@ -19,10 +19,10 @@
  <link rel="stylesheet" href="/features/calls/call-outcomes.css?v=20261111-voicemail" />
  <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261116-3cols" />
  <link rel="stylesheet" href="/features/reports/report-details.css?v=20261111-device-details" />
-  <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261119-all-reports-ui-fix4" />
+  <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261120-report-calendar-spacing1" />
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
- <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261119-contact-selector" />
+ <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261124-contact-lists-clarity" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
@@ -178,15 +178,19 @@
           <button id="contactsBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
         </div>
         <header class="contacts-window-header">
-          <div>
-            <h2>RUBRO Y LISTA</h2>
+          <div class="contacts-heading-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></div>
+          <div class="contacts-heading-copy">
+            <h2>Rubro y Lista</h2>
             <p>Gestiona tus listas de contactos, rubros e importaciones de archivos.</p>
           </div>
+          <div class="contacts-import-notice" id="contactsImportNotice" role="status" aria-live="polite" hidden></div>
         </header>
 
 <section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de todos los usuarios" hidden>
-          <h3>Contactos de vendedores</h3>
-          <p class="muted" style="margin-bottom:12px">Gestiona las listas de contactos de tu equipo. Importa desde CSV, Excel, HTML.</p>
+          <div class="admin-lists-heading">
+            <div><span class="admin-lists-kicker">GESTIÓN DE CONTACTOS</span><h3>Contactos de vendedores</h3>
+              <p class="muted">Elige un vendedor y una lista para consultar o importar contactos.</p></div>
+          </div>
           
           <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
             <label style="flex:1;min-width:200px">
@@ -199,71 +203,80 @@
             </label>
           </div>
 
-          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:12px;border:2px dashed var(--border);border-radius:8px;background:var(--card)">
+          <div class="admin-lists-importer">
+            <div class="admin-lists-import-copy"><strong>Importar contactos</strong><span>Selecciona un archivo CSV, Excel, HTML o TXT.</span></div>
+            <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center;margin:0;padding:0;border:0;background:transparent">
             <label class="file-upload-label" style="cursor:pointer;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:10px 12px;justify-content:center">
               <input type="file" id="adminListsImportFile" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none" aria-label="Seleccionar archivo de contactos">
-              <span>📁 Seleccionar archivo (CSV, Excel, HTML, TXT)</span>
+              <span id="adminListsFileLabel">📁 Elegir archivo</span>
             </label>
-            <button id="adminListsImportBtn" type="button" disabled style="padding:10px 20px;font-weight:600">⬆️ Importar a esta lista</button>
+            <button id="adminListsImportBtn" type="button" disabled style="padding:10px 20px;font-weight:600">Continuar</button>
+            </div>
           </div>
 
           <p id="adminListsStatus" class="muted" role="status" style="min-height:20px"></p>
           
-          <div id="adminListsImportPreview" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);max-height:30vh;overflow:auto">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <h4 style="margin:0">Vista previa (primeros 200)</h4>
+          <div id="adminListsImportPreview" class="admin-lists-preview" style="display:none">
+            <div class="admin-lists-preview-heading">
+              <div><span class="admin-lists-step">PASO 2 · REVISIÓN</span><h4>Revisa antes de importar</h4><p id="adminListsPreviewSummary">Contactos detectados en el archivo.</p></div>
               <button id="adminListsImportCancel" class="secondary" type="button" style="padding:6px 12px">Cancelar</button>
             </div>
-            <div class="table-wrap" style="overflow:auto">
-              <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha creación</th><th>Lista</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table>
+            <div class="table-wrap admin-lists-preview-table" style="overflow:auto">
+              <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th><th>Lista de destino</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table>
             </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:8px">
-              <button id="adminListsImportConfirm" type="button" style="padding:10px 20px;font-weight:600">✅ Confirmar importación</button>
+            <div class="admin-lists-preview-footer">
+              <span>Se agregarán a la lista seleccionada.</span>
+              <button id="adminListsImportConfirm" type="button" style="padding:10px 20px;font-weight:600">Confirmar importación</button>
             </div>
           </div>
 
+          <div class="admin-lists-saved-heading"><div><span class="admin-lists-step">CONTACTOS GUARDADOS</span><h4>Contactos de esta lista</h4></div><span id="adminListsPage" class="muted"></span></div>
           <div class="table-wrap" style="overflow:auto;max-height:60vh;margin-top:12px">
-            <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha creación</th></tr></thead><tbody id="adminListsContacts"></tbody></table>
+            <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th></tr></thead><tbody id="adminListsContacts"></tbody></table>
           </div>
           
           <div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">
             <button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button>
-            <span id="adminListsPage" class="muted"></span>
+            <span class="muted">Navega por las páginas de contactos</span>
             <button id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button>
           </div>
         </section>
 
         <!-- CONTACTS SECTION -->
-        <section id="contactsSection" style="display:none">
-          <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>
+        <section id="contactsSection" class="contacts-workspace" style="display:none">
+          <aside class="contacts-list-panel">
+            <div class="contacts-list-heading"><div><h3>Mis listas</h3><span class="contacts-list-count" id="contactsListCount">0 listas</span></div><button type="button" id="contactsListsToggle" class="contacts-list-toggle" aria-expanded="false" aria-controls="contactsTabs" aria-label="Mostrar listas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+            <label class="contacts-list-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="contactsListSearch" type="search" placeholder="Buscar lista…" autocomplete="off" aria-label="Buscar lista" /></label>
+            <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>
+          </aside>
 
+          <div class="contacts-main-panel">
           <div class="contacts-topbar">
-            <p class="section-title contacts-title">📋 Mis contactos</p>
-            <div class="called-counter">
-              <span>Llamados</span>
-              <strong id="calledContactsValue">0</strong>
-            </div>
+            <div class="contacts-selected-list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h7l2 2H21v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 9h18"/></svg><div><p class="section-title contacts-title" id="contactsActiveListTitle">Mis contactos</p><span id="contactsActiveListCount" class="contacts-active-count">0 contactos</span></div></div>
+            <div class="called-counter"><span>Llamados</span><strong id="calledContactsValue">0</strong></div>
           </div>
-          <div class="contact-actions contacts-search">
-            <label for="filterInput">Buscar</label>
+          <div class="contacts-toolbar"><div class="contact-actions contacts-search">
+            <label for="filterInput" class="contacts-search-label">Buscar contacto</label>
             <input id="filterInput" type="search" placeholder="Nombre o teléfono..." autocomplete="off" />
           </div>
+          <div class="contacts-toolbar-actions"><button type="button" id="contactsImportToggle" class="contacts-import-toggle" aria-expanded="false" aria-controls="contactsImportPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span>Importar contactos</span></button></div></div>
 
           <!-- IMPORT - SIMPLE -->
-          <div class="import-panel" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
-            <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div class="import-panel contacts-import-panel" id="contactsImportPanel" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);" hidden>
+            <div class="import-instructions"><span class="import-step-label">PASO 1</span><strong>Selecciona el archivo que contiene tus contactos</strong><span>Formatos aceptados: CSV, Excel (.xlsx, .xls) y Word (.docx). Luego podrás revisar los contactos antes de guardarlos.</span></div>
+            <div class="row import-file-row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
               <label class="file-label" for="importFile" style="flex:1;min-width:180px;text-align:center;background:rgba(255,91,200,.08);border:2px dashed rgba(236,198,250,.45);color:#f7d5ff;padding:18px;border-radius:10px;cursor:pointer;transition:all 0.2s;font-weight:600;">
-                📁 Arrastra o haz clic para subir CSV/Excel/Word
+                <span class="import-file-icon">📁</span><span class="import-file-title">Seleccionar archivo</span><span class="import-file-subtitle">Haz clic aquí y busca el archivo en tu dispositivo</span>
                 <input id="importFile" type="file" accept=".csv,.txt,.xlsx,.xls,.docx" multiple hidden />
               </label>
-              <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;min-width:150px;">Ningún archivo</span>
+              <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;min-width:150px;">Aún no has elegido un archivo</span>
             </div>
 
             <!-- PREVIEW -->
             <div id="importPreview" style="display:none;margin-top:12px;padding:14px;background:rgba(30,6,46,.97);border:1px solid rgba(236,198,250,.28);border-radius:12px;max-height:30vh;overflow:auto;color:#fdf4ff;">
-              <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <strong>Vista previa: <span id="previewCount">0</span> contactos</strong>
-                <button id="importCancelBtn" class="secondary" style="padding:6px 12px;">✕</button>
+              <div class="row import-preview-heading" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div><span class="import-step-label">PASO 2</span><strong>Revisa los contactos</strong><p><span id="previewCount">0</span> contactos detectados. Todavía no se han guardado.</p></div>
+                <button id="importCancelBtn" class="secondary" aria-label="Cancelar importación" title="Cancelar importación" style="padding:6px 12px;">Cancelar</button>
               </div>
               <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
                 <table class="import-preview-table" style="width:100%;font-size:13px;">
@@ -277,59 +290,32 @@
                 </table>
               </div>
               <div class="row" style="margin-top:12px;justify-content:flex-end;">
-                <button id="importConfirmBtn" style="background:linear-gradient(120deg,#c81fa5,#8b2fd6);color:#fff;border:1px solid #ff7bd4;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">✅ Guardar</button>
+                <button id="importConfirmBtn" style="background:linear-gradient(120deg,#c81fa5,#8b2fd6);color:#fff;border:1px solid #ff7bd4;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">Guardar contactos</button>
               </div>
             </div>
             <p id="importSaveFeedback" role="status" aria-live="polite" hidden style="margin-top:8px;font-size:13px;"></p>
           </div>
 
           <!-- CONTACTS TABLE -->
-          <div class="table-wrap contacts-table-wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);">
+          <div class="contacts-table-scroll"><div class="table-wrap contacts-table-wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);">
             <table style="width:100%;border-collapse:collapse;">
-              <thead style="background:#f9fafb;position:sticky;top:0;">
+              <thead>
                 <tr>
-                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Empresa</th>
-                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Teléfono</th>
-                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;">Fecha</th>
-                  <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;width:100px;">Acción</th>
+                  <th>Empresa</th><th>Teléfono</th><th>Fecha</th><th>Acción</th>
                 </tr>
               </thead>
               <tbody id="contactsBody"></tbody>
             </table>
-          </div>
+          </div></div>
           <div id="contactsPagination" class="pagination" style="display:none;justify-content:center;gap:8px;margin-top:12px;">
             <button id="prevPageBtn" class="secondary" style="padding:8px 16px;">← Ant</button>
             <span id="pageInfo" class="muted" style="align-self:center;font-size:13px;">Página 1 de 1</span>
             <button id="nextPageBtn" class="secondary" style="padding:8px 16px;">Sig →</button>
           </div>
 
+          </div>
         </section>
 
-        <!-- DATA FROM IMPORTED LISTS -->
-        <section id="contactsDataSection" class="contacts-data-section" style="display:none" aria-live="polite">
-          <div class="contacts-data-heading">
-            <h3>Mis contactos</h3>
-            <p class="muted" style="font-size:12px;margin-top:4px">Importa desde CSV/Excel. El nombre se guarda como Empresa. Fecha = hoy.</p>
-          </div>
-          <div class="table-wrap contacts-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Empresa</th>
-                  <th>Teléfono</th>
-                  <th>Fecha creación</th>
-                  <th>Contactar</th>
-                </tr>
-              </thead>
-              <tbody id="contactsBody"></tbody>
-            </table>
-          </div>
-          <div id="contactsPagination" class="pagination" style="display:none">
-            <button id="prevPageBtn" class="secondary">← Anterior</button>
-            <span id="pageInfo" class="muted">Página 1 de 1</span>
-            <button id="nextPageBtn" class="secondary">Siguiente →</button>
-          </div>
-        </section>
       </section>
 
       <section id="annualReport" class="annual-report" aria-label="Reportes de llamadas" hidden>
@@ -433,8 +419,8 @@
 <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
-            <tbody id="messageContactsBody"><tr><td colspan="4" class="muted">Sin contactos</td></tr></tbody>
+            <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Ingreso</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
+            <tbody id="messageContactsBody"><tr><td colspan="5" class="muted">Sin contactos</td></tr></tbody>
           </table>
         </div>
       </section>

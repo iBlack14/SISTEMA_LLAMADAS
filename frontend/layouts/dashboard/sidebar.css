@@ -209,6 +209,139 @@ button.viavox-menu-toggle { background: #350642 !important; }
 .admin-user-lists-view table { width: 100%; }
 .admin-user-lists-view td { overflow-wrap: anywhere; }
 
+/* Admin contact lists: clearer hierarchy for filters, imports and results. */
+.admin-user-lists-view {
+  margin-top: 22px;
+  padding: clamp(18px, 2.2vw, 28px);
+  background: linear-gradient(145deg, #310a46 0%, #260638 100%);
+  border-color: rgb(218 119 236 / 42%);
+  box-shadow: 0 18px 48px rgb(24 0 39 / 22%);
+}
+.admin-user-lists-view h3 {
+  margin-bottom: 5px;
+  font-size: clamp(18px, 1.4vw, 21px);
+  letter-spacing: -.025em;
+}
+.admin-user-lists-view > p.muted {
+  margin: 0 0 22px !important;
+  color: #d5bddf !important;
+  font-size: 13px;
+}
+.admin-user-lists-view > .row:first-of-type {
+  align-items: stretch !important;
+  gap: 16px !important;
+  margin-bottom: 18px !important;
+}
+.admin-user-lists-view label {
+  gap: 8px;
+  color: #f0def7;
+  font-size: 13px;
+  font-weight: 650;
+}
+.admin-user-lists-view select { margin-top: 1px; }
+.admin-user-lists-view > .row:nth-of-type(2) {
+  min-height: 84px;
+  margin-bottom: 12px !important;
+  padding: 14px !important;
+  border: 1px dashed rgb(222 91 221 / 70%) !important;
+  border-radius: 14px !important;
+  background: rgb(24 3 37 / 35%) !important;
+}
+.admin-user-lists-view .file-upload-label {
+  min-height: 52px;
+  color: #f8eafa;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.admin-user-lists-view .file-upload-label:hover { background: rgb(255 255 255 / 6%); }
+.admin-user-lists-view #adminListsImportBtn { min-height: 44px; border-radius: 10px; }
+.admin-user-lists-view #adminListsStatus {
+  min-height: 22px !important;
+  margin: 0 0 10px;
+  color: #e2cdea !important;
+  font-size: 13px;
+}
+.admin-user-lists-view > .table-wrap {
+  margin-top: 0 !important;
+  overflow: auto;
+  border: 1px solid rgb(222 91 221 / 30%);
+  border-radius: 13px;
+  background: rgb(20 2 31 / 27%);
+}
+.admin-user-lists-view table { border-collapse: separate; border-spacing: 0; }
+.admin-user-lists-view thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 13px 16px;
+  color: #f5e8f8;
+  background: #6e117b;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .045em;
+  text-align: left;
+}
+.admin-user-lists-view tbody td {
+  padding: 13px 16px;
+  color: #f5eaf8;
+  border-bottom: 1px solid rgb(227 194 235 / 10%);
+  font-size: 13px;
+}
+.admin-user-lists-view tbody tr:last-child td { border-bottom: 0; }
+.admin-user-lists-view tbody tr:nth-child(even) { background: rgb(255 255 255 / 2.5%); }
+.admin-user-lists-view > .row:last-child {
+  min-height: 44px;
+  margin-top: 14px !important;
+}
+.admin-user-lists-view > .row:last-child #adminListsPage { color: #d8c1e1 !important; font-size: 12px; }
+.admin-user-lists-view > .row:last-child button { min-height: 40px; border-radius: 10px; }
+.admin-lists-heading { margin-bottom: 24px; }
+.admin-lists-heading .admin-lists-kicker,
+.admin-lists-step { display: block; margin-bottom: 6px; color: #e7a3f4; font-size: 10px; font-weight: 750; letter-spacing: .09em; }
+.admin-lists-heading h3 { margin-bottom: 5px; }
+.admin-lists-heading p { margin: 0; color: #d7c1e0 !important; font-size: 13px; }
+.admin-user-lists-view > .row:first-of-type { margin-bottom: 22px !important; }
+.admin-user-lists-view > .row:first-of-type label { padding: 14px; border: 1px solid rgb(224 180 238 / 15%); border-radius: 12px; background: rgb(15 1 26 / 24%); }
+.admin-lists-importer { display: grid; grid-template-columns: minmax(190px, .65fr) minmax(0, 1.35fr); gap: 20px; align-items: center; margin: 0 0 16px; padding: 18px; border: 1px solid rgb(231 163 244 / 22%); border-radius: 14px; background: rgb(19 2 30 / 32%); }
+.admin-lists-import-copy { display: grid; gap: 5px; }
+.admin-lists-import-copy strong { color: #fff; font-size: 14px; }
+.admin-lists-import-copy span { color: #d2badb; font-size: 12px; line-height: 1.45; }
+.admin-user-lists-view .file-upload-label { min-height: 46px; justify-content: flex-start !important; border: 1px solid rgb(222 91 221 / 35%); background: rgb(255 255 255 / 4%); }
+.admin-user-lists-view .file-upload-label:hover { border-color: #d878df; background: rgb(255 255 255 / 8%); }
+.admin-user-lists-view #adminListsImportBtn { min-width: 170px; }
+.admin-user-lists-view #adminListsImportBtn:disabled { opacity: .55; cursor: not-allowed; }
+.admin-lists-preview { margin: 16px 0 24px; padding: 18px; border: 1px solid rgb(216 117 231 / 45%); border-radius: 14px; background: #21032f; box-shadow: inset 3px 0 #d83fce; }
+.admin-lists-preview-heading,
+.admin-lists-preview-footer,
+.admin-lists-saved-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.admin-lists-preview-heading { margin-bottom: 14px; }
+.admin-lists-preview-heading h4,
+.admin-lists-saved-heading h4 { margin: 0; color: #fff; font-size: 16px; }
+.admin-lists-preview-heading p { margin: 5px 0 0; color: #d2badb; font-size: 12px; }
+.admin-lists-preview-table { max-height: 300px; border: 1px solid rgb(222 91 221 / 24%); border-radius: 10px; }
+.admin-lists-preview-footer { margin-top: 13px; }
+.admin-lists-preview-footer > span { color: #d2badb; font-size: 12px; }
+.admin-lists-saved-heading { margin: 24px 0 10px; }
+.admin-lists-saved-heading .admin-lists-step { margin-bottom: 4px; color: #c6a3d0; }
+.admin-lists-saved-heading #adminListsPage { color: #e8d6ee !important; font-size: 12px; text-align: right; }
+.admin-user-lists-view > .table-wrap:has(#adminListsContacts) { margin-top: 0 !important; }
+.admin-user-lists-view #adminListsStatus:empty { display: none; }
+.admin-user-lists-view #adminListsStatus:not(:empty) { padding: 10px 12px; border-radius: 8px; background: rgb(255 255 255 / 5%); }
+@media (max-width: 700px) {
+  .admin-user-lists-view { padding: 16px; border-radius: 13px; }
+  .admin-lists-importer { grid-template-columns: 1fr; gap: 12px; padding: 14px; }
+  .admin-lists-importer > .row { align-items: stretch !important; flex-direction: column; }
+  .admin-user-lists-view #adminListsImportBtn { width: 100%; }
+  .admin-user-lists-view thead th,
+  .admin-user-lists-view tbody td { padding: 11px 12px; white-space: nowrap; }
+  .admin-lists-preview { padding: 14px; }
+  .admin-lists-preview-heading,
+  .admin-lists-preview-footer { align-items: flex-start; flex-direction: column; }
+  .admin-lists-preview-footer button { width: 100%; }
+}
+
 #messagesView {
   width: 100%;
   min-width: 0;

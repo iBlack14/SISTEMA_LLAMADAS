@@ -45,10 +45,21 @@ function renderDay() {
     <div class="report-day-toolbar">
       <div class="report-toolbar-top">
        <div class="report-day-title">
-        <h2>REPORTE DE LLAMADAS</h2>
-        <p id="reportPeriodSummary">${reportState.esc(reportPeriodLabel(reportState.viewedPeriod || {from: reportState.selectedDate, to: reportState.selectedDate}))}</p>
+        <h2><span class="report-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16.5v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 1.12 3.8 2 2 0 0 1 3.1 1.6h3a2 2 0 0 1 2 1.72c.12.9.34 1.78.65 2.62a2 2 0 0 1-.45 2.11L7 9.35a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.11-.45c.84.31 1.72.53 2.62.65A2 2 0 0 1 21 16.5Z"/></svg></span>Reporte de llamadas</h2>
+        <span class="report-day-subtitle">Registro y gestión de llamadas por rubro, usuario y equipo.</span>
        </div>
        <div class="report-filter-controls">
+        ${!reportState.showingDetailedReport ? `
+          <label class="report-search-input">
+            <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg></span>
+            <input
+              id="reportSearch"
+              type="search"
+              placeholder="Buscar rubro, empresa, teléfono, equipo o ID"
+              aria-label="Buscar en los reportes"
+              value="${reportState.esc(reportState.reportSearchTerm)}"
+            />
+          </label>` : ""}
         ${reportState.isAdmin ? `
           <label class="report-filter-field" for="reportScope">
             <span>Usuario</span>
@@ -79,16 +90,7 @@ function renderDay() {
                 </button>
               `).join("")}
             </div>`
-          : `<label class="report-search-input">
-              <span aria-hidden="true">🔎</span>
-              <input
-                id="reportSearch"
-                type="search"
-                placeholder="Buscar rubro, empresa, teléfono o equipo / ID"
-                value="${reportState.esc(reportState.reportSearchTerm)}"
-              />
-            </label>
-            <div class="report-rubros" aria-label="Rubros del reporte">
+          : `<div class="report-rubros" aria-label="Rubros del reporte">
               ${reportState.reports
                 .map((report, index) => `
                 <button
@@ -109,7 +111,7 @@ function renderDay() {
       ${reportState.reports.length ? `
         <div id="reportDetails"></div>
       ` : `
-        <p>No existen campañas registradas para ${reportState.viewedPeriod && reportState.viewedPeriod.from !== reportState.viewedPeriod.to ? "este rango de fechas" : "esta fecha"}.</p>
+        <p class="report-empty-state">No hay llamadas registradas para ${reportState.esc(reportPeriodLabel(reportState.viewedPeriod || {from: reportState.selectedDate, to: reportState.selectedDate}))}.</p>
       `}
       <nav class="report-date-navigation" aria-label="Navegar por fecha" ${reportState.viewedPeriod && reportState.viewedPeriod.from !== reportState.viewedPeriod.to ? "hidden" : ""}>
         <button id="reportPreviousDay" class="secondary" type="button"
@@ -204,7 +206,8 @@ function renderDayNavigation() {
 
     backToCalls.insertAdjacentHTML("afterend", `
       <button id="backCalendar" class="secondary" type="button">
-        ← CALENDARIO
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+        Calendario
       </button>
     `);
   }

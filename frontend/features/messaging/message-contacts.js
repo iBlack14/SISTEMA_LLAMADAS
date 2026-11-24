@@ -154,16 +154,31 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       const hint = userId === "mine" 
         ? "Los contactos que guardes desde la APK aparecerán aquí."
         : "Este vendedor no tiene contactos guardados aún.";
-      body.innerHTML = `<tr><td colspan="4" class="muted">${hint}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="5" class="muted">${hint}</td></tr>`;
       return;
     }
     const safeName = value => dashboardActions.escHtml(value);
+    const formatCreatedAt = value => {
+      if (!value) return "—";
+      const raw = String(value).trim();
+      // SQLite/MySQL timestamps without a zone represent local wall time.
+      const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw) ? raw.replace(" ", "T") : raw;
+      const date = new Date(normalized);
+      if (Number.isNaN(date.getTime())) return "—";
+      const parts = new Intl.DateTimeFormat("es-PE", {
+        day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true
+      }).formatToParts(date);
+      const get = type => parts.find(part => part.type === type)?.value || "";
+      const month = get("month").replace(".", "").toLowerCase();
+      return `${get("day")} ${month}, ${get("hour")}:${get("minute")} ${get("dayPeriod").toLowerCase()}`;
+    };
     body.innerHTML = dashboardState.messageContacts.map((contact) => {
       const phone = String(contact.phone || "").replace(/\D/g, "");
       const name = contact.name || phone;
       return `<tr data-phone="${phone}">
         <td>${safeName(name)}</td>
         <td>${safeName(phone)}</td>
+        <td>${safeName(formatCreatedAt(contact.createdAt || contact.created_at))}</td>
         <td class="message-contact-status" data-status-cell>${sendStatusChip(contact, safeName)}</td>
         <td><div class="message-contact-actions">
           <button type="button" class="message-contact-wa" data-message-action="send" data-phone="${phone}" title="Enviar por WhatsApp" aria-label="Enviar WhatsApp a ${safeName(name)}">${WHATSAPP_ICON}</button>

@@ -64,13 +64,22 @@ function renderContacts() {
 
   // Filter by active list
   const allContacts = Contacts.contacts;
-  const contacts = allContacts.filter(c => c.list === Contacts.activeList);
-
+  const query = String(document.getElementById("filterInput")?.value || "").trim().toLocaleLowerCase();
+  const contacts = allContacts.filter(c => {
+    if (c.list !== Contacts.activeList) return false;
+    if (!query) return true;
+    return `${c.company || c.name || ""} ${c.phone || ""}`.toLocaleLowerCase().includes(query);
+  });
+  const allInList = allContacts.filter(c => c.list === Contacts.activeList).length;
+  const activeTitle = document.getElementById("contactsActiveListTitle");
+  const activeCount = document.getElementById("contactsActiveListCount");
+  if (activeTitle) activeTitle.textContent = Contacts.activeList || "Mis contactos";
+  if (activeCount) activeCount.textContent = `${allInList.toLocaleString("es-PE")} ${allInList === 1 ? "contacto" : "contactos"}`;
   const totalPages = Math.max(1, Math.ceil(contacts.length / dashboardState.PAGE_SIZE));
   if (dashboardState.currentPage > totalPages) dashboardState.currentPage = totalPages;
 
   if (!contacts.length) {
-    cBodyEl.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center;padding:24px;">Sin contactos. Sube un archivo CSV/Excel para empezar.</td></tr>`;
+    cBodyEl.innerHTML = `<tr><td colspan="4" class="contacts-empty-state">${query ? "No hay contactos que coincidan con la búsqueda." : "Sin contactos en esta lista. Sube un archivo CSV o Excel para empezar."}</td></tr>`;
     refs.contactsPaginationEl.style.display = "none";
     renderReminderFloat();
     return;
@@ -117,16 +126,16 @@ function renderContacts() {
     const company = c.company || c.name || "";
     const dateStr = formatDate(c);
     tr.innerHTML = `
-      <td style="padding:10px 12px;border-bottom:1px solid var(--border);">${dashboardActions.escHtml(company)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid var(--border);font-family:monospace;font-size:13px;">${dashboardActions.escHtml(c.phone)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid var(--border);color:#e7d4f1;font-size:12px;font-variant-numeric:tabular-nums;">${dashboardActions.escHtml(dateStr)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid var(--border);">${dashboardActions.contactActionButtons(c)}</td>`;
+      <td>${dashboardActions.escHtml(company)}${callCount ? `<span class="contacts-row-call-count">${callCount} llamadas</span>` : ""}</td>
+      <td class="contacts-phone-cell">${dashboardActions.escHtml(c.phone)}</td>
+      <td class="contacts-date-cell">${dashboardActions.escHtml(dateStr)}</td>
+      <td class="contacts-action-cell">${dashboardActions.contactActionButtons(c)}</td>`;
     fragment.appendChild(tr);
   }
   cBodyEl.appendChild(fragment);
 
-  refs.contactsPaginationEl.style.display = totalPages > 1 ? "flex" : "none";
-  refs.pageInfoEl.textContent = `Página ${dashboardState.currentPage} de ${totalPages}`;
+  refs.contactsPaginationEl.style.display = contacts.length ? "flex" : "none";
+  refs.pageInfoEl.textContent = `Mostrando ${startIndex + 1}–${Math.min(startIndex + pageRows.length, contacts.length)} de ${contacts.length.toLocaleString("es-PE")} · Página ${dashboardState.currentPage} de ${totalPages}`;
   refs.prevPageBtn.disabled = dashboardState.currentPage <= 1;
   refs.nextPageBtn.disabled = dashboardState.currentPage >= totalPages;
   renderReminderFloat();

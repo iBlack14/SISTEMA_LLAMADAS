@@ -114,7 +114,7 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     if (contactsFromBooks.length) {
       const contacts = contactsFromBooks;
       return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
-        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note, createdAt, created_at }) => ({ name, phone, note, createdAt: createdAt || created_at || null })) });
     }
     if (!sessionCodes.length) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
     const [contacts] = await runtime.auth.pool.query(
@@ -162,7 +162,7 @@ runtime.app.get("/api/users/me/contact-book", async (req, res) => {
     if (contactsFromBooks.length) {
       const contacts = contactsFromBooks;
       return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
-        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note }) => ({ name, phone, note })) });
+        contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note, createdAt, created_at }) => ({ name, phone, note, createdAt: createdAt || created_at || null })) });
     }
     if (!sessionCodes.length) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
     const [contacts] = await runtime.auth.pool.query(
