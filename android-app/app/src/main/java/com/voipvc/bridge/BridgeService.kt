@@ -216,6 +216,9 @@ class BridgeService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Phone-VC iniciando…"))
         registerCallMonitor()
+        // La voz del interlocutor capturada con Shizuku también entra en la grabación.
+        VoicemailDetector.initialize(this)
+        VoicemailDetector.downlinkSink = { bytes -> callRecorder.writeDownlinkPcm(bytes) }
         val filter = IntentFilter(ACTION_TELECOM_CALL_STATE)
         ContextCompat.registerReceiver(
             this,
@@ -300,6 +303,7 @@ class BridgeService : Service() {
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
         stopAudio()
+        VoicemailDetector.stopRecordingCapture()
         callRecorder.cancel()
         unregisterCallMonitor()
         unregisterReceiver(telecomStateReceiver)
@@ -1107,6 +1111,8 @@ class BridgeService : Service() {
                 if (belongsToCampaign && activeCallId.isNotBlank() && isStreaming.get()) {
                     if (callAnsweredAtElapsedMs == 0L) callAnsweredAtElapsedMs = SystemClock.elapsedRealtime()
                     callRecorder.start(activeCallId)
+                    // Incluye el audio del interlocutor (VOICE_DOWNLINK) en la grabación.
+                    if (callRecorder.isRecording) VoicemailDetector.startRecordingCapture()
                 }
                 launchCallUi()
                 setStatus(if (callRecorder.isRecording) "🔴 En llamada · Grabando audio" else "🔊 En llamada")
@@ -1125,6 +1131,7 @@ class BridgeService : Service() {
                 } else {
                     callRecorder.cancel()
                 }
+                VoicemailDetector.stopRecordingCapture()
                 callAnsweredAtElapsedMs = 0L
                 setStatus("✅ Activo — esperando llamadas")
                 closeCallUi()
@@ -1401,6 +1408,11 @@ class BridgeService : Service() {
                     Log.w(TAG, "[HEARTBEAT] socket not connected after wait, will retry next interval")
                     continue
                 }
+                // While in a campaign call, also report "still on the call" so the
+                // server watchdog can tell a live call from a frozen one.
+                if (lastCallState == "in_call") {
+                    emitPhoneStatus("in_call", source = "heartbeat", correlateCampaign = true, force = true)
+                }
                 val sentAt = System.currentTimeMillis()
                 client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { ackArgs ->
                     val latencyMs = System.currentTimeMillis() - sentAt
@@ -1531,7 +1543,8 @@ class BridgeService : Service() {
         source: String,
         correlateCampaign: Boolean,
         phoneNumberOverride: String? = null,
-        directionOverride: String? = null
+        directionOverride: String? = null,
+        force: Boolean = false
     ) {
         val reportedNumber = phoneNumberOverride ?: currentPhoneNumber
         val reportedDirection = directionOverride ?: currentCallDirection
@@ -1558,7 +1571,7 @@ class BridgeService : Service() {
             isSpeakerOn.toString()
         ).joinToString("|")
         if (socket?.connected() != true) return
-        if (signature == lastEmittedStatusSignature && source != "reconnect") return
+        if (!force && signature == lastEmittedStatusSignature && source != "reconnect") return
         lastEmittedStatusSignature = signature
         statusSequence += 1
         Log.i(TAG, "[PHONE_STATUS] emit state=$state source=$source command=${commandId.takeLast(8)} call=${if (correlateCampaign) activeCallId.takeLast(8) else ""} sequence=$statusSequence terminalConfirmed=$noLiveCalls")

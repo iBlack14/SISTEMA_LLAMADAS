@@ -78,6 +78,9 @@ async function bootstrap() {
     session.callState = "idle";
   }
   services.synchronizeGlobalBlockedNumbers();
+  // Bound every active call: a device that never reports a terminal state is
+  // force-finalized and released instead of blocking its worker forever.
+  services.startCallWatchdog?.();
   // MySQL is the sole session/history store; file backups are optional exports.
   // Only save if there are sessions with pending changes to avoid unnecessary binlog writes.
   if (runtime.sessions.size > 0) {
@@ -103,6 +106,7 @@ async function gracefulShutdown(signal) {
   if (runtime.shuttingDown) return;
   runtime.shuttingDown = true;
   clearInterval(recordingRetentionTimer);
+  services.stopCallWatchdog?.();
   console.log(`[SHUTDOWN] ${signal}: guardando sesiones...`);
   try { await runtime.persistence.save(runtime.sessions); }
   catch (error) { console.error("No se pudieron guardar las sesiones al cerrar:", error); }

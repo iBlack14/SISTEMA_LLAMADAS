@@ -25,7 +25,8 @@ function createPhoneWorker({ socketId = null, id = "", deviceId = "", name = "",
     name: deviceName || name || "Android bridge",
     linkedAt: linkedAt || new Date().toISOString(),
     connected: Boolean(connected),
-    callState: callState || "idle"
+    callState: callState || "idle",
+    lastStatusAt: Number(rest.lastStatusAt) || 0
   };
 }
 

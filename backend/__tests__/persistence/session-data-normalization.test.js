@@ -54,6 +54,52 @@ test("commits changed session fields and the call ledger without touching the le
   assert.ok(queries.every(({ sql }) => /^(INSERT INTO|DELETE FROM) vc_session_state/.test(sql)));
 });
 
+test("reconciles stale assignments on load so a restart does not boot blocked", () => {
+  const storage = new SessionPersistence(undefined, {
+    env: { DB_HOST: "unused", DB_USER: "unused", DB_NAME: "unused" }
+  });
+  const session = {
+    campaign: {
+      status: "running",
+      assignments: {
+        workerA: { workerId: "workerA", contactId: "c1", attemptId: "a1" },
+        workerB: { workerId: "workerB", contactId: "c2", attemptId: "a2" }
+      },
+      activeContactId: "c1",
+      activeWorkerId: "workerA",
+      activeWorkerSocketId: "sockA",
+      contacts: [
+        { id: "c1", status: "in_call", attempts: 1, currentAttemptId: "a1", assignedWorkerId: "workerA",
+          attemptHistory: [{ id: "a1", startedAt: "2026-11-24T15:00:00.000Z", endedAt: null }] },
+        { id: "c2", status: "dialing", attempts: 2, currentAttemptId: "a2", assignedWorkerId: "workerB",
+          attemptHistory: [{ id: "a0", startedAt: "2026-11-24T14:00:00.000Z", endedAt: "2026-11-24T14:01:00.000Z" },
+            { id: "a2", startedAt: "2026-11-24T15:00:00.000Z", endedAt: null }] },
+        { id: "c3", status: "pending", attempts: 0, attemptHistory: [] }
+      ]
+    },
+    phoneWorkers: [{ id: "workerA", socketId: "sockA", connected: true, callState: "in_call" }]
+  };
+
+  const cleaned = storage.cleanSessionOnLoad(session);
+  assert.deepEqual(cleaned.campaign.assignments, {});
+  assert.equal(cleaned.campaign.activeContactId, null);
+  assert.equal(cleaned.campaign.activeWorkerId, null);
+  assert.equal(cleaned.campaign.activeWorkerSocketId, null);
+
+  const [c1, c2, c3] = cleaned.campaign.contacts;
+  assert.equal(c1.status, "pending");
+  assert.equal(c1.attempts, 0);
+  assert.equal(c1.currentAttemptId, "");
+  assert.equal(c1.attemptHistory.length, 0);
+  assert.equal(c2.status, "retry_pending");
+  assert.equal(c2.attempts, 1);
+  assert.equal(c2.attemptHistory.length, 1);
+  assert.equal(c3.status, "pending");
+
+  assert.equal(cleaned.phoneWorkers[0].connected, false);
+  assert.equal(cleaned.phoneWorkers[0].callState, "idle");
+});
+
 test("normalizes large session collections into rows and rebuilds the original API shape", () => {
   const session = {
     dashboardSocketId: "socket-secret",
@@ -141,4 +187,52 @@ test("lazy shift hydration keeps summary counts while moving unfinished contacts
   assert.equal(lazy.shiftManagement.history[0]._unfinishedContactsLoaded, false);
   assert.deepEqual(lazy.shiftManagement.history[0].report, [{ attemptId: "attempt-a" }]);
   assert.equal(split.rows.find(row => row.type === "shift_history").value.unfinishedContactCount, 2);
+});
+
+test("does not rewrite unchanged shift-unfinished rows on repeated saves", async () => {
+  const shiftInserts = [];
+  const connection = {
+    async query(sql, values) {
+      if (sql.startsWith("INSERT INTO vc_shift_unfinished_contacts")) shiftInserts.push(values);
+      return [[]];
+    },
+    async beginTransaction() {},
+    async commit() {},
+    async rollback() {},
+    release() {}
+  };
+  const storage = new SessionPersistence(undefined, {
+    env: { DB_HOST: "unused", DB_USER: "unused", DB_NAME: "unused" }
+  });
+  storage.pool = { getConnection: async () => connection };
+  storage.schemaReady = true;
+  storage.sessionDataStorageEnabled = false;
+  storage.sessionRowsStorageEnabled = false;
+  storage.shiftDetailsStorageEnabled = true;
+
+  const row = {
+    shiftId: "shift-1", detailId: "c1", contactId: "c1", listName: "Principal",
+    name: "Cliente", phone: "999111222", status: "pending", position: 0,
+    contact: { id: "c1", name: "Cliente", phone: "999111222" }
+  };
+  const metrics = {
+    shiftHistoryChanged: { S1: true },
+    shiftUnfinishedContacts: { S1: [row] },
+    shiftHistoryIds: { S1: ["shift-1"] }
+  };
+  const snapshot = { S1: { campaign: { contacts: [], history: [] } } };
+
+  await storage.saveNow(snapshot, ["S1"], metrics);
+  assert.equal(shiftInserts.length, 1);
+
+  await storage.saveNow(snapshot, ["S1"], metrics);
+  assert.equal(shiftInserts.length, 1);
+
+  const changed = { ...row, status: "completed" };
+  await storage.saveNow(snapshot, ["S1"], {
+    shiftHistoryChanged: { S1: true },
+    shiftUnfinishedContacts: { S1: [changed] },
+    shiftHistoryIds: { S1: ["shift-1"] }
+  });
+  assert.equal(shiftInserts.length, 2);
 });

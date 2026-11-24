@@ -34,6 +34,19 @@ export function createDispatcher(runtime, services) {
 const dialDeliveries = new Map();
 const confirmedDialDeliveries = new Set();
 
+// Watchdog: a call that never reports a terminal state must not block a worker
+// forever. These ceilings are generous enough for real calls but bound the worst
+// case, so any cause (OEM battery kill, lost socket, phantom native call, lost
+// ACK) degrades to "one lost contact" instead of a permanently stuck device.
+const WATCHDOG_INTERVAL_MS = Number(process.env.CALL_WATCHDOG_INTERVAL_MS || 5000);
+const WATCHDOG_DIALING_MS = Number(process.env.CALL_WATCHDOG_DIALING_MS || 45000);
+// With the app heartbeat (phone:status every 10s while in_call) a live call keeps
+// refreshing worker.lastStatusAt, so 45s of silence means the device is frozen.
+// The ceiling only applies to old APKs that never send a heartbeat timestamp.
+const WATCHDOG_HEARTBEAT_MS = Number(process.env.CALL_WATCHDOG_HEARTBEAT_MS || 45000);
+const WATCHDOG_INCALL_CEILING_MS = Number(process.env.CALL_WATCHDOG_INCALL_CEILING_MS || 15 * 60 * 1000);
+let callWatchdogTimer = null;
+
 function rememberConfirmedDial(key) {
   confirmedDialDeliveries.add(key);
   if (confirmedDialDeliveries.size > 10000) {
@@ -348,6 +361,85 @@ function dispatchNextCampaignCall(code) {
   return dispatchCampaignCalls(code)[0] || null;
 }
 
+function finalizeStuckAssignment(code, workerId, contact, assignment, reason) {
+  const session = runtime.sessions.get(code);
+  if (!session?.campaign) return false;
+  const worker = session.phoneWorkers?.find(item => String(item.id) === String(workerId));
+  // 1. Ask the phone to drop the physical call (best effort; the server does not
+  // depend on this succeeding to release the worker).
+  if (worker?.connected && worker.socketId) {
+    try {
+      runtime.io.to(worker.socketId).emit("call:action", {
+        action: "hangup", from: "watchdog", contactId: contact.id,
+        commandId: `watchdog-${assignment.attemptId}`
+      });
+    } catch { /* socket already gone; the assignment is still reclaimed below */ }
+  }
+  // 2. Mark the attempt terminal. markContactResult finalizes the attempt and
+  // releases the assignment; a late ended/failed from Android is then ignored
+  // because the contact is no longer in an active state (idempotent terminal).
+  markContactResult(session, contact.id, "sin_respuesta", { callbackReason: reason });
+  // 3. Guarantee the worker is free even if the result path kept the assignment.
+  if (session.campaign.assignments?.[workerId]) skipActiveContact(session, workerId);
+  session.updatedAt = Date.now();
+  services.saveSoon(code);
+  services.emitState(code);
+  services.emitCampaignState(code);
+  console.warn(`[WATCHDOG] intento colgado liberado sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} contacto=${String(contact.name || "").slice(0, 30)} intento=${String(assignment.attemptId).slice(-8)} motivo=${reason}`);
+  return true;
+}
+
+function scanStuckCalls() {
+  for (const [code, session] of runtime.sessions) {
+    const campaign = session?.campaign;
+    if (!campaign || campaign.status !== "running" || !campaign.assignments) continue;
+    for (const [workerId, assignment] of Object.entries(campaign.assignments)) {
+      const contact = campaign.contacts?.find(item => item.id === assignment.contactId);
+      if (!contact) continue;
+      const attempt = (contact.attemptHistory || []).find(item => item.id === assignment.attemptId);
+      const worker = session.phoneWorkers?.find(item => String(item.id) === String(workerId));
+      const status = String(contact.status || "");
+      if (status === "in_call") {
+        const lastStatusAt = Number(worker?.lastStatusAt || 0);
+        if (lastStatusAt) {
+          // Heartbeat-aware: a live call refreshes lastStatusAt every ~10s.
+          if (Date.now() - lastStatusAt > WATCHDOG_HEARTBEAT_MS) {
+            finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_in_call_heartbeat_timeout");
+          }
+        } else {
+          // Old APK without heartbeat: fall back to a generous hard ceiling.
+          const answeredAt = Date.parse(attempt?.answeredAt || contact.answeredAt || 0);
+          if (answeredAt && Date.now() - answeredAt > WATCHDOG_INCALL_CEILING_MS) {
+            finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_in_call_timeout");
+          }
+        }
+      } else if (status === "dialing" || status === "ringing") {
+        const startedAt = Date.parse(attempt?.startedAt || contact.lastAttemptAt || 0);
+        if (startedAt && Date.now() - startedAt > WATCHDOG_DIALING_MS) {
+          finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_dialing_timeout");
+        }
+      }
+    }
+  }
+}
+
+function startCallWatchdog() {
+  if (callWatchdogTimer) return callWatchdogTimer;
+  callWatchdogTimer = setInterval(() => {
+    if (runtime.shuttingDown) return;
+    try { scanStuckCalls(); }
+    catch (error) { console.error("[WATCHDOG] error:", error.code || error.message || "WATCHDOG_FAILED"); }
+  }, WATCHDOG_INTERVAL_MS);
+  callWatchdogTimer.unref?.();
+  console.info(`[WATCHDOG] activo interval=${WATCHDOG_INTERVAL_MS}ms dialing=${WATCHDOG_DIALING_MS}ms heartbeat=${WATCHDOG_HEARTBEAT_MS}ms in_callCeiling=${WATCHDOG_INCALL_CEILING_MS}ms`);
+  return callWatchdogTimer;
+}
+
+function stopCallWatchdog() {
+  if (callWatchdogTimer) clearInterval(callWatchdogTimer);
+  callWatchdogTimer = null;
+}
+
 function archiveCurrentCampaign(session) {
   const campaign = ensureCampaign(session);
   const archive = session.reportArchive ||= [];
@@ -397,5 +489,5 @@ function archiveCurrentCampaign(session) {
     archive[index] = record;
   }
 }
-return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign, acknowledgeDialDelivery, resumeAssignedDial };
+return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign, acknowledgeDialDelivery, resumeAssignedDial, startCallWatchdog, stopCallWatchdog, scanStuckCalls };
 }

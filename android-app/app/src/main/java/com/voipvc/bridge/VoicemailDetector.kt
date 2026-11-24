@@ -36,6 +36,24 @@ object VoicemailDetector {
     /** True once the Shizuku UserService is bound and alive. */
     val isConnected: Boolean get() = remote?.isBinderAlive == true
 
+    /**
+     * Consumidor opcional del PCM del interlocutor que se está leyendo para el
+     * reconocimiento. Lo usa CallRecorder para incluir la voz remota en la
+     * grabación. No se persiste nada aquí: solo se reenvían los bytes.
+     */
+    @Volatile var downlinkSink: ((ByteArray) -> Unit)? = null
+
+    /** La grabación pidió el downlink y hay que mantenerlo aunque no se detecte buzón. */
+    @Volatile private var captureRequested = false
+    @Volatile private var captureOnlyQueued = false
+
+    private fun shizukuAuthorized(): Boolean = try {
+        initialized && Shizuku.pingBinder() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    } catch (_: Exception) {
+        false
+    }
+
     private fun say(message: String) {
         status = message
         Log.i("BuzonDetector", message)
@@ -47,7 +65,7 @@ object VoicemailDetector {
         app = context.applicationContext
         VoicemailModelInstaller.install(app)
         Shizuku.addBinderReceivedListenerSticky {
-            if (enabled()) connect()
+            if (enabled() || captureRequested) connect()
         }
         Shizuku.addBinderDeadListener {
             remote = null
@@ -63,7 +81,7 @@ object VoicemailDetector {
                 } else say("Acceso denegado. Autoriza VOIP VC en Shizuku → Aplicaciones autorizadas")
             }
         }
-        if (enabled()) connect()
+        if (enabled() || captureRequested) connect()
     }
 
     fun enabled(): Boolean = initialized &&
@@ -139,7 +157,7 @@ object VoicemailDetector {
     private fun connect() {
         main.post {
             try {
-                if (!enabled() || !Shizuku.pingBinder() ||
+                if ((!enabled() && !captureRequested) || !Shizuku.pingBinder() ||
                     Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) return@post
                 if (remote == null && !binding) {
                     binding = true
@@ -166,7 +184,7 @@ object VoicemailDetector {
                         }
                     }, 8000)
                 }
-                decoder.execute { loadModel() }
+                if (enabled()) decoder.execute { loadModel() }
             } catch (e: Exception) {
                 binding = false
                 Log.e("BuzonDetector", "Could not bind Shizuku UserService", e)
@@ -185,6 +203,7 @@ object VoicemailDetector {
             } else {
                 say(if (model != null) "Detector listo: audio celular y español sin conexión"
                     else "Shizuku conectado; preparando modelo de español…")
+                if (captureRequested) startRecordingCapture()
             }
         }
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -254,10 +273,19 @@ object VoicemailDetector {
                     val buffer = ByteArray(1600)
                     val deadline = SystemClock.elapsedRealtime() + 90000
                     val toneDetector = BusyToneDetector(16000)
+                    var recognizing = true
                     say("Escuchando audio remoto para detectar buzón…")
-                    while (ticket == generation.get() && SystemClock.elapsedRealtime() < deadline) {
+                    while (ticket == generation.get()) {
                         val count = stream.read(buffer)
                         if (count <= 0) break
+                        // La misma lectura alimenta la grabación (si está activa).
+                        if (captureRequested) downlinkSink?.invoke(buffer.copyOf(count))
+                        if (recognizing && SystemClock.elapsedRealtime() >= deadline) {
+                            recognizing = false
+                            // Sin grabación pendiente se termina como antes.
+                            if (!captureRequested) break
+                        }
+                        if (!recognizing) continue
                         if (toneDetector.accept(buffer, count)) {
                             lastMatch = "Tono de ocupado repetido"
                             say("Tono de ocupado repetido detectado; solicitando corte")
@@ -294,6 +322,56 @@ object VoicemailDetector {
         input = null
         val binder = remote
         if (binder != null) decoder.execute { transactStop(binder) }
+    }
+
+    /**
+     * Mantiene abierto el downlink de Shizuku para que CallRecorder reciba la
+     * voz del interlocutor. No ejecuta reconocimiento; si ya hay una sesión de
+     * detección de buzón activa, esa misma sesión reenvía el PCM.
+     */
+    fun startRecordingCapture() {
+        captureRequested = true
+        if (!initialized || downlinkSink == null) return
+        if (!shizukuAuthorized()) return
+        if (remote == null) {
+            if (!binding) connect()
+            main.postDelayed({ if (captureRequested && remote == null) startRecordingCapture() }, 1500)
+            return
+        }
+        if (input != null || captureOnlyQueued) return // el detector ya está reenviando audio
+        captureOnlyQueued = true
+        decoder.execute { runCaptureOnly() }
+    }
+
+    fun stopRecordingCapture() {
+        captureRequested = false
+        stop()
+    }
+
+    private fun runCaptureOnly() {
+        val binder = remote
+        if (binder == null) { captureOnlyQueued = false; return }
+        if (input != null) { captureOnlyQueued = false; return }
+        val ticket = generation.get()
+        try {
+            val fd = transactOpen(binder)
+            ParcelFileDescriptor.AutoCloseInputStream(fd).use { stream ->
+                input = stream
+                val buffer = ByteArray(1600)
+                Log.i("BuzonDetector", "Downlink de grabación abierto")
+                while (ticket == generation.get() && captureRequested && binder.isBinderAlive) {
+                    val count = stream.read(buffer)
+                    if (count <= 0) break
+                    downlinkSink?.invoke(buffer.copyOf(count))
+                }
+            }
+        } catch (e: Exception) {
+            if (ticket == generation.get()) say("No se pudo grabar el audio remoto: ${e.message}")
+        } finally {
+            captureOnlyQueued = false
+            input = null
+            transactStop(binder)
+        }
     }
 
     private fun transactOpen(binder: IBinder): ParcelFileDescriptor {

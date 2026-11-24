@@ -205,6 +205,7 @@ this.env = env;
     this.sessionRowsStorageEnabled = false;
     this.sessionStateCache = new Map();
     this.shiftDetailsStorageEnabled = false;
+    this.shiftUnfinishedCache = new Map();
     this.sessionEntityCache = new Map();
     this.sessionEntityTypesBySession = new Map();
     this.shiftHistorySourceRefs = new Map();
@@ -767,6 +768,45 @@ this.env = env;
     }, { sessions: 0, contactBooks: 0, lists: 0, contacts: 0 });
   }
 
+  // After a process restart no phone worker is connected, so any assignment
+  // persisted in MySQL is stale: its contact is stuck in an active state with
+  // no device that will ever report the terminal event. Reconcile from the DB
+  // snapshot (not from JSON files) by reverting those contacts to a callable
+  // state and dropping the orphan assignments, otherwise the session boots
+  // already blocked and never recovers.
+  reconcileStaleAssignments(campaign) {
+    if (!campaign || typeof campaign !== "object") return campaign;
+    const assignments = campaign.assignments && typeof campaign.assignments === "object"
+      ? campaign.assignments : {};
+    const activeStates = new Set(["dialing", "ringing", "in_call", "held"]);
+    for (const contact of Array.isArray(campaign.contacts) ? campaign.contacts : []) {
+      if (!activeStates.has(contact.status)) continue;
+      const attempt = Array.isArray(contact.attemptHistory)
+        ? contact.attemptHistory.find(item => item.id === contact.currentAttemptId && !item.endedAt)
+          || contact.attemptHistory.find(item => !item.endedAt)
+        : null;
+      if (attempt) {
+        contact.attemptHistory = contact.attemptHistory.filter(item => item.id !== attempt.id);
+        contact.attempts = Math.max(0, Number(contact.attempts || 0) - 1);
+      }
+      contact.status = contact.attempts ? "retry_pending" : "pending";
+      contact.result = "";
+      contact.technicalResult = "";
+      contact.answeredAt = null;
+      contact.durationSeconds = 0;
+      contact.completedAt = null;
+      contact.currentAttemptId = "";
+      contact.assignedWorkerId = null;
+      contact.assignedWorkerName = "";
+    }
+    campaign.assignments = {};
+    campaign.activeContactId = null;
+    campaign.activeWorkerId = null;
+    campaign.activeWorkerSocketId = null;
+    campaign.updatedAt = Date.now();
+    return campaign;
+  }
+
   cleanSessionOnLoad(session) {
     const rawProcessed = session.processedCallIds;
     let processedCallIds;
@@ -774,13 +814,15 @@ this.env = env;
     else if (Array.isArray(rawProcessed)) processedCallIds = new Set(rawProcessed);
     else if (rawProcessed && typeof rawProcessed === "object") processedCallIds = new Set(Object.keys(rawProcessed));
     else processedCallIds = new Set();
-    return {
+    const cleaned = {
       ...session, dashboardSocketId: null, phoneSocketId: null, activePhoneSocketId: null,
       processedCallIds,
       phoneWorkers: (session.phoneWorkers || []).map(worker => ({
-        ...worker, socketId: null, connected: false, callState: "idle"
+        ...worker, socketId: null, connected: false, callState: "idle", lastStatusAt: 0
       }))
     };
+    if (cleaned.campaign) this.reconcileStaleAssignments(cleaned.campaign);
+    return cleaned;
   }
 
   save(sessionsMap, changedCodes = null) {
@@ -999,20 +1041,38 @@ this.env = env;
           }
         }
         if (this.shiftDetailsStorageEnabled && metrics.shiftHistoryChanged?.[code]) {
+          const changedShiftRows = [];
           for (const row of metrics.shiftUnfinishedContacts?.[code] || []) {
             if (row.shiftId.length > 191 || row.detailId.length > 191 || row.contactId.length > 191 ||
                 row.listName.length > 255 || row.name.length > 255 || row.phone.length > 64 ||
                 row.status.length > 64 || row.position < 0 || row.position > 4294967295) {
               throw new Error(`Detalle de turno fuera de límites en sesión ${code}, turno ${row.shiftId}.`);
             }
+            // Skip rows whose persisted payload is unchanged. Without this the
+            // whole shift (thousands of rows, each with an ON UPDATE timestamp)
+            // is rewritten on every save, which is the dominant source of binlog
+            // growth. Changed rows are still written, so durability is preserved.
+            const cacheKey = JSON.stringify([code, row.shiftId, row.detailId]);
+            const cached = JSON.stringify([row.position, row.contactId, row.listName, row.name, row.phone, row.status, row.contact]);
+            if (this.shiftUnfinishedCache.get(cacheKey) === cached) continue;
+            changedShiftRows.push([code,row.shiftId,row.detailId,row.contactId,row.listName,row.name,row.phone,row.status,row.position,JSON.stringify(row.contact)]);
+            this.shiftUnfinishedCache.set(cacheKey, cached);
+          }
+          for (let offset = 0; offset < changedShiftRows.length; offset += 200) {
+            const batch = changedShiftRows.slice(offset, offset + 200);
             await connection.query(`INSERT INTO vc_shift_unfinished_contacts
               (session_code,shift_id,detail_id,contact_id,list_name,name,phone,status,position,contact_data)
-              VALUES(?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE
+              VALUES ${batch.map(() => "(?,?,?,?,?,?,?,?,?,?)").join(",")} ON DUPLICATE KEY UPDATE
               contact_id=VALUES(contact_id),list_name=VALUES(list_name),name=VALUES(name),phone=VALUES(phone),
               status=VALUES(status),position=VALUES(position),contact_data=VALUES(contact_data)`,
-              [code,row.shiftId,row.detailId,row.contactId,row.listName,row.name,row.phone,row.status,row.position,JSON.stringify(row.contact)]);
+              batch.flat());
           }
           const retainedShiftIds = metrics.shiftHistoryIds?.[code] || [];
+          const retainedSet = new Set(retainedShiftIds.map(id => String(id)));
+          for (const key of [...this.shiftUnfinishedCache.keys()]) {
+            const [cacheCode, cacheShiftId] = JSON.parse(key);
+            if (cacheCode === code && !retainedSet.has(cacheShiftId)) this.shiftUnfinishedCache.delete(key);
+          }
           if (retainedShiftIds.length) {
             const placeholders = retainedShiftIds.map(() => "?").join(",");
             await connection.query(`DELETE FROM vc_shift_unfinished_contacts WHERE session_code=? AND shift_id NOT IN (${placeholders})`, [code,...retainedShiftIds]);

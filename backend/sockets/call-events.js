@@ -171,6 +171,9 @@ export function registerCallEvents(runtime, services, socket) {
     const session = sessions.get(code);
     if (!session) return;
     const worker = getPhoneWorkerBySocketId(session, socket.id);
+    // Liveness for the watchdog: any phone:status (including the in_call heartbeat,
+    // even if deduplicated below) proves the device is alive and on the call.
+    if (worker) worker.lastStatusAt = Date.now();
     if (commandId && worker) acknowledgeDialDelivery?.(code, worker.id, commandId, callId);
 
     // Idempotency: track processed callId+state to avoid duplicate processing
