@@ -55,7 +55,14 @@ runtime.app.post("/api/session/:code/campaign/start", async (req, res) => {
   }
   try {
     const history = await runtime.persistence.getCallAttempts(code);
-    contacts = uncalledContacts(contacts, services.allCallAttempts());
+    const called = services.annualBlocks();
+    const seen = new Set();
+    contacts = contacts.filter(contact => {
+      const key = phoneKey(contact.phone);
+      if (!key || called.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     const blockedPhones = new Set(services.globalBlockedNumbers().map(entry => phoneKey(entry.phone)));
     contacts = contacts.filter(contact => !blockedPhones.has(phoneKey(contact.phone)));
   } catch {

@@ -58,6 +58,7 @@ async function bootstrap() {
   }
   // MySQL releases this dedicated connection's lock when the process exits.
   runtime.sessions = await runtime.persistence.load();
+  await services.loadDialExclusions();
   if (process.env.AUTO_NORMALIZE_CONTACT_BOOKS === "1") {
     await runtime.persistence.normalizeContactBooks(runtime.sessions);
   }

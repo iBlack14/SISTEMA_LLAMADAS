@@ -67,6 +67,14 @@ export function collectCallAttempts(session) {
 }
 
 export const HISTORY_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS vc_dial_exclusions (
+    phone VARCHAR(64) NOT NULL PRIMARY KEY,
+    called BOOLEAN NOT NULL DEFAULT FALSE,
+    manual_block BOOLEAN NOT NULL DEFAULT FALSE,
+    invalid_number BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_session_state (
     session_code VARCHAR(50) NOT NULL, state_key VARCHAR(64) NOT NULL, state_value JSON NOT NULL,
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -197,5 +205,10 @@ export async function writeCallAttempts(connection, code, rows) {
        Math.max(0,Math.round(row.waitingSeconds || 0)),Math.max(0,Math.round(row.durationSeconds || 0)),
        Math.max(0,Math.round(row.totalSeconds || 0)),limit(row.technicalResult,64),
        limit(row.disposition,64),JSON.stringify(row)]);
+    const phone = String(row.phone || "").replace(/\D/g, "").replace(/^51(?=\d{9}$)/, "");
+    if (phone && row.startedAt) await connection.query(
+      `INSERT INTO vc_dial_exclusions(phone,called,invalid_number) VALUES (?,TRUE,?)
+       ON DUPLICATE KEY UPDATE called=TRUE,invalid_number=invalid_number OR VALUES(invalid_number)`,
+      [phone, ["numero_inexistente", "numero_incorrecto"].includes(row.technicalResult)]);
   }
 }

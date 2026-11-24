@@ -227,7 +227,7 @@ function dispatchNextCampaignCallLegacy(code) {
 
   // Seleccionar worker para saber si vamos directo o por PBX
   const worker = services.getActivePhoneWorker(session);
-  excludeCalledPending(campaign, services.allCallAttempts());
+  excludeCalledPendingFromBlocks(campaign, services.annualBlocks());
   excludeBlockedPending(campaign, services.globalBlockedNumbers());
   const next = assignNextContact(session, worker || {});
   session.updatedAt = Date.now();
@@ -280,7 +280,7 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
   const attempts = services.allCallAttempts();
-  const calledBlocks = annualPhoneBlocks(attempts);
+  const calledBlocks = services.annualBlocks();
   const blockedNumbers = services.globalBlockedNumbers();
   excludeCalledPendingFromBlocks(campaign, calledBlocks);
   excludeBlockedPending(campaign, blockedNumbers);

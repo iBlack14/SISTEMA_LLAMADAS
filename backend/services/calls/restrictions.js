@@ -7,6 +7,13 @@ import { collectCallAttempts } from "./call-history.js";
  * Se construye una vez por proceso.
  */
 export function createRestrictions(runtime, services) {
+  const durableExclusions = new Map();
+  async function loadDialExclusions() {
+    const [rows] = await runtime.persistence.pool.query("SELECT phone,called,manual_block,invalid_number FROM vc_dial_exclusions");
+    durableExclusions.clear();
+    for (const row of rows) durableExclusions.set(phoneKey(row.phone), row);
+    return rows.length;
+  }
   let cachedAllCallAttemptsKey = "";
   let cachedAllCallAttempts = [];
   let blockedAttemptsSnapshot = null;
@@ -57,6 +64,12 @@ export function createRestrictions(runtime, services) {
         if (Number.isFinite(expiry) && expiry < nextBlockExpiryAt) nextBlockExpiryAt = expiry;
       }
     }
+    for (const [phone, exclusion] of durableExclusions) {
+      if (exclusion.called || exclusion.invalid_number) blockedNumbersByPhone.set(phone, {
+        permanent: true, lastCalledAt: null, nextAllowedAt: null,
+        reason: exclusion.invalid_number ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : "NO VOLVER A LLAMAR: número ya llamado"
+      });
+    }
     return blockedNumbersByPhone;
   }
 
@@ -67,6 +80,9 @@ export function createRestrictions(runtime, services) {
       const key = phoneKey(entry.phone || entry.number);
       if (key && !blocked.has(key)) blocked.set(key, { name: entry.name || entry.phone || key, phone: entry.phone || entry.number || key });
     }
+  }
+  for (const [phone, exclusion] of durableExclusions) {
+    if (exclusion.manual_block && !blocked.has(phone)) blocked.set(phone, { name: phone, phone });
   }
   return [...blocked.values()];
 }
@@ -100,6 +116,10 @@ function changeGlobalBlockedNumber(action, entry) {
     for (const session of runtime.sessions.values()) session.blockedNumbers = structuredClone(next);
     try {
       await runtime.persistence.save(runtime.sessions);
+      await runtime.persistence.pool.query(
+        `INSERT INTO vc_dial_exclusions(phone,manual_block) VALUES (?,?)
+         ON DUPLICATE KEY UPDATE manual_block=VALUES(manual_block)`, [key, action === "add"]);
+      durableExclusions.set(key, { ...(durableExclusions.get(key) || {}), phone: key, manual_block: action === "add" });
     } catch (error) {
       for (const session of runtime.sessions.values()) session.blockedNumbers = structuredClone(previous);
       throw error;
@@ -135,6 +155,7 @@ function blockedCallMessage(block) {
     new Date(block.nextAllowedAt).toLocaleDateString("es-PE",{timeZone:"America/Lima"}) + ".";
 }
 return { allCallAttempts, annualBlock, annualBlocks: allAnnualBlocks, callRestrictions, blockedCallMessage,
+  loadDialExclusions,
   globalBlockedNumbers, isGloballyBlocked, synchronizeGlobalBlockedNumbers, changeGlobalBlockedNumber,
   refreshGlobalCallRestrictions };
 }
