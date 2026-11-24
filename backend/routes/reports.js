@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import compression from "compression";
 import { selectPendingReportContacts } from "../services/reports/report-selection.js";
+import { getRecordedAttemptIds } from "../services/calls/call-recordings.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks } from "../services/campaigns/contact-book.js";
 import {
   ensureCampaign,
@@ -57,7 +58,7 @@ runtime.app.get("/api/session/:code/reports/attempts", async (req, res) => {
   }
 });
 
-runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
+runtime.app.get("/api/session/:code/reports/daily", async (req, res) => {
   const code = String(req.params.code || "")
     .toUpperCase().trim();
 
@@ -86,9 +87,25 @@ runtime.app.get("/api/session/:code/reports/daily", (req, res) => {
     });
   }
 
+  let recorded = new Map();
+  try {
+    const bySession = await getRecordedAttemptIds(runtime.persistence?.pool, [code]);
+    recorded = bySession.get(code) || new Map();
+  } catch { /* sin grabaciones disponibles */ }
+
+  const reports = services.reportData(session, from && to ? { from, to } : date).map(report => ({
+    ...report,
+    sessionCode: code,
+    rows: (report.rows || []).map(row => ({
+      ...row,
+      sessionCode: code,
+      hasRecording: Boolean(row.attemptId && recorded.has(String(row.attemptId)))
+    }))
+  }));
+
   return res.json({
     ok: true,
-    reports: services.reportData(session, from && to ? { from, to } : date)
+    reports
   });
 });
 
@@ -136,16 +153,26 @@ runtime.app.get("/api/reports/all", runtime.auth.requireAdmin, async (req, res) 
     const reports = [];
     const reportBuildStartedAt = performance.now();
     const reportContext = services.createReportContext();
+    let recordedBySession = new Map();
+    try {
+      recordedBySession = await getRecordedAttemptIds(runtime.persistence?.pool, [...runtime.sessions.keys()]);
+    } catch { /* sin grabaciones disponibles */ }
     for (const [code, session] of runtime.sessions) {
       const ownerId = workspaceOwners.get(code) || String(session.ownerUserId || "");
       if (!ownerId || (userId && ownerId !== userId)) continue;
+      const recorded = recordedBySession.get(code) || new Map();
       for (const report of services.reportData(session, from && to ? { from, to } : date, reportContext)) {
         reports.push({
           ...report,
           id: `${code}-${report.id}`,
           sessionCode: code,
           ownerUserId: ownerId,
-          owner: names.get(ownerId) || `Usuario ${ownerId}`
+          owner: names.get(ownerId) || `Usuario ${ownerId}`,
+          rows: (report.rows || []).map(row => ({
+            ...row,
+            sessionCode: code,
+            hasRecording: Boolean(row.attemptId && recorded.has(String(row.attemptId)))
+          }))
         });
       }
     }

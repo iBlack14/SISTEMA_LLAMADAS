@@ -5,6 +5,7 @@ import { registerSessionAccess } from "../middleware/operational-access.js";
 import { registerDevices } from "./devices.js";
 import { registerSessions } from "./sessions.js";
 import { registerReports } from "./reports.js";
+import { registerRecordings } from "./recordings.js";
 import { registerCampaigns } from "./campaigns.js";
 import { registerServerInfo } from "./server-info.js";
 import { registerApk } from "./apk.js";
@@ -25,6 +26,7 @@ export function registerRoutes(runtime, services) {
   registerDevices(runtime, services);
   registerSessions(runtime, services);
   registerReports(runtime, services);
+  registerRecordings(runtime, services);
   registerReservations(runtime, services);
   registerMessageTemplates(runtime);
   registerMessageFilterOptions(runtime);

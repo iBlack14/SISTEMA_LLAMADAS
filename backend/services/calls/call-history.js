@@ -134,6 +134,17 @@ export const HISTORY_SCHEMA = [
     INDEX vc_attempt_worker(session_code, worker_id, started_at),
     INDEX vc_attempt_turn(session_code, shift_id, started_at),
     INDEX vc_attempt_result(session_code, technical_result, started_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS vc_call_recordings (
+    session_code VARCHAR(50) NOT NULL, attempt_id VARCHAR(96) NOT NULL,
+    contact_id VARCHAR(191) NOT NULL DEFAULT '', phone VARCHAR(64) NOT NULL DEFAULT '',
+    mime_type VARCHAR(64) NOT NULL DEFAULT 'audio/mp4',
+    duration_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+    size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+    audio_data MEDIUMBLOB NOT NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY(session_code, attempt_id),
+    INDEX vc_recording_phone(session_code, phone)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 ];
 

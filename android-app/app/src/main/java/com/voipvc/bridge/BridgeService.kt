@@ -166,6 +166,8 @@ class BridgeService : Service() {
     private var activeCommandId = ""
     private var activeContactId = ""
     private var campaignPhoneNumber = ""
+    private var callAnsweredAtElapsedMs = 0L
+    private val callRecorder by lazy { CallRecorder(applicationContext) }
     private var campaignStateObserved = false
     private var campaignTrackingRestored = false
     private var hangupVerificationToken = 0
@@ -1101,6 +1103,10 @@ class BridgeService : Service() {
             }
             "in_call" -> {
                 startAudio()
+                if (activeCallId.isNotBlank()) {
+                    if (callAnsweredAtElapsedMs == 0L) callAnsweredAtElapsedMs = SystemClock.elapsedRealtime()
+                    callRecorder.start(activeCallId, activeContactId, campaignPhoneNumber.ifBlank { currentPhoneNumber })
+                }
                 launchCallUi()
                 setStatus("🔊 En llamada")
             }
@@ -1108,6 +1114,16 @@ class BridgeService : Service() {
                 dialAttemptToken += 1
                 hangupVerificationToken += 1
                 stopAudio()
+                if (callAnsweredAtElapsedMs > 0L && activeCallId.isNotBlank()) {
+                    val elapsedSec = ((SystemClock.elapsedRealtime() - callAnsweredAtElapsedMs) / 1000L).toInt().coerceAtLeast(1)
+                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    val baseUrl = prefs.getString(PREF_SOCKET_URL, "").orEmpty()
+                    val sessionCode = prefs.getString(PREF_CODE, "").orEmpty()
+                    callRecorder.stopAndUpload(serviceScope, baseUrl, sessionCode, currentPairingToken, elapsedSec)
+                } else {
+                    callRecorder.cancel()
+                }
+                callAnsweredAtElapsedMs = 0L
                 setStatus("✅ Activo — esperando llamadas")
                 closeCallUi()
                 if (!isActuallyInCall()) {
@@ -1318,6 +1334,7 @@ class BridgeService : Service() {
                 val read = audioRecord?.read(buf, 0, CHUNK_BYTES) ?: -1
                 if (read > 0) {
                     val chunk = buf.copyOf(read)
+                    callRecorder.writePcm(chunk)
                     audioCaptureQueue.trySend(chunk)
                 }
             }

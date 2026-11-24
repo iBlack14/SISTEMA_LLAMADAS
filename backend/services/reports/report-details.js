@@ -40,6 +40,7 @@ export function hydrateReportDetails(record, session, knownAttempts = new Map())
       ...contact,
       workerId,
       workerName: call?.workerName || deviceLabel(workerName, workerId),
+      attemptId: call?.attemptId || contact.attemptId || "",
       attemptNumber: call?.attemptNumber || contact.attemptNumber || null,
       shiftLabel: call?.shiftLabel || contact.shiftLabel || "",
       answeredAt: call?.answeredAt || null,

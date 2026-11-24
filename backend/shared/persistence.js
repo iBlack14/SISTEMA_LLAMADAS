@@ -833,6 +833,7 @@ this.env = env;
         if (this.sessionDataStorageEnabled) {
           const rows = metrics.sessionEntities?.[code] || [];
           const currentKeysByType = new Map();
+          const changedRows = [];
           for (const row of rows) {
             const key = JSON.stringify([code,row.type,row.id]);
             if (row.type.length > 48 || row.id.length > 191 || row.position < 0 || row.position > 4294967295) {
@@ -843,10 +844,17 @@ this.env = env;
             const serialized = JSON.stringify(row.value);
             const cached = JSON.stringify([row.position,row.value]);
             if (this.sessionEntityCache.get(key) === cached) continue;
-            await connection.query(`INSERT INTO vc_session_entities(session_code,entity_type,entity_id,position,row_data)
-              VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE position=VALUES(position),row_data=VALUES(row_data)`,
-              [code,row.type,row.id,row.position,serialized]);
+            changedRows.push([code,row.type,row.id,row.position,serialized]);
             entityCacheChanges.set(key,cached);
+          }
+          // Batch changed entities so call-state commits do not issue one round trip
+          // per contact/attempt/report row while holding the same transaction.
+          for (let offset = 0; offset < changedRows.length; offset += 200) {
+            const batch = changedRows.slice(offset, offset + 200);
+            const placeholders = batch.map(() => "(?,?,?,?,?)").join(",");
+            await connection.query(`INSERT INTO vc_session_entities(session_code,entity_type,entity_id,position,row_data)
+              VALUES ${placeholders} ON DUPLICATE KEY UPDATE position=VALUES(position),row_data=VALUES(row_data)`,
+              batch.flat());
           }
           const preserved = new Set(metrics.preservedEntityTypes?.[code] || []);
           for (const [type, existingKeys] of this.sessionEntityTypesBySession.get(code) || []) {
@@ -855,8 +863,15 @@ this.env = env;
             for (const key of existingKeys) {
               if (currentKeys.has(key)) continue;
               const parsed = JSON.parse(key);
-              await connection.query("DELETE FROM vc_session_entities WHERE session_code=? AND entity_type=? AND entity_id=?", parsed);
               entityCacheDeletes.add(key);
+            }
+          }
+          if (entityCacheDeletes.size) {
+            const stale = [...entityCacheDeletes].map(key => JSON.parse(key)).filter(([sessionCode]) => sessionCode === code);
+            for (let offset = 0; offset < stale.length; offset += 200) {
+              const batch = stale.slice(offset, offset + 200);
+              const predicates = batch.map(() => "(session_code=? AND entity_type=? AND entity_id=?)").join(" OR ");
+              await connection.query(`DELETE FROM vc_session_entities WHERE ${predicates}`, batch.flat());
             }
           }
         }
