@@ -30,6 +30,9 @@ class CallRecorder(private val context: Context) {
         private const val BIT_RATE = 24000
         private const val CHANNEL_COUNT = 1
         private const val MIME_TYPE = MediaFormat.MIMETYPE_AUDIO_AAC
+        // Por debajo de este pico (≈ -42 dBFS) la captura se considera silencio
+        // digital: micrófono y downlink no entregaron audio utilizable.
+        private const val SILENCE_PEAK_THRESHOLD = 80
     }
 
     private val recording = AtomicBoolean(false)
@@ -54,6 +57,10 @@ class CallRecorder(private val context: Context) {
     private var lastDownlinkLogAt = 0L
 
     private var currentAttemptId = ""
+    // Métricas globales de la grabación actual para detectar silencio total.
+    private var overallPeak = 0
+    private var overallSumSquares = 0.0
+    private var overallSamples = 0L
     fun start(attemptId: String) {
         if (attemptId.isBlank()) return
         synchronized(lock) {
@@ -86,6 +93,9 @@ class CallRecorder(private val context: Context) {
                 synchronized(downlinkLock) { downlinkRing.clear() }
                 outputFile = file
                 currentAttemptId = attemptId
+                overallPeak = 0
+                overallSumSquares = 0.0
+                overallSamples = 0L
                 recording.set(true)
                 Log.i(TAG, "Grabación iniciada attempt=$attemptId")
             } catch (e: Exception) {
@@ -99,6 +109,7 @@ class CallRecorder(private val context: Context) {
         if (!recording.get() || pcmBytes.isEmpty()) return
         logLevel("mic", pcmBytes)
         val mixed = mixWithDownlink(pcmBytes)
+        trackOverallLevel(mixed)
         synchronized(lock) {
             val encoder = codec ?: return
             if (!recording.get()) return
@@ -190,6 +201,19 @@ class CallRecorder(private val context: Context) {
         Log.i(TAG, "nivel audio $source rms=$rms peak=$peak")
     }
 
+    /** Acumula pico y energía de la mezcla para decidir si la grabación es muda. */
+    private fun trackOverallLevel(pcm: ByteArray) {
+        var i = 0
+        while (i + 1 < pcm.size) {
+            val sample = signed16(pcm, i)
+            val magnitude = kotlin.math.abs(sample)
+            if (magnitude > overallPeak) overallPeak = magnitude
+            overallSumSquares += sample.toDouble() * sample
+            overallSamples += 1
+            i += 2
+        }
+    }
+
     fun cancel() {
         synchronized(lock) {
             releaseResourcesLocked(deleteFile = true)
@@ -205,6 +229,8 @@ class CallRecorder(private val context: Context) {
     ) {
         val fileToUpload: File?
         val attemptId: String
+        var recordedPeak = 0
+        var recordedRms = 0
 
         synchronized(lock) {
             if (!recording.getAndSet(false)) return
@@ -224,6 +250,9 @@ class CallRecorder(private val context: Context) {
             }
             fileToUpload = outputFile
             attemptId = currentAttemptId
+            recordedPeak = overallPeak
+            recordedRms = if (overallSamples > 0)
+                kotlin.math.sqrt(overallSumSquares / overallSamples).toInt() else 0
             releaseResourcesLocked(deleteFile = false)
         }
 
@@ -231,6 +260,13 @@ class CallRecorder(private val context: Context) {
             baseUrl.isBlank() || sessionCode.isBlank() || attemptId.isBlank()
         ) {
             fileToUpload?.delete()
+            return
+        }
+
+        // Si la captura completa fue silencio digital, no se sube un archivo mudo.
+        if (recordedPeak < SILENCE_PEAK_THRESHOLD) {
+            Log.w(TAG, "GRABACIÓN MUDA attempt=$attemptId peak=$recordedPeak rms=$recordedRms descartada; revisar fuente de audio/Shizuku en el equipo")
+            fileToUpload.delete()
             return
         }
 
