@@ -109,6 +109,8 @@ class BridgeService : Service() {
     // ── STATE ─────────────────────────────────────────────────────────────────
     private var socket: Socket? = null
     private var connectionKey = ""
+    private val logoutInProgress = AtomicBoolean(false)
+    private val logoutCleanupStarted = AtomicBoolean(false)
 
     // Audio
     private var audioRecord : AudioRecord? = null
@@ -332,6 +334,9 @@ class BridgeService : Service() {
             setStatus("⚠️ Datos incompletos")
             return
         }
+
+        logoutInProgress.set(false)
+        logoutCleanupStarted.set(false)
 
         val requestedConnectionKey = listOf(url.trim(), code.trim(), token.trim(), devId.trim()).joinToString("|")
         if (requestedConnectionKey == connectionKey && socket != null) {
@@ -618,7 +623,7 @@ class BridgeService : Service() {
             val reason = it.firstOrNull()?.toString().orEmpty()
             Log.w(TAG, "[SOCKET] disconnected session=${code.takeLast(2)} reason=${reason.take(120)}")
             stopHeartbeat()
-            if (client === socket) mainHandler.post { setStatus("🔄 Reconectando…") }
+            if (client === socket && !logoutInProgress.get()) mainHandler.post { setStatus("🔄 Reconectando…") }
         }
         client.on(Socket.EVENT_CONNECT_ERROR) { args ->
             val error = args.firstOrNull()
@@ -1510,6 +1515,20 @@ class BridgeService : Service() {
     }
 
     private fun logoutAndStop() {
+        if (!logoutInProgress.compareAndSet(false, true)) return
+        val currentSocket = socket
+        if (currentSocket?.connected() == true) {
+            currentSocket.emit("session:logout", Ack {
+                mainHandler.post { completeLogout() }
+            })
+            mainHandler.postDelayed({ completeLogout() }, 1_000L)
+            return
+        }
+        completeLogout()
+    }
+
+    private fun completeLogout() {
+        if (!logoutCleanupStarted.compareAndSet(false, true)) return
         try {
             dialAttemptToken += 1
             stopAudio()

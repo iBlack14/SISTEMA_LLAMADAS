@@ -150,6 +150,8 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     const worker = (session.phoneWorkers || []).find((item) => item.socketId === socket.id);
     clearDeviceFromPairingSlots(session, worker?.id);
     socket.data.explicitLogout = true;
+    if (worker) removePhoneWorker(session, socket.id);
+    syncSessionPhoneState(session);
     session.updatedAt = Date.now();
     saveSoon(code);
     emitState(code);
