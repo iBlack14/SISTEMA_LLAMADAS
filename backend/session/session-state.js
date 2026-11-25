@@ -107,6 +107,8 @@ function emitState(code) {
     return {
       id: worker.id,
       name: worker.name,
+      detectorState: worker.detectorState || "unknown",
+      detectorState: worker.detectorState || "unknown",
       linkedAt: worker.linkedAt,
       connected: Boolean(worker.connected && worker.socketId),
       callState: worker.callState || "idle",

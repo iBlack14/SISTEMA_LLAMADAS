@@ -64,9 +64,10 @@ function renderWorkersPanel() {
     return `
       <article class="worker-card ${stateClass}" data-worker-id="${dashboardActions.escHtml(worker.id)}">
         <div class="worker-card-head">
-          <div><strong>${dashboardActions.escHtml(worker.name || "Android")}</strong><small>${dashboardActions.escHtml(worker.lineLabel || worker.id || "Teléfono")}</small></div>
+          <div><strong>${dashboardActions.escHtml(worker.name || "Android")}</strong><small>ID del equipo: ${dashboardActions.escHtml(worker.id || "Sin identificar")}</small></div>
           <span class="worker-state">${dashboardActions.escHtml(stateLabel)}</span>
         </div>
+        <div class="worker-empty">${dashboardActions.escHtml(!worker.connected ? "Detector sin conexión" : ({ disabled: "Detector de buzón desactivado", ready: "Detector de buzón listo", preparing: "Preparando detector de buzón" }[worker.detectorState] || "Detector sin información"))}</div>
         ${busy ? `
           <div class="worker-contact"><strong>${dashboardActions.escHtml(worker.companyName || "Contacto")}</strong><span>${dashboardActions.escHtml(worker.phoneNumber || "-")}</span></div>
           <div class="worker-duration">${dashboardActions.formatSeconds(worker.answeredAt ? Math.floor((Date.now() - Date.parse(worker.answeredAt)) / 1000) : (worker.durationSeconds || 0))}</div>

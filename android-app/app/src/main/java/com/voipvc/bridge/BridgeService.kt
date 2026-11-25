@@ -386,6 +386,7 @@ class BridgeService : Service() {
 
         client.on("session:joined") { args ->
             if (client !== socket) return@on
+            client.emit("phone:detector_status", JSONObject().put("state", VoicemailDetector.dashboardState()))
             val rotatedToken = (args.firstOrNull() as? JSONObject)?.optString("token").orEmpty()
             Log.i(TAG, "[SOCKET] joined phone session=${code.takeLast(2)} device=${devId.takeLast(6)}")
             mainHandler.post {
@@ -1423,6 +1424,7 @@ class BridgeService : Service() {
                     emitPhoneStatus("in_call", source = "heartbeat", correlateCampaign = true, force = true)
                 }
                 val sentAt = System.currentTimeMillis()
+                client.emit("phone:detector_status", JSONObject().put("state", VoicemailDetector.dashboardState()))
                 client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { ackArgs ->
                     val latencyMs = System.currentTimeMillis() - sentAt
                     if (latencyMs > HEARTBEAT_TIMEOUT_MS) {

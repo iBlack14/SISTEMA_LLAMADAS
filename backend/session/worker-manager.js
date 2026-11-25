@@ -25,6 +25,7 @@ function upsertPhoneWorker(session, { socketId, deviceId, deviceName }) {
     existing.id = deviceId || existing.id;
     existing.name = deviceName || existing.name;
     existing.connected = Boolean(socketId);
+    existing.detectorState = "unknown";
     existing.linkedAt = existing.linkedAt || new Date().toISOString();
     existing.callState = existing.callState || "idle";
     // Remove stale duplicates left by older versions while retaining the

@@ -305,6 +305,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeShowVoicemailReminder() {
+        if (VoicemailDetector.dashboardState() == "disabled") return
         if (isFinishing || isDestroyed || !hasWindowFocus() || voicemailReminderChecked) return
         if (voicemailReminderDialog?.isShowing == true) {
             voicemailReminderChecked = true
@@ -460,7 +461,7 @@ class MainActivity : AppCompatActivity() {
     private fun hydrateTechnicalInputs() {
         baseUrlIn.setText(defaultBaseUrl)
         settingsBaseUrlIn.setText(defaultBaseUrl)
-        deviceNameText.text = buildDeviceName()
+        deviceNameText.text = deviceDisplayName(buildDeviceName())
         sessionValueText.text = "-"
         serverValueText.text = "Servidor -"
     }
@@ -596,7 +597,7 @@ class MainActivity : AppCompatActivity() {
         updatePersistentStatus("Conectando al bridge…", "Conectando", Tone.WARNING)
         sessionValueText.text = code
         serverValueText.text = "Servidor conectado"
-        deviceNameText.text = deviceName
+        deviceNameText.text = deviceDisplayName(deviceName)
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -738,7 +739,7 @@ class MainActivity : AppCompatActivity() {
         tokenIn.setText(token)
         syncSettingsInputs(fromConnected = false)
         setBridgeMode(BridgeMode.CONNECTED)
-        deviceNameText.text = devName
+        deviceNameText.text = deviceDisplayName(devName)
         sessionValueText.text = code
         serverValueText.text = "Servidor conectado"
         updatePersistentStatus("Restaurando sesión guardada…", "Conectando", Tone.WARNING)
@@ -1009,7 +1010,7 @@ class MainActivity : AppCompatActivity() {
         val connected = VoicemailDetector.isConnected
         val detectorStatus = VoicemailDetector.status
         val summary = when {
-            !enabled -> "Desactivada. Actívala para analizar llamadas salientes."
+            VoicemailDetector.dashboardState() == "disabled" -> "Detector de buzón desactivado. Puedes seguir llamando."
             connecting -> "Conectando con Shizuku…"
             connected && detectorStatus.startsWith("Escuchando", ignoreCase = true) -> detectorStatus
             connected -> "Conectada y lista. La prueba se realiza durante una llamada saliente."
@@ -1020,7 +1021,7 @@ class MainActivity : AppCompatActivity() {
         voicemailStatusText.setTextColor(ContextCompat.getColor(
             this,
             when {
-                connected -> R.color.vc_success
+                VoicemailDetector.dashboardState() == "ready" -> R.color.vc_success
                 connecting -> R.color.vc_warning
                 enabled -> R.color.vc_error
                 else -> R.color.vc_text_secondary
@@ -1068,6 +1069,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun sanitizeBaseForLabel(value: String): String =
         value.removePrefix("https://").removePrefix("http://")
+
+    private fun deviceDisplayName(name: String): String {
+        val id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID).orEmpty()
+        return "$name\nID del equipo: $id"
+    }
 
     private fun buildDeviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
 

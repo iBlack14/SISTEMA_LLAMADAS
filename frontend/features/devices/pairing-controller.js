@@ -70,7 +70,7 @@ function renderPairingSlotsUi(slots) {
           ? `<div class="pairing-slot-linked-box">
                <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
                <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
-               <small class="pairing-slot-linked-sub">${dashboardActions.escHtml(slot.deviceName || "Vinculado")}</small>
+               <small class="pairing-slot-linked-sub">${dashboardActions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${dashboardActions.escHtml(slot.deviceId || "—")}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
              </div>`
           : (qrUrl
               ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
@@ -275,7 +275,7 @@ function renderSingleSlot(slot, index, state, actions) {
         ? `<div class="pairing-slot-linked-box">
              <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
              <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
-             <small class="pairing-slot-linked-sub">${actions.escHtml(slot.deviceName || "Vinculado")}</small>
+             <small class="pairing-slot-linked-sub">${actions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${actions.escHtml(slot.deviceId || "—")}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
            </div>`
         : (qrUrl
             ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`

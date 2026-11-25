@@ -54,6 +54,16 @@ import {
 export function registerUtilityEvents(runtime, services, socket) {
 const { io, sessions, persistence, network } = runtime;
 const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneState, emitCampaignState, hasPersistentCampaignData, emitState, emitMessageContacts } = services;
+  socket.on("phone:detector_status", (payload = {}) => {
+    const { code, role } = socket.data;
+    if (role !== "phone" || !code) return;
+    const session = sessions.get(code);
+    const worker = session?.phoneWorkers?.find(item => item.socketId === socket.id);
+    const state = payload?.state;
+    if (!worker || !["disabled", "preparing", "ready"].includes(state) || worker.detectorState === state) return;
+    worker.detectorState = state;
+    emitState(code);
+  });
   socket.on("blocked-numbers:change", async (payload = {}) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -169,6 +179,16 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     emitCampaignState(code);
     network.notifyChanged();
     if (typeof acknowledge === "function") acknowledge({ ok: true });
+  });
+
+  socket.on("phone:detector_status", (payload = {}) => {
+    if (socket.data.role !== "phone") return;
+    const session = sessions.get(socket.data.code);
+    const worker = session?.phoneWorkers?.find(item => item.socketId === socket.id);
+    if (!worker || !["ready", "disabled", "preparing"].includes(payload?.state)) return;
+    if (worker.detectorState === payload.state) return;
+    worker.detectorState = payload.state;
+    emitState(socket.data.code);
   });
 
   // App-level heartbeat: respond to ping with pong

@@ -36,6 +36,12 @@ object VoicemailDetector {
     /** True once the Shizuku UserService is bound and alive. */
     val isConnected: Boolean get() = remote?.isBinderAlive == true
 
+    fun dashboardState(): String = when {
+        !enabled() || !shizukuAuthorized() -> "disabled"
+        !isConnected || model == null -> "preparing"
+        else -> "ready"
+    }
+
     /**
      * Consumidor opcional del PCM del interlocutor que se está leyendo para el
      * reconocimiento. Lo usa CallRecorder para incluir la voz remota en la

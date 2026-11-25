@@ -82,7 +82,8 @@ socket.on("state:changed", st => {
     worker.callState || "idle",
     worker.companyName || "",
     worker.phoneNumber || "",
-    Boolean(worker.speakerOn)
+    Boolean(worker.speakerOn),
+    worker.detectorState || "unknown"
   ]));
 
   if (nextDeviceSignature !== dashboardState.pairingDeviceSignature) {
