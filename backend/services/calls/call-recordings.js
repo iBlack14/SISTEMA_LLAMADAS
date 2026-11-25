@@ -125,3 +125,12 @@ export async function getCallRecording(pool, sessionCode, attemptId) {
   );
   return rows[0] || null;
 }
+
+export async function deleteCallRecording(pool, sessionCode, attemptId) {
+  if (!pool || !sessionCode || !attemptId) return 0;
+  const [result] = await pool.query(
+    "DELETE FROM vc_call_recordings WHERE session_code = ? AND attempt_id = ?",
+    [String(sessionCode).slice(0, 50), String(attemptId).slice(0, 96)]
+  );
+  return result.affectedRows;
+}

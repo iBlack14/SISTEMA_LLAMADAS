@@ -33,8 +33,33 @@ function createPanel(panel) {
     title.textContent = row.contact || row.phone || "Reproducción";
     detail.textContent = [row.phone, row.list, row.worker, formatDuration(row.durationSeconds)].filter(Boolean).join(" · ");
     player.hidden = false;
+    player.dataset.attemptId = entry.attemptId;
     audio.src = `/api/session/${encodeURIComponent(row.sessionCode)}/recordings/${encodeURIComponent(row.attemptId)}`;
     audio.play().catch(() => {});
+  }
+
+  async function remove(entry, button) {
+    const label = entry.contact || entry.phone || "este contacto";
+    if (!window.confirm(`¿Eliminar la grabación de ${label}? Esta acción no se puede deshacer.`)) return;
+    button.disabled = true;
+    try {
+      const response = await apiFetch(
+        `/api/admin/recordings/${encodeURIComponent(entry.sessionCode)}/${encodeURIComponent(entry.attemptId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo eliminar la grabación.");
+      if (player.dataset.attemptId === entry.attemptId) {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        player.hidden = true;
+      }
+      await load(offset);
+    } catch (error) {
+      status.textContent = error.message;
+      button.disabled = false;
+    }
   }
 
   function cell(row, primary, secondary = "") {
@@ -83,7 +108,14 @@ function createPanel(panel) {
         button.setAttribute("aria-pressed", "false");
         button.setAttribute("aria-label", `Escuchar grabación de ${entry.contact || entry.phone || "este contacto"}`);
         button.addEventListener("click", () => play(entry, button));
-        row.insertCell().append(button);
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "voice-secondary voice-delete";
+        del.textContent = "🗑 Eliminar";
+        del.setAttribute("aria-label", `Eliminar grabación de ${entry.contact || entry.phone || "este contacto"}`);
+        del.addEventListener("click", () => remove(entry, del));
+        const actions = row.insertCell();
+        actions.append(button, del);
       }
       status.textContent = data.rows.length
         ? `Mostrando ${offset + 1}–${offset + data.rows.length}`

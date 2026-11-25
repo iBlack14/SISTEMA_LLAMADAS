@@ -1,5 +1,5 @@
 import express from "express";
-import { saveCallRecording, getCallRecording, listAnsweredRecordings, RECORDING_RETENTION_DAYS } from "../services/calls/call-recordings.js";
+import { saveCallRecording, getCallRecording, deleteCallRecording, listAnsweredRecordings, RECORDING_RETENTION_DAYS } from "../services/calls/call-recordings.js";
 
 function isValidPairingToken(session, token) {
   const candidate = String(token || "").trim();
@@ -96,6 +96,23 @@ export function registerRecordings(runtime) {
     } catch (error) {
       console.error("[RECORDINGS] Error guardando grabación:", error.code || error.name);
       return res.status(503).json({ ok: false, error: "No se pudo guardar la grabación en MySQL" });
+    }
+  });
+
+  runtime.app.delete("/api/admin/recordings/:code/:attemptId", runtime.auth.requireAdmin, async (req, res) => {
+    const code = String(req.params.code || "").toUpperCase().trim();
+    const attemptId = String(req.params.attemptId || "").trim();
+    if (code.length > 50 || attemptId.length > 96) {
+      return res.status(400).json({ ok: false, error: "Parámetros inválidos." });
+    }
+    try {
+      const deleted = await deleteCallRecording(runtime.persistence.pool, code, attemptId);
+      if (!deleted) return res.status(404).json({ ok: false, error: "Grabación no encontrada." });
+      console.info(`[RECORDINGS] Grabación eliminada code=${code} attempt=${attemptId}`);
+      return res.json({ ok: true, deleted });
+    } catch (error) {
+      console.error("[RECORDINGS] Error eliminando grabación:", error.code || error.name);
+      return res.status(503).json({ ok: false, error: "No se pudo eliminar la grabación." });
     }
   });
 

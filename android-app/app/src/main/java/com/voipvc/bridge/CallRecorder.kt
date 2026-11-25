@@ -263,6 +263,13 @@ class CallRecorder(private val context: Context) {
             return
         }
 
+        // Solo se conservan llamadas de más de 15 s; las cortas se descartan.
+        if (durationSeconds <= 15) {
+            Log.i(TAG, "GRABACIÓN DESCARTADA por duración attempt=$attemptId dur=${durationSeconds}s (<=15s)")
+            fileToUpload.delete()
+            return
+        }
+
         // Si la captura completa fue silencio digital, no se sube un archivo mudo.
         if (recordedPeak < SILENCE_PEAK_THRESHOLD) {
             Log.w(TAG, "GRABACIÓN MUDA attempt=$attemptId peak=$recordedPeak rms=$recordedRms descartada; revisar fuente de audio/Shizuku en el equipo")
