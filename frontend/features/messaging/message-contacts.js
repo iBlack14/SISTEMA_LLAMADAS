@@ -1,4 +1,4 @@
-﻿import { openContactSendModal } from './message-templates.js?v=20261119-users-ui3';
+import { openContactSendModal } from './message-templates.js?v=20261119-users-ui3';
 import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
@@ -53,6 +53,21 @@ function bindSendStatusUpdates() {
  * Se construye una vez por dashboard.
  */
 export function createMessageContacts(dashboardState, dashboardActions) {
+  let ownContacts = [];
+  let selectedContacts = [];
+  let requestSerial = 0;
+  function contactShift(contact) {
+    const date = new Date(contact.createdAt);
+    if (!contact.createdAt || Number.isNaN(date.getTime())) return { key: "unknown", label: "Sin fecha de ingreso" };
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).formatToParts(date).map(part => [part.type, part.value]));
+    const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+    const shift = minutes >= 420 && minutes < 810 ? "Mañana" : minutes >= 810 && minutes < 1230 ? "Tarde" : "Fuera de turno";
+    const day = `${parts.year}-${parts.month}-${parts.day}`;
+    return { key: `${day}|${shift}`, label: `${parts.day}/${parts.month}/${parts.year} · ${shift}` };
+  }
   async function initMessageContactsAdmin() {
     const authUser = currentUser || window.VOIP_VC_AUTH_USER;
     if (authUser?.role !== "ADMINISTRADOR") return;
@@ -61,6 +76,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     if (!initialized) {
       initialized = true;
       $("messageContactsUser").addEventListener("change", onMessageUserChange);
+      $("messageContactsShift")?.addEventListener("change", () => renderMessageContacts());
       await loadMessageUsers();
     } else if (!users.length) {
       await loadMessageUsers();
@@ -76,16 +92,17 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los vendedores.");
       users = data.users;
       const select = $("messageContactsUser");
-      select.replaceChildren(new Option("— Mis contactos —", "mine"));
+      select.replaceChildren(new Option("Yo · Mis contactos", "mine"));
       const myId = currentUser?.id || window.VOIP_VC_AUTH_USER?.id;
       for (const user of users) {
         const isMe = myId && String(user.id) === String(myId);
+        if (isMe) continue;
         select.add(new Option(`${user.username}${isMe ? " (tú)" : ""} · ${user.role === "ADMINISTRADOR" ? "Admin" : "Vendedor"}`, String(user.id)));
       }
       // Auto-select "Mis contactos" by default
       select.value = "mine";
-      onMessageUserChange();
-      status.textContent = users.length ? "Contactos sincronizados desde el celular." : "Solo tú tienes acceso.";
+      await onMessageUserChange();
+
     } catch (error) {
       status.textContent = error.message || "No se pudieron cargar los vendedores.";
     }
@@ -94,38 +111,49 @@ export function createMessageContacts(dashboardState, dashboardActions) {
   async function onMessageUserChange() {
     const userId = $("messageContactsUser").value;
     const status = $("messageContactsStatus");
+    const serial = ++requestSerial;
     if (!userId || userId === "mine") {
-      // Show current user's contacts (from socket event)
-      status.textContent = dashboardState.messageContacts.length 
-        ? `Tus contactos: ${dashboardState.messageContacts.length}`
-        : "Tus contactos del celular aparecerán aquí automáticamente.";
+      renderMessageContacts();
       return;
     }
+    selectedContacts = [];
+    renderMessageContacts();
     status.textContent = "Cargando contactos del vendedor…";
     try {
       const response = await apiFetch(`/api/users/${encodeURIComponent(userId)}/message-contacts`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los contactos.");
-      dashboardActions.renderMessageContacts(data.contacts);
-      status.textContent = data.contacts.length 
-        ? `${data.contacts.length} contacto${data.contacts.length === 1 ? "" : "s"} de ${data.username}.`
-        : `Sin contactos guardados en ${data.username}.`;
+      if (serial !== requestSerial || $("messageContactsUser").value !== userId) return;
+      selectedContacts = data.contacts || [];
+      renderMessageContacts();
     } catch (error) {
+      if (serial !== requestSerial) return;
       status.textContent = error.message || "Error al cargar contactos.";
     }
   }
 
-  function renderMessageContacts(contacts = dashboardState.messageContacts) {
-    dashboardState.messageContacts = Array.isArray(contacts) ? contacts : [];
+  function renderMessageContacts(contacts) {
+    if (Array.isArray(contacts)) ownContacts = contacts;
+    const userId = $("messageContactsUser")?.value;
+    const allContacts = !userId || userId === "mine" ? ownContacts : selectedContacts;
+    const shiftSelect = $("messageContactsShift");
+    const selectedShift = shiftSelect?.value || "";
+    if (shiftSelect) {
+      const shifts = new Map(allContacts.map(contact => { const shift = contactShift(contact); return [shift.key, shift.label]; }));
+      shiftSelect.replaceChildren(new Option("Todos los turnos", ""));
+      for (const [key, label] of [...shifts].sort((a, b) => b[0].localeCompare(a[0]))) shiftSelect.add(new Option(label, key));
+      if (selectedShift && !shifts.has(selectedShift)) shiftSelect.add(new Option(selectedShift.replace("|", " · "), selectedShift));
+      shiftSelect.value = selectedShift;
+    }
+    dashboardState.messageContacts = allContacts.filter(contact => !selectedShift || contactShift(contact).key === selectedShift);
     bindSendStatusUpdates();
     const body = $("messageContactsBody");
     const count = $("messageContactsCount");
     const status = $("messageContactsStatus");
-    const userId = $("messageContactsUser")?.value;
     if (count) count.textContent = `${dashboardState.messageContacts.length} contacto${dashboardState.messageContacts.length === 1 ? "" : "s"}`;
-    if (status && (!userId || userId === "mine")) {
+    if (status) {
       status.textContent = dashboardState.messageContacts.length 
-        ? `Tus contactos: ${dashboardState.messageContacts.length}`
+        ? `${dashboardState.messageContacts.length} contactos · ${!userId || userId === "mine" ? "Yo" : (users.find(user => String(user.id) === userId)?.username || "Usuario")}`
         : "Tus contactos del celular aparecerán aquí automáticamente.";
     }
     if (!body) return;
@@ -138,6 +166,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       if (action === "send") { openContactSendModal(contact, "whatsapp"); return; }
       if (action === "mail") { openContactSendModal(contact, "email"); return; }
       if (action === "delete") {
+        if (userId && userId !== "mine") return;
         if (!await dashboardActions.requestConfirmation({ 
           title: "Eliminar contacto", 
           message: `¿Eliminar a ${contact.name} (${contact.phone}) de la lista de WhatsApp?`, 
@@ -166,6 +195,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       const date = new Date(normalized);
       if (Number.isNaN(date.getTime())) return "—";
       const parts = new Intl.DateTimeFormat("es-PE", {
+        timeZone: "America/Lima",
         day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true
       }).formatToParts(date);
       const get = type => parts.find(part => part.type === type)?.value || "";
@@ -183,7 +213,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
         <td><div class="message-contact-actions">
           <button type="button" class="message-contact-wa" data-message-action="send" data-phone="${phone}" title="Enviar por WhatsApp" aria-label="Enviar WhatsApp a ${safeName(name)}">${WHATSAPP_ICON}</button>
           <button type="button" class="message-contact-icon message-contact-mail" data-message-action="mail" data-phone="${phone}" title="Enviar por correo" aria-label="Enviar correo a ${safeName(name)}">${MAIL_ICON}</button>
-          <button type="button" class="message-contact-icon message-contact-delete" data-message-action="delete" data-phone="${phone}" title="Eliminar" aria-label="Eliminar contacto">${TRASH_ICON}</button>
+          <button ${userId && userId !== "mine" ? "disabled" : ""} type="button" class="message-contact-icon message-contact-delete" data-message-action="delete" data-phone="${phone}" title="Eliminar" aria-label="Eliminar contacto">${TRASH_ICON}</button>
         </div></td>
       </tr>`;
     }).join("");
@@ -259,7 +289,14 @@ export function createMessageContacts(dashboardState, dashboardActions) {
           name: contactData.name,
           phone: contactData.phone
         });
-        if (data) renderMessageContacts(data.contacts);
+        if (data) {
+          const select = $("messageContactsUser");
+          if (select) select.value = "mine";
+          requestSerial += 1;
+          const shift = $("messageContactsShift");
+          if (shift) shift.value = "";
+          renderMessageContacts(data.contacts);
+        }
       } finally {
         addBtn.disabled = false;
       }

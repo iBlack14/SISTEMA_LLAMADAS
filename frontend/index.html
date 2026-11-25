@@ -414,7 +414,13 @@
               <svg class="mc-select-chevron" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
           </div>
-          <p id="messageContactsHint" class="mc-user-selector-hint">Elige un vendedor para ver sus contactos guardados en el celular, o deja “Mis contactos” para ver los tuyos.</p>
+          <div class="mc-user-selector-field">
+            <label for="messageContactsShift">Turno de ingreso</label>
+            <div class="mc-select-wrap">
+              <select id="messageContactsShift"><option value="">Todos los turnos</option></select>
+            </div>
+          </div>
+          <p id="messageContactsHint" class="mc-user-selector-hint">Selecciona “Yo” o un usuario y el turno en que ingresaron sus contactos. Horario de Lima.</p>
         </div>
         <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
 <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button></div>

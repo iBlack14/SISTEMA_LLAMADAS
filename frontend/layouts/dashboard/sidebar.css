@@ -390,6 +390,7 @@ button.viavox-menu-toggle { background: #350642 !important; }
 /* Selector de vendedor para "Contactos para WhatsApp" */
 #messageContactsUserSelector.mc-user-selector {
   display: none;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 18px;
   padding: 12px 14px;

@@ -3,7 +3,7 @@
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
 
-import { apiFetch, requireLogin } from '../auth/auth-session.js';
+import { apiFetch, requireLogin, currentUser } from '../auth/auth-session.js';
 import { recordSendStatus } from './message-send-status.js';
 
 const STORAGE_KEY = 'voip_message_templates';
@@ -195,6 +195,8 @@ export function init() {
       await migrateLegacyTemplates();
       const data = await requestJson('/api/message-templates');
       templates = Array.isArray(data.templates) ? data.templates : [];
+      const createButton = document.getElementById('createTemplateBtn');
+      if (createButton) createButton.hidden = (currentUser || window.VOIP_VC_AUTH_USER)?.role !== 'ADMINISTRADOR';
     } catch (err) {
       console.error('Error cargando plantillas desde la base de datos:', err);
       templates = [];
@@ -205,6 +207,7 @@ export function init() {
     renderTemplates();
     renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
   })();
+  initializationPromise.finally(() => { initializationPromise = null; });
   return initializationPromise;
 }
 
@@ -216,6 +219,7 @@ async function requestJson(url, options = {}) {
 }
 
 async function migrateLegacyTemplates() {
+  if ((currentUser || window.VOIP_VC_AUTH_USER)?.role !== 'ADMINISTRADOR') return;
   try {
     if (localStorage.getItem(DB_MIGRATION_KEY) === 'true') return;
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -289,12 +293,14 @@ function renderTemplates() {
         <div class="template-header">
           <h4>${escapeHtml(template.name)}</h4>
           <div class="template-actions">
+            ${template.shared ? '<span>Plantilla del administrador</span>' : `
             <button type="button" class="edit-template-btn" data-id="${escapeHtml(template.id)}" title="Editar plantilla">
               ✏️
             </button>
             <button type="button" class="delete-template-btn" data-id="${escapeHtml(template.id)}" title="Eliminar plantilla">
               🗑️
             </button>
+            `}
           </div>
         </div>
         <div class="template-type">

@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { mergeTemplateCatalog } from "../services/messaging/template-catalog.js";
 import { CAMPAIGN_FLYERS_2027 } from "../../frontend/features/messaging/campaign-flyers-2027.js";
 
 const TEMPLATE_SCHEMA = `CREATE TABLE IF NOT EXISTS message_templates (
@@ -66,6 +67,7 @@ function toClient(row) {
   return {
     id: String(row.id), name: row.name, category: row.category, type: row.type,
     message: row.message, footer: row.footer || "", image: row.image || null,
+    shared: Boolean(row.shared),
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
   };
@@ -84,6 +86,20 @@ export function registerMessageTemplates(runtime) {
   const pool = () => auth.pool;
   const requireUser = auth.requireUser;
   const csrf = auth.csrf;
+  const sharedTemplates = async db => {
+    const [rows] = await db.query(`SELECT t.* FROM message_templates t
+      JOIN auth_users u ON u.id=t.user_id
+      WHERE u.role='ADMINISTRADOR'
+      ORDER BY (t.is_seeded=FALSE OR t.updated_at>t.created_at) DESC,
+        t.updated_at DESC,t.user_id ASC`);
+    return rows;
+  };
+  const rejectSharedEdit = async (db, req, res, id) => {
+    if (req.user.role === "ADMINISTRADOR") return false;
+    if (!(await sharedTemplates(db)).some(row => String(row.id) === id)) return false;
+    res.status(403).json({ ok: false, error: "Esta plantilla la administra el administrador." });
+    return true;
+  };
 
   app.get("/api/message-templates", requireUser, async (req, res) => {
     try {
@@ -96,16 +112,18 @@ export function registerMessageTemplates(runtime) {
         values.push(req.user.id, id, flyer.name, flyer.category || "Otros", "both",
           `Hola, te compartimos nuestro flyer de ${flyer.name}. Si deseas más información, estamos para ayudarte.`, "", flyer.image);
       }
-      await db.query(`INSERT IGNORE INTO message_templates
+      if (req.user.role === "ADMINISTRADOR") await db.query(`INSERT IGNORE INTO message_templates
         (user_id,id,name,category,type,message,footer,image,is_seeded) VALUES ${CAMPAIGN_FLYERS_2027.map(() => "(?,?,?,?,?,?,?,?,TRUE)").join(",")}`, values);
       const [rows] = await db.query(`SELECT id,name,category,type,message,footer,image,created_at,updated_at
         FROM message_templates WHERE user_id=? AND is_deleted=FALSE`, [req.user.id]);
       res.setHeader("Cache-Control", "no-store");
-      return res.json({ ok: true, templates: rows.map(toClient) });
+      const catalog = req.user.role === "ADMINISTRADOR" ? rows
+        : mergeTemplateCatalog([], await sharedTemplates(db));
+      return res.json({ ok: true, templates: catalog.map(toClient) });
     } catch (error) { return templateError(res, error); }
   });
 
-  app.post("/api/message-templates/import", requireUser, csrf, async (req, res) => {
+  app.post("/api/message-templates/import", requireUser, auth.requireAdmin, csrf, async (req, res) => {
     try {
       const incoming = req.body?.templates;
       if (!Array.isArray(incoming) || incoming.length > 300) {
@@ -125,7 +143,7 @@ export function registerMessageTemplates(runtime) {
     } catch (error) { return templateError(res, error); }
   });
 
-  app.post("/api/message-templates", requireUser, csrf, async (req, res) => {
+  app.post("/api/message-templates", requireUser, auth.requireAdmin, csrf, async (req, res) => {
     try {
       const item = cleanTemplate(req.body);
       const db = pool();
@@ -139,12 +157,13 @@ export function registerMessageTemplates(runtime) {
     } catch (error) { return templateError(res, error); }
   });
 
-  app.patch("/api/message-templates/:id", requireUser, csrf, async (req, res) => {
+  app.patch("/api/message-templates/:id", requireUser, auth.requireAdmin, csrf, async (req, res) => {
     try {
       const item = cleanTemplate({ ...req.body, id: req.params.id });
       const db = pool();
       if (!db) throw new Error("DATABASE_UNAVAILABLE");
       await ensureSchema(db);
+      if (await rejectSharedEdit(db, req, res, item.id)) return;
       const [result] = await db.query(`UPDATE message_templates SET name=?,category=?,type=?,message=?,footer=?,image=?,updated_at=CURRENT_TIMESTAMP(3)
         WHERE user_id=? AND id=?`, [item.name, item.category, item.type, item.message, item.footer, item.image, req.user.id, item.id]);
       if (!result.affectedRows) return res.status(404).json({ ok: false, error: "Plantilla no encontrada." });
@@ -154,12 +173,17 @@ export function registerMessageTemplates(runtime) {
     } catch (error) { return templateError(res, error); }
   });
 
-  app.delete("/api/message-templates/:id", requireUser, csrf, async (req, res) => {
+  app.delete("/api/message-templates/:id", requireUser, auth.requireAdmin, csrf, async (req, res) => {
     try {
       const db = pool();
       if (!db) throw new Error("DATABASE_UNAVAILABLE");
       await ensureSchema(db);
       const id = String(req.params.id).slice(0, 120);
+      if (await rejectSharedEdit(db, req, res, id)) return;
+      if (req.user.role === "ADMINISTRADOR") {
+        await db.query("UPDATE message_templates SET is_deleted=TRUE,updated_at=CURRENT_TIMESTAMP(3) WHERE user_id=? AND id=?", [req.user.id, id]);
+        return res.json({ ok: true });
+      }
       const [seeded] = await db.query("UPDATE message_templates SET is_deleted=TRUE WHERE user_id=? AND id=? AND is_seeded=TRUE", [req.user.id, id]);
       if (!seeded.affectedRows) await db.query("DELETE FROM message_templates WHERE user_id=? AND id=?", [req.user.id, id]);
       return res.json({ ok: true });
