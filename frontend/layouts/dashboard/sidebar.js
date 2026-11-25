@@ -1,4 +1,4 @@
-﻿import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
+import { panelPaths, showPanelView } from "../../app/navigation/panel-navigation.js";
 import { currentUser, requireLogin, bindAccountControls } from "../../features/auth/auth-session.js?v=20261119-users-ui3";
 
 const adminPaths = { network: "/nucleo-red", users: "/usuarios", settings: "/configuracion", voice: "/voz" };
@@ -130,7 +130,7 @@ async function loadAdminWorkspace() {
     document.head.append(stylesheet);
     const voiceStylesheet = document.createElement("link");
     voiceStylesheet.rel = "stylesheet";
-    voiceStylesheet.href = "/features/admin/voice/voice.css";
+    voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261124-voice-ui2";
     document.head.append(voiceStylesheet);
   })().catch(error => {
     adminPromise = null;
@@ -206,7 +206,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         await settings.initEmailSettingsPage?.();
       }
       if (view === "voice") {
-        const voice = await import("../../features/admin/voice/voice.js");
+        const voice = await import("../../features/admin/voice/voice.js?v=20261124-voice-ui2");
         if (request !== viewRequest) return;
         await voice.openVoicePanel(adminVoice);
       }
