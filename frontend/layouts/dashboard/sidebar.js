@@ -130,7 +130,7 @@ async function loadAdminWorkspace() {
     document.head.append(stylesheet);
     const voiceStylesheet = document.createElement("link");
     voiceStylesheet.rel = "stylesheet";
-    voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261124-voice-ui2";
+    voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261124-voice-ui3";
     document.head.append(voiceStylesheet);
   })().catch(error => {
     adminPromise = null;
@@ -206,7 +206,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         await settings.initEmailSettingsPage?.();
       }
       if (view === "voice") {
-        const voice = await import("../../features/admin/voice/voice.js?v=20261124-voice-ui2");
+        const voice = await import("../../features/admin/voice/voice.js?v=20261124-voice-ui3");
         if (request !== viewRequest) return;
         await voice.openVoicePanel(adminVoice);
       }
