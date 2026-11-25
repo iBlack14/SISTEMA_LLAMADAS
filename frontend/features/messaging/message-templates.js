@@ -987,10 +987,12 @@ const STF_BTN = {
 
 /** Aplica un valor a un filtro y actualiza la lista de plantillas. */
 function setStfFilter(kind, value) {
-  activeFilters[kind] = value;
   const [btnId, labelId, shortLabel] = STF_BTN[kind] || [];
   if (!btnId) return;
-  updateStfBtnState(btnId, labelId, shortLabel, value);
+  for (const [filterKind, [buttonId, filterLabelId, label]] of Object.entries(STF_BTN)) {
+    activeFilters[filterKind] = filterKind === kind ? value : '';
+    updateStfBtnState(buttonId, filterLabelId, label, activeFilters[filterKind]);
+  }
   document.getElementById(btnId)?.setAttribute('aria-expanded', 'false');
   closeAllStfMenus();
   syncClearBtn();
@@ -1127,6 +1129,11 @@ function renderSendTemplateList(selectedId = '') {
   if (!list) return;
 
   const emailMode = currentSendTab === 'email';
+  const selectedFilter = emailMode ? '' : Object.values(activeFilters).find(Boolean);
+  if (search) {
+    search.placeholder = selectedFilter ? `Buscar en ${selectedFilter}…` : 'Nombre o contenido…';
+    search.setAttribute('aria-label', selectedFilter ? `Buscar plantilla en ${selectedFilter}` : 'Buscar plantilla');
+  }
 
   // En Correo no hay categorías: solo la lista de plantillas corporativas.
   if (filterTools) filterTools.style.display = emailMode ? 'none' : '';
@@ -1166,13 +1173,16 @@ function renderSendTemplateList(selectedId = '') {
       const searchable = `${template.name} ${template.message}`.toLocaleLowerCase('es');
       if (!searchable.includes(query)) return false;
     }
-    if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
-    if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
-    if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
-    if (activeFilters.combo && inferCombo(template) !== activeFilters.combo) return false;
+    if (!emailMode) {
+      if (activeFilters.rubro && (template.category || 'Otros') !== activeFilters.rubro) return false;
+      if (activeFilters.speech && inferSpeech(template) !== activeFilters.speech) return false;
+      if (activeFilters.precio && inferPrecio(template) !== activeFilters.precio) return false;
+      if (activeFilters.combo && inferCombo(template) !== activeFilters.combo) return false;
+    }
     return true;
   }));
 
+  if (count) count.textContent = String(visibleTemplates.length);
   if (resultCount) {
     resultCount.textContent = query || hasActiveFilters
       ? `${visibleTemplates.length} de ${pool.length} plantillas`
