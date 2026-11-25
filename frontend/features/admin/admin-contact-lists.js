@@ -86,8 +86,8 @@ export async function initAdminContactLists() {
   const authUser = currentUser || window.VOIP_VC_AUTH_USER;
   if (!view || authUser?.role !== "ADMINISTRADOR") return;
   view.hidden = false;
-  $("contactsSection").hidden = true;
-  $("contactsDataSection").hidden = true;
+  if ($("contactsSection")) $("contactsSection").hidden = true;
+  if ($("contactsDataSection")) $("contactsDataSection").hidden = true;
   if (!initialized) {
     initialized = true;
     $("adminListsUser").addEventListener("change", onUserChange);
