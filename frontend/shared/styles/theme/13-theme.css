@@ -108,6 +108,7 @@
 
 .worker-card.is-busy { border-color: rgba(124, 58, 237, .5); }
 .worker-card.is-ready { border-color: rgba(16, 185, 129, .35); }
+.worker-card.is-no-contacts { border-color: rgba(217, 119, 6, .48); background: rgba(245, 158, 11, .055); }
 .worker-card.is-paused { border-color: rgba(245, 158, 11, .45); background: rgba(245, 158, 11, .05); }
 .worker-card.is-offline { opacity: .62; }
 
@@ -126,6 +127,7 @@
 .worker-contact span,
 .worker-empty { color: var(--muted); font-size: 12px; }
 .worker-state { font-size: 11px; font-weight: 700; padding: 5px 8px; border-radius: 999px; background: rgba(124, 58, 237, .1); }
+.worker-card.is-no-contacts .worker-state { color: #92400e; background: rgba(245, 158, 11, .16); }
 .worker-contact { margin-top: 12px; }
 .worker-duration { margin: 8px 0; font: 700 18px/1 monospace; }
 .worker-empty { min-height: 48px; display: flex; align-items: center; }

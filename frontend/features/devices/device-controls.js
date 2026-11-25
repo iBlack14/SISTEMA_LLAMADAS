@@ -53,17 +53,24 @@ function renderWorkersPanel() {
 
   refs.workersListEl.innerHTML = workers.map((worker) => {
     const busy = ["dialing", "ringing", "in_call"].includes(worker.callState);
-    const stateClass = worker.paused ? "is-paused" : busy ? "is-busy" : worker.connected ? "is-ready" : "is-offline";
+    const noContacts = worker.connected && !worker.paused && !busy && !worker.activeContactId;
+    const stateClass = worker.paused ? "is-paused" : busy ? "is-busy" : noContacts ? "is-no-contacts" : worker.connected ? "is-ready" : "is-offline";
+    const stateLabel = noContacts ? "Sin contactos" : workerStateLabel(worker);
+    const emptyMessage = worker.paused
+      ? "No recibirá nuevas llamadas"
+      : noContacts
+        ? "No hay una llamada asignada a este teléfono"
+        : "Esperando asignación";
     return `
       <article class="worker-card ${stateClass}" data-worker-id="${dashboardActions.escHtml(worker.id)}">
         <div class="worker-card-head">
           <div><strong>${dashboardActions.escHtml(worker.name || "Android")}</strong><small>${dashboardActions.escHtml(worker.lineLabel || worker.id || "Teléfono")}</small></div>
-          <span class="worker-state">${dashboardActions.escHtml(workerStateLabel(worker))}</span>
+          <span class="worker-state">${dashboardActions.escHtml(stateLabel)}</span>
         </div>
         ${busy ? `
           <div class="worker-contact"><strong>${dashboardActions.escHtml(worker.companyName || "Contacto")}</strong><span>${dashboardActions.escHtml(worker.phoneNumber || "-")}</span></div>
           <div class="worker-duration">${dashboardActions.formatSeconds(worker.answeredAt ? Math.floor((Date.now() - Date.parse(worker.answeredAt)) / 1000) : (worker.durationSeconds || 0))}</div>
-        ` : `<div class="worker-empty">${worker.paused ? "No recibirá nuevas llamadas" : "Esperando asignación"}</div>`}
+        ` : `<div class="worker-empty">${dashboardActions.escHtml(emptyMessage)}</div>`}
         <div class="worker-actions">
           <button class="secondary" data-worker-action="pause" data-worker-id="${dashboardActions.escHtml(worker.id)}">${worker.paused ? "Reanudar" : "Pausar"}</button>
           <button class="danger-soft" data-worker-action="hangup" data-worker-id="${dashboardActions.escHtml(worker.id)}" ${busy ? "" : "disabled"}>Colgar</button>
