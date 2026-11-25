@@ -155,7 +155,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
   if (!adminPaths[view]) await window.startOperationalDashboard?.();
   if (request !== viewRequest) return;
   if (view === "reports") {
-    const reports = await import("../../features/reports/reports-page.js?v=20261124-voice-retention");
+    const reports = await import("../../features/reports/reports-page.js?v=20261124-voice-ui5");
     if (request !== viewRequest) return;
     reports.showCalendar?.();
   } else if (view === "messages") {
@@ -206,7 +206,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         await initNetwork?.();
       }
       if (view === "users") {
-        if (!initUsers) initUsers = (await import("../../features/admin/users/users-page.js")).initUsersPage;
+        if (!initUsers) initUsers = (await import("../../features/admin/users/users-page.js?v=20261124-voice-ui4")).initUsersPage;
         await initUsers?.();
       }
       if (view === "settings") {

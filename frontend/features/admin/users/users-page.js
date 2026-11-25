@@ -1,4 +1,4 @@
-import { apiFetch, bindAccountControls, requireLogin } from "../../auth/auth-session.js";
+import { apiFetch, bindAccountControls, requireLogin } from "../../auth/auth-session.js?v=20261119-users-ui3";
 
 const MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 

@@ -51,7 +51,19 @@ function renderDetails() {
     const allTableRows = reportState.reports.flatMap(reportItem =>
         reportItem.rows.map(contact => ({ report: reportItem, contact }))
       );
-    const tableRows = (allMode || term
+    const metricPredicate = filter => {
+      if (filter === "LLAMADAS TOTALES") return contact =>
+        isAnsweredAttempt(contact) || isVoicemailAttempt(contact) || isInoperableAttempt(contact) || Boolean(contact.lastCallAt);
+      if (filter === "CONTESTADAS") return isAnsweredAttempt;
+      if (filter === "BUZONES") return isVoicemailAttempt;
+      if (filter === "INOPERABLES") return isInoperableAttempt;
+      if (filter === "PENDIENTES") return contact =>
+        !isAnsweredAttempt(contact) && !isVoicemailAttempt(contact) && !isInoperableAttempt(contact);
+      return null;
+    };
+    const activeMetricFilter = reportState.metricFilter || "";
+    const activePredicate = metricPredicate(activeMetricFilter);
+    const baseTableRows = (allMode || term
       ? allTableRows.filter(({ report: reportItem, contact }) =>
         normalizeSearchText(
           `${reportItem.rubro} ${contact.name} ${contact.phone} ${contact.id || ""} ` +
@@ -61,11 +73,15 @@ function renderDetails() {
       )
       : report.rows.map(contact => ({ report, contact }))
     );
+    const tableRows = activePredicate
+      ? baseTableRows.filter(({ contact }) => activePredicate(contact))
+      : baseTableRows;
     // El listado se muestra de 20 en 20; el PDF y la descarga total siguen usando todo.
     const rowsPerPage = reportState.tableRowsPerPage || 20;
     const pageKey = [
       reportState.selectedReport,
       reportState.reportSearchTerm,
+      activeMetricFilter,
       reportState.selectedDetailedTeam,
       reportState.detailedPendingOnly
     ].join("|");
@@ -678,13 +694,15 @@ function renderDetails() {
         </div>
         <section class="report-summary" aria-label="Resumen del reporte">
           <div class="report-metrics">
-            ${metrics.map(([name, value, icon]) => `
-              <div class="report-metric" data-metric="${reportState.esc(name)}">
+            ${metrics.map(([name, value, icon]) => {
+              const isActive = activeMetricFilter === name || (!activeMetricFilter && name === "NÚMEROS USADOS");
+              return `
+              <button type="button" class="report-metric${isActive ? " is-active" : ""}" data-metric="${reportState.esc(name)}" aria-pressed="${isActive ? "true" : "false"}">
                 <span class="report-metric-icon" aria-hidden="true">${icon}</span>
                 <span class="report-metric-label">${reportState.esc(name)}</span>
                 <strong class="report-metric-value">${reportState.esc(value)}</strong>
-              </div>
-            `).join("")}
+              </button>`;
+            }).join("")}
           </div>
         </section>
 
@@ -701,9 +719,10 @@ function renderDetails() {
               </div>
             </div>
           ` : ""}
-          ${term ? `
+          ${(term || activeMetricFilter) ? `
             <div class="report-detail-heading">
-              <h3>RESULTADOS DE BÚSQUEDA (${tableRows.length})</h3>
+              <h3>${activeMetricFilter ? `${reportState.esc(activeMetricFilter)} (${tableRows.length})` : `RESULTADOS DE BÚSQUEDA (${tableRows.length})`}</h3>
+              ${activeMetricFilter ? `<button id="clearMetricFilter" class="secondary" type="button">Ver todos</button>` : ""}
             </div>
           ` : ""}
           <div id="report-detail-table" class="report-table-wrap">
@@ -784,6 +803,26 @@ function renderDetails() {
       </section>
     `;
 
+    reportState.$("reportDetails").querySelectorAll(".report-metric[data-metric]").forEach(card => {
+      card.addEventListener("click", () => {
+        const metric = card.dataset.metric || "";
+        if (metric === "EQUIPOS USADOS") {
+          reportState.showingDetailedReport = true;
+          reportState.detailedPage = 0;
+          renderDetailedReport();
+          return;
+        }
+        reportState.metricFilter = metric === "NÚMEROS USADOS" || reportState.metricFilter === metric ? "" : metric;
+        reportState.tablePage = 0;
+        renderDetails();
+        reportState.$("report-detail-table")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+    reportState.$("clearMetricFilter")?.addEventListener("click", () => {
+      reportState.metricFilter = "";
+      reportState.tablePage = 0;
+      renderDetails();
+    });
     reportState.$("reportPrevPage")?.addEventListener("click", () => {
       reportState.tablePage = Math.max(0, reportState.tablePage - 1);
       reportActions.renderDetails();

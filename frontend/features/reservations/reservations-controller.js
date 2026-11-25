@@ -1,5 +1,7 @@
 import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { showPanelView } from '../../app/navigation/panel-navigation.js';
+import { apiFetch, currentUser } from '../auth/auth-session.js?v=20261119-users-ui3';
+import { dashboardSessionKeys } from '../workspace/dashboard-session.js';
 
 let reservationsState = {
   reservations: [],
@@ -28,12 +30,33 @@ function esc(str) {
     .replace(/'/g, '&#39;');
 }
 
+function getDashboardToken(code) {
+  const userId = (currentUser || window.VOIP_VC_AUTH_USER)?.id;
+  const keys = dashboardSessionKeys(userId);
+  if (!keys || !code) return "";
+  try {
+    return String(sessionStorage.getItem(`${keys.tokenPrefix}${code}`) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function reservationFetch(code, suffix = "", options = {}) {
+  const headers = new Headers(options.headers);
+  const token = getDashboardToken(code);
+  if (token) headers.set("x-dashboard-token", token);
+  return apiFetch(`${API_BASE}/api/session/${encodeURIComponent(code)}/reservations${suffix}`, {
+    ...options,
+    headers
+  });
+}
+
 export async function loadReservations() {
   const code = getSessionCode();
   if (!code) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/session/${code}/reservations`, {
+    const res = await reservationFetch(code, "", {
       headers: { "Accept": "application/json" }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -150,13 +173,13 @@ async function handleSaveQuote(e) {
   try {
     let res;
     if (id) {
-      res = await fetch(`${API_BASE}/api/session/${code}/reservations/${id}`, {
+      res = await reservationFetch(code, `/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
     } else {
-      res = await fetch(`${API_BASE}/api/session/${code}/reservations`, {
+      res = await reservationFetch(code, "", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -184,7 +207,7 @@ async function handleCallReservation(id) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/session/${code}/reservations/${id}/call`, {
+    const res = await reservationFetch(code, `/${encodeURIComponent(id)}/call`, {
       method: "POST",
       headers: { "Content-Type": "application/json" }
     });
@@ -211,7 +234,7 @@ async function handleTogglePause(id) {
 
   const nextStatus = reservation.status === "paused" ? "scheduled" : "paused";
   try {
-    await fetch(`${API_BASE}/api/session/${code}/reservations/${id}`, {
+    await reservationFetch(code, `/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: nextStatus })
@@ -231,7 +254,7 @@ async function handleToggleComplete(id) {
 
   const nextStatus = reservation.status === "completed" ? "scheduled" : "completed";
   try {
-    await fetch(`${API_BASE}/api/session/${code}/reservations/${id}`, {
+    await reservationFetch(code, `/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: nextStatus })
@@ -249,7 +272,7 @@ async function handleDeleteReservation(id) {
   if (!confirm("¿Seguro que deseas eliminar esta reserva de cotización?")) return;
 
   try {
-    await fetch(`${API_BASE}/api/session/${code}/reservations/${id}`, {
+    await reservationFetch(code, `/${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
     await loadReservations();
