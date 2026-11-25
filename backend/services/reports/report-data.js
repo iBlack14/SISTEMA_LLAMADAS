@@ -70,16 +70,19 @@ function reportData(session, date, context = createReportContext()) {
         };
       });
 
+      const resolvedCalls = rows.filter(c => c.answered || c.voicemail || c.inoperable).length;
+
       return {
         id: r.id,
         date: r.date,
         rubro: r.rubro,
         numbers: rows.length,
-        totalCalls: r.history.length,
+        totalCalls: Math.max(r.history.length, resolvedCalls),
         calls: r.calls,
         teamShifts: r.teamShifts,
         answered: rows.filter(c => c.answered).length,
         voicemail: rows.filter(c => c.voicemail).length,
+        inoperable: rows.filter(c => c.inoperable).length,
         pending: rows.filter(c => c.pending).length,
         rows
       };

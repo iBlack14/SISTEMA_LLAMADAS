@@ -1,4 +1,4 @@
-import { apiFetch, currentUser, requireLogin } from "../auth/auth-session.js";
+import { apiFetch, currentUser, requireLogin } from "../auth/auth-session.js?v=20261119-users-ui3";
 
 // Spinner animation for import feedback
 if (!document.getElementById("admin-import-spinner-style")) {

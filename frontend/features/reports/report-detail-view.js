@@ -23,6 +23,7 @@ function renderDetails() {
       totalCalls: reportState.reports.reduce((sum, item) => sum + Number(item.totalCalls || 0), 0),
       answered: reportState.reports.reduce((sum, item) => sum + Number(item.answered || 0), 0),
       voicemail: reportState.reports.reduce((sum, item) => sum + Number(item.voicemail || 0), 0),
+      inoperable: reportState.reports.reduce((sum, item) => sum + Number(item.inoperable ?? (item.rows || []).filter(isInoperableAttempt).length), 0),
       pending: reportState.reports.reduce((sum, item) => sum + Number(item.pending || 0), 0),
       rows: reportState.reports.flatMap(item => (item.rows || []).map(contact => ({
         ...contact,
@@ -118,7 +119,7 @@ function renderDetails() {
       ["LLAMADAS TOTALES", report.totalCalls, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16.5v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 1.12 3.8 2 2 0 0 1 3.1 1.6h3a2 2 0 0 1 2 1.72c.12.9.34 1.78.65 2.62a2 2 0 0 1-.45 2.11L7 9.35a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.11-.45c.84.31 1.72.53 2.62.65A2 2 0 0 1 21 16.5Z"/></svg>'],
       ["CONTESTADAS", report.answered, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>'],
       ["BUZONES", report.voicemail ?? report.rows.filter(isVoicemailAttempt).length, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 13h4l2 3h6l2-3h4"/></svg>'],
-      ["INOPERABLES", report.rows.filter(isInoperableAttempt).length, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>'],
+      ["INOPERABLES", report.inoperable ?? report.rows.filter(isInoperableAttempt).length, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>'],
       ["PENDIENTES", report.pending, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'],
       ["EQUIPOS USADOS", equipmentCount || "—", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 5h6m-5 14h4"/></svg>'],
       ["NÚMEROS USADOS", report.numbers, '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 6 21M18 3l-2 18M3 9h18M2 15h18"/></svg>']

@@ -167,14 +167,22 @@ async function navigate(view, { history = true, scroll = true } = {}) {
     const reservations = await import("../../features/reservations/reservations-controller.js");
     reservations.initReservationsView?.();
   } else if (view === "contacts" && user?.role === "ADMINISTRADOR") {
-    const adminLists = await import("../../features/admin/admin-contact-lists.js");
     const section = document.getElementById("adminUserListsView");
     const contacts = document.getElementById("contactsSection");
     const data = document.getElementById("contactsDataSection");
     if (section) section.hidden = false;
     if (contacts) contacts.hidden = true;
     if (data) data.hidden = true;
-    await adminLists.initAdminContactLists();
+    setViewVisibility(view);
+    setActive(view);
+    if (panelPaths[view]) showPanelView(view, { history });
+    try {
+      const adminLists = await import("../../features/admin/admin-contact-lists.js?v=20261124-voice-ui3");
+      await adminLists.initAdminContactLists();
+    } catch (error) {
+      const status = document.getElementById("adminListsStatus");
+      if (status) status.textContent = error?.message || "No se pudieron cargar las listas de vendedores.";
+    }
   } else if (view === "contacts") {
     const section = document.getElementById("adminUserListsView");
     const contacts = document.getElementById("contactsSection");

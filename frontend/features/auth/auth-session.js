@@ -6,6 +6,7 @@ try {
 } catch { /* ignore invalid per-tab bootstrap state */ }
 clearBootstrap();
 export let currentUser = bootstrap?.user && bootstrap?.csrfToken ? bootstrap.user : undefined;
+if (currentUser) window.VOIP_VC_AUTH_USER = currentUser;
 let csrfToken = bootstrap?.csrfToken || "";
 let loginRequest = null;
 const accountChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("calls-account") : null;
