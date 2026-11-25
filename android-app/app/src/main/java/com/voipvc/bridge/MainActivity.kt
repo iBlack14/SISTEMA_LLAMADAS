@@ -103,7 +103,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var messageBtn: MaterialButton
     private lateinit var blockBtn: MaterialButton
     private lateinit var blockedNumbersText: TextView
-    private lateinit var blockedRowsContainer: LinearLayout
 
     private var bridgeMode = BridgeMode.ONBOARDING
     private var transientStatusMessage = "Escanea el QR del dashboard para vincular."
@@ -406,7 +405,6 @@ class MainActivity : AppCompatActivity() {
         messageBtn = findViewById(R.id.messageBtn)
         blockBtn = findViewById(R.id.blockBtn)
         blockedNumbersText = findViewById(R.id.blockedNumbersText)
-        blockedRowsContainer = findViewById(R.id.blockedRowsContainer)
     }
 
     private fun bindActions() {
@@ -915,82 +913,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBlockedNumbersUi() {
-        val blocked = BlockedNumberStore.read(this).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-        blockedRowsContainer.removeAllViews()
-        blockedNumbersText.text = if (blocked.isEmpty()) {
-            "Sin números bloqueados\nLos números se guardan en este teléfono."
-        } else {
-            "Los cambios se guardan en este teléfono."
-        }
-        blocked.forEach { entry ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10), dp(9), dp(8), dp(9))
-                background = GradientDrawable().apply {
-                    setColor(Color.WHITE)
-                    cornerRadius = dp(14).toFloat()
-                    setStroke(dp(1), ContextCompat.getColor(this@MainActivity, R.color.vc_border))
-                }
-            }
-            val avatar = TextView(this).apply {
-                val initials = entry.name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull()?.toString() }
-                text = initials.joinToString("").uppercase(Locale.getDefault()).ifBlank { "?" }
-                gravity = Gravity.CENTER
-                textSize = 12f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_accent))
-                background = GradientDrawable().apply {
-                    setColor(ContextCompat.getColor(this@MainActivity, R.color.vc_muted_chip))
-                    shape = GradientDrawable.OVAL
-                }
-            }
-            row.addView(avatar, LinearLayout.LayoutParams(dp(40), dp(40)))
-            val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            val name = TextView(this).apply {
-                text = entry.name
-                textSize = 13f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_primary))
-                maxLines = 1
-            }
-            val number = TextView(this).apply {
-                text = "${entry.number} · En este teléfono"
-                textSize = 11f
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_text_secondary))
-                maxLines = 1
-            }
-            details.addView(name)
-            details.addView(number)
-            row.addView(details, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(10)
-                marginEnd = dp(4)
-            })
-            val remove = MaterialButton(this).apply {
-                text = "Quitar"
-                isAllCaps = false
-                textSize = 11f
-                minHeight = dp(38)
-                minimumWidth = dp(66)
-                insetTop = 0
-                insetBottom = 0
-                cornerRadius = dp(12)
-                backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.vc_muted_chip))
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.vc_accent))
-                setOnClickListener {
-                    BlockedNumberStore.setBlocked(this@MainActivity, entry.name, entry.number, false)
-                    sendBlockedNumberChange("remove", entry.name, entry.number)
-                    updateBlockedNumbersUi()
-                    Toast.makeText(this@MainActivity, "Número quitado de la lista", Toast.LENGTH_SHORT).show()
-                }
-            }
-            row.addView(remove)
-            blockedRowsContainer.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = dp(8)
-            })
-        }
+        val count = BlockedNumberStore.read(this).size
+        blockedNumbersText.text = resources.getQuantityString(R.plurals.blocked_numbers_count, count, count)
     }
-
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun consumeServiceStatusMessage(msg: String) {

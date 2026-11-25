@@ -13,7 +13,11 @@
         <item name="colorOnSurface">@color/vc_text_primary</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+        <item name="materialButtonStyle">@style/Widget.VoipVcBridge.Button</item>
+    </style>
+
+    <style name="Widget.VoipVcBridge.Button" parent="Widget.MaterialComponents.Button">
+        <item name="android:stateListAnimator">@animator/button_press</item>
     </style>
 
     <style name="Theme.VoipVcBridge.Scanner" parent="Theme.MaterialComponents.DayNight.NoActionBar">

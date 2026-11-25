@@ -302,7 +302,7 @@ class IncomingCallActivity : AppCompatActivity() {
         applyStateChipStyle(state)
         val ringing = state == "ringing"
         callTopSpacer.layoutParams = callTopSpacer.layoutParams.apply {
-            height = dp(if (ringing) 0 else if (state == "in_call") 112 else 80)
+            height = dp(if (ringing) 0 else 16)
         }
         val imageParams = companyImage.layoutParams
         if (imageParams is ViewGroup.MarginLayoutParams) {

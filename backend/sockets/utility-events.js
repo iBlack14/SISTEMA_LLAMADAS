@@ -83,31 +83,42 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
     }
   });
 
-  socket.on("phone:message-contact:add", async (payload = {}) => {
+  socket.on("phone:message-contact:add", async (payload = {}, acknowledge) => {
+    const reply = (result) => {
+      if (typeof acknowledge === "function") acknowledge(result);
+      else socket.emit("phone:message-contact:ack", result);
+    };
     const code = socket.data.code;
-    if (!code || socket.data.role !== "phone") return;
+    if (!code || socket.data.role !== "phone") {
+      reply({ ok: false, message: "El teléfono perdió su sesión. Vuelve a vincularlo." });
+      return;
+    }
     const session = sessions.get(code);
-    if (!session) return;
+    if (!session) {
+      reply({ ok: false, message: "La sesión ya no existe. Vuelve a vincular el teléfono." });
+      return;
+    }
 
     const data = payload && typeof payload === "object" ? payload : {};
     const result = upsertMessageContact(session.messageContacts, data);
     if (result.error) {
-      socket.emit("phone:message-contact:ack", { ok: false, message: result.error });
+      reply({ ok: false, message: result.error });
       return;
     }
 
     session.messageContacts = result.contacts;
     session.updatedAt = Date.now();
     try {
-      await persistence.save(sessions);
+      await persistence.save(sessions, [code]);
       emitMessageContacts(code);
-      socket.emit("phone:message-contact:ack", {
+      console.info(`[MESSAGES] Contacto guardado; panel conectado=${Boolean(session.dashboardSocketId)} total=${result.contacts.length}`);
+      reply({
         ok: true,
         message: `Contacto ${result.contact.name} guardado en la web.`
       });
     } catch (error) {
       console.error("[MESSAGES] No se pudo guardar el contacto:", error.code || "STORAGE_UNAVAILABLE");
-      socket.emit("phone:message-contact:ack", {
+      reply({
         ok: false,
         message: "No se pudo guardar el contacto en la web. Verifica la conexión e inténtalo de nuevo."
       });

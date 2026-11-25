@@ -162,7 +162,7 @@
                     app:icon="@drawable/ic_qr_scan"
                     app:iconGravity="textStart"
                     app:iconPadding="10dp"
-                    app:iconTint="@color/vc_text_inverse" />
+                    app:iconTint="@color/vc_text_inverse" app:backgroundTint="@null" />
             </LinearLayout>
 
             <LinearLayout
@@ -203,7 +203,7 @@
                     android:text="Preparar permisos"
                     android:textAllCaps="false"
                     android:textColor="@color/vc_accent"
-                    android:textSize="11sp" />
+                    android:textSize="11sp" app:backgroundTint="@null" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -310,7 +310,7 @@
                 android:insetBottom="0dp"
                 android:text="Vincular equipo"
                 android:textAllCaps="false"
-                android:textColor="@color/vc_text_inverse" />
+                android:textColor="@color/vc_text_inverse" app:backgroundTint="@null" />
 
             </LinearLayout>
 
@@ -594,7 +594,7 @@
                         android:text="Contestar"
                         android:textAllCaps="false"
                         android:textColor="@color/vc_text_inverse"
-                        android:visibility="gone" />
+                        android:visibility="gone" app:backgroundTint="@null" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/hangupBtn"
@@ -607,7 +607,7 @@
                         android:insetBottom="0dp"
                         android:text="Colgar"
                         android:textAllCaps="false"
-                        android:textColor="@color/vc_text_inverse" />
+                        android:textColor="@color/vc_text_inverse" app:backgroundTint="@null" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -626,7 +626,7 @@
                         android:insetBottom="0dp"
                         android:text="Micrófono"
                         android:textAllCaps="false"
-                        android:textColor="@color/vc_text_primary" />
+                        android:textColor="@color/vc_text_primary" app:backgroundTint="@null" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/speakerBtn"
@@ -639,7 +639,7 @@
                         android:insetBottom="0dp"
                         android:text="Altavoz"
                         android:textAllCaps="false"
-                        android:textColor="@color/vc_text_primary" />
+                        android:textColor="@color/vc_text_primary" app:backgroundTint="@null" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -658,7 +658,7 @@
                         android:insetBottom="0dp"
                         android:text="Mensaje"
                         android:textAllCaps="false"
-                        android:textColor="@color/vc_text_primary" />
+                        android:textColor="@color/vc_text_primary" app:backgroundTint="@null" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/blockBtn"
@@ -671,7 +671,7 @@
                         android:insetBottom="0dp"
                         android:text="Bloquear"
                         android:textAllCaps="false"
-                        android:textColor="@color/vc_error" />
+                        android:textColor="@color/vc_error" app:backgroundTint="@null" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -686,7 +686,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Lista de bloqueos"
+                    android:text="Números bloqueados"
                     android:textColor="@color/vc_text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -696,16 +696,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="Sin números bloqueados\nLos números se guardan en este teléfono."
+                    android:text="0 números bloqueados"
                     android:textColor="@color/vc_text_secondary"
                     android:textSize="12sp" />
 
-                <LinearLayout
-                    android:id="@+id/blockedRowsContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="vertical" />
             </LinearLayout>
 
             <TextView
@@ -745,7 +739,7 @@
                     android:insetBottom="0dp"
                     android:text="Reconectar bridge"
                     android:textAllCaps="false"
-                    android:textColor="@color/vc_text_inverse" />
+                    android:textColor="@color/vc_text_inverse" app:backgroundTint="@null" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/relinkBtn"
@@ -757,7 +751,7 @@
                     android:insetBottom="0dp"
                     android:text="Revincular / escanear nuevo QR"
                     android:textAllCaps="false"
-                    android:textColor="@color/vc_text_primary" />
+                    android:textColor="@color/vc_text_primary" app:backgroundTint="@null" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/toggleSettingsBtn"
@@ -769,7 +763,7 @@
                     android:insetBottom="0dp"
                     android:text="Ver ajustes del bridge"
                     android:textAllCaps="false"
-                    android:textColor="@color/vc_text_primary" />
+                    android:textColor="@color/vc_text_primary" app:backgroundTint="@null" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/logoutBtn"
@@ -781,7 +775,7 @@
                     android:insetBottom="0dp"
                     android:text="Cerrar sesión"
                     android:textAllCaps="false"
-                    android:textColor="@color/vc_text_inverse" />
+                    android:textColor="@color/vc_text_inverse" app:backgroundTint="@null" />
             </LinearLayout>
 
             <LinearLayout
@@ -886,7 +880,7 @@
                     android:insetBottom="0dp"
                     android:text="Guardar y reconectar"
                     android:textAllCaps="false"
-                    android:textColor="@color/vc_text_inverse" />
+                    android:textColor="@color/vc_text_inverse" app:backgroundTint="@null" />
             </LinearLayout>
         </LinearLayout>
 
@@ -934,7 +928,7 @@
                 android:insetBottom="0dp"
                 android:text="Configurar detección"
                 android:textAllCaps="false"
-                android:textColor="@color/vc_teal" />
+                android:textColor="@color/vc_teal" app:backgroundTint="@null" />
         </LinearLayout>
 
     </LinearLayout>

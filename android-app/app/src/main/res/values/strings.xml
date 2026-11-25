@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">VOIP VC</string>
+    <plurals name="blocked_numbers_count">
+        <item quantity="one">%d número bloqueado</item>
+        <item quantity="other">%d números bloqueados</item>
+    </plurals>
 </resources>

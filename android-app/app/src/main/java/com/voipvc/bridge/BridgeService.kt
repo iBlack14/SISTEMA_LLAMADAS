@@ -18,6 +18,7 @@ import android.telecom.TelecomManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.socket.client.IO
@@ -525,7 +526,10 @@ class BridgeService : Service() {
             val message = data.optString("message").ifBlank {
                 if (data.optBoolean("ok")) "Contacto guardado en la web." else "No se pudo guardar el contacto."
             }
-            mainHandler.post { setStatus(message) }
+            mainHandler.post {
+                setStatus(message)
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            }
         }
 
         client.on("call:action") { args ->
@@ -1649,18 +1653,39 @@ class BridgeService : Service() {
         val number = intent.getStringExtra(EXTRA_PHONE_NUMBER).orEmpty().trim()
         if (number.isBlank()) {
             setStatus("No se pudo guardar: falta el número del contacto.")
+            Toast.makeText(this, "Falta el número del contacto", Toast.LENGTH_LONG).show()
             return
         }
         val client = socket
         if (client?.connected() != true) {
             setStatus("No se pudo enviar el contacto: el celular no está conectado a la web.")
+            Toast.makeText(this, "Sin conexión al panel. Reintenta cuando conecte.", Toast.LENGTH_LONG).show()
             return
         }
+        Toast.makeText(this, "Enviando contacto al panel…", Toast.LENGTH_SHORT).show()
+        val replied = AtomicBoolean(false)
+        val timeout = Runnable {
+            if (replied.compareAndSet(false, true)) {
+                Toast.makeText(this, "El panel no confirmó el guardado. Comprueba Mensajes antes de reintentar.", Toast.LENGTH_LONG).show()
+            }
+        }
+        mainHandler.postDelayed(timeout, 10_000L)
         client.emit(
             "phone:message-contact:add",
             JSONObject()
                 .put("name", name.ifBlank { number })
-                .put("phone", number)
+                .put("phone", number),
+            Ack { args ->
+                val response = args.firstOrNull() as? JSONObject ?: return@Ack
+                if (replied.compareAndSet(false, true)) mainHandler.post {
+                    mainHandler.removeCallbacks(timeout)
+                    val message = response.optString("message").ifBlank {
+                        if (response.optBoolean("ok")) "Contacto guardado en Mensajes." else "No se pudo guardar el contacto."
+                    }
+                    setStatus(message)
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            }
         )
     }
 
