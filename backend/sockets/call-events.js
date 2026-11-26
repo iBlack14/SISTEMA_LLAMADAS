@@ -56,7 +56,7 @@ import {
 // Extraído del servidor original; conserva validaciones y contratos públicos.
 export function registerCallEvents(runtime, services, socket) {
   const { io, sessions, historyGate, persistence, network } = runtime;
-  const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState, acknowledgeDialDelivery } = services;
+  const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState, acknowledgeDialReceipt, acknowledgeDialDelivery } = services;
   socket.on("phone:call_trace", (payload = {}) => {
     if (socket.data.role !== "phone") return;
     const allowedStages = new Set([
@@ -352,6 +352,17 @@ export function registerCallEvents(runtime, services, socket) {
     });
   });
 
+  socket.on("phone:command_received", ({ commandId, action }) => {
+    const code = socket.data.code;
+    if (!code || socket.data.role !== "phone" || action !== "dial") return;
+    const session = sessions.get(code);
+    const worker = session && getPhoneWorkerBySocketId(session, socket.id);
+    const assignment = worker && session.campaign?.assignments?.[worker.id];
+    if (!assignment?.attemptId || String(commandId || "") !== `campaign-${assignment.attemptId}`) return;
+    const firstReceipt = acknowledgeDialReceipt?.(code, worker.id, commandId, assignment.attemptId);
+    if (firstReceipt) console.info(`[CALL_DELIVERY] APK recibió orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} intento=${String(assignment.attemptId).slice(-8)}`);
+  });
+
   socket.on("phone:command_ack", ({ commandId, action, ok, message }) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -364,7 +375,7 @@ export function registerCallEvents(runtime, services, socket) {
     if (action === "dial" && worker) {
       const assignment = session.campaign?.assignments?.[worker.id];
       if (assignment?.attemptId && String(commandId || "") === `campaign-${assignment.attemptId}`) {
-        const firstConfirmation = acknowledgeDialDelivery?.(code, worker.id, commandId, assignment.attemptId);
+        const firstConfirmation = acknowledgeDialDelivery?.(code, worker.id, commandId, assignment.attemptId, Boolean(ok));
         if (firstConfirmation) {
           const contact = session.campaign?.contacts?.find(item => item.id === assignment.contactId);
           const deliveryLog = `[CALL_DELIVERY] Android ${ok ? "confirmó" : "rechazó"} la orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} contacto=${String(contact?.name || "sin nombre").slice(0, 40)} intento=${String(assignment.attemptId).slice(-8)}${ok ? "" : ` motivo=${String(message || "sin detalle").replace(/[|\r\n]/g, " ").slice(0, 100)}`}`;

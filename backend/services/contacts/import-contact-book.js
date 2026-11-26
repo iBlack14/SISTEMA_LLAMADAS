@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { phoneKey } from "../campaigns/contact-book.js";
+import { isExcludedCampaignContact } from "./contact-exclusions.js";
 
 const normalizeListName = value => String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
 
@@ -55,8 +56,10 @@ export function mergeImportedContactBatches(bookInput, batches, { annualBlocks =
     if (!list || !Array.isArray(batch?.contacts) || !batch.contacts.length) throw new Error("Cada base requiere un nombre y contactos.");
     const contacts = batch.contacts.map(contact => ({
       ...contact,
+      rawPhone: String(contact?.phone || ""),
       phone: phoneKey(contact?.phone),
-      name: String(contact?.name || contact?.company || "Contacto").trim() || "Contacto"
+      name: String(contact?.name || contact?.company || "Contacto").trim() || "Contacto",
+      company: String(contact?.company || contact?.name || "").trim()
     })).filter(contact => /^\d{6,15}$/.test(contact.phone));
     if (!contacts.length) throw new Error(`La base "${list}" no contiene teléfonos válidos.`);
     const matchingName = existingByList.get(normalizeListName(list));
@@ -100,8 +103,10 @@ export function mergeImportedContactBatches(bookInput, batches, { annualBlocks =
     let skippedCalled = 0;
     let skippedBlocked = 0;
     let skippedDuplicate = 0;
+    let skippedExcluded = 0;
     for (const contact of batch.contacts) {
       const phone = contact.phone;
+      if (isExcludedCampaignContact(contact, batch.list)) { skippedExcluded++; continue; }
       if (annualBlocks.has(phone)) { skippedCalled++; continue; }
       if (blockedPhones.has(phone)) { skippedBlocked++; continue; }
       if (existingPhones.has(phone) || importedPhones.has(`${targetName}:${phone}`)) { skippedDuplicate++; continue; }
@@ -120,9 +125,9 @@ export function mergeImportedContactBatches(bookInput, batches, { annualBlocks =
     }
     if (!book.lists.includes(batch.list)) book.lists.push(batch.list);
     if (added) fingerprints[fingerprint(phoneSet(batch.contacts))] = { list: batch.list, importedAt: new Date().toISOString() };
-    batch.result = { list: batch.list, added, skippedCalled, skippedBlocked, skippedDuplicate };
+    batch.result = { list: batch.list, added, skippedCalled, skippedBlocked, skippedDuplicate, skippedExcluded };
   }
   book.preferences.importedBaseFingerprints = fingerprints;
   if (prepared[0]?.list) book.activeList = prepared[0].list;
-  return { book, batches: prepared.map(({ result }) => result || { list: "", added: 0, skippedCalled: 0, skippedBlocked: 0, skippedDuplicate: 0 }) };
+  return { book, batches: prepared.map(({ result }) => result || { list: "", added: 0, skippedCalled: 0, skippedBlocked: 0, skippedDuplicate: 0, skippedExcluded: 0 }) };
 }

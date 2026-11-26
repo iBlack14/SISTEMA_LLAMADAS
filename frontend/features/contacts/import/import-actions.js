@@ -61,7 +61,8 @@ async function addImportedContacts() {
     const called = data.batches.reduce((sum, batch) => sum + batch.skippedCalled, 0);
     const blocked = data.batches.reduce((sum, batch) => sum + batch.skippedBlocked, 0);
     const duplicates = data.batches.reduce((sum, batch) => sum + batch.skippedDuplicate, 0);
-    const details = [called ? `${called} ya llamados omitidos` : "", blocked ? `${blocked} bloqueados omitidos` : "", duplicates ? `${duplicates} duplicados omitidos` : ""].filter(Boolean);
+    const excluded = data.batches.reduce((sum, batch) => sum + batch.skippedExcluded, 0);
+    const details = [called ? `${called} ya llamados omitidos` : "", blocked ? `${blocked} bloqueados omitidos` : "", duplicates ? `${duplicates} duplicados omitidos` : "", excluded ? `${excluded} instituciones protegidas omitidas` : ""].filter(Boolean);
     const successMessage = `${data.batches.length} lista(s) guardada(s): ${added} contacto(s) listo(s) para llamar${details.length ? `; ${details.join(", ")}` : ""}.`;
 
     setStatus(successMessage, true);

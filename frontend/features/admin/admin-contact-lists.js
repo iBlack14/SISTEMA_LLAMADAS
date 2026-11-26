@@ -381,7 +381,8 @@ async function confirmImport() {
     const skipped = [
       data.skippedCalled ? `${data.skippedCalled} ya llamados` : "",
       data.skippedBlocked ? `${data.skippedBlocked} bloqueados` : "",
-      data.skippedDuplicate ? `${data.skippedDuplicate} duplicados` : ""
+      data.skippedDuplicate ? `${data.skippedDuplicate} duplicados` : "",
+      data.skippedExcluded ? `${data.skippedExcluded} instituciones protegidas` : ""
     ].filter(Boolean);
     status.textContent = `✅ ${data.added} contactos listos para llamar en "${list}".${skipped.length ? ` Omitidos: ${skipped.join(", ")}.` : ""}`;
     hideImportPreview();

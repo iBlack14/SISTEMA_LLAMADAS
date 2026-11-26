@@ -538,6 +538,11 @@ class BridgeService : Service() {
             val data = args.firstOrNull() as? JSONObject ?: return@on
             val serverAck = args.lastOrNull() as? Ack
             val receivedAtElapsedMs = SystemClock.elapsedRealtime()
+            val receivedCommandId = data.optString("commandId")
+            val receivedAction = data.optString("action")
+            if (receivedAction == "dial" && receivedCommandId.startsWith("campaign-")) {
+                emitCommandReceived(receivedCommandId, receivedAction)
+            }
             mainHandler.post {
               if (client !== socket) {
                   serverAck?.call(JSONObject().put("ok", false).put("message", "socket_replaced"))
@@ -562,7 +567,7 @@ class BridgeService : Service() {
                             emitPhoneStatus(lastCallState.ifBlank { "dialing" }, "command_duplicate", correlateCampaign = true)
                             DialResult(true, "La llamada de esta orden ya está activa")
                         } else {
-                            DialResult(false, "La orden ya existe, pero Android no confirma una llamada activa; requiere revisar el teléfono")
+                            DialResult(true, "Orden recibida; Android todavía no confirma el estado físico de la llamada")
                         }
                     } else if (commandId.isNotBlank() && commandId == lastDialCommandId) {
                         Log.w(TAG, "[DIAL] duplicate command ignored command=${commandId.takeLast(8)}")
@@ -1541,6 +1546,14 @@ class BridgeService : Service() {
                 .put("action", action)
                 .put("ok", ok)
                 .put("message", message)
+        )
+    }
+
+    private fun emitCommandReceived(commandId: String, action: String) {
+        if (commandId.isBlank() || socket?.connected() != true) return
+        socket?.emit(
+            "phone:command_received",
+            JSONObject().put("commandId", commandId).put("action", action)
         )
     }
 

@@ -225,6 +225,7 @@
     "phone:message-contact:add",
     "call:action",
     "phone:status",
+    "phone:command_received",
     "phone:command_ack",
     "phone:quote:request",
     "audio:phone",

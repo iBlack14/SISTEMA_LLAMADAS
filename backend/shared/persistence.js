@@ -191,6 +191,11 @@ this.env = env;
     this.schemaReady = false;
     this.pendingDatabase = false;
     this.saveChain = Promise.resolve();
+    this.pendingSaveJobs = [];
+    this.saveRunning = false;
+    this.saveQueueTimer = null;
+    this.saveQueueSequence = 0;
+    this.resolveSaveQueueIdle = null;
     this.records = new Map();
     this.dirty = new Set();
     this.dirtySessions = new Set();
@@ -825,7 +830,72 @@ this.env = env;
     return cleaned;
   }
 
-  save(sessionsMap, changedCodes = null) {
+  enqueueSaveJob(job, priority = false) {
+    if (!this.saveRunning && this.pendingSaveJobs.length === 0) {
+      this.saveChain = new Promise(resolve => { this.resolveSaveQueueIdle = resolve; });
+    }
+    job.sequence = ++this.saveQueueSequence;
+    this.pendingSaveJobs.push(job);
+    if (this.saveQueueTimer) {
+      clearTimeout(this.saveQueueTimer);
+      this.saveQueueTimer = null;
+    }
+    this.saveQueueTimer = setTimeout(() => {
+      this.saveQueueTimer = null;
+      void this.drainSaveQueue();
+    }, priority ? 0 : 10);
+    return job.promise;
+  }
+
+  async drainSaveQueue() {
+    if (this.saveRunning || !this.pendingSaveJobs.length) return;
+    this.saveRunning = true;
+    const jobs = this.pendingSaveJobs.splice(0).sort((a, b) => a.sequence - b.sequence);
+    const snapshot = {};
+    const metricMaps = ["snapshotJson", "sessionEntities", "preservedEntityTypes", "shiftHistorySources",
+      "shiftUnfinishedContacts", "shiftHistoryIds", "shiftHistoryChanged", "callAttempts", "contactBooks", "contactBookRevisions"];
+    const metrics = Object.fromEntries(metricMaps.map(key => [key, {}]));
+    const changedCodes = new Set();
+    let saveAllSessions = false;
+    let snapshotBuildMs = 0;
+    for (const job of jobs) {
+      Object.assign(snapshot, job.snapshot);
+      if (job.changedCodes === null) saveAllSessions = true;
+      else for (const code of job.changedCodes) changedCodes.add(code);
+      for (const key of metricMaps) Object.assign(metrics[key], job.metrics[key]);
+      snapshotBuildMs += job.metrics.snapshotBuildMs || 0;
+    }
+    metrics.snapshotBytes = Object.values(metrics.snapshotJson).reduce((sum, value) => sum + Buffer.byteLength(value), 0);
+    metrics.snapshotBuildMs = snapshotBuildMs;
+    metrics.queueWaitMs = Date.now() - jobs[0].queuedAt;
+    metrics.coalescedSaves = jobs.length;
+    try {
+      const result = await this.saveNow(snapshot, saveAllSessions ? null : [...changedCodes], metrics);
+      for (const job of jobs) {
+        try { job.onSuccess(); job.resolve(result); }
+        catch (error) { job.reject(error); }
+      }
+    } catch (error) {
+      for (const job of jobs) {
+        job.onFailure(error);
+        job.reject(error);
+      }
+    } finally {
+      this.saveRunning = false;
+      if (this.pendingSaveJobs.length) {
+        this.saveQueueTimer = setTimeout(() => {
+          this.saveQueueTimer = null;
+          void this.drainSaveQueue();
+        }, 0);
+      } else {
+        const resolveIdle = this.resolveSaveQueueIdle;
+        this.resolveSaveQueueIdle = null;
+        resolveIdle?.();
+      }
+    }
+  }
+
+  save(sessionsMap, changedCodes = null, options = {}) {
     // Capture immediately, before another reset/delete can mutate the live Map.
     const snapshotStartedAt = Date.now();
     const snapshot = {};
@@ -887,7 +957,7 @@ this.env = env;
       .filter(code => this.dirtySessions.has(code))
       .map(code => [code, this.dirtySessionVersions.get(code) || 0]));
     const queuedAt = Date.now();
-    const operation = this.saveChain.then(() => this.saveNow(snapshot, changedCodes, {
+    const metrics = {
       snapshotJson,
       sessionEntities,
       preservedEntityTypes,
@@ -899,30 +969,32 @@ this.env = env;
       contactBooks,
       contactBookRevisions,
       snapshotBytes,
-      snapshotBuildMs,
-      queueWaitMs: Date.now() - queuedAt
-    })).then(result => {
-      this.storageFailed = false;
-      this.lastError = "";
-      for (const [code, book] of Object.entries(contactBooks)) {
-        this.normalizedContactBooks.add(code);
-        this.contactBookCache.set(code, book);
+      snapshotBuildMs
+    };
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return this.enqueueSaveJob({
+      snapshot, changedCodes: changedCodes ? [...changedCodes] : null, metrics, queuedAt, promise, resolve, reject,
+      onSuccess: () => {
+        this.storageFailed = false;
+        this.lastError = "";
+        for (const [code, book] of Object.entries(contactBooks)) {
+          this.normalizedContactBooks.add(code);
+          this.contactBookCache.set(code, book);
+        }
+        for (const [code, version] of contactBookVersions) {
+          if (this.contactBookVersions.get(code) === version) this.dirtyContactBooks.delete(code);
+        }
+        for (const [code, version] of dirtyVersions) {
+          if (this.dirtySessionVersions.get(code) === version) this.dirtySessions.delete(code);
+        }
+      },
+      onFailure: error => {
+        this.storageFailed = true;
+        this.lastError = error.code || "STORAGE_WRITE_FAILED";
       }
-      for (const [code, version] of contactBookVersions) {
-        if (this.contactBookVersions.get(code) === version) this.dirtyContactBooks.delete(code);
-      }
-      for (const [code, version] of dirtyVersions) {
-        if (this.dirtySessionVersions.get(code) === version) this.dirtySessions.delete(code);
-      }
-      return result;
-    }, error => {
-      this.storageFailed = true;
-      this.lastError = error.code || "STORAGE_WRITE_FAILED";
-      throw error;
-    });
-    // A failed save rejects its caller, but cannot permanently poison future retries.
-    this.saveChain = operation.catch(() => {});
-    return operation;
+    }, Boolean(options.priority));
   }
 
   markSessionDirty(code) {
@@ -1128,7 +1200,7 @@ this.env = env;
       const logSignature = `${summary.sessions}:${summary.contactBooks}:${summary.lists}:${summary.contacts}:${this.records.size}`;
       const now = Date.now();
       if (logSignature !== this.lastWriteLogSignature || now - this.lastWriteLogAt >= 30000) {
-        console.info(`[PERSISTENCE] MySQL snapshot committed target=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size} snapshotBytes=${metrics.snapshotBytes || 0} snapshotBuildMs=${metrics.snapshotBuildMs || 0} queueWaitMs=${metrics.queueWaitMs || 0}`);
+        console.info(`[PERSISTENCE] MySQL snapshot committed target=${this.env.DB_HOST}:${Number(this.env.DB_PORT || 3306)}/${this.env.DB_NAME} sessions=${summary.sessions} contactBooks=${summary.contactBooks} lists=${summary.lists} contacts=${summary.contacts} attempts=${this.records.size} snapshotBytes=${metrics.snapshotBytes || 0} snapshotBuildMs=${metrics.snapshotBuildMs || 0} queueWaitMs=${metrics.queueWaitMs || 0} coalescedSaves=${metrics.coalescedSaves || 1}`);
         this.lastWriteLogSignature = logSignature;
         this.lastWriteLogAt = now;
       }

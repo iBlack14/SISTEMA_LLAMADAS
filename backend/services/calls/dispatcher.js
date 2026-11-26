@@ -33,6 +33,8 @@ import {
 export function createDispatcher(runtime, services) {
 const dialDeliveries = new Map();
 const confirmedDialDeliveries = new Set();
+const receivedDialDeliveries = new Set();
+const acknowledgedDialResults = new Set();
 
 // Watchdog: a call that never reports a terminal state must not block a worker
 // forever. These ceilings are generous enough for real calls but bound the worst
@@ -52,6 +54,11 @@ function rememberConfirmedDial(key) {
   if (confirmedDialDeliveries.size > 10000) {
     confirmedDialDeliveries.delete(confirmedDialDeliveries.values().next().value);
   }
+}
+
+function rememberDialKey(store, key) {
+  store.add(key);
+  if (store.size > 10000) store.delete(store.values().next().value);
 }
 
 function dialDeliveryKey(code, workerId, commandId) {
@@ -74,6 +81,10 @@ function scheduleDialDelivery(code, workerId, payload, retry = 0) {
   const delivery = { timer: null, payload, retry };
   delivery.timer = setTimeout(() => {
     if (dialDeliveries.get(key) !== delivery) return;
+    if (receivedDialDeliveries.has(key)) {
+      stopDialDelivery(code, workerId, commandId);
+      return;
+    }
     const session = runtime.sessions.get(code);
     const assignment = session?.campaign?.assignments?.[workerId];
     if (!assignment || assignment.attemptId !== payload.callId || assignment.contactId !== payload.contactId
@@ -98,16 +109,29 @@ function scheduleDialDelivery(code, workerId, payload, retry = 0) {
   dialDeliveries.set(key, delivery);
 }
 
-function acknowledgeDialDelivery(code, workerId, commandId, callId) {
+function acknowledgeDialReceipt(code, workerId, commandId, callId) {
   const key = dialDeliveryKey(code, workerId, commandId);
   const normalizedCallId = String(callId || "");
   const assignment = runtime.sessions.get(code)?.campaign?.assignments?.[workerId];
   if (!normalizedCallId || String(commandId || "") !== `campaign-${normalizedCallId}`
     || assignment?.attemptId !== normalizedCallId) return false;
-  const wasConfirmed = confirmedDialDeliveries.has(key);
-  rememberConfirmedDial(key);
+  const wasReceived = receivedDialDeliveries.has(key);
+  rememberDialKey(receivedDialDeliveries, key);
   stopDialDelivery(code, workerId, commandId);
-  return !wasConfirmed;
+  return !wasReceived;
+}
+
+function acknowledgeDialDelivery(code, workerId, commandId, callId, accepted = true) {
+  const key = dialDeliveryKey(code, workerId, commandId);
+  const normalizedCallId = String(callId || "");
+  const assignment = runtime.sessions.get(code)?.campaign?.assignments?.[workerId];
+  if (!normalizedCallId || String(commandId || "") !== `campaign-${normalizedCallId}`
+    || assignment?.attemptId !== normalizedCallId) return false;
+  const wasAcknowledged = acknowledgedDialResults.has(key);
+  rememberDialKey(acknowledgedDialResults, key);
+  if (accepted) rememberConfirmedDial(key);
+  stopDialDelivery(code, workerId, commandId);
+  return !wasAcknowledged;
 }
 
 function resumeAssignedDial(code, workerId) {
@@ -124,6 +148,8 @@ function resumeAssignedDial(code, workerId) {
     callId, commandId: `campaign-${callId}`
   };
   console.warn(`[CALL_DELIVERY] reanudando orden pendiente sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} contacto=${String(contact.name || "sin nombre").slice(0, 40)} progreso=${contact.attempts || 1}`);
+  receivedDialDeliveries.delete(dialDeliveryKey(code, workerId, payload.commandId));
+  acknowledgedDialResults.delete(dialDeliveryKey(code, workerId, payload.commandId));
   sendPersistedDial(code, worker.socketId, payload);
   return true;
 }
@@ -135,7 +161,7 @@ async function sendPersistedDial(code, socketId, payload, retry = 0, startedAt =
   try {
     console.info(`[CALL_TRACE] stage=server_persist_begin session=${sessionId} command=${commandId} call=${callId}`);
     console.info(`[CALL_DISPATCH] persist-before-dial session=${sessionId} worker=${socketId ? "connected" : "missing"} command=${commandId} call=${callId} retry=${retry}`);
-    await runtime.persistence.save(runtime.sessions, [code]);
+    await runtime.persistence.save(runtime.sessions, [code], { priority: payload.action === "dial" });
     const persistedMs = Date.now() - startedAt;
     const session = runtime.sessions.get(code);
     const assignmentEntry = Object.entries(session?.campaign?.assignments || {})
@@ -190,6 +216,7 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
     console.info(`[CALL_DELIVERY] reenvío omitido: Android ya confirmó sesión=${sessionId} equipo=${String(workerId).slice(-8)} intento=${callId}`);
     return;
   }
+  receivedDialDeliveries.delete(deliveryKey);
   if (!target?.connected) {
     console.warn(`[CALL_DISPATCH] not sent session=${sessionId} reason=worker_disconnected command=${commandId} call=${callId} retry=${retry}`);
     if (Date.now() - startedAt < 30000) scheduleDialRetry(code, workerId, payload, retry, startedAt);
@@ -493,5 +520,5 @@ function archiveCurrentCampaign(session) {
     archive[index] = record;
   }
 }
-return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign, acknowledgeDialDelivery, resumeAssignedDial, startCallWatchdog, stopCallWatchdog, scanStuckCalls };
+return { sendPersistedDial, dispatchNextCampaignCallLegacy, dispatchCampaignCalls, dispatchNextCampaignCall, archiveCurrentCampaign, acknowledgeDialReceipt, acknowledgeDialDelivery, resumeAssignedDial, startCallWatchdog, stopCallWatchdog, scanStuckCalls };
 }

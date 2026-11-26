@@ -139,7 +139,8 @@ runtime.app.post("/api/session/:code/contact-book/import", async (req, res) => {
       if (!totalAdded) {
         const called = merged.batches.reduce((sum, batch) => sum + batch.skippedCalled, 0);
         const blocked = merged.batches.reduce((sum, batch) => sum + batch.skippedBlocked, 0);
-        const error = new Error(`No hay números nuevos para importar. ${called} ya fueron llamados y ${blocked} están bloqueados.`);
+        const excluded = merged.batches.reduce((sum, batch) => sum + batch.skippedExcluded, 0);
+        const error = new Error(`No hay números nuevos para importar. ${called} ya fueron llamados, ${blocked} están bloqueados y ${excluded} pertenecen a servicios médicos, policiales, municipales o de emergencia excluidos.`);
         error.status = 422;
         throw error;
       }

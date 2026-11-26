@@ -188,7 +188,7 @@ runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin
       });
       const summary = merged.batches[0];
       if (!summary.added) {
-        const error = new Error(`No hay números nuevos para importar. ${summary.skippedCalled} ya fueron llamados y ${summary.skippedBlocked} están bloqueados.`);
+        const error = new Error(`No hay números nuevos para importar. ${summary.skippedCalled} ya fueron llamados, ${summary.skippedBlocked} están bloqueados y ${summary.skippedExcluded} pertenecen a servicios médicos, policiales, municipales o de emergencia excluidos.`);
         error.status = 422;
         throw error;
       }
