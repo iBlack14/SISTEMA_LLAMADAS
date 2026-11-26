@@ -317,6 +317,7 @@ runtime.app.post("/api/session/:code/workers/:workerId/disconnect", (req, res) =
   services.saveSoon(code);
   services.emitState(code);
   services.emitCampaignState(code);
+  runtime.network.notifyChanged();
 
   setTimeout(() => {
     if (phoneSocket?.connected) phoneSocket.disconnect(true);
@@ -400,6 +401,7 @@ runtime.app.post("/api/android/pair", runtime.pairingRateLimit, (req, res) => {
   session.updatedAt = Date.now();
   services.saveSoon(code);
   services.emitState(code);
+  runtime.network.notifyChanged();
 
   const baseUrl = services.getAndroidApiBaseUrl(req);
   return res.json({

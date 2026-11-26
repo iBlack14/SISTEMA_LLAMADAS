@@ -54,7 +54,7 @@ import {
 
 // Extraído del servidor original; conserva validaciones y contratos públicos.
 export function registerWorkspaceEvents(runtime, services, socket) {
-const { io, sessions, workspaces } = runtime;
+const { io, sessions, workspaces, network } = runtime;
 const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneState, emitCampaignState, detachSocketFromCurrentSession, dispatchCampaignCalls, getOrCreateSession, emitState, emitMessageContacts, resumeAssignedDial } = services;
   const openWorkspace = async ({ dashboardClientId, previousCode } = {}) => {
     const user = socket.data.authUser;
@@ -83,6 +83,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
       emitState(code);
       emitCampaignState(code);
       emitMessageContacts(code);
+      network.notifyChanged();
     } catch (error) {
       socket.emit("session:error", { reason: "WORKSPACE_UNAVAILABLE", message: error.message || "No se pudo abrir tu espacio de trabajo." });
     }
@@ -189,6 +190,7 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     emitState(normalizedCode);
     emitCampaignState(normalizedCode);
     if (role === "dashboard") emitMessageContacts(normalizedCode);
+    if (role === "phone") network.notifyChanged();
 
     // If a phone joined and a campaign is running but idle, kickstart it
     if (role === "phone") {
