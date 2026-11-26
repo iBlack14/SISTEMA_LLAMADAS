@@ -378,7 +378,12 @@ async function confirmImport() {
     const data = await response.json();
     console.log("[IMPORT] Backend response:", data);
     if (!response.ok || !data.ok) throw new Error(data.error || "Error al importar");
-    status.textContent = `✅ ${data.added} contactos importados a la lista "${list}".`;
+    const skipped = [
+      data.skippedCalled ? `${data.skippedCalled} ya llamados` : "",
+      data.skippedBlocked ? `${data.skippedBlocked} bloqueados` : "",
+      data.skippedDuplicate ? `${data.skippedDuplicate} duplicados` : ""
+    ].filter(Boolean);
+    status.textContent = `✅ ${data.added} contactos listos para llamar en "${list}".${skipped.length ? ` Omitidos: ${skipped.join(", ")}.` : ""}`;
     hideImportPreview();
     loadContacts();
   } catch (error) {

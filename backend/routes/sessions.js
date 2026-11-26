@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../services/campaigns/contact-book.js";
+import { collectUsedBaseFingerprints, mergeImportedContactBatches } from "../services/contacts/import-contact-book.js";
 import {
   ensureCampaign,
   getCampaignSnapshot,
@@ -113,6 +114,48 @@ runtime.app.put("/api/session/:code/contact-book", async (req, res) => {
     res.json({ok:true,revision});
   } catch (error) {
     res.status(error.conflict ? 409 : 503).json({ok:false,error:error.conflict ? error.message : "No se confirmó el guardado en MySQL. Recarga antes de continuar."});
+  }
+});
+
+runtime.app.post("/api/session/:code/contact-book/import", async (req, res) => {
+  const code = String(req.params.code).toUpperCase().trim();
+  const session = runtime.sessions.get(code);
+  if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
+  const batches = req.body?.batches;
+  if (!Array.isArray(batches) || !batches.length || batches.length > 50) {
+    return res.status(400).json({ok:false,error:"Selecciona una o más bases válidas."});
+  }
+  try {
+    const result = await runtime.historyGate.serialize(code, async () => {
+      if (Number(req.body?.revision) !== Number(session.contactBookRevision || 0)) {
+        throw Object.assign(new Error("La base cambió. Recarga antes de importar."),{status:409,conflict:true});
+      }
+      const merged = mergeImportedContactBatches(session.contactBook, batches, {
+        annualBlocks: services.annualBlocks(),
+        globallyBlocked: services.globalBlockedNumbers(),
+        usedBases: collectUsedBaseFingerprints(runtime.sessions, code)
+      });
+      const totalAdded = merged.batches.reduce((sum, batch) => sum + batch.added, 0);
+      if (!totalAdded) {
+        const called = merged.batches.reduce((sum, batch) => sum + batch.skippedCalled, 0);
+        const blocked = merged.batches.reduce((sum, batch) => sum + batch.skippedBlocked, 0);
+        const error = new Error(`No hay números nuevos para importar. ${called} ya fueron llamados y ${blocked} están bloqueados.`);
+        error.status = 422;
+        throw error;
+      }
+      const book = normalizeBook(merged.book);
+      session.contactBook = book;
+      session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
+      session.updatedAt = Date.now();
+      runtime.persistence.markContactBookDirty(code);
+      await runtime.persistence.save(runtime.sessions, [code]);
+      return { revision: session.contactBookRevision, batches: merged.batches, total: book.contacts.length };
+    });
+    if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision: result.revision });
+    return res.json({ok:true,...result});
+  } catch (error) {
+    const status = error.status || (error.conflict ? 409 : 503);
+    return res.status(status).json({ok:false,conflict:Boolean(error.conflict),error:error.message || "No se pudo importar la base."});
   }
 });
 

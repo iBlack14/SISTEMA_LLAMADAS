@@ -36,35 +36,33 @@ async function addImportedContacts() {
   showImportSaveFeedback("Guardando los contactos en MySQL…");
 
   try {
-    await Contacts.flushDatabase();
-    let successMessage = "";
-    if (dashboardState.importPreviewBatches.length) {
-      let totalAdded = 0;
-      let processedLists = 0;
-      let omitted = 0;
-      for (const batch of dashboardState.importPreviewBatches) {
-        Contacts.addList(batch.listName);
-        const added = Contacts.addContacts(batch.contacts, batch.listName);
-        totalAdded += added;
-        omitted += Math.max(0, batch.contacts.length - added);
-        processedLists += 1;
-      }
-      Contacts.setActiveList(dashboardState.importPreviewBatches[0].listName);
-      await Contacts.flushDatabase();
-      successMessage = `${processedLists} lista(s) guardada(s): ${totalAdded} contacto(s) agregado(s)${omitted ? ` y ${omitted} duplicado(s) omitido(s)` : ""}.`;
-    } else {
+    let preparedBatches = dashboardState.importPreviewBatches.length ? dashboardState.importPreviewBatches : null;
+    if (!preparedBatches) {
       const defaultTab = dashboardState.currentImportFileName ? dashboardState.currentImportFileName.split('.')[0] : "Lista Nueva";
       const listName = await dashboardActions.requestListName({ title: "Guardar contactos importados", defaultValue: defaultTab });
       if (!listName) {
         showImportSaveFeedback("Guardado cancelado; los contactos siguen en la vista previa.");
         return;
       }
-      Contacts.addList(listName);
-      Contacts.setActiveList(listName);
-      const addedCount = Contacts.addContacts(dashboardState.importPreviewData, listName);
-      await Contacts.flushDatabase();
-      successMessage = `Lista "${listName}" guardada con ${addedCount} contacto(s).`;
+      preparedBatches = [{ listName, contacts: dashboardState.importPreviewData }];
     }
+    const response = await fetch(`${API_BASE}/api/session/${encodeURIComponent(dashboardState.sessionCode)}/contact-book/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Dashboard-Token": dashboardState.dashboardToken },
+      body: JSON.stringify({
+        revision: Contacts.getRevision(),
+        batches: preparedBatches.map(batch => ({ list: batch.listName, contacts: batch.contacts }))
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || "No se pudo importar la base.");
+    await Contacts.refreshDatabase(true);
+    const added = data.batches.reduce((sum, batch) => sum + batch.added, 0);
+    const called = data.batches.reduce((sum, batch) => sum + batch.skippedCalled, 0);
+    const blocked = data.batches.reduce((sum, batch) => sum + batch.skippedBlocked, 0);
+    const duplicates = data.batches.reduce((sum, batch) => sum + batch.skippedDuplicate, 0);
+    const details = [called ? `${called} ya llamados omitidos` : "", blocked ? `${blocked} bloqueados omitidos` : "", duplicates ? `${duplicates} duplicados omitidos` : ""].filter(Boolean);
+    const successMessage = `${data.batches.length} lista(s) guardada(s): ${added} contacto(s) listo(s) para llamar${details.length ? `; ${details.join(", ")}` : ""}.`;
 
     setStatus(successMessage, true);
     dashboardActions.resetImportPreview();

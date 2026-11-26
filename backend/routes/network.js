@@ -1,4 +1,6 @@
 import path from "path";
+import { normalizeBook } from "../services/campaigns/contact-book.js";
+import { collectUsedBaseFingerprints, mergeImportedContactBatches } from "../services/contacts/import-contact-book.js";
 
 /**
  * registerNetwork: conserva los contratos y reglas existentes.
@@ -178,30 +180,29 @@ runtime.app.post("/api/users/:id/contact-book/import", runtime.auth.requireAdmin
     const code = sessionCodes[0];
     const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada." });
-    let book = session.contactBook ? { ...session.contactBook, contacts: [...session.contactBook.contacts], lists: [...session.contactBook.lists] } : { contacts: [], lists: ["Principal"] };
-    if (!book.lists.includes(listName)) book.lists.push(listName);
-    let added = 0;
-    const now = new Date();
-    const createdAt = now.toISOString();
-    for (const c of contacts) {
-      const phone = String(c.phone || "").replace(/\D/g, "");
-      const name = String(c.name || "").trim();
-      if (!phone || !name) continue;
-      const exists = book.contacts.some(contact => contact.phone === phone && (contact.list || "Principal") === listName);
-      if (!exists) {
-        book.contacts.push({ id: crypto.randomUUID(), name: "", phone, list: listName, note: c.note || "", company: name, createdAt });
-        added++;
+    const result = await runtime.historyGate.serialize(code, async () => {
+      const merged = mergeImportedContactBatches(session.contactBook, [{ list: listName, contacts }], {
+        annualBlocks: services.annualBlocks(),
+        globallyBlocked: services.globalBlockedNumbers(),
+        usedBases: collectUsedBaseFingerprints(runtime.sessions, code)
+      });
+      const summary = merged.batches[0];
+      if (!summary.added) {
+        const error = new Error(`No hay números nuevos para importar. ${summary.skippedCalled} ya fueron llamados y ${summary.skippedBlocked} están bloqueados.`);
+        error.status = 422;
+        throw error;
       }
-    }
-    session.contactBook = book;
-    session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
-    session.updatedAt = Date.now();
-    runtime.persistence.markContactBookDirty(code);
-    await runtime.persistence.save(runtime.sessions, [code]);
-    if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision: session.contactBookRevision });
-    return res.json({ ok: true, added, list: listName, total: book.contacts.length, revision: session.contactBookRevision });
+      session.contactBook = normalizeBook(merged.book);
+      session.contactBookRevision = Number(session.contactBookRevision || 0) + 1;
+      session.updatedAt = Date.now();
+      runtime.persistence.markContactBookDirty(code);
+      await runtime.persistence.save(runtime.sessions, [code]);
+      return { summary, total: session.contactBook.contacts.length, revision: session.contactBookRevision };
+    });
+    if (runtime.io) runtime.io.to(code).emit("contact-book:changed", { revision: result.revision });
+    return res.json({ ok: true, ...result.summary, total: result.total, revision: result.revision });
   } catch (error) {
-    return res.status(503).json({ ok: false, error: "No se pudo importar: " + error.message });
+    return res.status(error.status || 503).json({ ok: false, error: error.message || "No se pudo importar la base." });
   }
 });
 
