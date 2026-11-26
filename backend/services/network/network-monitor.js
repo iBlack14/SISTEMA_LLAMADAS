@@ -78,6 +78,61 @@ export class NetworkMonitor {
     }
   }
 
+  movePosition(fromNumber, toNumber, expectedDeviceId) {
+    const operation = this.chain.then(() => this.persistPositionChange(fromNumber, toNumber, expectedDeviceId));
+    this.chain = operation.catch(() => {});
+    return operation;
+  }
+
+  async persistPositionChange(fromNumber, toNumber, expectedDeviceId) {
+    if (!this.pool?.getConnection) throw new Error("La base de datos no admite cambios de posición.");
+    const devices = this.candidates();
+    const registeredIds = new Set(this.registry.map(row => row.device_id));
+    const virtualRows = [...devices.entries()]
+      .filter(([id]) => !registeredIds.has(id))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, device], index) => ({
+        position: Math.max(10, ...this.registry.map(row => Number(row.position) || 0)) + index + 1,
+        device_id: device.slot.deviceId, session_code: device.code, name: device.name, last_activity_at: null
+      }));
+    const positions = new Map([...this.registry, ...virtualRows].map(row => [Number(row.position), row]));
+    const source = positions.get(fromNumber);
+    const target = positions.get(toNumber);
+    if (!source?.device_id || source.device_id !== expectedDeviceId) throw new Error("El equipo cambió desde que se cargó la página. Actualiza e inténtalo de nuevo.");
+    if (fromNumber === toNumber) return await this.buildSnapshot(new Set());
+
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const ids = [...new Set([source.device_id, target?.device_id].filter(Boolean))];
+      const placeholders = ids.map(() => "?").join(",");
+      const [storedRows] = await connection.query(`SELECT * FROM admin_network_devices WHERE device_id IN (${placeholders}) FOR UPDATE`, ids);
+      const storedById = new Map(storedRows.map(row => [row.device_id, row]));
+      const sourceRow = { ...source, ...(storedById.get(source.device_id) || {}) };
+      const targetRow = target?.device_id ? { ...target, ...(storedById.get(target.device_id) || {}) } : null;
+      const [columns] = await connection.query("SHOW COLUMNS FROM admin_network_devices");
+      const available = new Set(columns.map(column => column.Field));
+      const insertRow = async (row, position) => {
+        const values = { position, device_id: row.device_id, session_code: row.session_code, name: row.name, last_activity_at: row.last_activity_at ?? null };
+        for (const field of ["connected_at", "disconnected_at"]) if (available.has(field)) values[field] = row[field] ?? null;
+        const fields = Object.keys(values);
+        await connection.query(`INSERT INTO admin_network_devices (${fields.join(",")}) VALUES (${fields.map(() => "?").join(",")})`, fields.map(field => values[field]));
+      };
+      await connection.query(`DELETE FROM admin_network_devices WHERE device_id IN (${placeholders})`, ids);
+      await insertRow(sourceRow, toNumber);
+      if (targetRow) await insertRow(targetRow, fromNumber);
+      await connection.commit();
+      const [rows] = await this.pool.query("SELECT * FROM admin_network_devices ORDER BY position");
+      this.registry = rows;
+      return await this.buildSnapshot(new Set());
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   observe(code, worker, payload) {
     if (!worker || !states.has(payload.callState)) return;
     const device = this.candidates().get(worker.id);

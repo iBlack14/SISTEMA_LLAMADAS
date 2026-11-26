@@ -391,6 +391,44 @@ h3 {
   color: var(--muted);
 }
 
+.equipment-slider {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.equipment-slider[hidden] {
+  display: none;
+}
+
+.equipment-slider button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-hi);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.equipment-slider button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.equipment-slider button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
 /* Indicators */
 .indicators {
   display: grid;
@@ -464,6 +502,19 @@ h3 {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
+}
+
+.indicator .orb-device-id {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.2;
+  opacity: .82;
+  font-variant-numeric: tabular-nums;
 }
 
 .indicator .orb-sub {
@@ -1006,6 +1057,17 @@ td small {
   align-items: center;
   gap: 5px;
   transition: all 0.18s ease;
+}
+
+.equipment-position .button.equipment-number-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 2px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .equipment-position .button.equipment-reconnect-btn:hover:not(:disabled) {

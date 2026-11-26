@@ -6,6 +6,10 @@ let socket;
 let lastReceived = 0;
 let receivedAt = 0;
 let reconnectingAll = false;
+let equipmentPage = 0;
+let equipmentLive = false;
+let orderedEquipmentSnapshot = [];
+const EQUIPMENT_PAGE_SIZE = 10;
 // El monitor publica cada 30 s (NETWORK_MONITOR_INTERVAL_MS). Un umbral de 6 s
 // marcaba "Sin conexión" entre publicaciones aunque el socket estuviera sano.
 const STALE_MS = 45000;
@@ -68,14 +72,16 @@ function createOrb(number) {
   const el = document.createElement("button");
   el.type = "button";
   el.className = "indicator";
-  el.innerHTML = '<span class="indicator-dot" aria-hidden="true"></span><span class="orb-num"></span><span class="orb-sub"></span><span class="orb-time-caption"></span><span class="orb-time"></span><span class="orb-connection"><span></span></span>';
+  el.innerHTML = '<span class="indicator-dot" aria-hidden="true"></span><span class="orb-num"></span><span class="orb-device-id"></span><span class="orb-sub"></span><span class="orb-time-caption"></span><span class="orb-time"></span><span class="orb-connection"><span></span></span>';
   el.addEventListener("click", () => {
     const card = cards.get(number);
     if (!card) return;
     selectFilter("all");
     filterQuery = "";
     $("searchInput").value = "";
-    applyFilters();
+    const itemIndex = orderedEquipmentSnapshot.findIndex(item => item.number === number);
+    equipmentPage = Math.max(0, Math.floor(itemIndex / EQUIPMENT_PAGE_SIZE));
+    render();
     card.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center"});
     card.focus({preventScroll: true});
   });
@@ -92,7 +98,12 @@ function createOrb(number) {
   message.hidden = true;
   message.setAttribute("role", "status");
   reconnect.addEventListener("click", () => reconnectSingleEquipment(number, reconnect, message));
-  position.append(el, reconnect, message);
+  const renumber = document.createElement("button");
+  renumber.type = "button";
+  renumber.className = "button secondary equipment-number-btn";
+  renumber.textContent = "Cambiar número";
+  renumber.addEventListener("click", () => changeEquipmentNumber(number, renumber, message));
+  position.append(el, reconnect, renumber, message);
   $("equipmentIndicators").appendChild(position);
   orbs.set(number, el);
   return el;
@@ -104,6 +115,10 @@ function renderOrb(el, number, state, name, item, live) {
   const timeText = status.seconds === null ? "—" : formatElapsed(status.seconds);
   el.setAttribute("aria-label", `Equipo ${number}, ${name || ""}, ${status.label}. ${status.caption}: ${timeText}. ${status.connectionLabel}. Ver detalle.`);
   el.querySelector(".orb-num").textContent = String(number).padStart(2, "0");
+  const deviceIdEl = el.querySelector(".orb-device-id");
+  deviceIdEl.textContent = item.deviceId ? `ID: ${item.deviceId}` : "Sin ID";
+  deviceIdEl.title = item.deviceId ? `ID del dispositivo: ${item.deviceId}` : "Sin ID vinculado";
+  deviceIdEl.hidden = !item.deviceId;
   el.querySelector(".orb-sub").textContent = status.label;
   el.querySelector(".orb-time-caption").textContent = status.caption;
   const connection = el.querySelector(".orb-connection");
@@ -248,29 +263,38 @@ let filterState = "all";
 let filterQuery = "";
 
 
+function matchesEquipmentFilters(item) {
+  const state = displayState(item, equipmentLive);
+  const query = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
+  return (filterState === "all" || state === filterState) && (!filterQuery || query.includes(filterQuery));
+}
 function applyFilters() {
   let visible = 0;
   for (const card of cards.values()) {
-    card.hidden = !((filterState === "all" || card.dataset.state === filterState) && (!filterQuery || (card.dataset.search || "").includes(filterQuery)));
+    card.hidden = card.dataset.sliderVisible !== "true"
+      || !((filterState === "all" || card.dataset.state === filterState) && (!filterQuery || (card.dataset.search || "").includes(filterQuery)));
     if (!card.hidden) visible++;
   }
   $("emptyResults").hidden = visible > 0 || !snapshot;
 }
 function updateFilterCounts() {
-  const counts = {all: cards.size};
-  for (const card of cards.values()) counts[card.dataset.state] = (counts[card.dataset.state] || 0) + 1;
+  const counts = {all: orderedEquipmentSnapshot.length};
+  for (const item of orderedEquipmentSnapshot) {
+    const state = displayState(item, equipmentLive);
+    counts[state] = (counts[state] || 0) + 1;
+  }
   document.querySelectorAll("#stateFilters .filter-pill").forEach(button => {
     const base = button.dataset.label || (button.dataset.label = button.textContent.trim());
     button.textContent = `${base} (${counts[button.dataset.filter] ?? 0})`;
   });
 }
 function equipmentOrder(item) {
-  const priority = { "En llamada": 0, "Marcando": 1, "Disponible": 2, "Desconectado": 3, "Sin vincular": 4 };
-  return priority[item.state] ?? 5;
+  return Number(item.number) || 0;
 }
 function render() {
   if (!snapshot) return;
   const live = Boolean(socket?.connected && Date.now() - lastReceived < STALE_MS);
+  equipmentLive = live;
   $("liveStatus").textContent = live ? "En vivo" : "Sin conexión";
   $("liveDot").className = "status-dot" + (live ? " connected" : "");
   document.querySelector(".connection").classList.toggle("is-offline", !live);
@@ -283,20 +307,41 @@ function render() {
   $("downloadLog").disabled = false;
   const counts = {"En llamada": 0, "Marcando": 0, "Disponible": 0, "Desconectado": 0, "Sin equipo": 0, "Sin señal de estado": 0};
   const disconnected = [];
-  const orderedEquipment = [...snapshot.equipment].sort((left, right) =>
+  orderedEquipmentSnapshot = [...snapshot.equipment].sort((left, right) =>
     equipmentOrder(left) - equipmentOrder(right) || left.number - right.number
   );
-  for (const item of orderedEquipment) {
+  for (const item of orderedEquipmentSnapshot) {
     const state = displayState(item, live);
     counts[state]++;
     if (state === "Desconectado") disconnected.push(item);
+  }
+  const matchingEquipment = orderedEquipmentSnapshot.filter(matchesEquipmentFilters);
+  const pageCount = Math.max(1, Math.ceil(matchingEquipment.length / EQUIPMENT_PAGE_SIZE));
+  equipmentPage = Math.min(equipmentPage, pageCount - 1);
+  const firstVisibleIndex = equipmentPage * EQUIPMENT_PAGE_SIZE;
+  for (const card of cards.values()) {
+    card.dataset.sliderVisible = "false";
+    card.hidden = true;
+  }
+  for (const orb of orbs.values()) orb.parentElement.hidden = true;
+  for (const item of matchingEquipment.slice(firstVisibleIndex, firstVisibleIndex + EQUIPMENT_PAGE_SIZE)) {
+    const state = displayState(item, live);
     const orb = orbs.get(item.number) || createOrb(item.number);
     renderOrb(orb, item.number, state, item.name, item, live);
+    orb.parentElement.hidden = false;
     $("equipmentIndicators").appendChild(orb.parentElement);
     const card = cards.get(item.number) || createCard(item.number);
     renderCard(card, item, state, live);
+    card.dataset.sliderVisible = "true";
     $("equipmentGrid").appendChild(card);
   }
+  const slider = $("equipmentSlider");
+  slider.hidden = matchingEquipment.length <= EQUIPMENT_PAGE_SIZE;
+  $("equipmentSliderPrev").disabled = equipmentPage === 0;
+  $("equipmentSliderNext").disabled = equipmentPage >= pageCount - 1;
+  const pageStart = matchingEquipment.length ? firstVisibleIndex + 1 : 0;
+  const pageEnd = Math.min(firstVisibleIndex + EQUIPMENT_PAGE_SIZE, matchingEquipment.length);
+  $("equipmentSliderPage").textContent = `Página ${equipmentPage + 1} de ${pageCount} · ${pageStart}–${pageEnd} de ${matchingEquipment.length}`;
   for (const [id, state] of [["legendActive","En llamada"],["legendDialing","Marcando"],["legendReady","Disponible"],["legendOffline","Desconectado"],["legendNone","Sin equipo"],["legendUnknown","Sin señal de estado"]]) $(id).textContent = counts[state];
   const m = live ? snapshot.summary?.metrics : null;
   $("turnUnavailable").hidden = Boolean(m);
@@ -312,7 +357,7 @@ function render() {
   reconnectAll.title = !live ? "Sin conexion con el servidor" : hasDisconnected
     ? `Reconectar ${disconnected.length} equipo(s) desconectado(s)` : "No hay equipos desconectados";
   $("overflowNotice").hidden = !snapshot.overflow;
-  $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) identificados por ID y mostrados desde la posición ${Math.max(10, snapshot.equipment.length - snapshot.overflow) + 1}.` : "";
+  $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) identificados por ID. Usa el slider para recorrerlos.` : "";
   updateFilterCounts();
   applyFilters();
 }
@@ -363,6 +408,42 @@ async function reconnectSingleEquipment(number, btn, msgEl) {
     reconnectingEquipment.delete(number);
     btn.innerHTML = originalHtml;
     render();
+  }
+}
+
+async function changeEquipmentNumber(number, btn, msgEl) {
+  if (btn.disabled) return;
+  const current = snapshot?.equipment.find(item => item.number === number);
+  if (!current?.deviceId) {
+    if (msgEl) { msgEl.textContent = "Vincula un dispositivo antes de cambiar su número."; msgEl.hidden = false; }
+    return;
+  }
+  const answer = window.prompt(`Nuevo número para el equipo con ID ${current.deviceId} (1–255):`, String(number));
+  if (answer === null) return;
+  const newNumber = Number(answer.trim());
+  if (!Number.isInteger(newNumber) || newNumber < 1 || newNumber > 255) {
+    if (msgEl) { msgEl.textContent = "Ingresa un número entero del 1 al 255."; msgEl.hidden = false; msgEl.className = "equipment-reconnect-msg error"; }
+    return;
+  }
+  if (newNumber === number) return;
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+  if (msgEl) { msgEl.hidden = true; msgEl.textContent = ""; }
+  try {
+    const response = await apiFetch(`/api/network/equipment/${number}/position`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ number: newNumber, deviceId: current.deviceId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "No se pudo cambiar el número.");
+    if (msgEl) { msgEl.textContent = `✓ Equipo ${String(newNumber).padStart(2, "0")} guardado`; msgEl.hidden = false; msgEl.className = "equipment-reconnect-msg"; }
+    if (Array.isArray(result.snapshot?.equipment)) accept(result.snapshot);
+  } catch (error) {
+    if (msgEl) { msgEl.textContent = `⚠ ${error.message}`; msgEl.hidden = false; msgEl.className = "equipment-reconnect-msg error"; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Cambiar número";
   }
 }
 
@@ -479,13 +560,16 @@ try {
       a.click();
       URL.revokeObjectURL(a.href);
     });
-    $("searchInput").addEventListener("input", e => { filterQuery = e.target.value.trim().toLowerCase(); applyFilters(); });
+    $("searchInput").addEventListener("input", e => { filterQuery = e.target.value.trim().toLowerCase(); equipmentPage = 0; render(); });
     document.querySelectorAll("#stateFilters .filter-pill").forEach(btn => {
       btn.addEventListener("click", () => {
         selectFilter(btn.dataset.filter);
-        applyFilters();
+        equipmentPage = 0;
+        render();
       });
     });
+    $("equipmentSliderPrev").addEventListener("click", () => { equipmentPage = Math.max(0, equipmentPage - 1); render(); });
+    $("equipmentSliderNext").addEventListener("click", () => { equipmentPage += 1; render(); });
     document.querySelector('#stateFilters .filter-pill[data-filter="all"]').classList.add("active");
 
     socket = window.io(window.location.origin, { transports: ["websocket"], auth: { client: "dashboard", userId: user.id } });

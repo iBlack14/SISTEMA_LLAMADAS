@@ -267,6 +267,29 @@ runtime.app.get("/api/network/equipment/:number", runtime.auth.requireAdmin, asy
   } catch { res.status(503).json({ ok: false, error: "No se pudo consultar el equipo." }); }
 });
 
+runtime.app.post("/api/network/equipment/:number/position", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const fromNumber = Number(req.params.number);
+  const toNumber = Number(req.body?.number);
+  const deviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId : "";
+  if (!Number.isInteger(fromNumber) || fromNumber < 1 || fromNumber > 1000
+      || !Number.isInteger(toNumber) || toNumber < 1 || toNumber > 255
+      || !deviceId || deviceId.length > 191) {
+    return res.status(400).json({ ok: false, error: "Número o ID de equipo no válido." });
+  }
+  try {
+    const before = await runtime.network.snapshot();
+    const source = before.equipment.find(item => item.number === fromNumber);
+    if (!source?.deviceId || source.deviceId !== deviceId) {
+      return res.status(409).json({ ok: false, error: "El equipo cambió desde que se cargó la página. Actualízala e inténtalo de nuevo." });
+    }
+    const snapshot = await runtime.network.movePosition(fromNumber, toNumber, deviceId);
+    res.json({ ok: true, snapshot });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message || "No se pudo cambiar la posición del equipo." });
+  }
+});
+
 async function attemptReconnectEquipment(number) {
   const row = runtime.network.registry.find(item => item.position === number);
   const candidates = runtime.network.candidates();
