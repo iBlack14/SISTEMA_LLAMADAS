@@ -172,9 +172,16 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     const status = $("messageContactsStatus");
     if (count) count.textContent = `${dashboardState.messageContacts.length} contacto${dashboardState.messageContacts.length === 1 ? "" : "s"}`;
     if (status) {
-      status.textContent = dashboardState.messageContacts.length 
-        ? `${dashboardState.messageContacts.length} contactos · ${!userId || userId === "mine" ? "Yo" : (users.find(user => String(user.id) === userId)?.username || "Usuario")}`
-        : "Tus contactos del celular aparecerán aquí automáticamente.";
+      const selectedDayLabel = selectedDay
+        ? [...new Map(allContacts.map(contact => {
+            const shift = contactShift(contact);
+            return [shift.day, shift.dayLabel];
+          })).entries()].find(([day]) => day === selectedDay)?.[1] || "Fecha seleccionada"
+        : "Todos los días";
+      status.classList.add("mc-contacts-date");
+      status.textContent = dashboardState.messageContacts.length
+        ? selectedDayLabel
+        : (allContacts.length ? "Sin contactos para esta fecha" : "Tus contactos del celular aparecerán aquí automáticamente.");
     }
     if (!body) return;
     body.onclick = async (event) => {

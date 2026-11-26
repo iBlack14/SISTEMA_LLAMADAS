@@ -520,6 +520,16 @@ button.viavox-menu-toggle { background: #350642 !important; }
   flex: 1 1 220px;
 }
 
+#messageContactsStatus.mc-contacts-date {
+  margin: 14px 0 18px;
+  color: #fff;
+  text-align: left;
+  font-size: clamp(20px, 2.2vw, 28px);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: .01em;
+}
+
 @media (max-width: 760px) {
   #messageContactsUserSelector.mc-user-selector.is-visible {
     flex-direction: column;

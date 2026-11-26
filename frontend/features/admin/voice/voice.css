@@ -618,6 +618,13 @@
   font-size: 12.5px;
 }
 
+#voiceView .voice-status.voice-status--date {
+  color: var(--voice-text);
+  font-size: clamp(25px, 2.5vw, 34px);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
 #voiceView .voice-table-scroll {
   overflow: auto;
 }

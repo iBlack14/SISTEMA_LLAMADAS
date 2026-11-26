@@ -4,6 +4,9 @@ const pageSize = 25;
 const dateFormatter = new Intl.DateTimeFormat("es-PE", {
   dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima"
 });
+const dayFormatter = new Intl.DateTimeFormat("es-PE", {
+  dateStyle: "full", timeZone: "America/Lima"
+});
 const panels = new WeakMap();
 
 const ICONS = {
@@ -95,6 +98,7 @@ function createPanel(panel) {
   let offset = 0;
   let currentCount = 0;
   let request;
+  let autoApplyTimer = null;
   let activeEntry = null;
   let activeButton = null;
 
@@ -382,6 +386,7 @@ function createPanel(panel) {
     panel.classList.add("voice-loading");
     previous.disabled = next.disabled = true;
     if (refresh) refresh.disabled = true;
+    status.classList.remove("voice-status--date");
     status.textContent = "Cargando grabaciones…";
     body.replaceChildren();
     stopPlayer();
@@ -402,14 +407,30 @@ function createPanel(panel) {
         empty.className = "voice-empty";
         empty.textContent = "No se encontraron grabaciones con estos filtros.";
       }
-      status.textContent = data.rows.length
-        ? `Mostrando ${offset + 1}–${offset + data.rows.length}`
-        : "Sin resultados";
+      const from = form.elements.namedItem("from")?.value;
+      const to = form.elements.namedItem("to")?.value;
+      const labelDay = value => value
+        ? dayFormatter.format(new Date(`${value}T12:00:00`))
+        : "";
+      const firstRecordingDate = data.rows[0]
+        ? new Date(data.rows[0].connectedAt || data.rows[0].startedAt)
+        : null;
+      const selectedDate = from && to
+        ? `${labelDay(from)} — ${labelDay(to)}`
+        : from || to ? labelDay(from || to)
+          : firstRecordingDate && !Number.isNaN(firstRecordingDate.getTime())
+            ? dayFormatter.format(firstRecordingDate)
+            : "Sin resultados";
+      status.textContent = selectedDate;
+      status.classList.toggle("voice-status--date", Boolean(data.rows.length));
       page.textContent = `Página ${Math.floor(offset / pageSize) + 1}`;
       previous.disabled = offset === 0;
       next.disabled = !data.hasMore;
     } catch (error) {
-      if (!current.signal.aborted) status.textContent = error.message;
+      if (!current.signal.aborted) {
+        status.classList.remove("voice-status--date");
+        status.textContent = error.message;
+      }
       previous.disabled = offset === 0;
       next.disabled = true;
     } finally {
@@ -492,14 +513,29 @@ function createPanel(panel) {
     if (!player.hidden) showPlaybackError();
   });
 
-  form.addEventListener("submit", event => {
-    event.preventDefault();
+  const applyCurrentFilters = () => {
     filters = new URLSearchParams(new FormData(form));
     void load(0);
+  };
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    clearTimeout(autoApplyTimer);
+    applyCurrentFilters();
+  });
+  form.addEventListener("change", event => {
+    if (event.target.matches("select, input[type=date]")) {
+      clearTimeout(autoApplyTimer);
+      applyCurrentFilters();
+    }
+  });
+  form.addEventListener("input", event => {
+    if (!event.target.matches("input:not([type=date])")) return;
+    clearTimeout(autoApplyTimer);
+    autoApplyTimer = setTimeout(applyCurrentFilters, 350);
   });
   form.addEventListener("reset", () => {
-    filters = new URLSearchParams();
-    void load(0);
+    clearTimeout(autoApplyTimer);
+    setTimeout(applyCurrentFilters, 0);
   });
   previous.addEventListener("click", () => void load(Math.max(0, offset - pageSize)));
   next.addEventListener("click", () => void load(offset + pageSize));
