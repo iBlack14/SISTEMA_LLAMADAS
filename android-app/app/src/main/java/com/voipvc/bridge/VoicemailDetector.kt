@@ -12,6 +12,7 @@ import org.vosk.Recognizer
 import rikka.shizuku.Shizuku
 import java.io.File
 import java.io.InputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
@@ -270,7 +271,7 @@ object VoicemailDetector {
             if (ticket != generation.get()) return@execute
             var recognizer: Recognizer? = null
             val voskQueue = java.util.concurrent.ArrayBlockingQueue<ByteArray>(64)
-            @Volatile var recognizing = true
+            val recognizing = AtomicBoolean(true)
             var voskThread: Thread? = null
             try {
                 val fd = transactOpen(binder)
@@ -285,16 +286,16 @@ object VoicemailDetector {
                     say("Escuchando audio remoto para detectar buzón…")
                     voskThread = Thread({
                         try {
-                            while (ticket == generation.get() && recognizing) {
+                            while (ticket == generation.get() && recognizing.get()) {
                                 val chunk = voskQueue.poll(150, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
                                 if (SystemClock.elapsedRealtime() >= deadline) {
-                                    recognizing = false
+                                    recognizing.set(false)
                                     break
                                 }
                                 if (toneDetector.accept(chunk, chunk.size)) {
                                     lastMatch = "Tono de ocupado repetido"
                                     say("Tono de ocupado repetido detectado; solicitando corte")
-                                    recognizing = false
+                                    recognizing.set(false)
                                     main.post {
                                         if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, "tono_ocupado")
                                     }
@@ -306,7 +307,7 @@ object VoicemailDetector {
                                 val resultCode = VoicemailPhrases.result(text) ?: continue
                                 lastMatch = text.take(160)
                                 say("Locución detectada ($resultCode): $lastMatch")
-                                recognizing = false
+                                recognizing.set(false)
                                 main.post {
                                     if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, resultCode)
                                 }
@@ -325,10 +326,10 @@ object VoicemailDetector {
                         val copy = buffer.copyOf(count)
                         // La lectura del downlink alimenta primero la grabación sin bloquearse en Vosk.
                         if (captureRequested) downlinkSink?.invoke(copy)
-                        if (recognizing && SystemClock.elapsedRealtime() >= deadline) {
-                            recognizing = false
+                        if (recognizing.get() && SystemClock.elapsedRealtime() >= deadline) {
+                            recognizing.set(false)
                         }
-                        if (recognizing) {
+                        if (recognizing.get()) {
                             voskQueue.offer(copy)
                         } else if (!captureRequested) {
                             break
@@ -338,7 +339,7 @@ object VoicemailDetector {
             } catch (e: Exception) {
                 if (ticket == generation.get()) say("No se pudo analizar el audio: ${e.message}")
             } finally {
-                recognizing = false
+                recognizing.set(false)
                 voskThread?.interrupt()
                 try { voskThread?.join(300) } catch (_: Exception) {}
                 input = null
