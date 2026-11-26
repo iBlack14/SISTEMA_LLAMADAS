@@ -619,16 +619,8 @@ class BridgeService : Service() {
             }
         }
 
-        // Receive web mic audio → play on phone speaker during call
-        client.on("audio:dashboard") { args ->
-            if (client !== socket) return@on
-            val raw = args.firstOrNull()
-            val bytes: ByteArray? = when (raw) {
-                is ByteArray -> raw
-                else -> null
-            }
-            bytes?.let { audioPlaybackQueue.trySend(it) }
-        }
+        // PC-to-phone audio bridge disabled: calls run natively on the handset.
+        client.on("audio:dashboard") { /* no-op */ }
 
         client.on(Socket.EVENT_DISCONNECT) {
             val reason = it.firstOrNull()?.toString().orEmpty()
@@ -929,7 +921,6 @@ class BridgeService : Service() {
             return false
         }
         lastCallState = "in_call"
-        startAudio()
         emitPhoneStatus("in_call", "user_action", correlateCampaign = activeCommandId.isNotBlank())
         emitCallUiState()
         launchCallUi()
@@ -1133,12 +1124,14 @@ class BridgeService : Service() {
                 setStatus("📲 Llamada entrante")
             }
             "in_call" -> {
-                startAudio()
-                if (belongsToCampaign && activeCallId.isNotBlank() && isStreaming.get()) {
+                if (belongsToCampaign && activeCallId.isNotBlank()) {
                     if (callAnsweredAtElapsedMs == 0L) callAnsweredAtElapsedMs = SystemClock.elapsedRealtime()
                     callRecorder.start(activeCallId)
-                    // Incluye el audio del interlocutor (VOICE_DOWNLINK) en la grabación.
-                    if (callRecorder.isRecording) VoicemailDetector.startRecordingCapture()
+                    // Captura micrófono local solo para grabación (sin puente AudioTrack hacia la PC).
+                    if (callRecorder.isRecording) {
+                        startAudio()
+                        VoicemailDetector.startRecordingCapture()
+                    }
                 }
                 launchCallUi()
                 setStatus(if (callRecorder.isRecording) "🔴 En llamada · Grabando audio" else "🔊 En llamada")
@@ -1277,9 +1270,8 @@ class BridgeService : Service() {
     // ── AUDIO BRIDGE (no root required) ──────────────────────────────────────
 
     /**
-     * Starts:
-     * 1. AudioRecord — captures phone MIC → sends to web via socket "audio:phone"
-     * 2. AudioTrack  — receives web MIC audio → plays on phone speaker
+     * Captura solo micrófono local para la grabación de la llamada nativa.
+     * No abre AudioTrack ni transmite audio por socket hacia la PC.
      */
     @SuppressLint("MissingPermission")
     private fun startAudio() {
@@ -1291,54 +1283,13 @@ class BridgeService : Service() {
             return
         }
 
-        // ── AudioTrack (playback) ─────────────────────────────────────────────
-        try {
-            audioTrack = AudioTrack(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
-                AudioFormat.Builder()
-                    .setSampleRate(SAMPLE_RATE)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .build(),
-                minBufOut,
-                AudioTrack.MODE_STREAM,
-                AudioManager.AUDIO_SESSION_ID_GENERATE
-            )
-            audioTrack!!.play()
-            isPlaying.set(true)
-            playbackJob = serviceScope.launch(Dispatchers.IO) {
-                // Jitter buffer: pre-fill with 3 chunks (~240ms) before starting playback
-                val preBuffer = mutableListOf<ByteArray>()
-                for (bytes in audioPlaybackQueue) {
-                    if (!isPlaying.get()) break
-                    preBuffer.add(bytes)
-                    if (preBuffer.size >= 3) {
-                        // Pre-buffer full, start playback
-                        for (buf in preBuffer) playAudio(buf)
-                        preBuffer.clear()
-                        break
-                    }
-                }
-                // Continue normal playback
-                for (bytes in audioPlaybackQueue) {
-                    if (isPlaying.get()) playAudio(bytes)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "AudioTrack failed", e)
-        }
-
-        // ── AudioRecord (capture) ─────────────────────────────────────────────
         try {
             audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                MediaRecorder.AudioSource.MIC,
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                minBufIn
+                minBufIn * 4
             )
         } catch (e: Exception) {
             Log.e(TAG, "AudioRecord failed", e)
@@ -1361,8 +1312,8 @@ class BridgeService : Service() {
             return
         }
 
-        // Capture: read from AudioRecord -> captureQueue (backpressure)
         captureJob = serviceScope.launch(Dispatchers.IO) {
+            try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) } catch (_: Exception) {}
             val buf = ByteArray(CHUNK_BYTES)
             var consecutiveReadErrors = 0
             while (isActive && isStreaming.get()) {
@@ -1370,9 +1321,7 @@ class BridgeService : Service() {
                 val read = source.read(buf, 0, CHUNK_BYTES)
                 if (read > 0) {
                     consecutiveReadErrors = 0
-                    val chunk = buf.copyOf(read)
-                    callRecorder.writePcm(chunk)
-                    audioCaptureQueue.trySend(chunk)
+                    callRecorder.writePcm(buf.copyOf(read))
                 } else if (read < 0) {
                     consecutiveReadErrors += 1
                     if (consecutiveReadErrors == 1 || consecutiveReadErrors % 10 == 0) {
@@ -1387,18 +1336,8 @@ class BridgeService : Service() {
                 }
             }
         }
-        // Emit from captureQueue -> socket (separate coroutine for backpressure)
-        serviceScope.launch(Dispatchers.IO) {
-            for (chunk in audioCaptureQueue) {
-                if (socket?.connected() == true) {
-                    socket!!.emit("audio:phone", chunk)
-                } else {
-                    // Socket disconnected, drop chunk to avoid buildup
-                }
-            }
-        }
 
-        Log.d(TAG, "Audio bridge started via Coroutines")
+        Log.d(TAG, "Local mic capture started for recording (native call mode)")
     }
 
     private fun stopAudio() {
@@ -1415,15 +1354,6 @@ class BridgeService : Service() {
         try { audioTrack?.stop(); audioTrack?.release()  } catch (_: Exception) {}
         audioRecord = null
         audioTrack  = null
-        try {
-            val audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
-            @Suppress("DEPRECATION")
-            audioManager?.isMicrophoneMute = false
-            @Suppress("DEPRECATION")
-            audioManager?.isSpeakerphoneOn = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) audioManager?.clearCommunicationDevice()
-            audioManager?.mode = AudioManager.MODE_NORMAL
-        } catch (_: Exception) {}
         isMicMuted = false
         isSpeakerOn = false
     }

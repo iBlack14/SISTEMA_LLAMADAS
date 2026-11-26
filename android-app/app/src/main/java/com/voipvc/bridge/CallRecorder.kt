@@ -16,6 +16,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.ByteBuffer
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -58,6 +60,8 @@ class CallRecorder(private val context: Context) {
     private var lastCodecDropLogAt = 0L
 
     private var currentAttemptId = ""
+    private val pcmQueue = LinkedBlockingQueue<ByteArray>(250)
+    private var encoderThread: Thread? = null
     // Métricas globales de la grabación actual para detectar silencio total.
     private var overallPeak = 0
     private var overallSumSquares = 0.0
@@ -92,12 +96,14 @@ class CallRecorder(private val context: Context) {
                 muxerStarted = false
                 presentationTimeUs = 0L
                 synchronized(downlinkLock) { downlinkRing.clear() }
+                pcmQueue.clear()
                 outputFile = file
                 currentAttemptId = attemptId
                 overallPeak = 0
                 overallSumSquares = 0.0
                 overallSamples = 0L
                 recording.set(true)
+                encoderThread = Thread({ runEncoderLoop() }, "call-recorder-encoder").apply { start() }
                 Log.i(TAG, "Grabación iniciada attempt=$attemptId")
             } catch (e: Exception) {
                 Log.e(TAG, "No se pudo iniciar grabación", e)
@@ -109,24 +115,51 @@ class CallRecorder(private val context: Context) {
     fun writePcm(pcmBytes: ByteArray) {
         if (!recording.get() || pcmBytes.isEmpty()) return
         logLevel("mic", pcmBytes)
+        if (!pcmQueue.offer(pcmBytes)) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastCodecDropLogAt >= 2000) {
+                lastCodecDropLogAt = now
+                Log.w(TAG, "Cola de grabación llena; bloque PCM descartado=${pcmBytes.size} bytes")
+            }
+        }
+    }
+
+    private fun runEncoderLoop() {
+        while (recording.get() || pcmQueue.isNotEmpty()) {
+            val pcmBytes = try {
+                if (recording.get()) pcmQueue.poll(50, TimeUnit.MILLISECONDS)
+                else pcmQueue.poll()
+            } catch (_: InterruptedException) {
+                break
+            } ?: continue
+            encodePcmChunk(pcmBytes)
+        }
+    }
+
+    private fun encodePcmChunk(pcmBytes: ByteArray) {
         val mixed = mixWithDownlink(pcmBytes)
         trackOverallLevel(mixed)
         synchronized(lock) {
             val encoder = codec ?: return
-            if (!recording.get()) return
             try {
                 var offset = 0
+                var retries = 0
                 while (offset < mixed.size) {
-                    // Espera brevemente para no perder bloques PCM cuando AAC está ocupado.
-                    val inputIndex = encoder.dequeueInputBuffer(10_000)
+                    val inputIndex = encoder.dequeueInputBuffer(20_000)
                     if (inputIndex < 0) {
-                        val now = SystemClock.elapsedRealtime()
-                        if (now - lastCodecDropLogAt >= 2000) {
-                            lastCodecDropLogAt = now
-                            Log.w(TAG, "Codificador AAC sin búfer disponible; PCM pendiente descartado=${mixed.size - offset} bytes")
+                        drainEncoderLocked(endOfStream = false)
+                        retries += 1
+                        if (retries >= 10) {
+                            val now = SystemClock.elapsedRealtime()
+                            if (now - lastCodecDropLogAt >= 2000) {
+                                lastCodecDropLogAt = now
+                                Log.w(TAG, "Codificador AAC saturado; PCM pendiente descartado=${mixed.size - offset} bytes")
+                            }
+                            break
                         }
-                        break
+                        continue
                     }
+                    retries = 0
                     val inputBuffer = encoder.getInputBuffer(inputIndex) ?: break
                     inputBuffer.clear()
                     val toWrite = minOf(inputBuffer.remaining(), mixed.size - offset)
@@ -241,8 +274,14 @@ class CallRecorder(private val context: Context) {
         var recordedPeak = 0
         var recordedRms = 0
 
+        if (!recording.getAndSet(false)) return
+        val worker = encoderThread
+        encoderThread = null
+        if (worker != null && worker !== Thread.currentThread()) {
+            try { worker.join(2000) } catch (_: InterruptedException) {}
+        }
+
         synchronized(lock) {
-            if (!recording.getAndSet(false)) return
             try {
                 val encoder = codec
                 if (encoder != null) {
@@ -339,6 +378,9 @@ class CallRecorder(private val context: Context) {
 
     private fun releaseResourcesLocked(deleteFile: Boolean) {
         recording.set(false)
+        pcmQueue.clear()
+        encoderThread?.let { if (it !== Thread.currentThread()) it.interrupt() }
+        encoderThread = null
         synchronized(downlinkLock) { downlinkRing.clear() }
         try { codec?.stop() } catch (_: Exception) {}
         try { codec?.release() } catch (_: Exception) {}

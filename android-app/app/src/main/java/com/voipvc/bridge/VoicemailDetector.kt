@@ -269,6 +269,9 @@ object VoicemailDetector {
             }
             if (ticket != generation.get()) return@execute
             var recognizer: Recognizer? = null
+            val voskQueue = java.util.concurrent.ArrayBlockingQueue<ByteArray>(64)
+            @Volatile var recognizing = true
+            var voskThread: Thread? = null
             try {
                 val fd = transactOpen(binder)
                 if (ticket != generation.get()) { fd.close(); return@execute }
@@ -279,42 +282,65 @@ object VoicemailDetector {
                     val buffer = ByteArray(1600)
                     val deadline = SystemClock.elapsedRealtime() + 90000
                     val toneDetector = BusyToneDetector(16000)
-                    var recognizing = true
                     say("Escuchando audio remoto para detectar buzón…")
+                    voskThread = Thread({
+                        try {
+                            while (ticket == generation.get() && recognizing) {
+                                val chunk = voskQueue.poll(150, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
+                                if (SystemClock.elapsedRealtime() >= deadline) {
+                                    recognizing = false
+                                    break
+                                }
+                                if (toneDetector.accept(chunk, chunk.size)) {
+                                    lastMatch = "Tono de ocupado repetido"
+                                    say("Tono de ocupado repetido detectado; solicitando corte")
+                                    recognizing = false
+                                    main.post {
+                                        if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, "tono_ocupado")
+                                    }
+                                    break
+                                }
+                                val final = rec.acceptWaveForm(chunk, chunk.size)
+                                val result = JSONObject(if (final) rec.result else rec.partialResult)
+                                val text = result.optString(if (final) "text" else "partial").trim()
+                                val resultCode = VoicemailPhrases.result(text) ?: continue
+                                lastMatch = text.take(160)
+                                say("Locución detectada ($resultCode): $lastMatch")
+                                recognizing = false
+                                main.post {
+                                    if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, resultCode)
+                                }
+                                break
+                            }
+                        } catch (_: InterruptedException) {
+                        } catch (e: Exception) {
+                            Log.w("BuzonDetector", "Vosk worker error: ${e.message}")
+                        }
+                    }, "buzon-vosk").apply { start() }
+
+                    try { Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO) } catch (_: Exception) {}
                     while (ticket == generation.get()) {
                         val count = stream.read(buffer)
                         if (count <= 0) break
-                        // La misma lectura alimenta la grabación (si está activa).
-                        if (captureRequested) downlinkSink?.invoke(buffer.copyOf(count))
+                        val copy = buffer.copyOf(count)
+                        // La lectura del downlink alimenta primero la grabación sin bloquearse en Vosk.
+                        if (captureRequested) downlinkSink?.invoke(copy)
                         if (recognizing && SystemClock.elapsedRealtime() >= deadline) {
                             recognizing = false
-                            // Sin grabación pendiente se termina como antes.
-                            if (!captureRequested) break
                         }
-                        if (!recognizing) continue
-                        if (toneDetector.accept(buffer, count)) {
-                            lastMatch = "Tono de ocupado repetido"
-                            say("Tono de ocupado repetido detectado; solicitando corte")
-                            main.post {
-                                if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, "tono_ocupado")
-                            }
+                        if (recognizing) {
+                            voskQueue.offer(copy)
+                        } else if (!captureRequested) {
                             break
                         }
-                        val final = rec.acceptWaveForm(buffer, count)
-                        val result = JSONObject(if (final) rec.result else rec.partialResult)
-                        val text = result.optString(if (final) "text" else "partial").trim()
-                        val resultCode = VoicemailPhrases.result(text) ?: continue
-                        lastMatch = text.take(160)
-                        say("Locución detectada ($resultCode): $lastMatch")
-                        main.post {
-                            if (ticket == generation.get() && enabled()) onVoicemail(lastMatch, resultCode)
-                        }
-                        break
                     }
                 }
             } catch (e: Exception) {
                 if (ticket == generation.get()) say("No se pudo analizar el audio: ${e.message}")
             } finally {
+                recognizing = false
+                voskThread?.interrupt()
+                try { voskThread?.join(300) } catch (_: Exception) {}
                 input = null
                 try { recognizer?.close() } catch (_: Exception) {}
                 transactStop(binder)
