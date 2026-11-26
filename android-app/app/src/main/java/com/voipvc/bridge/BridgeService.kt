@@ -547,6 +547,7 @@ class BridgeService : Service() {
               val action = data.optString("action")
               val callId = data.optString("callId")
               Log.i(TAG, "[CALL_ACTION] received action=$action command=${commandId.takeLast(8)} call=${callId.takeLast(8)} mainQueueMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
+              if (action == "dial") emitCallTrace("apk_received", commandId, callId)
               when (action) {
                 "dial"   -> {
                     val phoneNumber = data.optString("phoneNumber")
@@ -655,16 +656,20 @@ class BridgeService : Service() {
         receivedAtElapsedMs: Long
     ): DialResult {
         Log.i(TAG, "[DIAL] start command=${commandId.takeLast(8)} call=${callId.takeLast(8)} contactPresent=${contactId.isNotBlank()} receivedToStartMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
+        emitCallTrace("dial_started", commandId, callId)
         if (number.isBlank() || commandId.isBlank()) {
             Log.w(TAG, "[DIAL] rejected: number or command id is empty")
+            emitCallTrace("dial_rejected", commandId, callId, "invalid_command")
             return DialResult(false, "Número o identificador de llamada inválido")
         }
         if (BlockedNumberStore.contains(this, number)) {
             Log.w(TAG, "[DIAL] rejected: number is blocked locally")
+            emitCallTrace("dial_rejected", commandId, callId, "locally_blocked")
             return DialResult(false, "Número bloqueado. Quítalo de la lista de bloqueos antes de llamar.")
         }
         if (isActuallyInCall() || activeCommandId.isNotBlank()) {
             Log.w(TAG, "[DIAL] rejected: another call is active")
+            emitCallTrace("dial_rejected", commandId, callId, "call_already_active")
             return DialResult(false, "El teléfono ya está atendiendo otra llamada")
         }
         dialAttemptToken += 1
@@ -702,10 +707,12 @@ class BridgeService : Service() {
 
         if (!hasPermission(Manifest.permission.CALL_PHONE)) {
             Log.e(TAG, "[DIAL] rejected: CALL_PHONE permission missing")
+            emitCallTrace("dial_rejected", commandId, callId, "permission_missing")
             return abortDial("Falta permiso CALL_PHONE")
         }
         if (!isDefaultDialer()) {
             Log.e(TAG, "[DIAL] rejected: app is not the default dialer")
+            emitCallTrace("dial_rejected", commandId, callId, "not_default_dialer")
             return abortDial("Phone-VC no es el marcador predeterminado")
         }
 
@@ -714,6 +721,7 @@ class BridgeService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && tm != null) {
                 tm.placeCall(Uri.parse("tel:$number"), Bundle())
                 Log.i(TAG, "[DIAL] TelecomManager.placeCall accepted command=${commandId.takeLast(8)} call=${callId.takeLast(8)} receivedToPlaceCallMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
+                emitCallTrace("place_call_accepted", commandId, callId)
                 emitPhoneStatus("dialing", "command", correlateCampaign = true)
                 setStatus("📞 Intentando llamada a $number")
 
@@ -724,6 +732,7 @@ class BridgeService : Service() {
                     if (thisAttempt != dialAttemptToken) return@postDelayed
                     if (!isActuallyInCall()) {
                         Log.e(TAG, "[DIAL] no Telecom call state within timeout command=${commandId.takeLast(8)} call=${callId.takeLast(8)} elapsedMs=${SystemClock.elapsedRealtime() - activeDialStartedAtElapsedMs}")
+                        emitCallTrace("dial_timeout", commandId, callId, "no_telecom_state_10s")
                         handleObservedCallState(
                             "failed",
                             number,
@@ -738,6 +747,7 @@ class BridgeService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "[DIAL] TelecomManager.placeCall failed command=${commandId.takeLast(8)} call=${callId.takeLast(8)}", e)
+            emitCallTrace("place_call_failed", commandId, callId, "telecom_exception")
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -746,6 +756,7 @@ class BridgeService : Service() {
 
         try {
             startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            emitCallTrace("fallback_call_accepted", commandId, callId)
             emitPhoneStatus("dialing", "command", correlateCampaign = true)
             setStatus("📞 Llamando $number")
             return DialResult(true, "Comando recibido e inicio de llamada solicitado")
@@ -1531,6 +1542,17 @@ class BridgeService : Service() {
                 .put("ok", ok)
                 .put("message", message)
         )
+    }
+
+    private fun emitCallTrace(stage: String, commandId: String, callId: String, detail: String = "") {
+        val currentSocket = socket ?: return
+        if (!currentSocket.connected()) return
+        val payload = JSONObject()
+            .put("stage", stage)
+            .put("commandId", commandId.takeLast(96))
+            .put("callId", callId.takeLast(96))
+        if (detail.isNotBlank()) payload.put("detail", detail)
+        currentSocket.emit("phone:call_trace", payload)
     }
 
     private fun logoutAndStop() {

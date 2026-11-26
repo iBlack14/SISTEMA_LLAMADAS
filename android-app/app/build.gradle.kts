@@ -30,7 +30,7 @@ val releaseKeyPassword = providers.environmentVariable("VOIP_VC_KEY_PASSWORD")
 val generatedVersionCode = providers.environmentVariable("ANDROID_VERSION_CODE")
     .orElse((System.currentTimeMillis() / 1000L).toString())
 val generatedVersionName = providers.environmentVariable("ANDROID_VERSION_NAME")
-    .orElse("1.2")
+    .orElse("1.3")
 
 val androidEnv = rootProject.file(".env").takeIf { it.isFile }?.readLines()
     ?.mapNotNull { line ->

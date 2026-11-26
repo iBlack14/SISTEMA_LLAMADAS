@@ -57,6 +57,23 @@ import {
 export function registerCallEvents(runtime, services, socket) {
   const { io, sessions, historyGate, persistence, network } = runtime;
   const { saveSoon, getConnectedPhoneWorkers, getPhoneWorkerBySocketId, getActivePhoneWorker, syncSessionPhoneState, emitCampaignState, annualBlock, blockedCallMessage, sendPersistedDial, dispatchCampaignCalls, getPeer, emitState, acknowledgeDialDelivery } = services;
+  socket.on("phone:call_trace", (payload = {}) => {
+    if (socket.data.role !== "phone") return;
+    const allowedStages = new Set([
+      "apk_received", "dial_started", "dial_rejected", "place_call_accepted",
+      "place_call_failed", "dial_timeout", "fallback_call_accepted"
+    ]);
+    const stage = String(payload.stage || "");
+    if (!allowedStages.has(stage)) return;
+    const code = socket.data.code;
+    const session = code && sessions.get(code);
+    const worker = session && getPhoneWorkerBySocketId(session, socket.id);
+    const command = String(payload.commandId || "").slice(-8);
+    const call = String(payload.callId || "").slice(-8);
+    const detail = /^[a-z0-9_-]{1,64}$/i.test(String(payload.detail || "")) ? String(payload.detail) : "";
+    console.info(`[CALL_TRACE] stage=${stage} session=${String(code || "").slice(-2)} worker=${String(worker?.id || "").slice(-8)} command=${command} call=${call}${detail ? ` detail=${detail}` : ""}`);
+  });
+
   socket.on("call:action", ({ action, phoneNumber, companyName, contactName, imageUrl, commandId, contactId, workerId }) => {
     const code = socket.data.code;
     const role = socket.data.role;
@@ -101,6 +118,8 @@ export function registerCallEvents(runtime, services, socket) {
         worker.activeContactId = tracked.id;
         worker.callState = "dialing";
       }
+      commandId = commandId || nanoid();
+      console.info(`[CALL_TRACE] stage=dashboard_requested session=${String(code).slice(-2)} worker=${String(worker?.id || "none").slice(-8)} command=${String(commandId || "").slice(-8)} call=${String(worker ? getActiveAttemptId(session, worker.id) : "").slice(-8)} result=${worker ? "accepted" : "no_worker"}`);
       session.updatedAt = Date.now();
       saveSoon(code);
 
@@ -114,7 +133,7 @@ export function registerCallEvents(runtime, services, socket) {
           imageUrl: imageUrl || "",
           contactId: contactId || "",
           callId: getActiveAttemptId(session, worker.id),
-          commandId: commandId || nanoid()
+          commandId
         });
         saveSoon(code);
         emitState(code);
@@ -364,6 +383,8 @@ export function registerCallEvents(runtime, services, socket) {
       username: session.ownerUsername,
       detail: ok ? "" : `${action || "acción desconocida"}${message ? `: ${String(message).slice(0, 80)}` : ""}`
     });
+    const activeAssignment = worker && session.campaign?.assignments?.[worker.id];
+    console.info(`[CALL_TRACE] stage=apk_ack session=${String(code).slice(-2)} worker=${String(worker?.id || "").slice(-8)} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)} call=${String(activeAssignment?.attemptId || "").slice(-8)}`);
     console.info(`[CALL_ACK] session=${String(code).slice(-2)} worker=${socket.data.workerId || "phone"} action=${action || "unknown"} ok=${Boolean(ok)} command=${String(commandId || "").slice(-8)}`);
 
     const peerId = getPeer(session, "phone");

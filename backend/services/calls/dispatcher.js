@@ -133,6 +133,7 @@ async function sendPersistedDial(code, socketId, payload, retry = 0, startedAt =
   const commandId = String(payload.commandId || "").slice(-8);
   const callId = String(payload.callId || "").slice(-8);
   try {
+    console.info(`[CALL_TRACE] stage=server_persist_begin session=${sessionId} command=${commandId} call=${callId}`);
     console.info(`[CALL_DISPATCH] persist-before-dial session=${sessionId} worker=${socketId ? "connected" : "missing"} command=${commandId} call=${callId} retry=${retry}`);
     await runtime.persistence.save(runtime.sessions, [code]);
     const persistedMs = Date.now() - startedAt;
@@ -147,8 +148,10 @@ async function sendPersistedDial(code, socketId, payload, retry = 0, startedAt =
     const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);
     const targetSocketId = worker?.connected && worker.socketId ? worker.socketId : socketId;
     console.info(`[CALL_DISPATCH] persisted session=${sessionId} command=${commandId} call=${callId} persistMs=${persistedMs}`);
+    console.info(`[CALL_TRACE] stage=server_persisted session=${sessionId} worker=${String(workerId).slice(-8)} command=${commandId} call=${callId} persistMs=${persistedMs}`);
     emitDialWithAck(code, workerId, targetSocketId, payload, 0, startedAt);
   } catch (error) {
+    console.error(`[CALL_TRACE] stage=server_persist_failed session=${sessionId} command=${commandId} call=${callId} error=${error.code || "STORAGE_UNAVAILABLE"}`);
     console.error(`[CALL_DISPATCH] not sent session=${sessionId} reason=persistence command=${commandId} call=${callId} retry=${retry} elapsedMs=${Date.now() - startedAt} error=${error.code || error.message || "STORAGE_UNAVAILABLE"}`);
     if (!retry) runtime.io.to(code).emit("call:error",{message:"No se confirmó el guardado en MySQL. La orden queda pendiente y se reintentará."});
     schedulePersistedDialRetry(code, socketId, payload, retry, startedAt);
@@ -198,6 +201,7 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
   // through phone:status. Sending without a callback avoids the 5s timeout
   // that otherwise reports invalid_ack/ack-timeout for every successful dial.
   target.emit("call:action", payload);
+  console.info(`[CALL_TRACE] stage=server_sent session=${sessionId} worker=${String(workerId).slice(-8)} command=${commandId} call=${callId} retry=${retry}`);
   console.info(`[CALL_DISPATCH] sent session=${sessionId} command=${commandId} call=${callId} retry=${retry} targetConnected=true`);
   if (payload.action === "dial" && workerId && String(payload.commandId || "").startsWith("campaign-")) {
     scheduleDialDelivery(code, workerId, payload);
