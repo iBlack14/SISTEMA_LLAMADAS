@@ -132,7 +132,7 @@
 /* ── Filtros ────────────────────────────────────────────── */
 #voiceView .voice-filters {
   display: grid;
-  grid-template-columns: minmax(210px, 1.45fr) repeat(4, minmax(118px, 1fr)) auto;
+  grid-template-columns: minmax(210px, 1.45fr) repeat(6, minmax(118px, 1fr)) auto;
   align-items: end;
   gap: 12px;
   padding: 16px;
@@ -153,7 +153,10 @@
   text-transform: uppercase;
 }
 
-#voiceView .voice-field input {
+#voiceView .voice-field input,
+#voiceView .voice-field select {
+  appearance: none;
+  -webkit-appearance: none;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -171,15 +174,23 @@
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
+#voiceView .voice-field select {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  padding-right: 30px;
+}
+
 #voiceView .voice-field input::placeholder {
   color: #b79ac7;
 }
 
-#voiceView .voice-field input:hover {
+#voiceView .voice-field input:hover,
+#voiceView .voice-field select:hover {
   border-color: rgba(255, 156, 224, 0.55);
 }
 
-#voiceView .voice-field input:focus {
+#voiceView .voice-field input:focus,
+#voiceView .voice-field select:focus {
   outline: none;
   border-color: var(--voice-accent);
   background: rgba(20, 4, 34, 0.9);

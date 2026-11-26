@@ -38,17 +38,32 @@ export function registerRecordings(runtime) {
     const list = field("list");
     const worker = field("worker");
     const search = field("search");
+    const userId = field("userId");
+    const shift = field("shift");
     const offset = Number(field("offset") || 0);
     const validDate = value => !value || (/^\d{4}-\d{2}-\d{2}$/.test(value)
       && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value);
     if (!validDate(from) || !validDate(to) || (from && to && from > to) ||
         list.length > 255 || worker.length > 255 || search.length > 100 ||
+        (userId && !/^\d+$/.test(userId)) ||
+        (shift && !["morning", "afternoon", "outside"].includes(shift)) ||
         !Number.isSafeInteger(offset) || offset < 0) {
       return res.status(400).json({ ok: false, error: "Revisa los filtros y el rango de fechas." });
     }
     try {
+      let sessionCodes = null;
+      if (userId) {
+        const [workspaces] = await runtime.auth.pool.query(
+          "SELECT session_code FROM auth_user_workspaces WHERE user_id=?", [userId]);
+        const ownerCodes = new Set(workspaces.map(row => String(row.session_code)));
+        for (const [code, session] of runtime.sessions || []) {
+          if (String(session.ownerUserId || "") === userId) ownerCodes.add(String(code));
+        }
+        sessionCodes = [...ownerCodes];
+        if (!sessionCodes.length) return res.json({ ok: true, rows: [], hasMore: false });
+      }
       return res.json({ ok: true, ...await listAnsweredRecordings(runtime.persistence.pool, {
-        from, to, list, worker, search, offset, limit: 25
+        from, to, list, worker, search, sessionCodes, shift, offset, limit: 25
       }) });
     } catch (error) {
       console.error("[RECORDINGS] Error consultando el catálogo:", error.code || error.name);
@@ -82,6 +97,9 @@ export function registerRecordings(runtime) {
       if (attempt.expired) return res.status(410).json({ ok: false, error: "Terminó el plazo para guardar esta grabación." });
       if (!attempt.connected_at || attempt.technical_result !== "contesto") {
         return res.status(422).json({ ok: false, error: "El intento no corresponde a una llamada contestada." });
+      }
+      if (Number(attempt.connected_seconds || 0) < 30) {
+        return res.status(422).json({ ok: false, error: "Solo se guardan grabaciones de llamadas de 30 segundos o más." });
       }
       const saved = await saveCallRecording(pool, {
         sessionCode: code,

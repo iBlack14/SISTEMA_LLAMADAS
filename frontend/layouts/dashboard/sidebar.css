@@ -477,6 +477,36 @@ button.viavox-menu-toggle { background: #350642 !important; }
   box-shadow: 0 0 0 3px rgba(216, 20, 130, .25);
 }
 
+#messageContactsUserSelector select:not(#messageContactsUser) {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 36px 0 12px;
+  border: 1px solid #a553b8 !important;
+  border-radius: 10px;
+  background: rgba(16, 3, 26, .55) !important;
+  color: #fff !important;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+#messageContactsUserSelector select:not(#messageContactsUser):hover,
+#messageContactsUserSelector select:not(#messageContactsUser):focus-visible {
+  border-color: #e07ae9 !important;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(216, 20, 130, .2);
+}
+
+#messageContactsUserSelector select:not(#messageContactsUser) option {
+  background: #2a0a3c;
+  color: #fff;
+}
+
 #messageContactsUser option {
   background: #2a0a3c;
   color: #fff;

@@ -55,6 +55,7 @@ class CallRecorder(private val context: Context) {
     private val downlinkRing = PcmRing(SAMPLE_RATE * 2 * 2) // 2 s de margen
     private var lastMicLogAt = 0L
     private var lastDownlinkLogAt = 0L
+    private var lastCodecDropLogAt = 0L
 
     private var currentAttemptId = ""
     // Métricas globales de la grabación actual para detectar silencio total.
@@ -116,8 +117,16 @@ class CallRecorder(private val context: Context) {
             try {
                 var offset = 0
                 while (offset < mixed.size) {
-                    val inputIndex = encoder.dequeueInputBuffer(0)
-                    if (inputIndex < 0) break
+                    // Espera brevemente para no perder bloques PCM cuando AAC está ocupado.
+                    val inputIndex = encoder.dequeueInputBuffer(10_000)
+                    if (inputIndex < 0) {
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - lastCodecDropLogAt >= 2000) {
+                            lastCodecDropLogAt = now
+                            Log.w(TAG, "Codificador AAC sin búfer disponible; PCM pendiente descartado=${mixed.size - offset} bytes")
+                        }
+                        break
+                    }
                     val inputBuffer = encoder.getInputBuffer(inputIndex) ?: break
                     inputBuffer.clear()
                     val toWrite = minOf(inputBuffer.remaining(), mixed.size - offset)
@@ -263,9 +272,9 @@ class CallRecorder(private val context: Context) {
             return
         }
 
-        // Solo se conservan llamadas de más de 15 s; las cortas se descartan.
-        if (durationSeconds <= 15) {
-            Log.i(TAG, "GRABACIÓN DESCARTADA por duración attempt=$attemptId dur=${durationSeconds}s (<=15s)")
+        // Solo se conservan llamadas de 30 s o más; las cortas se descartan.
+        if (durationSeconds < 30) {
+            Log.i(TAG, "GRABACIÓN DESCARTADA por duración attempt=$attemptId dur=${durationSeconds}s (<30s)")
             fileToUpload.delete()
             return
         }

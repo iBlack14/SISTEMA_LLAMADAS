@@ -1,9 +1,9 @@
-﻿import { socket, API_BASE } from '../shared/realtime/socket.js';
+import { socket, API_BASE } from '../shared/realtime/socket.js';
 import { validateReportPeriod, isInReportPeriod, reportPeriodLabel } from '../features/reports/report-period.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../shared/ui/dom.js';
 import * as Contacts from '../features/contacts/contacts-repository.js';
 import * as WhatsApp from '../features/messaging/whatsapp.js';
-import { openContactSendModal } from '../features/messaging/message-templates.js?v=20261119-users-ui3';
+import { openContactSendModal } from '../features/messaging/message-templates.js?v=20261125-direct-number1';
 import { showPanelView } from './navigation/panel-navigation.js';
 
 /**

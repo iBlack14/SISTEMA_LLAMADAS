@@ -1345,16 +1345,29 @@ class BridgeService : Service() {
             return
         }
 
-        val chunkBytes = CHUNK_FRAMES * 2
         // Capture: read from AudioRecord -> captureQueue (backpressure)
         captureJob = serviceScope.launch(Dispatchers.IO) {
             val buf = ByteArray(CHUNK_BYTES)
+            var consecutiveReadErrors = 0
             while (isActive && isStreaming.get()) {
-                val read = audioRecord?.read(buf, 0, CHUNK_BYTES) ?: -1
+                val source = audioRecord ?: break
+                val read = source.read(buf, 0, CHUNK_BYTES)
                 if (read > 0) {
+                    consecutiveReadErrors = 0
                     val chunk = buf.copyOf(read)
                     callRecorder.writePcm(chunk)
                     audioCaptureQueue.trySend(chunk)
+                } else if (read < 0) {
+                    consecutiveReadErrors += 1
+                    if (consecutiveReadErrors == 1 || consecutiveReadErrors % 10 == 0) {
+                        Log.w(TAG, "AudioRecord.read devolvió error=$read consecutivos=$consecutiveReadErrors")
+                    }
+                    if (consecutiveReadErrors >= 10) {
+                        setStatus("⚠️ Se interrumpió la captura del micrófono")
+                        Log.e(TAG, "Captura de micrófono detenida tras $consecutiveReadErrors errores de lectura")
+                        break
+                    }
+                    delay(20)
                 }
             }
         }

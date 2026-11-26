@@ -3,7 +3,7 @@ import { bindDashboardEvents } from "./dashboard-events.js";
 import { createListAssignments } from "../features/devices/list-assignments.js";
 import { createDashboardLifecycle } from "./dashboard-lifecycle.js";
 import { createDashboardFormat } from "../shared/formatting/dashboard-format.js";
-import { createMessageContacts } from "../features/messaging/message-contacts.js?v=20261119-users-ui3";
+import { createMessageContacts } from "../features/messaging/message-contacts.js?v=20261125-direct-number1";
 import { createContactActions } from "../features/contacts/contact-actions.js";
 import { createShiftPanel } from "../features/shifts/shift-panel.js";
 import { createContactParsers } from "../features/contacts/import/contact-parsers.js";

@@ -587,7 +587,7 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
   if (!modal) return;
 
   const digits = String(contact?.phone || '').replace(/\D/g, '');
-  const phone = digits.startsWith('51') || digits.length !== 9 ? digits : `51${digits}`;
+  const phone = !digits ? '' : digits.startsWith('51') || digits.length !== 9 ? digits : `51${digits}`;
   const email = String(contact?.email || contact?.correo || '').trim();
   const emailMode = initialTab === 'email';
   // Correo no hereda plantillas de WhatsApp: se abre en blanco para redactar.
@@ -618,6 +618,15 @@ async function openContactSendModal(contact, initialTab = 'whatsapp') {
   modal.style.display = 'grid';
 }
 
+async function openDirectMessageModal() {
+  await openContactSendModal({ phone: '', name: '' }, 'whatsapp');
+  currentSendContact = null;
+  contactSendResolved = true;
+  const contactName = document.getElementById('sendMessageContactName');
+  if (contactName) contactName.textContent = 'Número directo';
+  document.getElementById('sendWhatsAppNumber')?.focus();
+}
+
 // ============================================================================
 // DROPDOWN FILTER HELPERS
 // ============================================================================
@@ -644,15 +653,25 @@ function inferCombo(template) {
 }
 
 /** Cierra todos los menus desplegables del filtro. */
-function closeAllStfMenus(except = null) {
-  ['stfRubroDropdown', 'stfSpeechDropdown', 'stfPrecioDropdown', 'stfComboDropdown'].forEach(id => {
-    if (id === except) return;
-    const wrap = document.getElementById(id);
-    if (!wrap) return;
-    wrap.querySelector('.stf-dropdown-menu')?.classList.remove('is-open');
-    const btn = wrap.querySelector('.stf-dropdown-btn');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-  });
+let activeStfTab = 'rubro';
+let browsingStfCategories = false;
+function closeAllStfMenus() {
+  syncStfTabs();
+}
+
+function syncStfTabs() {
+  for (const [kind, [buttonId]] of Object.entries(STF_BTN)) {
+    const selected = browsingStfCategories && kind === activeStfTab;
+    const button = document.getElementById(buttonId);
+    const panel = document.getElementById(buttonId.replace('Btn', 'Menu'));
+    button?.setAttribute('aria-selected', String(selected));
+    button?.setAttribute('aria-controls', buttonId.replace('Btn', 'Menu'));
+    if (button) button.tabIndex = selected ? 0 : -1;
+    if (panel) {
+      panel.hidden = !selected;
+      panel.classList.toggle('is-open', selected);
+    }
+  }
 }
 
 /** Genera las opciones de un menu a partir de un Set de valores. */
@@ -989,11 +1008,16 @@ const STF_BTN = {
 function setStfFilter(kind, value) {
   const [btnId, labelId, shortLabel] = STF_BTN[kind] || [];
   if (!btnId) return;
+  if (browsingStfCategories) {
+    const search = document.getElementById('sendTemplateSearch');
+    if (search) search.value = '';
+  }
+  activeStfTab = kind;
+  browsingStfCategories = false;
   for (const [filterKind, [buttonId, filterLabelId, label]] of Object.entries(STF_BTN)) {
     activeFilters[filterKind] = filterKind === kind ? value : '';
     updateStfBtnState(buttonId, filterLabelId, label, activeFilters[filterKind]);
   }
-  document.getElementById(btnId)?.setAttribute('aria-expanded', 'false');
   closeAllStfMenus();
   syncClearBtn();
   renderSendTemplateList(document.getElementById('sendMessageModal')?.dataset.templateId || '');
@@ -1126,13 +1150,19 @@ function renderSendTemplateList(selectedId = '') {
   const search = document.getElementById('sendTemplateSearch');
   const resultCount = document.getElementById('sendTemplateResultCount');
   const filterTools = document.getElementById('sendTemplateFilterTools');
+  const templateCount = document.getElementById('sendTemplateCount');
   if (!list) return;
 
   const emailMode = currentSendTab === 'email';
+  const browsingCategories = !emailMode && browsingStfCategories;
   const selectedFilter = emailMode ? '' : Object.values(activeFilters).find(Boolean);
   if (search) {
-    search.placeholder = selectedFilter ? `Buscar en ${selectedFilter}…` : 'Nombre o contenido…';
-    search.setAttribute('aria-label', selectedFilter ? `Buscar plantilla en ${selectedFilter}` : 'Buscar plantilla');
+    search.placeholder = browsingCategories
+      ? 'Buscar categoría…'
+      : selectedFilter ? `Buscar en ${selectedFilter}…` : 'Nombre o contenido…';
+    search.setAttribute('aria-label', browsingCategories
+      ? 'Buscar categoría'
+      : selectedFilter ? `Buscar plantilla en ${selectedFilter}` : 'Buscar plantilla');
   }
 
   // En Correo no hay categorías: solo la lista de plantillas corporativas.
@@ -1143,7 +1173,9 @@ function renderSendTemplateList(selectedId = '') {
   if (intro) {
     intro.textContent = emailMode
       ? 'Plantillas de correo sin imágenes. Edita el contenido y el pie de página; adjunta PDF, Word o Excel al enviar.'
-      : 'Elige un texto para cargarlo en el mensaje.';
+      : browsingCategories
+        ? 'Elige una categoría para ver sus plantillas.'
+        : 'Elige un texto para cargarlo en el mensaje.';
   }
 
   // Correo empieza vacío: las plantillas de WhatsApp no se reutilizan aquí.
@@ -1151,6 +1183,18 @@ function renderSendTemplateList(selectedId = '') {
     ? t.type === 'email'
     : (t.type === 'whatsapp' || t.type === 'both'));
   if (!emailMode) refreshStfDropdowns();
+  if (!emailMode) syncStfTabs();
+  if (!emailMode && search) {
+    const categoryQuery = search.value.trim().toLocaleLowerCase('es');
+    const activeMenu = document.getElementById(STF_BTN[activeStfTab]?.[0]?.replace('Btn', 'Menu'));
+    activeMenu?.querySelectorAll(':scope > li').forEach(item => {
+      item.hidden = Boolean(categoryQuery) && !item.textContent.toLocaleLowerCase('es').includes(categoryQuery);
+    });
+  }
+  list.hidden = browsingCategories;
+  if (templateCount) templateCount.hidden = browsingCategories;
+  if (search?.parentElement) search.parentElement.hidden = emailMode;
+  if (browsingCategories && resultCount) resultCount.textContent = 'Elige una categoría para ver sus plantillas';
   if (count) count.textContent = String(pool.length);
   list.replaceChildren();
 
@@ -1490,13 +1534,19 @@ async function sendWhatsApp() {
     }
   }
 
-  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  let cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length === 9) cleanPhone = `51${cleanPhone}`;
+  if (cleanPhone.length < 8 || cleanPhone.length > 15) {
+    showToast('Revisa el número e incluye el código de país si corresponde.', 'warning');
+    phoneInput.focus();
+    return;
+  }
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
   const waWindow = window.open(waUrl, '_blank');
   const opened = Boolean(waWindow);
   // El estado se registra para el contacto de la fila, no para el número tecleado.
-  recordSendStatus(currentSendContact?.phone || phone, opened ? 'sent' : 'failed', 'whatsapp');
+  recordSendStatus(currentSendContact?.phone || cleanPhone, opened ? 'sent' : 'failed', 'whatsapp');
   contactSendResolved = true;
   if (!opened) {
     showToast('El navegador bloqueó WhatsApp Web. Permite las ventanas emergentes y reintenta.', 'warning');
@@ -1700,6 +1750,7 @@ function bindEvents() {
       activeFilters.speech = '';
       activeFilters.precio = '';
       activeFilters.combo = '';
+      browsingStfCategories = false;
       updateStfBtnState('stfRubroBtn', 'stfRubroLabel', 'R', '');
       updateStfBtnState('stfSpeechBtn', 'stfSpeechLabel', 'S', '');
       updateStfBtnState('stfPrecioBtn', 'stfPrecioLabel', 'P', '');
@@ -1723,12 +1774,22 @@ function bindEvents() {
 
     const btn = target.closest('.stf-dropdown-btn');
     if (btn && btn.closest('#stfDropdownRow')) {
-      const dropId = btn.id.replace('Btn', 'Dropdown');
-      const menu = document.getElementById(btn.id.replace('Btn', 'Menu'));
-      const isOpen = menu?.classList.contains('is-open') || false;
-      closeAllStfMenus(isOpen ? null : dropId);
-      menu?.classList.toggle('is-open', !isOpen);
-      btn.setAttribute('aria-expanded', String(!isOpen));
+      const kind = Object.keys(STF_BTN).find(key => STF_BTN[key][0] === btn.id);
+      if (kind) {
+        activeStfTab = kind;
+        browsingStfCategories = true;
+        const search = document.getElementById('sendTemplateSearch');
+        if (search) search.value = '';
+        activeFilters.rubro = '';
+        activeFilters.speech = '';
+        activeFilters.precio = '';
+        activeFilters.combo = '';
+        for (const [filterKind, [buttonId, labelId, label]] of Object.entries(STF_BTN)) {
+          updateStfBtnState(buttonId, labelId, label, '');
+        }
+        syncClearBtn();
+        renderSendTemplateList(sendModal?.dataset.templateId || '');
+      }
       return;
     }
 
@@ -2012,6 +2073,7 @@ export {
   openTemplateModal,
   openSendModal,
   openContactSendModal,
+  openDirectMessageModal,
   editTemplate,
   deleteTemplate,
   saveTemplate,

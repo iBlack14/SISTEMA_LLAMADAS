@@ -82,6 +82,7 @@ function createPanel(panel) {
   const mute = player.querySelector(".voice-player-mute");
   const close = player.querySelector(".voice-player-close");
   const toast = panel.querySelector(".voice-toast");
+  const userSelect = form.elements.namedItem("userId");
   const confirmDialog = panel.querySelector(".voice-confirm-dialog");
   const confirmName = confirmDialog?.querySelector(".voice-confirm-name");
   const confirmMeta = confirmDialog?.querySelector(".voice-confirm-meta");
@@ -96,6 +97,19 @@ function createPanel(panel) {
   let request;
   let activeEntry = null;
   let activeButton = null;
+
+  if (userSelect) {
+    apiFetch("/api/users/lists", { cache: "no-store" })
+      .then(response => response.json().then(data => ({ response, data })))
+      .then(({ response, data }) => {
+        if (!response.ok || !data.ok || !Array.isArray(data.users)) return;
+        const selected = userSelect.value;
+        userSelect.replaceChildren(new Option("Todos los usuarios", ""));
+        for (const user of data.users) userSelect.add(new Option(user.username, String(user.id)));
+        userSelect.value = selected;
+      })
+      .catch(error => console.warn("No se pudo cargar el filtro de usuarios del Panel de voz:", error));
+  }
 
   function showToast(message, isError = false) {
     if (!toast) return;

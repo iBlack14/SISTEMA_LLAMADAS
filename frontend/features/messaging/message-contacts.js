@@ -1,4 +1,4 @@
-import { openContactSendModal } from './message-templates.js?v=20261119-users-ui3';
+import { openContactSendModal, openDirectMessageModal } from './message-templates.js?v=20261125-direct-number1';
 import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
@@ -57,8 +57,9 @@ export function createMessageContacts(dashboardState, dashboardActions) {
   let selectedContacts = [];
   let requestSerial = 0;
   function contactShift(contact) {
-    const date = new Date(contact.createdAt);
-    if (!contact.createdAt || Number.isNaN(date.getTime())) return { key: "unknown", label: "Sin fecha de ingreso" };
+    const createdAt = contact.createdAt || contact.created_at;
+    const date = new Date(createdAt);
+    if (!createdAt || Number.isNaN(date.getTime())) return { key: "unknown", label: "Sin fecha de ingreso", day: "unknown", dayLabel: "Sin fecha de ingreso" };
     const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", hourCycle: "h23"
@@ -66,7 +67,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     const minutes = Number(parts.hour) * 60 + Number(parts.minute);
     const shift = minutes >= 420 && minutes < 810 ? "Mañana" : minutes >= 810 && minutes < 1230 ? "Tarde" : "Fuera de turno";
     const day = `${parts.year}-${parts.month}-${parts.day}`;
-    return { key: `${day}|${shift}`, label: `${parts.day}/${parts.month}/${parts.year} · ${shift}` };
+    return { key: shift, label: shift, day, dayLabel: `${parts.day}/${parts.month}/${parts.year}` };
   }
   async function initMessageContactsAdmin() {
     const authUser = currentUser || window.VOIP_VC_AUTH_USER;
@@ -76,6 +77,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     if (!initialized) {
       initialized = true;
       $("messageContactsUser").addEventListener("change", onMessageUserChange);
+      $("messageContactsDay")?.addEventListener("change", () => renderMessageContacts());
       $("messageContactsShift")?.addEventListener("change", () => renderMessageContacts());
       await loadMessageUsers();
     } else if (!users.length) {
@@ -136,16 +138,34 @@ export function createMessageContacts(dashboardState, dashboardActions) {
     if (Array.isArray(contacts)) ownContacts = contacts;
     const userId = $("messageContactsUser")?.value;
     const allContacts = !userId || userId === "mine" ? ownContacts : selectedContacts;
+    const daySelect = $("messageContactsDay");
     const shiftSelect = $("messageContactsShift");
-    const selectedShift = shiftSelect?.value || "";
+    let selectedDay = daySelect?.value || "";
+    let selectedShift = shiftSelect?.value || "";
+    if (daySelect) {
+      const days = new Map(allContacts.map(contact => {
+        const shift = contactShift(contact);
+        return [shift.day || "unknown", shift.dayLabel || "Sin fecha de ingreso"];
+      }));
+      daySelect.replaceChildren(new Option("Todos los días", ""));
+      for (const [key, label] of [...days].sort((a, b) => b[0].localeCompare(a[0]))) {
+        daySelect.add(new Option(label, key));
+      }
+      daySelect.value = selectedDay;
+      selectedDay = daySelect.value;
+    }
+    const contactsForShifts = allContacts.filter(contact => !selectedDay || contactShift(contact).day === selectedDay);
     if (shiftSelect) {
-      const shifts = new Map(allContacts.map(contact => { const shift = contactShift(contact); return [shift.key, shift.label]; }));
+      const shifts = new Map(contactsForShifts.map(contact => { const shift = contactShift(contact); return [shift.key, shift.label]; }));
       shiftSelect.replaceChildren(new Option("Todos los turnos", ""));
       for (const [key, label] of [...shifts].sort((a, b) => b[0].localeCompare(a[0]))) shiftSelect.add(new Option(label, key));
-      if (selectedShift && !shifts.has(selectedShift)) shiftSelect.add(new Option(selectedShift.replace("|", " · "), selectedShift));
-      shiftSelect.value = selectedShift;
+      shiftSelect.value = shifts.has(selectedShift) ? selectedShift : "";
+      selectedShift = shiftSelect.value;
     }
-    dashboardState.messageContacts = allContacts.filter(contact => !selectedShift || contactShift(contact).key === selectedShift);
+    dashboardState.messageContacts = allContacts.filter(contact =>
+      (!selectedDay || contactShift(contact).day === selectedDay) &&
+      (!selectedShift || contactShift(contact).key === selectedShift)
+    );
     bindSendStatusUpdates();
     const body = $("messageContactsBody");
     const count = $("messageContactsCount");
@@ -278,6 +298,7 @@ export function createMessageContacts(dashboardState, dashboardActions) {
   }
 
   const addBtn = $("addManualContactBtn");
+  $("sendDirectMessageBtn")?.addEventListener("click", () => openDirectMessageModal());
   if (addBtn) {
     addBtn.onclick = async () => {
       const contactData = await promptContactModal();
@@ -295,6 +316,8 @@ export function createMessageContacts(dashboardState, dashboardActions) {
           requestSerial += 1;
           const shift = $("messageContactsShift");
           if (shift) shift.value = "";
+          const day = $("messageContactsDay");
+          if (day) day.value = "";
           renderMessageContacts(data.contacts);
         }
       } finally {

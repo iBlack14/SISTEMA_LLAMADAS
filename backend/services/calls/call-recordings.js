@@ -84,15 +84,20 @@ export async function saveCallRecording(pool, {
   };
 }
 
-export async function listAnsweredRecordings(pool, { from, to, list, worker, search, offset, limit }) {
+export async function listAnsweredRecordings(pool, { from, to, list, worker, search, sessionCodes, shift, offset, limit }) {
   const conditions = ["a.technical_result='contesto'", "a.connected_at IS NOT NULL", "a.ended_at IS NOT NULL",
-    `r.created_at > ${expiration}`];
+    "r.duration_seconds>=30", `r.created_at > ${expiration}`];
   const values = [];
   const add = (condition, ...args) => { conditions.push(condition); values.push(...args); };
   if (from) add("a.report_date>=?", from);
   if (to) add("a.report_date<=?", to);
   if (list) add("c.list_name=?", list);
   if (worker) add("(a.worker_id=? OR d.name=?)", worker, worker);
+  if (Array.isArray(sessionCodes)) add(`a.session_code IN (${sessionCodes.map(() => "?").join(",")})`, ...sessionCodes);
+  if (shift) {
+    const pattern = shift === "morning" ? "%MAÑANA%" : shift === "afternoon" ? "%TARDE%" : "%FUERA%";
+    add("t.label LIKE ?", pattern);
+  }
   if (search) {
     const pattern = search.replace(/[!%_]/g, char => "!" + char) + "%";
     add("(a.phone LIKE ? ESCAPE '!' OR c.name LIKE ? ESCAPE '!')", pattern, pattern);
@@ -107,6 +112,7 @@ export async function listAnsweredRecordings(pool, { from, to, list, worker, sea
        JOIN vc_call_attempts a ON a.session_code=r.session_code AND a.attempt_id=r.attempt_id
        LEFT JOIN vc_call_contacts c ON c.session_code=a.session_code AND c.contact_id=a.contact_id
        LEFT JOIN vc_call_devices d ON d.session_code=a.session_code AND d.device_id=a.worker_id
+       LEFT JOIN vc_call_turns t ON t.session_code=a.session_code AND t.turn_id=a.shift_id
       WHERE ${conditions.join(" AND ")}
       ORDER BY a.report_date DESC, a.started_at DESC, a.session_code DESC, a.attempt_id DESC
       LIMIT ? OFFSET ?`, [...values, limit + 1, offset]);

@@ -415,15 +415,24 @@
             </div>
           </div>
           <div class="mc-user-selector-field">
+            <label for="messageContactsDay">Día de ingreso</label>
+            <div class="mc-select-wrap">
+              <select id="messageContactsDay"><option value="">Todos los días</option></select>
+            </div>
+          </div>
+          <div class="mc-user-selector-field">
             <label for="messageContactsShift">Turno de ingreso</label>
             <div class="mc-select-wrap">
               <select id="messageContactsShift"><option value="">Todos los turnos</option></select>
             </div>
           </div>
-          <p id="messageContactsHint" class="mc-user-selector-hint">Selecciona “Yo” o un usuario y el turno en que ingresaron sus contactos. Horario de Lima.</p>
+          <p id="messageContactsHint" class="mc-user-selector-hint">Filtra por usuario, día y turno de ingreso. Horario de Lima.</p>
         </div>
         <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
-<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button></div>
+<div class="message-contact-toolbar">
+  <button type="button" id="sendDirectMessageBtn" class="add-manual-contact-btn send-direct-message-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.9 7.3L3 20l1.2-4.6A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h7"/><path d="M12 8v7"/></svg><span>Enviar a un número</span></button>
+  <button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button>
+</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Ingreso</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
@@ -700,43 +709,45 @@
         <div class="send-template-filter-tools" id="sendTemplateFilterTools">
           <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
           <!-- Filtros de cuatro columnas: RUBRO · SPEECH · PRECIO · COMBO -->
-          <div class="stf-dropdown-row" id="stfDropdownRow">
+          <div class="stf-dropdown-row" id="stfDropdownRow" role="tablist" aria-label="Secciones de plantillas">
             <!-- Rubro -->
             <div class="stf-dropdown" id="stfRubroDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-label="Filtrar por rubro" aria-haspopup="listbox" aria-expanded="false">
+              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-label="Filtrar por rubro" role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfRubroLabel">R</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <button type="button" class="stf-add-btn" id="stfRubroAddBtn" data-kind="rubro" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
-              <ul class="stf-dropdown-menu" id="stfRubroMenu" role="listbox" aria-label="Filtrar por Rubro"></ul>
             </div>
             <!-- Speech -->
             <div class="stf-dropdown" id="stfSpeechDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-label="Filtrar por speech" aria-haspopup="listbox" aria-expanded="false">
+              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-label="Filtrar por speech" role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfSpeechLabel">S</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <button type="button" class="stf-add-btn" id="stfSpeechAddBtn" data-kind="speech" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
-              <ul class="stf-dropdown-menu" id="stfSpeechMenu" role="listbox" aria-label="Filtrar por Speech"></ul>
             </div>
             <!-- Precio -->
             <div class="stf-dropdown" id="stfPrecioDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-label="Filtrar por precio" aria-haspopup="listbox" aria-expanded="false">
+              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-label="Filtrar por precio" role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfPrecioLabel">P</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <button type="button" class="stf-add-btn" id="stfPrecioAddBtn" data-kind="precio" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
-              <ul class="stf-dropdown-menu" id="stfPrecioMenu" role="listbox" aria-label="Filtrar por Precio"></ul>
             </div>
             <!-- Combo -->
             <div class="stf-dropdown" id="stfComboDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfComboBtn" aria-label="Filtrar por combo" aria-haspopup="listbox" aria-expanded="false">
+              <button type="button" class="stf-dropdown-btn" id="stfComboBtn" aria-label="Filtrar por combo" role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfComboLabel">C</span>
                 <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <button type="button" class="stf-add-btn" id="stfComboAddBtn" data-kind="combo" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
-              <ul class="stf-dropdown-menu" id="stfComboMenu" role="listbox" aria-label="Filtrar por Combo"></ul>
             </div>
+          </div>
+          <div class="stf-tab-panels">
+            <ul class="stf-dropdown-menu" id="stfRubroMenu" role="tabpanel" aria-labelledby="stfRubroBtn" hidden></ul>
+            <ul class="stf-dropdown-menu" id="stfSpeechMenu" role="tabpanel" aria-labelledby="stfSpeechBtn" hidden></ul>
+            <ul class="stf-dropdown-menu" id="stfPrecioMenu" role="tabpanel" aria-labelledby="stfPrecioBtn" hidden></ul>
+            <ul class="stf-dropdown-menu" id="stfComboMenu" role="tabpanel" aria-labelledby="stfComboBtn" hidden></ul>
           </div>
           <!-- Contador de resultados + limpiar filtros -->
           <div class="stf-status-row">
