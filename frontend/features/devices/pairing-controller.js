@@ -2,6 +2,7 @@ import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../../shared/ui/dom.js';
 import { apiFetch as fetch, currentUser, bindAccountControls } from '../auth/auth-session.js';
 import * as Contacts from '../contacts/contacts-repository.js';
+import { shortDeviceId } from '../../shared/device-id.js';
 
 /**
  * createPairingController: conserva los contratos y reglas existentes.
@@ -70,7 +71,7 @@ function renderPairingSlotsUi(slots) {
           ? `<div class="pairing-slot-linked-box">
                <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
                <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
-               <small class="pairing-slot-linked-sub">${dashboardActions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${dashboardActions.escHtml(slot.deviceId || "—")}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
+               <small class="pairing-slot-linked-sub">${dashboardActions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${dashboardActions.escHtml(shortDeviceId(slot.deviceId))}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
              </div>`
           : (qrUrl
               ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`

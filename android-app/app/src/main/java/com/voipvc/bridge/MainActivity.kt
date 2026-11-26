@@ -770,7 +770,7 @@ class MainActivity : AppCompatActivity() {
         connectedSection.visibility = if (mode == BridgeMode.CONNECTED) View.VISIBLE else View.GONE
         connectionBadgeText.visibility = if (mode == BridgeMode.CONNECTED) View.VISIBLE else View.GONE
         findViewById<TextView>(R.id.brandSubtitleText).text =
-            if (mode == BridgeMode.CONNECTED) "Teléfono vinculado" else "Configura tu teléfono"
+            "ID: ${shortDeviceId()} · " + if (mode == BridgeMode.CONNECTED) "Teléfono vinculado" else "Configura tu teléfono"
     }
 
     private fun activeBaseUrlInput(): TextInputEditText =
@@ -1071,8 +1071,18 @@ class MainActivity : AppCompatActivity() {
         value.removePrefix("https://").removePrefix("http://")
 
     private fun deviceDisplayName(name: String): String {
+        return "$name\nID del equipo: ${shortDeviceId()}"
+    }
+
+    private fun shortDeviceId(): String {
         val id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID).orEmpty()
-        return "$name\nID del equipo: $id"
+            .ifBlank { "android" }
+        var hash = 0x811c9dc5.toInt()
+        for (byte in id.toByteArray(Charsets.UTF_8)) {
+            hash = (hash xor (byte.toInt() and 0xff)) * 0x01000193
+        }
+        val shortId = (hash.toLong() and 0xffffffffL) % 100000L
+        return String.format(Locale.US, "%05d", shortId)
     }
 
     private fun buildDeviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()

@@ -1,5 +1,6 @@
 import { requireLogin, bindAccountControls, apiFetch } from "../../auth/auth-session.js";
 import { equipmentStatus, displayState } from "./equipment-status.js";
+import { shortDeviceId } from "../../../shared/device-id.js";
 
 let snapshot;
 let socket;
@@ -116,8 +117,8 @@ function renderOrb(el, number, state, name, item, live) {
   el.setAttribute("aria-label", `Equipo ${number}, ${name || ""}, ${status.label}. ${status.caption}: ${timeText}. ${status.connectionLabel}. Ver detalle.`);
   el.querySelector(".orb-num").textContent = String(number).padStart(2, "0");
   const deviceIdEl = el.querySelector(".orb-device-id");
-  deviceIdEl.textContent = item.deviceId ? `ID: ${item.deviceId}` : "Sin ID";
-  deviceIdEl.title = item.deviceId ? `ID del dispositivo: ${item.deviceId}` : "Sin ID vinculado";
+  deviceIdEl.textContent = item.deviceId ? `ID: ${shortDeviceId(item.deviceId)}` : "Sin ID";
+  deviceIdEl.title = item.deviceId ? `ID corto del dispositivo: ${shortDeviceId(item.deviceId)}` : "Sin ID vinculado";
   deviceIdEl.hidden = !item.deviceId;
   el.querySelector(".orb-sub").textContent = status.label;
   el.querySelector(".orb-time-caption").textContent = status.caption;
@@ -170,16 +171,16 @@ function createCard(number) {
 function renderCard(card, item, state, live) {
   card.dataset.state = state;
   card.dataset.tone = tones[state];
-  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
+  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.deviceId ? shortDeviceId(item.deviceId) : ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
   card.querySelector(".card-title").textContent = `Equipo ${String(item.number).padStart(2, "0")}`;
   const model = (item.name || "").replace(/\bCelular\b/gi, "Equipo").replace(/^Equipo\s*\d*\s*/i, "").trim();
   const modelEl = card.querySelector(".card-model");
   modelEl.textContent = model;
   modelEl.hidden = !model;
   const deviceIdEl = card.querySelector(".card-device-id");
-  deviceIdEl.textContent = item.deviceId ? `ID: ${item.deviceId}` : "Sin ID vinculado";
+  deviceIdEl.textContent = item.deviceId ? `ID: ${shortDeviceId(item.deviceId)}` : "Sin ID vinculado";
   deviceIdEl.hidden = !item.deviceId;
-  deviceIdEl.title = item.deviceId ? `ID del dispositivo: ${item.deviceId}` : "";
+  deviceIdEl.title = item.deviceId ? `ID corto del dispositivo: ${shortDeviceId(item.deviceId)}` : "";
   const meta = card.querySelector(".card-meta");
   meta.innerHTML = [item.rubro, item.schedule].filter(Boolean).map(part => `<span>${esc(part)}</span>`).join("");
   meta.hidden = !meta.textContent;
@@ -265,7 +266,7 @@ let filterQuery = "";
 
 function matchesEquipmentFilters(item) {
   const state = displayState(item, equipmentLive);
-  const query = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
+  const query = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.deviceId ? shortDeviceId(item.deviceId) : ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
   return (filterState === "all" || state === filterState) && (!filterQuery || query.includes(filterQuery));
 }
 function applyFilters() {
@@ -418,7 +419,7 @@ async function changeEquipmentNumber(number, btn, msgEl) {
     if (msgEl) { msgEl.textContent = "Vincula un dispositivo antes de cambiar su número."; msgEl.hidden = false; }
     return;
   }
-  const answer = window.prompt(`Nuevo número para el equipo con ID ${current.deviceId} (1–255):`, String(number));
+  const answer = window.prompt(`Nuevo número para el equipo con ID ${shortDeviceId(current.deviceId)} (1–255):`, String(number));
   if (answer === null) return;
   const newNumber = Number(answer.trim());
   if (!Number.isInteger(newNumber) || newNumber < 1 || newNumber > 255) {
