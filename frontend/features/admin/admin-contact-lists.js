@@ -79,7 +79,18 @@ const pageSize = 100;
 let totalContacts = 0;
 let contactRequest = 0;
 let importPreviewData = [];
+let selectedMonth = "";
+let selectedYear = "";
+let browseRows = [];
+let browseLimit = 20;
+let browseContactTarget = null;
 const $ = id => document.getElementById(id);
+const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+function limaYearMonthNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  return { year: parts.find(part => part.type === "year").value, month: parts.find(part => part.type === "month").value };
+}
 
 export async function initAdminContactLists() {
   const view = $("adminUserListsView");
@@ -88,12 +99,34 @@ export async function initAdminContactLists() {
   view.hidden = false;
   if ($("contactsSection")) $("contactsSection").hidden = true;
   if ($("contactsDataSection")) $("contactsDataSection").hidden = true;
+  $("adminListsBrowseView").hidden = false;
+  $("adminListsDetailView").hidden = true;
   if (!initialized) {
     initialized = true;
     $("adminListsUser").addEventListener("change", onUserChange);
-    $("adminListsName").addEventListener("change", () => { pageOffset = 0; loadContacts(); });
-    $("adminListsPrev").addEventListener("click", () => { pageOffset = Math.max(0, pageOffset - pageSize); loadContacts(); });
-    $("adminListsNext").addEventListener("click", () => { pageOffset += pageSize; loadContacts(); });
+    $("adminListsName").addEventListener("change", () => { pageOffset = 0; });
+    $("adminListsPrev").addEventListener("click", () => { pageOffset = Math.max(0, pageOffset - pageSize); loadContacts(browseContactTarget); });
+    $("adminListsNext").addEventListener("click", () => { pageOffset += pageSize; loadContacts(browseContactTarget); });
+    $("adminListsYear").addEventListener("change", () => { selectedYear = $("adminListsYear").value; renderAdminListBrowser(); });
+    $("adminListsMonths").addEventListener("click", event => {
+      const button = event.target.closest("[data-month]");
+      if (!button) return;
+      selectedMonth = button.dataset.month;
+      browseLimit = 20;
+      renderAdminListBrowser();
+    });
+    $("adminListsSearch").addEventListener("input", () => { browseLimit = 20; renderAdminListRows(); });
+    $("adminListsCategory").addEventListener("change", () => { browseLimit = 20; renderAdminListRows(); });
+    $("adminListsRows").addEventListener("click", event => {
+      const button = event.target.closest("[data-open-list]");
+      if (button) openMonthlyList(Number(button.dataset.userId), button.dataset.listName, button.dataset.count);
+    });
+    $("adminListsBrowseMore").addEventListener("click", () => { browseLimit += 20; renderAdminListRows(); });
+    $("adminListsBackToBrowse").addEventListener("click", () => {
+      $("adminListsDetailView").hidden = true;
+      $("adminListsBrowseView").hidden = false;
+      browseContactTarget = null;
+    });
     $("adminListsImportFile").addEventListener("change", onImportFileChange);
     $("adminListsImportBtn").addEventListener("click", showImportPreview);
     $("adminListsImportCancel").addEventListener("click", hideImportPreview);
@@ -126,16 +159,16 @@ async function loadUsers() {
     if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar los vendedores.");
     users = data.users;
     const select = $("adminListsUser");
-    select.replaceChildren(new Option("— Mis listas —", "mine"));
+    select.replaceChildren(new Option("Selecciona una cuenta", ""));
     const myId = currentUser?.id || window.VOIP_VC_AUTH_USER?.id;
     for (const user of users) {
       const isMe = myId && String(user.id) === String(myId);
       select.add(new Option(`${user.username}${isMe ? " (tú)" : ""} · ${user.role === "ADMINISTRADOR" ? "Admin" : "Vendedor"}`, String(user.id)));
     }
-    // Auto-select "Mis listas" by default
-    select.value = "mine";
+    select.value = "";
     onUserChange();
-    status.textContent = users.length ? "Elige un vendedor para ver sus listas." : "Solo tú tienes acceso.";
+    initializeAdminListBrowser();
+    status.textContent = "";
   } catch (error) {
     status.textContent = error.message || "No se pudieron cargar los vendedores.";
   }
@@ -148,8 +181,18 @@ function onUserChange() {
   const select = $("adminListsName");
   const status = $("adminListsStatus");
   
-  if (userId === "mine" || !userId) {
-    // Show current user's lists
+  if (!userId) {
+    status.textContent = "Selecciona una cuenta de destino para importar.";
+    select.replaceChildren(new Option("Primero selecciona una cuenta", ""));
+    select.disabled = true;
+    $("adminListsContacts").replaceChildren();
+    $("adminListsPage").textContent = "";
+    $("adminListsPrev").disabled = true;
+    $("adminListsNext").disabled = true;
+    pageOffset = 0;
+    return;
+  }
+  if (userId === "mine") {
     status.textContent = "Tus listas de contactos.";
     select.replaceChildren(new Option("Principal (tus contactos)", "Principal"));
     select.disabled = false;
@@ -176,17 +219,135 @@ function onUserChange() {
   pageOffset = 0;
 }
 
-async function loadContacts() {
-  const userId = $("adminListsUser").value;
-  const list = $("adminListsName").value;
+function initializeAdminListBrowser() {
+  const { year, month } = limaYearMonthNow();
+  const years = new Set([year]);
+  for (const user of users) for (const list of user.lists || []) {
+    for (const key of Object.keys(list.monthlyCounts || {})) years.add(key.slice(0, 4));
+  }
+  const sortedYears = [...years].sort((a, b) => Number(b) - Number(a));
+  const yearSelect = $("adminListsYear");
+  yearSelect.replaceChildren(...sortedYears.map(value => new Option(value, value)));
+  selectedYear = sortedYears.includes(year) ? year : sortedYears[0];
+  selectedMonth = month;
+  yearSelect.value = selectedYear;
+  renderAdminListBrowser();
+}
+
+function renderAdminListBrowser() {
+  const years = new Set([limaYearMonthNow().year]);
+  for (const user of users) for (const list of user.lists || []) {
+    for (const key of Object.keys(list.monthlyCounts || {})) years.add(key.slice(0, 4));
+  }
+  const sortedYears = [...years].sort((a, b) => Number(b) - Number(a));
+  const yearSelect = $("adminListsYear");
+  if ([...yearSelect.options].map(option => option.value).join(",") !== sortedYears.join(",")) {
+    yearSelect.replaceChildren(...sortedYears.map(value => new Option(value, value)));
+  }
+  if (!sortedYears.includes(selectedYear)) selectedYear = sortedYears[0];
+  yearSelect.value = selectedYear;
+  const months = $("adminListsMonths");
+  months.replaceChildren(...monthNames.map((name, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.month = String(index + 1).padStart(2, "0");
+    button.textContent = name;
+    button.className = `admin-lists-month${button.dataset.month === selectedMonth ? " is-selected" : ""}`;
+    button.setAttribute("aria-pressed", String(button.dataset.month === selectedMonth));
+    return button;
+  }));
+
+  const yearMonth = `${selectedYear}-${selectedMonth}`;
+  const monthName = monthNames[Number(selectedMonth) - 1] || "";
+  $("adminListsMonthTitle").textContent = `Listas de ${monthName} de ${selectedYear}`;
+  browseRows = [];
+  for (const user of users) for (const list of user.lists || []) {
+    const count = Number(list.monthlyCounts?.[yearMonth] || 0);
+    if (count > 0) browseRows.push({ userId: user.id, name: list.name, count, total: Number(list.count || 0), createdAt: list.monthlyLastImportedAt?.[yearMonth] || null, rubro: list.rubro || list.name });
+  }
+  browseRows.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")) || a.name.localeCompare(b.name, "es"));
+  const totalContactsForMonth = browseRows.reduce((sum, row) => sum + row.count, 0);
+  $("adminListsMonthSummary").textContent = `${browseRows.length.toLocaleString("es-PE")} listas · ${totalContactsForMonth.toLocaleString("es-PE")} contactos importados en total`;
+  const categories = [...new Set(browseRows.map(row => row.rubro))].sort((a, b) => a.localeCompare(b, "es"));
+  const category = $("adminListsCategory");
+  const selectedCategory = category.value;
+  category.replaceChildren(new Option("Todos los rubros", ""), ...categories.map(value => new Option(value, value)));
+  if (categories.includes(selectedCategory)) category.value = selectedCategory;
+  renderAdminListRows();
+}
+
+function renderAdminListRows() {
+  const query = $("adminListsSearch").value.trim().toLocaleLowerCase("es");
+  const category = $("adminListsCategory").value;
+  const rows = browseRows.filter(row => (!category || row.rubro === category) && (!query || `${row.name} ${row.rubro}`.toLocaleLowerCase("es").includes(query)));
+  const body = $("adminListsRows");
+  body.replaceChildren();
+  $("adminListsResultCount").textContent = `${rows.length.toLocaleString("es-PE")} ${rows.length === 1 ? "lista" : "listas"}`;
+  const pageRows = rows.slice(0, browseLimit);
+  for (const item of pageRows) {
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    nameCell.className = "admin-lists-name-cell";
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const sub = document.createElement("span");
+    sub.textContent = "Lista de contactos";
+    nameCell.append(name, sub);
+    const rubroCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "admin-lists-rubro-badge";
+    badge.textContent = item.rubro;
+    rubroCell.appendChild(badge);
+    const countCell = document.createElement("td");
+    countCell.className = "admin-lists-count-cell";
+    countCell.textContent = item.count.toLocaleString("es-PE");
+    const dateCell = document.createElement("td");
+    dateCell.textContent = item.createdAt ? new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : "—";
+    const actionCell = document.createElement("td");
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "admin-lists-open-button";
+    open.dataset.openList = "true";
+    open.dataset.userId = String(item.userId);
+    open.dataset.listName = item.name;
+    open.dataset.count = String(item.count);
+    open.textContent = "Ver →";
+    actionCell.appendChild(open);
+    row.append(nameCell, rubroCell, countCell, dateCell, actionCell);
+    body.appendChild(row);
+  }
+  $("adminListsBrowseMore").hidden = rows.length <= browseLimit;
+  $("adminListsBrowseStatus").textContent = rows.length
+    ? `Mostrando ${pageRows.length.toLocaleString("es-PE")} de ${rows.length.toLocaleString("es-PE")} listas.`
+    : `No hay listas con contactos importados en ${monthNames[Number(selectedMonth) - 1]} de ${selectedYear}.`;
+}
+
+function openMonthlyList(userId, listName, count) {
+  browseContactTarget = { userId, listName, year: selectedYear, month: selectedMonth };
+  pageOffset = 0;
+  $("adminListsBrowseView").hidden = true;
+  $("adminListsDetailView").hidden = false;
+  $("adminListsDetailTitle").textContent = listName;
+  $("adminListsDetailMonth").textContent = `${monthNames[Number(selectedMonth) - 1]} ${selectedYear} · ${Number(count).toLocaleString("es-PE")} contactos`;
+  $("adminListsDetailStatus").textContent = "";
+  loadContacts(browseContactTarget);
+}
+
+async function loadContacts(target = null) {
+  const userId = target?.userId ? String(target.userId) : $("adminListsUser").value;
+  const list = target?.listName || $("adminListsName").value;
   if (!userId || !list) return;
-  const status = $("adminListsStatus");
+  const status = target ? $("adminListsDetailStatus") : $("adminListsStatus");
   const request = ++contactRequest;
   status.textContent = "Cargando contactos…";
   $("adminListsPrev").disabled = true;
   $("adminListsNext").disabled = true;
   try {
     const query = new URLSearchParams({ list, offset: String(pageOffset), limit: String(pageSize) });
+    if (target?.month && target?.year) {
+      query.set("month", target.month);
+      query.set("year", target.year);
+    }
     // The admin contact-book endpoint expects the numeric ID, including for the current admin.
     const apiUserId = userId === "mine"
       ? (currentUser?.id || window.VOIP_VC_AUTH_USER?.id)
@@ -222,7 +383,7 @@ async function loadContacts() {
     $("adminListsPage").textContent = `${totalContacts.toLocaleString("es-PE")} contactos · página ${currentPage} de ${pages}`;
     $("adminListsPrev").disabled = pageOffset === 0;
     $("adminListsNext").disabled = pageOffset + pageSize >= totalContacts;
-    status.textContent = totalContacts ? "" : "Esta lista no tiene contactos.";
+    status.textContent = totalContacts ? "" : "Esta lista no tiene contactos en el mes seleccionado.";
   } catch (error) {
     if (request !== contactRequest) return;
     status.textContent = error.message || "No se pudieron cargar los contactos."
@@ -384,9 +545,10 @@ async function confirmImport() {
       data.skippedDuplicate ? `${data.skippedDuplicate} duplicados` : "",
       data.skippedExcluded ? `${data.skippedExcluded} instituciones protegidas` : ""
     ].filter(Boolean);
-    status.textContent = `✅ ${data.added} contactos listos para llamar en "${list}".${skipped.length ? ` Omitidos: ${skipped.join(", ")}.` : ""}`;
+    const successMessage = `✅ ${data.added} contactos listos para llamar en "${list}".${skipped.length ? ` Omitidos: ${skipped.join(", ")}.` : ""}`;
     hideImportPreview();
-    loadContacts();
+    await loadUsers();
+    status.textContent = successMessage;
   } catch (error) {
     console.error("[IMPORT] Error:", error);
     status.textContent = "Error: " + error.message;

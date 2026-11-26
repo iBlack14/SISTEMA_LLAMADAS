@@ -22,13 +22,13 @@
   <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261124-voice-ui5" />
  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
- <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261124-contact-lists-clarity" />
+ <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261126-admin-monthly-lists" />
  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
   <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
 
-  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261124-voice-ui6"></script>
+  <script type="module" src="/layouts/dashboard/sidebar.js?v=20261126-admin-monthly-lists"></script>
  <script>document.documentElement.classList.add("auth-pending");</script>
 
 </head>
@@ -187,60 +187,60 @@
           <div class="contacts-import-notice" id="contactsImportNotice" role="status" aria-live="polite" hidden></div>
         </header>
 
-<section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de todos los usuarios" hidden>
+<section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de contactos por mes" hidden>
           <div class="admin-lists-heading">
-            <div><span class="admin-lists-kicker">GESTIÓN DE CONTACTOS</span><h3>Contactos de vendedores</h3>
-              <p class="muted">Elige un vendedor y una lista para consultar o importar contactos.</p></div>
-          </div>
-          
-          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
-            <label style="flex:1;min-width:200px">
-              Ver contactos de:
-              <select id="adminListsUser"><option value="">Cargando…</option></select>
-            </label>
-            <label style="flex:1;min-width:200px">
-              Lista:
-              <select id="adminListsName" disabled><option value="">Primero elige vendedor</option></select>
-            </label>
+            <div><span class="admin-lists-kicker">GESTIÓN DE CONTACTOS</span><h3>Listas importadas</h3>
+              <p class="muted">Consulta en una sola vista las listas importadas en cada mes.</p></div>
           </div>
 
-          <div class="admin-lists-importer">
-            <div class="admin-lists-import-copy"><strong>Importar contactos</strong><span>Selecciona un archivo CSV, Excel, HTML o TXT.</span></div>
-            <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center;margin:0;padding:0;border:0;background:transparent">
-            <label class="file-upload-label" style="cursor:pointer;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;padding:10px 12px;justify-content:center">
-              <input type="file" id="adminListsImportFile" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none" aria-label="Seleccionar archivo de contactos">
-              <span id="adminListsFileLabel">📁 Elegir archivo</span>
-            </label>
-            <button id="adminListsImportBtn" type="button" disabled style="padding:10px 20px;font-weight:600">Continuar</button>
+          <section id="adminListsBrowseView" aria-label="Listas importadas por mes">
+            <div class="admin-lists-month-panel">
+              <div class="admin-lists-month-heading"><span class="admin-lists-step">MES DE IMPORTACIÓN</span><label for="adminListsYear">Año</label><select id="adminListsYear" aria-label="Año de importación"></select></div>
+              <div id="adminListsMonths" class="admin-lists-months" role="group" aria-label="Mes de importación"></div>
+              <p>El mes filtra automáticamente las listas de todos los usuarios.</p>
             </div>
-          </div>
+            <div class="admin-lists-overview">
+              <div><h4 id="adminListsMonthTitle">Listas del mes</h4><span id="adminListsMonthSummary">Cargando listas…</span></div>
+              <label class="admin-lists-search"><span aria-hidden="true">⌕</span><input id="adminListsSearch" type="search" placeholder="Buscar por rubro o nombre de lista…" autocomplete="off" aria-label="Buscar rubro o lista"></label>
+              <label class="admin-lists-category"><span class="admin-lists-step">RUBRO</span><select id="adminListsCategory" aria-label="Filtrar por rubro"><option value="">Todos los rubros</option></select></label>
+            </div>
+            <div class="admin-lists-table-heading"><h4>Listas importadas en el mes</h4><span id="adminListsResultCount"></span></div>
+            <div class="table-wrap admin-lists-table-wrap">
+              <table><thead><tr><th>LISTA</th><th>RUBRO</th><th>CONTACTOS</th><th>FECHA DE IMPORTACIÓN</th><th>ACCIÓN</th></tr></thead><tbody id="adminListsRows"></tbody></table>
+            </div>
+            <div class="admin-lists-browse-footer"><span id="adminListsBrowseStatus" role="status"></span><button id="adminListsBrowseMore" type="button" hidden>Ver más listas →</button></div>
+            <details class="admin-lists-import-details">
+              <summary>Importar una lista</summary>
+              <div class="admin-lists-import-content">
+                <p>Elige a qué cuenta asignar la nueva lista.</p>
+                <div class="row admin-lists-import-target">
+                  <label>Cuenta de destino<select id="adminListsUser"><option value="">Cargando…</option></select></label>
+                  <label>Lista de destino<select id="adminListsName" disabled><option value="">Primero elige una cuenta</option></select></label>
+                </div>
+                <div class="admin-lists-importer">
+                  <div class="admin-lists-import-copy"><strong>Seleccionar archivo</strong><span>CSV, Excel, HTML o TXT.</span></div>
+                  <div class="row admin-lists-import-file-row">
+                    <label class="file-upload-label"><input type="file" id="adminListsImportFile" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none" aria-label="Seleccionar archivo de contactos"><span id="adminListsFileLabel">📁 Elegir archivo</span></label>
+                    <button id="adminListsImportBtn" type="button" disabled>Continuar</button>
+                  </div>
+                </div>
+              </div>
+            </details>
+            <p id="adminListsStatus" class="muted" role="status" style="min-height:20px"></p>
+            <div id="adminListsImportPreview" class="admin-lists-preview" style="display:none">
+              <div class="admin-lists-preview-heading"><div><span class="admin-lists-step">PASO 2 · REVISIÓN</span><h4>Revisa antes de importar</h4><p id="adminListsPreviewSummary">Contactos detectados en el archivo.</p></div><button id="adminListsImportCancel" class="secondary" type="button">Cancelar</button></div>
+              <div class="table-wrap admin-lists-preview-table" style="overflow:auto"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th><th>Lista de destino</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table></div>
+              <div class="admin-lists-preview-footer"><span>Se agregarán a la lista seleccionada.</span><button id="adminListsImportConfirm" type="button">Confirmar importación</button></div>
+            </div>
+          </section>
 
-          <p id="adminListsStatus" class="muted" role="status" style="min-height:20px"></p>
-          
-          <div id="adminListsImportPreview" class="admin-lists-preview" style="display:none">
-            <div class="admin-lists-preview-heading">
-              <div><span class="admin-lists-step">PASO 2 · REVISIÓN</span><h4>Revisa antes de importar</h4><p id="adminListsPreviewSummary">Contactos detectados en el archivo.</p></div>
-              <button id="adminListsImportCancel" class="secondary" type="button" style="padding:6px 12px">Cancelar</button>
-            </div>
-            <div class="table-wrap admin-lists-preview-table" style="overflow:auto">
-              <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th><th>Lista de destino</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table>
-            </div>
-            <div class="admin-lists-preview-footer">
-              <span>Se agregarán a la lista seleccionada.</span>
-              <button id="adminListsImportConfirm" type="button" style="padding:10px 20px;font-weight:600">Confirmar importación</button>
-            </div>
-          </div>
-
-          <div class="admin-lists-saved-heading"><div><span class="admin-lists-step">CONTACTOS GUARDADOS</span><h4>Contactos de esta lista</h4></div><span id="adminListsPage" class="muted"></span></div>
-          <div class="table-wrap" style="overflow:auto;max-height:60vh;margin-top:12px">
-            <table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th></tr></thead><tbody id="adminListsContacts"></tbody></table>
-          </div>
-          
-          <div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">
-            <button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button>
-            <span class="muted">Navega por las páginas de contactos</span>
-            <button id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button>
-          </div>
+          <section id="adminListsDetailView" class="admin-lists-detail-view" aria-label="Contactos de la lista" hidden>
+            <button id="adminListsBackToBrowse" class="secondary" type="button">← Volver a las listas</button>
+            <div class="admin-lists-saved-heading"><div><span class="admin-lists-step" id="adminListsDetailMonth"></span><h4 id="adminListsDetailTitle">Contactos de la lista</h4></div><span id="adminListsPage" class="muted"></span></div>
+            <p id="adminListsDetailStatus" role="status"></p>
+            <div class="table-wrap admin-lists-table-wrap"><table><thead><tr><th>EMPRESA</th><th>TELÉFONO</th><th>FECHA DE CREACIÓN</th></tr></thead><tbody id="adminListsContacts"></tbody></table></div>
+            <div class="row admin-lists-pagination"><button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button><span class="muted">Navega por los contactos de esta lista</span><button id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button></div>
+          </section>
         </section>
 
         <!-- CONTACTS SECTION -->

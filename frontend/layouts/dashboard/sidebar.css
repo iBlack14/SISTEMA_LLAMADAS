@@ -788,3 +788,100 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   .viavox-sidebar .viavox-navigation > a,
   .viavox-sidebar .viavox-navigation > button { transition: none; }
 }
+
+/* Admin contact lists: browse every account's imports together by month. */
+.admin-user-lists-view .admin-lists-heading { margin-bottom: 18px; }
+.admin-lists-month-panel,
+.admin-lists-overview,
+.admin-lists-detail-view {
+  border: 1px solid rgb(222 113 244 / 30%);
+  border-radius: 16px;
+  background: rgb(31 6 46 / 82%);
+}
+.admin-lists-month-panel { padding: 20px 22px 14px; }
+.admin-lists-month-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.admin-lists-month-heading .admin-lists-step { margin-right: auto; }
+.admin-lists-month-heading label { display: flex; align-items: center; gap: 8px; color: #cdb9db; font-size: 13px; }
+.admin-lists-month-heading select,
+.admin-lists-category select {
+  min-width: 86px; min-height: 38px; padding: 7px 12px; border: 1px solid #8c55a5; border-radius: 10px;
+  color: #fbf6ff; background: #1c0829;
+}
+.admin-lists-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; }
+.admin-lists-months .admin-lists-month {
+  min-height: 40px; padding: 8px 6px; border: 1px solid #734482; border-radius: 11px;
+  color: #d7c1e0; background: #3b174e; font-weight: 650; cursor: pointer; transition: .16s ease;
+}
+.admin-lists-months .admin-lists-month:hover { border-color: #e78afa; color: #fff; }
+.admin-lists-months .admin-lists-month.is-selected {
+  border-color: #f585ff; color: #fff; background: linear-gradient(110deg, #9c25d4, #6626a2);
+  box-shadow: 0 5px 16px rgb(20 2 32 / 30%);
+}
+.admin-lists-month-panel > p { margin: 12px 0 0; color: #bba4ca; font-size: 12px; }
+.admin-lists-overview { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.25fr) minmax(180px, .55fr); gap: 20px; align-items: center; margin-top: 18px; padding: 18px 22px; }
+.admin-lists-overview h4,
+.admin-lists-table-heading h4 { margin: 0 0 5px; color: #fff; font-size: 18px; }
+.admin-lists-overview > div > span { color: #cdb9db; font-size: 13px; }
+.admin-lists-search { display: flex !important; align-items: center; gap: 11px !important; min-width: 0 !important; min-height: 48px; padding: 0 15px; border: 1px solid #88529d; border-radius: 13px; background: #160723; color: #cbb1dc !important; }
+.admin-lists-search > span { font-size: 24px; line-height: 1; }
+.admin-lists-search input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; color: #fbf6ff; background: transparent; }
+.admin-lists-search input::placeholder { color: #a98cba; }
+.admin-lists-category { display: grid !important; gap: 5px !important; min-width: 0 !important; }
+.admin-lists-category select { width: 100%; }
+.admin-lists-table-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 23px 4px 11px; }
+.admin-lists-table-heading span { color: #d5c0e1; font-size: 13px; }
+.admin-lists-table-wrap { margin: 0 !important; overflow: auto; border: 1px solid rgb(203 85 229 / 32%); border-radius: 14px; background: rgb(35 8 51 / 82%); }
+.admin-lists-table-wrap table { width: 100%; min-width: 790px; border-collapse: separate; border-spacing: 0; }
+.admin-lists-table-wrap thead th { padding: 14px 16px; color: #f7eaff; background: #681181; text-align: left; font-size: 11px; letter-spacing: .045em; white-space: nowrap; }
+.admin-lists-table-wrap thead th:first-child { border-radius: 12px 0 0; }
+.admin-lists-table-wrap thead th:last-child { border-radius: 0 12px 0 0; }
+.admin-lists-table-wrap tbody td { padding: 15px 16px; border-bottom: 1px solid rgb(177 113 199 / 17%); color: #f4eafa; font-size: 13px; }
+.admin-lists-table-wrap tbody tr:last-child td { border-bottom: 0; }
+.admin-lists-table-wrap tbody tr:hover { background: rgb(255 255 255 / 3%); }
+.admin-lists-name-cell strong,
+.admin-lists-name-cell span { display: block; }
+.admin-lists-name-cell strong { color: #fff; font-size: 14px; }
+.admin-lists-name-cell span { margin-top: 4px; color: #a98cba; font-size: 11px; }
+.admin-lists-rubro-badge { display: inline-flex; padding: 6px 12px; border: 1px solid #9251ae; border-radius: 99px; background: #47195f; color: #f4eafa; }
+.admin-lists-count-cell { font-weight: 750; white-space: nowrap; }
+.admin-lists-open-button,
+.admin-lists-browse-footer button { min-height: 36px; padding: 7px 15px; border: 1px solid #b64cd6; border-radius: 99px; color: #fff; background: #5b187a; font-weight: 700; cursor: pointer; }
+.admin-lists-open-button:hover,
+.admin-lists-browse-footer button:hover { background: #8121a6; }
+.admin-lists-browse-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 54px; margin-top: 4px; color: #cdb9db; font-size: 13px; }
+.admin-lists-import-details { margin-top: 16px; border: 1px solid rgb(222 113 244 / 26%); border-radius: 13px; background: rgb(31 6 46 / 55%); }
+.admin-lists-import-details summary { padding: 14px 18px; color: #f8e9ff; font-weight: 700; cursor: pointer; }
+.admin-lists-import-content { padding: 0 18px 18px; }
+.admin-lists-import-content > p { margin: 0 0 14px; color: #bfa9ce; font-size: 13px; }
+.admin-lists-import-target { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px; padding: 0; border: 0; background: transparent; }
+.admin-lists-import-target label { display: grid; gap: 7px; color: #dec6eb; }
+.admin-lists-importer { display: grid; grid-template-columns: minmax(190px, .4fr) 1fr; gap: 18px; align-items: center; margin: 0; padding: 14px; border: 1px solid rgb(224 180 238 / 17%); border-radius: 12px; background: rgb(15 1 26 / 24%); }
+.admin-lists-import-file-row { display: flex; gap: 10px; align-items: center; margin: 0; padding: 0; border: 0; background: transparent; }
+.admin-lists-import-file-row .file-upload-label { min-height: 44px; flex: 1; justify-content: flex-start; padding: 10px 12px; border: 1px solid rgb(222 91 221 / 35%); background: rgb(255 255 255 / 4%); cursor: pointer; }
+.admin-lists-import-file-row button { min-height: 44px; padding: 10px 20px; font-weight: 650; }
+.admin-lists-detail-view { padding: 20px; }
+.admin-lists-detail-view > .secondary { margin-bottom: 20px; }
+.admin-lists-detail-view .admin-lists-saved-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 13px; }
+.admin-lists-detail-view .admin-lists-saved-heading h4 { margin: 5px 0 0; color: #fff; font-size: 21px; }
+.admin-lists-detail-view #adminListsDetailStatus { min-height: 0; margin: 0 0 10px; color: #f7bfdc; }
+.admin-lists-detail-view #adminListsDetailStatus:empty { display: none; }
+.admin-lists-pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.admin-user-lists-view #adminListsStatus:empty { display: none; }
+@media (max-width: 900px) {
+  .admin-lists-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .admin-lists-overview { grid-template-columns: 1fr 1fr; }
+  .admin-lists-search { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 560px) {
+  .admin-lists-month-panel { padding: 15px; }
+  .admin-lists-months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .admin-lists-overview { grid-template-columns: 1fr; padding: 15px; }
+  .admin-lists-search { grid-column: auto; grid-row: auto; }
+  .admin-lists-import-target,
+  .admin-lists-importer { grid-template-columns: 1fr; }
+  .admin-lists-import-file-row { flex-wrap: wrap; }
+  .admin-lists-import-file-row button { flex: 1; }
+  .admin-lists-table-heading { align-items: flex-start; flex-direction: column; }
+  .admin-lists-detail-view { padding: 14px; }
+  .admin-lists-detail-view .admin-lists-saved-heading { align-items: flex-start; flex-direction: column; }
+}

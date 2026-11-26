@@ -10,6 +10,15 @@ import { collectUsedBaseFingerprints, mergeImportedContactBatches } from "../ser
 export function registerNetwork(runtime, services) {
 runtime.app.get("/api/network/access", (req, res) => res.json({ ok: true, role: req.user.role }));
 
+const limaYearMonth = value => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!value || !Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value;
+  const month = parts.find(part => part.type === "month")?.value;
+  return year && month ? `${year}-${month}` : null;
+};
+
 runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -25,7 +34,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
     for (const row of rows) {
       const key = String(row.user_id);
       if (!usersById.has(key)) usersById.set(key, { id: row.user_id, username: row.username,
-        role: row.role, active: Boolean(Number(row.active)), lists: [] });
+        role: row.role, active: Boolean(Number(row.active)), lists: [], _listsBySession: new Map() });
     }
     const users = [...usersById.values()];
     const activeCodes = [...new Set(rows.map(row => row.session_code).filter(Boolean))];
@@ -38,16 +47,61 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
       const counts = new Map();
       for (const contact of book.contacts || []) {
         const name = contact.list || "Principal";
+        let list = user._listsBySession.get(name);
+        if (!list) {
+          list = { name, count: 0, monthlyCounts: {}, monthlyLastImportedAt: {}, lastImportedAt: null };
+          user._listsBySession.set(name, list);
+          user.lists.push(list);
+        }
+        list.count++;
+        const createdAt = contact.createdAt || contact.created_at;
+        const yearMonth = limaYearMonth(createdAt);
+        if (yearMonth) {
+          list.monthlyCounts[yearMonth] = (list.monthlyCounts[yearMonth] || 0) + 1;
+          if (Number.isFinite(new Date(createdAt).getTime()) && (!list.monthlyLastImportedAt[yearMonth] || new Date(createdAt).getTime() > new Date(list.monthlyLastImportedAt[yearMonth]).getTime())) {
+            list.monthlyLastImportedAt[yearMonth] = createdAt;
+          }
+        }
+        const timestamp = createdAt ? new Date(createdAt).getTime() : NaN;
+        if (Number.isFinite(timestamp) && (!list.lastImportedAt || timestamp > new Date(list.lastImportedAt).getTime())) list.lastImportedAt = createdAt;
         counts.set(name, (counts.get(name) || 0) + 1);
       }
       for (const name of new Set([...(book.lists || []), ...counts.keys()])) {
-        const existing = user.lists.find(list => list.name === name);
-        if (existing) existing.count += counts.get(name) || 0;
-        else user.lists.push({ name, count: counts.get(name) || 0 });
+        const key = name;
+        if (!user._listsBySession.has(key)) {
+          const list = { name, count: counts.get(name) || 0, monthlyCounts: {}, monthlyLastImportedAt: {}, lastImportedAt: null };
+          user._listsBySession.set(key, list);
+          user.lists.push(list);
+        }
       }
     }
     const missingCodes = activeCodes.filter(code => !booksByCode.get(code)?.contacts?.length);
     if (missingCodes.length) {
+      const [monthlyStoredContacts] = await runtime.auth.pool.query(
+        `SELECT session_code,list_name,
+          DATE_FORMAT(DATE_SUB(STR_TO_DATE(SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt')),1,23),'%Y-%m-%dT%H:%i:%s.%f'),INTERVAL 5 HOUR),'%Y-%m') AS year_month,
+          COUNT(*) AS contact_count,MAX(JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))) AS last_imported_at
+          FROM vc_contact_book_contacts WHERE session_code IN (${missingCodes.map(() => "?").join(",")})
+            AND JSON_EXTRACT(contact_data,'$.createdAt') IS NOT NULL
+          GROUP BY session_code,list_name,year_month`, missingCodes);
+      for (const row of monthlyStoredContacts) {
+        if (!row.year_month) continue;
+        const account = rows.find(item => item.session_code === row.session_code);
+        const user = account && usersById.get(String(account.user_id));
+        if (!user) continue;
+        let list = user._listsBySession.get(row.list_name);
+        if (!list) {
+          list = { name: row.list_name, count: 0, monthlyCounts: {}, monthlyLastImportedAt: {}, lastImportedAt: null };
+          user._listsBySession.set(row.list_name, list);
+          user.lists.push(list);
+        }
+        list.monthlyCounts[row.year_month] = (list.monthlyCounts[row.year_month] || 0) + Number(row.contact_count);
+        const currentDate = list.monthlyLastImportedAt[row.year_month];
+        if (!currentDate || new Date(row.last_imported_at).getTime() > new Date(currentDate).getTime()) {
+          list.monthlyLastImportedAt[row.year_month] = row.last_imported_at;
+        }
+        if (!list.lastImportedAt || new Date(row.last_imported_at).getTime() > new Date(list.lastImportedAt).getTime()) list.lastImportedAt = row.last_imported_at;
+      }
       const [storedContacts] = await runtime.auth.pool.query(
         `SELECT session_code,list_name,COUNT(*) AS contact_count FROM vc_call_contacts
           WHERE session_code IN (${missingCodes.map(() => "?").join(",")}) GROUP BY session_code,list_name`, missingCodes);
@@ -55,9 +109,14 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
         const account = rows.find(item => item.session_code === row.session_code);
         const user = account && usersById.get(String(account.user_id));
         if (!user) continue;
-        const existing = user.lists.find(list => list.name === row.list_name);
-        if (existing) existing.count = Math.max(existing.count, Number(row.contact_count));
-        else user.lists.push({ name: row.list_name, count: Number(row.contact_count) });
+        const key = row.list_name;
+        const existing = user._listsBySession.get(key);
+        if (existing) existing.count += Number(row.contact_count);
+        else {
+          const list = { name: row.list_name, count: Number(row.contact_count), monthlyCounts: {}, monthlyLastImportedAt: {}, lastImportedAt: null };
+          user._listsBySession.set(key, list);
+          user.lists.push(list);
+        }
       }
       const [campaignLists] = await runtime.auth.pool.query(
         `SELECT DISTINCT session_code,list_name FROM vc_call_campaigns
@@ -65,9 +124,17 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
       for (const row of campaignLists) {
         const account = rows.find(item => item.session_code === row.session_code);
         const user = account && usersById.get(String(account.user_id));
-        if (user && !user.lists.some(list => list.name === row.list_name)) user.lists.push({ name: row.list_name, count: 0 });
+        if (user) {
+          const key = row.list_name;
+          if (!user._listsBySession.has(key)) {
+            const list = { name: row.list_name, count: 0, monthlyCounts: {}, monthlyLastImportedAt: {}, lastImportedAt: null };
+            user._listsBySession.set(key, list);
+            user.lists.push(list);
+          }
+        }
       }
     }
+    for (const user of users) delete user._listsBySession;
     res.json({ ok: true, users });
   } catch {
     res.status(503).json({ ok: false, error: "No se pudieron cargar las listas de los usuarios." });
@@ -80,8 +147,14 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
   const listName = String(req.query.list || "").trim();
   const offset = Number(req.query.offset || 0);
   const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+  const year = Number(req.query.year || 0);
+  const month = Number(req.query.month || 0);
+  const filterMonth = Boolean(req.query.year || req.query.month);
   if (!Number.isSafeInteger(userId) || userId < 1 || !listName || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit)) {
     return res.status(400).json({ ok: false, error: "Usuario, lista o página no válidos." });
+  }
+  if (filterMonth && (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12)) {
+    return res.status(400).json({ ok: false, error: "El mes solicitado no es válido." });
   }
   try {
     const [rows] = await runtime.auth.pool.query(`SELECT u.username,access.session_code
@@ -100,11 +173,28 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     const contactsFromBooks = sessionCodes.flatMap(code => (books.get(code)?.contacts || [])
       .filter(contact => (contact.list || "Principal") === listName));
     if (contactsFromBooks.length) {
-      const contacts = contactsFromBooks;
+      const contacts = filterMonth
+        ? contactsFromBooks.filter(contact => limaYearMonth(contact.createdAt || contact.created_at) === `${year}-${String(month).padStart(2, "0")}`)
+        : contactsFromBooks;
       return res.json({ ok: true, username: rows[0].username, list: listName, total: contacts.length,
         contacts: contacts.slice(offset, offset + limit).map(({ name, phone, note, createdAt, created_at }) => ({ name, phone, note, createdAt: createdAt || created_at || null })) });
     }
     if (!sessionCodes.length) return res.json({ ok: true, username: rows[0].username, list: listName, total: 0, contacts: [] });
+    if (filterMonth) {
+      const monthStart = new Date(Date.UTC(year, month - 1, 1, 5)).toISOString();
+      const monthEnd = new Date(Date.UTC(year, month, 1, 5)).toISOString();
+      const [storedRows] = await runtime.auth.pool.query(
+        `SELECT contact_data FROM vc_contact_book_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=?
+          AND JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))>=? AND JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))<?
+          ORDER BY position LIMIT ? OFFSET ?`, [...sessionCodes, listName, monthStart, monthEnd, limit, offset]);
+      const contacts = storedRows.map(row => typeof row.contact_data === "string" ? JSON.parse(row.contact_data) : row.contact_data);
+      const [[{ total }]] = await runtime.auth.pool.query(
+        `SELECT COUNT(*) AS total FROM vc_contact_book_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=?
+          AND JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))>=? AND JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))<?`,
+        [...sessionCodes, listName, monthStart, monthEnd]);
+      return res.json({ ok: true, username: rows[0].username, list: listName, total: Number(total),
+        contacts: contacts.map(({ name, phone, note, createdAt, created_at }) => ({ name, phone, note, createdAt: createdAt || created_at || null })) });
+    }
     const [contacts] = await runtime.auth.pool.query(
       `SELECT name,phone,'' AS note FROM vc_call_contacts WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=? ORDER BY name LIMIT ? OFFSET ?`,
       [...sessionCodes, listName, limit, offset]);
