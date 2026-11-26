@@ -43,7 +43,7 @@ runtime.app.post("/api/session/:code/message-contacts/update", async (req, res) 
   const session = runtime.sessions.get(code);
   if (!session) return res.status(404).json({ok:false,error:"Sesión no encontrada"});
   const {action, phone, name} = req.body || {};
-  if (!["add", "edit", "delete"].includes(action) || typeof phone !== "string" ||
+  if (!["add", "edit", "delete", "delete-all"].includes(action) || (action !== "delete-all" && typeof phone !== "string") ||
       ((action === "add" || action === "edit") && (typeof name !== "string" || !name.trim() || name.trim().length > 120))) {
     return res.status(400).json({ok:false,error:"Datos del contacto inválidos"});
   }
@@ -56,6 +56,8 @@ runtime.app.post("/api/session/:code/message-contacts/update", async (req, res) 
       } else if (action === "delete") {
         if (!previous.some(item => item.phone === phone)) throw Object.assign(new Error("Contacto no encontrado"),{status:404});
         session.messageContacts = previous.filter(item => item.phone !== phone);
+      } else if (action === "delete-all") {
+        session.messageContacts = [];
       } else {
         if (!previous.some(item => item.phone === phone)) throw Object.assign(new Error("Contacto no encontrado"),{status:404});
         session.messageContacts = previous.map(item => item.phone === phone ? {...item,name:name.trim(),updatedAt:new Date().toISOString()} : item);

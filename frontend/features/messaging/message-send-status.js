@@ -74,3 +74,12 @@ export function recordSendStatus(phone, status, channel = "whatsapp") {
   }
   return entry;
 }
+
+export function clearSendStatus(phone) {
+  const key = sendStatusKey(phone);
+  if (!key) return;
+  const store = readStore();
+  if (!(key in store)) return;
+  delete store[key];
+  writeStore(store);
+}

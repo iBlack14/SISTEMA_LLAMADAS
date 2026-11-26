@@ -931,6 +931,24 @@
   transform: translateY(0);
 }
 
+.delete-all-message-contacts-btn:not(:disabled) {
+  border-color: #e94d70 !important;
+  background: linear-gradient(135deg, #d83c62, #a52355) !important;
+  box-shadow: 0 3px 10px rgba(205, 42, 92, .28) !important;
+}
+
+.delete-all-message-contacts-btn:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: grayscale(.35);
+  box-shadow: none !important;
+}
+
+.delete-all-message-contacts-btn:disabled:hover {
+  transform: none;
+  filter: grayscale(.35);
+}
+
 .add-manual-contact-btn svg {
   flex-shrink: 0;
 }

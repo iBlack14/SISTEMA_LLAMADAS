@@ -1,10 +1,11 @@
 import { openContactSendModal, openDirectMessageModal } from './message-templates.js?v=20261125-direct-number1';
-import { getSendStatus, sendStatusKey, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
+import { getSendStatus, sendStatusKey, clearSendStatus, MESSAGE_SEND_STATUS_EVENT } from './message-send-status.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 
 let initialized = false;
 let users = [];
 let sendStatusBound = false;
+let sendStatusChanged = null;
 
 const MAIL_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>`;
 const TRASH_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>`;
@@ -34,7 +35,8 @@ function sendStatusChip(contact, escHtml) {
 }
 
 /** Actualiza solo la celda de estado, sin re-renderizar toda la tabla. */
-function bindSendStatusUpdates() {
+function bindSendStatusUpdates(onStatusChange) {
+  sendStatusChanged = onStatusChange;
   if (sendStatusBound) return;
   sendStatusBound = true;
   window.addEventListener(MESSAGE_SEND_STATUS_EVENT, event => {
@@ -44,6 +46,7 @@ function bindSendStatusUpdates() {
       .find(item => sendStatusKey(item.dataset.phone) === phone);
     const cell = row?.querySelector("[data-status-cell]");
     if (cell) cell.innerHTML = sendStatusChip({ phone }, String);
+    sendStatusChanged?.();
   });
 }
 
@@ -166,7 +169,17 @@ export function createMessageContacts(dashboardState, dashboardActions) {
       (!selectedDay || contactShift(contact).day === selectedDay) &&
       (!selectedShift || contactShift(contact).key === selectedShift)
     );
-    bindSendStatusUpdates();
+    const deleteAllButton = $("deleteAllMessageContactsBtn");
+    const syncDeleteAllButton = () => {
+      if (!deleteAllButton) return;
+      const allOwnContactsSent = ownContacts.length > 0 && ownContacts.every(contact => getSendStatus(contact.phone)?.status === "sent");
+      deleteAllButton.disabled = Boolean(userId && userId !== "mine") || !allOwnContactsSent;
+      deleteAllButton.title = allOwnContactsSent
+        ? "Eliminar todos los contactos enviados"
+        : "Se habilita cuando todos tus contactos estén enviados";
+    };
+    bindSendStatusUpdates(syncDeleteAllButton);
+    syncDeleteAllButton();
     const body = $("messageContactsBody");
     const count = $("messageContactsCount");
     const status = $("messageContactsStatus");
@@ -206,6 +219,27 @@ export function createMessageContacts(dashboardState, dashboardActions) {
         } finally { button.disabled = false; }
       }
     };
+    if (deleteAllButton && !deleteAllButton.dataset.bound) {
+      deleteAllButton.dataset.bound = "true";
+      deleteAllButton.addEventListener("click", async () => {
+        if (deleteAllButton.disabled || !ownContacts.length) return;
+        if (!await dashboardActions.requestConfirmation({
+          title: "Eliminar todos los contactos enviados",
+          message: `Se eliminarán los ${ownContacts.length} contactos de tu lista de mensajes. ¿Continuar?`,
+          confirmLabel: "Eliminar todos"
+        })) return;
+        deleteAllButton.disabled = true;
+        try {
+          const removed = [...ownContacts];
+          const data = await dashboardActions.postCampaignAction("/message-contacts/update", { action: "delete-all" });
+          if (!data) return;
+          removed.forEach(contact => clearSendStatus(contact.phone));
+          renderMessageContacts(data.contacts);
+        } finally {
+          syncDeleteAllButton();
+        }
+      });
+    }
     if (!dashboardState.messageContacts.length) {
       const hint = userId === "mine" 
         ? "Los contactos que guardes desde la APK aparecerán aquí."
