@@ -269,11 +269,19 @@ runtime.app.get("/api/network/equipment/:number", runtime.auth.requireAdmin, asy
 
 async function attemptReconnectEquipment(number) {
   const row = runtime.network.registry.find(item => item.position === number);
-  const snapshot = await runtime.network.snapshot();
-  const item = snapshot.equipment.find(equipment => equipment.number === number);
-  const deviceId = item?.deviceId || row?.device_id || null;
-  const candidate = [...runtime.network.candidates().entries()].find(([id]) => id === deviceId)?.[1];
-  const sessionCode = candidate?.code || row?.session_code || null;
+  const candidates = runtime.network.candidates();
+  let deviceId = row?.device_id || null;
+  let sessionCode = row?.session_code || null;
+  if (!row) {
+    const registeredIds = new Set(runtime.network.registry.map(item => item.device_id));
+    const unregistered = [...candidates.entries()]
+      .filter(([id]) => !registeredIds.has(id))
+      .sort(([left], [right]) => left.localeCompare(right));
+    const firstVirtualPosition = Math.max(10, ...runtime.network.registry.map(item => Number(item.position) || 0)) + 1;
+    const candidate = unregistered[number - firstVirtualPosition]?.[1];
+    deviceId = candidate?.slot?.deviceId || null;
+    sessionCode = candidate?.code || null;
+  }
 
   const session = sessionCode ? runtime.sessions.get(sessionCode) : null;
   const worker = (session?.phoneWorkers || []).find(w => w.id === deviceId);

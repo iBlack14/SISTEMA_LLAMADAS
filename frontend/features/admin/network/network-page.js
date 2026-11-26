@@ -264,6 +264,10 @@ function updateFilterCounts() {
     button.textContent = `${base} (${counts[button.dataset.filter] ?? 0})`;
   });
 }
+function equipmentOrder(item) {
+  const priority = { "En llamada": 0, "Marcando": 1, "Disponible": 2, "Desconectado": 3, "Sin vincular": 4 };
+  return priority[item.state] ?? 5;
+}
 function render() {
   if (!snapshot) return;
   const live = Boolean(socket?.connected && Date.now() - lastReceived < STALE_MS);
@@ -279,12 +283,19 @@ function render() {
   $("downloadLog").disabled = false;
   const counts = {"En llamada": 0, "Marcando": 0, "Disponible": 0, "Desconectado": 0, "Sin equipo": 0, "Sin señal de estado": 0};
   const disconnected = [];
-  for (const item of snapshot.equipment) {
+  const orderedEquipment = [...snapshot.equipment].sort((left, right) =>
+    equipmentOrder(left) - equipmentOrder(right) || left.number - right.number
+  );
+  for (const item of orderedEquipment) {
     const state = displayState(item, live);
     counts[state]++;
     if (state === "Desconectado") disconnected.push(item);
-    renderOrb(orbs.get(item.number) || createOrb(item.number), item.number, state, item.name, item, live);
-    renderCard(cards.get(item.number) || createCard(item.number), item, state, live);
+    const orb = orbs.get(item.number) || createOrb(item.number);
+    renderOrb(orb, item.number, state, item.name, item, live);
+    $("equipmentIndicators").appendChild(orb.parentElement);
+    const card = cards.get(item.number) || createCard(item.number);
+    renderCard(card, item, state, live);
+    $("equipmentGrid").appendChild(card);
   }
   for (const [id, state] of [["legendActive","En llamada"],["legendDialing","Marcando"],["legendReady","Disponible"],["legendOffline","Desconectado"],["legendNone","Sin equipo"],["legendUnknown","Sin señal de estado"]]) $(id).textContent = counts[state];
   const m = live ? snapshot.summary?.metrics : null;
