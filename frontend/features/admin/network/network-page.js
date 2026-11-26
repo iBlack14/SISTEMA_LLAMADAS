@@ -135,7 +135,7 @@ function createCard(number) {
   card.id = `equip-${number}`;
   card.tabIndex = -1;
   card.innerHTML = `<div class="card-heading">
-    <div><h3 class="card-title"></h3><span class="card-model"></span></div>
+    <div><h3 class="card-title"></h3><span class="card-model"></span><span class="card-device-id"></span></div>
     <span class="card-pill"></span>
   </div>
   <div class="card-time-badge"></div>
@@ -155,12 +155,16 @@ function createCard(number) {
 function renderCard(card, item, state, live) {
   card.dataset.state = state;
   card.dataset.tone = tones[state];
-  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
+  card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
   card.querySelector(".card-title").textContent = `Equipo ${String(item.number).padStart(2, "0")}`;
   const model = (item.name || "").replace(/\bCelular\b/gi, "Equipo").replace(/^Equipo\s*\d*\s*/i, "").trim();
   const modelEl = card.querySelector(".card-model");
   modelEl.textContent = model;
   modelEl.hidden = !model;
+  const deviceIdEl = card.querySelector(".card-device-id");
+  deviceIdEl.textContent = item.deviceId ? `ID: ${item.deviceId}` : "Sin ID vinculado";
+  deviceIdEl.hidden = !item.deviceId;
+  deviceIdEl.title = item.deviceId ? `ID del dispositivo: ${item.deviceId}` : "";
   const meta = card.querySelector(".card-meta");
   meta.innerHTML = [item.rubro, item.schedule].filter(Boolean).map(part => `<span>${esc(part)}</span>`).join("");
   meta.hidden = !meta.textContent;
@@ -267,7 +271,11 @@ function render() {
   $("liveDot").className = "status-dot" + (live ? " connected" : "");
   document.querySelector(".connection").classList.toggle("is-offline", !live);
   $("updatedAt").textContent = `Actualizado ${stamp(snapshot.generatedAt)}`;
-  $("nodeCount").textContent = `${snapshot.equipment.length} posiciones`;
+  const connectedCount = snapshot.equipment.filter(item => ["Disponible", "En llamada", "Marcando"].includes(item.state)).length;
+  const linkedCount = snapshot.equipment.filter(item => item.deviceId).length;
+  $("nodeCount").textContent = live
+    ? `${connectedCount} conectados · ${linkedCount} vinculados · ${snapshot.equipment.length} posiciones`
+    : `Sin conexión · ${linkedCount} vinculados · ${snapshot.equipment.length} posiciones`;
   $("downloadLog").disabled = false;
   const counts = {"En llamada": 0, "Marcando": 0, "Disponible": 0, "Desconectado": 0, "Sin equipo": 0, "Sin señal de estado": 0};
   const disconnected = [];
@@ -293,7 +301,7 @@ function render() {
   reconnectAll.title = !live ? "Sin conexion con el servidor" : hasDisconnected
     ? `Reconectar ${disconnected.length} equipo(s) desconectado(s)` : "No hay equipos desconectados";
   $("overflowNotice").hidden = !snapshot.overflow;
-  $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) fuera de las 10 posiciones.` : "";
+  $("overflowNotice").textContent = snapshot.overflow ? `${snapshot.overflow} equipo(s) adicional(es) identificados por ID y mostrados desde la posición ${Math.max(10, snapshot.equipment.length - snapshot.overflow) + 1}.` : "";
   updateFilterCounts();
   applyFilters();
 }

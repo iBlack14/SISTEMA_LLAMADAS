@@ -745,6 +745,17 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.card-device-id {
+  display: block;
+  margin-top: 5px;
+  color: #d8b9e8;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .card-meta {
   display: flex;
   flex-wrap: wrap;

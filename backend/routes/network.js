@@ -243,11 +243,13 @@ runtime.app.get("/api/network", runtime.auth.requireAdmin, async (_, res) => {
 runtime.app.get("/api/network/activity", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const raw = String(req.query.equipment || "");
-  if (!/^(?:[1-9]|10)(?:,(?:[1-9]|10))*$/.test(raw) || raw.split(",").length > 10) {
-    return res.status(400).json({ ok: false, error: "Selecciona equipos del 1 al 10." });
+  if (!/^[1-9]\d*(?:,[1-9]\d*)*$/.test(raw) || raw.split(",").length > 100) {
+    return res.status(400).json({ ok: false, error: "Selecciona IDs de equipo válidos." });
   }
   const numbers = [...new Set(raw.split(",").map(Number))];
   try {
+    const current = await runtime.network.snapshot();
+    if (numbers.some(number => number > current.equipment.length)) return res.status(400).json({ ok: false, error: "Equipo fuera del rango actual." });
     const snapshot = await runtime.network.snapshot({ detailNumbers: numbers });
     res.json({ ok: true, equipment: snapshot.equipment.filter(item => numbers.includes(item.number)) });
   } catch { res.status(503).json({ ok: false, error: "No se pudo consultar la actividad." }); }
@@ -256,26 +258,22 @@ runtime.app.get("/api/network/activity", runtime.auth.requireAdmin, async (req, 
 runtime.app.get("/api/network/equipment/:number", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const number = Number(req.params.number);
-  if (!Number.isInteger(number) || number < 1 || number > 10) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
+  if (!Number.isInteger(number) || number < 1 || number > 1000) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
   try {
     const snapshot = await runtime.network.snapshot({ detailNumbers: [number] });
-    res.json({ ok: true, generatedAt: snapshot.generatedAt, equipment: snapshot.equipment[number - 1] });
+    const equipment = snapshot.equipment.find(item => item.number === number);
+    if (!equipment) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
+    res.json({ ok: true, generatedAt: snapshot.generatedAt, equipment });
   } catch { res.status(503).json({ ok: false, error: "No se pudo consultar el equipo." }); }
 });
 
 async function attemptReconnectEquipment(number) {
   const row = runtime.network.registry.find(item => item.position === number);
-  let deviceId = row?.device_id || null;
-  let sessionCode = row?.session_code || null;
-
-  if (!deviceId) {
-    const candidates = [...runtime.network.candidates().values()];
-    const candidate = candidates[number - 1];
-    if (candidate) {
-      deviceId = candidate.slot?.deviceId;
-      sessionCode = candidate.code;
-    }
-  }
+  const snapshot = await runtime.network.snapshot();
+  const item = snapshot.equipment.find(equipment => equipment.number === number);
+  const deviceId = item?.deviceId || row?.device_id || null;
+  const candidate = [...runtime.network.candidates().entries()].find(([id]) => id === deviceId)?.[1];
+  const sessionCode = candidate?.code || row?.session_code || null;
 
   const session = sessionCode ? runtime.sessions.get(sessionCode) : null;
   const worker = (session?.phoneWorkers || []).find(w => w.id === deviceId);
@@ -321,7 +319,7 @@ async function attemptReconnectEquipment(number) {
 runtime.app.post("/api/network/equipment/:number/reconnect", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const number = Number(req.params.number);
-  if (!Number.isInteger(number) || number < 1 || number > 10) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
+  if (!Number.isInteger(number) || number < 1 || number > 1000) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
   try {
     const result = await attemptReconnectEquipment(number);
     const snapshot = await runtime.network.snapshot();
@@ -334,12 +332,12 @@ runtime.app.post("/api/network/equipment/:number/reconnect", runtime.auth.requir
 runtime.app.post("/api/network/reconnect", runtime.auth.requireAdmin, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
+    const current = await runtime.network.snapshot();
     let numbers = [];
     if (Array.isArray(req.body?.equipment) && req.body.equipment.length > 0) {
-      numbers = [...new Set(req.body.equipment.map(Number))].filter(n => Number.isInteger(n) && n >= 1 && n <= 10);
+      numbers = [...new Set(req.body.equipment.map(Number))].filter(n => Number.isInteger(n) && n >= 1 && n <= current.equipment.length);
     } else {
-      const snapshot = await runtime.network.snapshot();
-      numbers = snapshot.equipment.filter(e => e.state === "Desconectado").map(e => e.number);
+      numbers = current.equipment.filter(e => e.state === "Desconectado").map(e => e.number);
     }
 
     const results = [];

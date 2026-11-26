@@ -168,8 +168,21 @@ export class NetworkMonitor {
   async buildSnapshot(detailNumbers) {
     const devices = this.candidates();
     await this.syncRegistry(devices);
+    const registeredIds = new Set(this.registry.map(row => row.device_id));
+    const virtualRows = [...devices.entries()]
+      .filter(([id]) => !registeredIds.has(id))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, device], index) => ({
+        position: Math.max(10, ...this.registry.map(row => Number(row.position) || 0)) + index + 1,
+        device_id: device.slot.deviceId,
+        session_code: device.code,
+        name: device.name,
+        last_activity_at: null
+      }));
+    const displayRows = [...this.registry, ...virtualRows];
+    const rowsByPosition = new Map(displayRows.map(row => [Number(row.position), row]));
     const sources = new Map();
-    for (const row of this.registry) {
+    for (const row of displayRows) {
       const code = devices.get(row.device_id)?.code || row.session_code;
       if (sources.has(code)) continue;
       const session = this.getSessions().get(code);
@@ -230,8 +243,8 @@ export class NetworkMonitor {
         /* Keep the last confirmed history snapshot while storage recovers. */
       }
     }
-    const equipment = Array.from({ length: 10 }, (_, index) => {
-      const row = this.registry.find(item => item.position === index + 1);
+    const equipment = Array.from({ length: Math.max(10, ...displayRows.map(row => Number(row.position) || 0)) }, (_, index) => {
+      const row = rowsByPosition.get(index + 1);
       if (!row) return { number: index + 1, name: `Equipo ${index + 1}`, state: "Sin vincular", calling: false,
         stateSince: null,
         call: null, deviceId: null, metrics: null, pending: null, historyVersion: "unknown",
@@ -337,9 +350,9 @@ export class NetworkMonitor {
       && ["morning", "afternoon"].includes(s.turn.type) && /^\d{4}-\d{2}-\d{2}$/.test(s.turn.date)
       && s.turn.startedAt && s.rows && s.turn.date === allSources[0].turn.date && s.turn.type === allSources[0].turn.type);
     const scopeRows = common ? allSources.flatMap(s => s.rows.filter(r => r.shiftId === s.turn.id
-      && this.registry.some(device => device.device_id === r.workerId))) : null;
-    return { generatedAt: iso(this.now()), callingCount: equipment.filter(e => e.calling).length, capacity: 10,
-      equipment, overflow: [...devices.keys()].filter(id => !this.registry.some(r => r.device_id === id)).length,
+      && displayRows.some(device => device.device_id === r.workerId))) : null;
+    return { generatedAt: iso(this.now()), callingCount: equipment.filter(e => e.calling).length, capacity: equipment.length,
+      equipment, overflow: virtualRows.length,
       summary: { metrics: scopeRows ? summarizeAttempts(scopeRows) : null,
         label: common ? `${allSources[0].turn.label} · ${allSources[0].turn.date}` : "Turno sin alcance común",
         scope: common ? `${allSources.length} sesión(es); intentos identificados por turno y celular.` : "No hay turnos activos compatibles para consolidar el resumen.",
