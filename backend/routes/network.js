@@ -79,13 +79,13 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
     if (missingCodes.length) {
       const [monthlyStoredContacts] = await runtime.auth.pool.query(
         `SELECT session_code,list_name,
-          DATE_FORMAT(DATE_SUB(STR_TO_DATE(SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt')),1,23),'%Y-%m-%dT%H:%i:%s.%f'),INTERVAL 5 HOUR),'%Y-%m') AS year_month,
+          DATE_FORMAT(DATE_SUB(STR_TO_DATE(SUBSTRING(JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt')),1,23),'%Y-%m-%dT%H:%i:%s.%f'),INTERVAL 5 HOUR),'%Y-%m') AS import_month,
           COUNT(*) AS contact_count,MAX(JSON_UNQUOTE(JSON_EXTRACT(contact_data,'$.createdAt'))) AS last_imported_at
           FROM vc_contact_book_contacts WHERE session_code IN (${missingCodes.map(() => "?").join(",")})
             AND JSON_EXTRACT(contact_data,'$.createdAt') IS NOT NULL
-          GROUP BY session_code,list_name,year_month`, missingCodes);
+          GROUP BY session_code,list_name,import_month`, missingCodes);
       for (const row of monthlyStoredContacts) {
-        if (!row.year_month) continue;
+        if (!row.import_month) continue;
         const account = rows.find(item => item.session_code === row.session_code);
         const user = account && usersById.get(String(account.user_id));
         if (!user) continue;
@@ -95,10 +95,10 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
           user._listsBySession.set(row.list_name, list);
           user.lists.push(list);
         }
-        list.monthlyCounts[row.year_month] = (list.monthlyCounts[row.year_month] || 0) + Number(row.contact_count);
-        const currentDate = list.monthlyLastImportedAt[row.year_month];
+        list.monthlyCounts[row.import_month] = (list.monthlyCounts[row.import_month] || 0) + Number(row.contact_count);
+        const currentDate = list.monthlyLastImportedAt[row.import_month];
         if (!currentDate || new Date(row.last_imported_at).getTime() > new Date(currentDate).getTime()) {
-          list.monthlyLastImportedAt[row.year_month] = row.last_imported_at;
+          list.monthlyLastImportedAt[row.import_month] = row.last_imported_at;
         }
         if (!list.lastImportedAt || new Date(row.last_imported_at).getTime() > new Date(list.lastImportedAt).getTime()) list.lastImportedAt = row.last_imported_at;
       }

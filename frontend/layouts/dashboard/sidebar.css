@@ -817,6 +817,27 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   border-color: #f585ff; color: #fff; background: linear-gradient(110deg, #9c25d4, #6626a2);
   box-shadow: 0 5px 16px rgb(20 2 32 / 30%);
 }
+.admin-user-lists-view .admin-lists-months > button.admin-lists-month:not(.is-selected) {
+  border-color: #734482 !important; color: #d7c1e0 !important; background: #3b174e !important;
+  background-image: none !important; box-shadow: none !important;
+}
+.admin-user-lists-view .admin-lists-months > button.admin-lists-month.is-selected {
+  border-color: #f585ff !important; color: #fff !important;
+  background: linear-gradient(110deg, #9c25d4, #6626a2) !important;
+  box-shadow: 0 5px 16px rgb(20 2 32 / 30%) !important;
+}
+.admin-user-lists-view .admin-lists-month-heading label {
+  display: flex !important; align-items: center; gap: 8px; width: auto; min-width: 0 !important;
+  margin-left: auto; color: #cdb9db !important;
+}
+.admin-user-lists-view .admin-lists-month-heading select {
+  width: 86px !important; min-width: 86px; min-height: 38px; padding: 7px 27px 7px 12px;
+  border: 1px solid #8c55a5; border-radius: 10px; color: #fbf6ff !important;
+  color-scheme: dark; background-color: #1c0829 !important;
+}
+.admin-user-lists-view .admin-lists-category select {
+  color: #fbf6ff !important; color-scheme: dark; background-color: #1c0829 !important;
+}
 .admin-lists-month-panel > p { margin: 12px 0 0; color: #bba4ca; font-size: 12px; }
 .admin-lists-overview { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.25fr) minmax(180px, .55fr); gap: 20px; align-items: center; margin-top: 18px; padding: 18px 22px; }
 .admin-lists-overview h4,
@@ -871,6 +892,9 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   .admin-lists-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .admin-lists-overview { grid-template-columns: 1fr 1fr; }
   .admin-lists-search { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (min-width: 901px) and (max-width: 1440px) {
+  .admin-lists-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   .admin-lists-month-panel { padding: 15px; }
