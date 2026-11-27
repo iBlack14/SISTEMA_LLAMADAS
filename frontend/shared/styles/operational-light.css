@@ -10,6 +10,8 @@ body:has(#callsContent:not([hidden])) #statusText, body:has(#contactsContent:not
 #callsContent :is(.calls-shift-label, .qr-description, .call-equipment-list, .call-equipment-current small, summary) { color: #796c81 !important; }
 #callsContent .general-call-heading > span { color: #796c81 !important; }
 #callsContent :is(.call-equipment-current, .call-equipment-detector) { background: #f8f5fa; border-color: #e8dfec; color: #35233f; }
+#callsContent .call-equipment-current span, #callsContent .call-equipment-detector strong { color: #35233f !important; }
+#callsContent .call-equipment-detector > span { color: #796c81 !important; }
 #callsContent .call-equipment-list select { background: #fff; border-color: #ded3e3; color: #35233f; }
 #callsContent .call-connection { background: #e5f4ea; border-color: #b8dfc5; color: #167846; }
 #callsContent [data-tone="offline"] .call-connection { background: #f8f5fa; border-color: #e8dfec; color: #796c81; }
@@ -21,7 +23,8 @@ body:has(#callsContent:not([hidden])) #statusText, body:has(#contactsContent:not
 #callsContent .calls-table-search input { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
 #callsContent :is(.calls-team-tabs, .calls-state-tabs) button { background: #fff !important; border: 1px solid #ded3e3 !important; color: #594660 !important; box-shadow: none !important; }
 #callsContent :is(.calls-team-tabs, .calls-state-tabs) button.is-active { background: #79258e !important; border-color: #79258e !important; color: #fff !important; }
-#callsContent .call-equipment-heading .call-connection { color: #594660 !important; background: #f1e9f5 !important; border-color: #e8dfec !important; }
+#callsContent .call-equipment-heading .call-connection { color: #167846 !important; background: #e5f4ea !important; border-color: #b8dfc5 !important; }
+#callsContent [data-tone="offline"] .call-equipment-heading .call-connection { color: #796c81 !important; background: #f1e9f5 !important; border-color: #e8dfec !important; }
 #callsContent .call-equipment-card [data-delete-pairing-slot] { background: #fff !important; border: 1px solid #ded3e3 !important; color: #79258e !important; box-shadow: none !important; }
 #contactsContent { color: #35233f; font-family: 'Outfit', sans-serif; }
 #contactsContent :is(.contacts-window-header, #contactsSection, .admin-user-lists-view) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none !important; }
