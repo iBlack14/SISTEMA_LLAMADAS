@@ -8,6 +8,18 @@ export const socket = io(API_BASE, {
   transports: ["websocket"],
   timeout: 60000
 });
+let initialBootId = null;
+socket.on("app:version", ({ bootId } = {}) => {
+  if (!bootId) return;
+  if (!initialBootId) {
+    initialBootId = bootId;
+    return;
+  }
+  if (bootId !== initialBootId) {
+    window.location.reload();
+  }
+});
+
 socket.on("connect_error", error => {
   if (error.message === "AUTH_REQUIRED") window.location.replace("/login");
   if (error.message === "AUTH_CHANGED") window.location.replace("/");

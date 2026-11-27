@@ -37,7 +37,10 @@ export function registerStatic(runtime) {
   const staticOptions = {
     maxAge: "1d",
     setHeaders(res, filePath) {
-      if (/\.(?:html|js|css)$/.test(filePath)) {
+      if (/\.html$/.test(filePath)) {
+        // El HTML raíz nunca debe servirse cacheado para que cargue siempre los últimos assets.
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      } else if (/\.(?:js|css)$/.test(filePath)) {
         // El código y los estilos cambian con cada deploy: revalidar siempre.
         res.setHeader("Cache-Control", "no-cache, must-revalidate");
       } else if (/\.(?:png|jpg|jpeg|svg|ico|woff2?)$/.test(filePath)) {
