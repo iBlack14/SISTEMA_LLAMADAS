@@ -54,7 +54,10 @@ runtime.app.post("/api/session/:code/campaign/start", async (req, res) => {
     return res.status(413).json({ ok: false, error: "La campana admite hasta 10000 contactos." });
   }
   try {
-    const history = await runtime.persistence.getCallAttempts(code);
+    const persistenceStatus = runtime.persistence.status();
+    if (persistenceStatus.databaseConfigured && persistenceStatus.mode === "pending") {
+      throw new Error("MySQL tiene escrituras pendientes.");
+    }
     const called = services.annualBlocks();
     const seen = new Set();
     contacts = contacts.filter(contact => {

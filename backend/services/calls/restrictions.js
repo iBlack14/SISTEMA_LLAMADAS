@@ -14,12 +14,23 @@ export function createRestrictions(runtime, services) {
     for (const row of rows) durableExclusions.set(phoneKey(row.phone), row);
     return rows.length;
   }
+  let cachedPersistedRevision = -1;
+  let cachedPersistedRows = [];
   let cachedAllCallAttemptsKey = "";
   let cachedAllCallAttempts = [];
-  let blockedAttemptsSnapshot = null;
-  let blockedNumbersByPhone = new Map();
-  let nextBlockExpiryAt = 0;
-  
+  let cachedPersistedBlocksRevision = -1;
+  let cachedPersistedBlocks = new Map();
+  let nextPersistedExpiryAt = 0;
+
+  function persistedRows() {
+    const revision = runtime.persistence.attemptsRevision || 0;
+    if (revision !== cachedPersistedRevision) {
+      cachedPersistedRows = [...runtime.persistence.records.values()].map(entry => entry.row);
+      cachedPersistedRevision = revision;
+    }
+    return cachedPersistedRows;
+  }
+
   function allCallAttempts() {
     const startedAt = Date.now();
     // Use cached attempts if available
@@ -32,45 +43,63 @@ export function createRestrictions(runtime, services) {
       if (elapsedMs >= 100) console.info(`[CALL_ATTEMPTS] cache=hit sessions=${runtime.sessions.size} rows=${cachedAllCallAttempts.length} elapsedMs=${elapsedMs}`);
       return cachedAllCallAttempts;
     }
-    
-    const rows = [...runtime.persistence.records.values()].map(entry => entry.row);
+
+    const rows = [...persistedRows()];
     for (const session of runtime.sessions.values()) rows.push(...collectCallAttempts(session));
-    
+
     cachedAllCallAttemptsKey = cacheKey;
     cachedAllCallAttempts = rows;
     const elapsedMs = Date.now() - startedAt;
     if (elapsedMs >= 100) console.info(`[CALL_ATTEMPTS] cache=miss sessions=${runtime.sessions.size} rows=${rows.length} elapsedMs=${elapsedMs}`);
     return rows;
   }
-  
+
   function clearAllCallAttemptsCache() {
+    cachedPersistedRevision = -1;
+    cachedPersistedRows = [];
     cachedAllCallAttemptsKey = "";
     cachedAllCallAttempts = [];
-    blockedAttemptsSnapshot = null;
-    blockedNumbersByPhone = new Map();
-    nextBlockExpiryAt = 0;
+    cachedPersistedBlocksRevision = -1;
+    cachedPersistedBlocks = new Map();
+    nextPersistedExpiryAt = 0;
+  }
+
+  function persistedAnnualBlocks(now) {
+    const revision = runtime.persistence.attemptsRevision || 0;
+    if (revision !== cachedPersistedBlocksRevision || now >= nextPersistedExpiryAt) {
+      cachedPersistedBlocks = annualPhoneBlocks(persistedRows(), new Date(now));
+      cachedPersistedBlocksRevision = revision;
+      nextPersistedExpiryAt = Infinity;
+      for (const block of cachedPersistedBlocks.values()) {
+        if (block.permanent) continue;
+        const expiry = Date.parse(block.nextAllowedAt);
+        if (Number.isFinite(expiry) && expiry < nextPersistedExpiryAt) nextPersistedExpiryAt = expiry;
+      }
+    }
+    return cachedPersistedBlocks;
   }
 
   function allAnnualBlocks() {
-    const attempts = allCallAttempts();
     const now = Date.now();
-    if (attempts !== blockedAttemptsSnapshot || now >= nextBlockExpiryAt) {
-      blockedNumbersByPhone = annualPhoneBlocks(attempts, new Date(now));
-      blockedAttemptsSnapshot = attempts;
-      nextBlockExpiryAt = Infinity;
-      for (const block of blockedNumbersByPhone.values()) {
-        if (block.permanent) continue;
-        const expiry = Date.parse(block.nextAllowedAt);
-        if (Number.isFinite(expiry) && expiry < nextBlockExpiryAt) nextBlockExpiryAt = expiry;
+    const blocks = new Map(persistedAnnualBlocks(now));
+    const liveAttempts = [];
+    for (const session of runtime.sessions.values()) liveAttempts.push(...collectCallAttempts(session));
+    if (liveAttempts.length) {
+      for (const [phone, block] of annualPhoneBlocks(liveAttempts, new Date(now))) {
+        const existing = blocks.get(phone);
+        if (existing?.permanent) continue;
+        if (block.permanent || !existing || Date.parse(block.lastCalledAt) > Date.parse(existing.lastCalledAt)) {
+          blocks.set(phone, block);
+        }
       }
     }
     for (const [phone, exclusion] of durableExclusions) {
-      if (exclusion.called || exclusion.invalid_number) blockedNumbersByPhone.set(phone, {
+      if (exclusion.called || exclusion.invalid_number) blocks.set(phone, {
         permanent: true, lastCalledAt: null, nextAllowedAt: null,
         reason: exclusion.invalid_number ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : "NO VOLVER A LLAMAR: número ya llamado"
       });
     }
-    return blockedNumbersByPhone;
+    return blocks;
   }
 
   function globalBlockedNumbers() {

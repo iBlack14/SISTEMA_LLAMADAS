@@ -263,7 +263,7 @@ function renderAdminListBrowser() {
   browseRows = [];
   for (const user of users) for (const list of user.lists || []) {
     const count = Number(list.monthlyCounts?.[yearMonth] || 0);
-    if (count > 0) browseRows.push({ userId: user.id, name: list.name, count, total: Number(list.count || 0), createdAt: list.monthlyLastImportedAt?.[yearMonth] || null, rubro: list.rubro || list.name });
+    if (count > 0) browseRows.push({ userId: user.id, name: list.name, count, total: Number(list.count || 0), createdAt: list.monthlyLastImportedAt?.[yearMonth] || null, estimated: Boolean(list.monthlyEstimatedMonths?.[yearMonth]), rubro: list.rubro || list.name });
   }
   browseRows.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")) || a.name.localeCompare(b.name, "es"));
   const totalContactsForMonth = browseRows.reduce((sum, row) => sum + row.count, 0);
@@ -302,7 +302,9 @@ function renderAdminListRows() {
     countCell.className = "admin-lists-count-cell";
     countCell.textContent = item.count.toLocaleString("es-PE");
     const dateCell = document.createElement("td");
-    dateCell.textContent = item.createdAt ? new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : "—";
+    const formattedDate = item.createdAt ? new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : "—";
+    dateCell.textContent = item.estimated ? `${formattedDate} · Registro inicial` : formattedDate;
+    if (item.estimated) dateCell.title = "Asignada a este mes para hacer visible una base antigua sin fecha de importación; no representa su fecha histórica.";
     const actionCell = document.createElement("td");
     const open = document.createElement("button");
     open.type = "button";
