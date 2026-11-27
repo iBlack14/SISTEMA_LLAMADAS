@@ -5,19 +5,88 @@ body:has(#messagesView:not([hidden])) .panel { background: #fff !important; bord
 body:has(#messagesView:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
 body:has(#messagesView:not([hidden])) #statusText { color: #796c81 !important; }
 #messagesView { color: #35233f; font-family: 'Outfit', sans-serif; }
-#messagesView .messages-section-card { background: #fff; border: 1px solid #e8dfec; color: #35233f; }
+#messagesView .messages-section-card {
+  background: #fff;
+  border: 1px solid #e5d2ec;
+  border-top: 3px solid #b51eb9;
+  box-shadow: 0 8px 26px rgba(121, 37, 142, 0.06);
+  color: #35233f;
+}
 #messagesView .messages-card-header h3 { color: #35233f !important; }
-#messagesView .muted, #messagesView #messageContactsStatus, #messagesView #messageContactsCount { color: #796c81 !important; }
-#messagesView #messagesBackBtn { color: #796c81 !important; background: #f8f5fa !important; border: 1px solid #e8dfec !important; }
-#messagesView #messageContactsUserSelector.mc-user-selector { background: #f8f5fa; border-color: #e8dfec; }
-#messagesView #messageContactsUserSelector label, #messagesView #messageContactsUserSelector .mc-user-selector-hint { color: #796c81 !important; }
-#messagesView #messageContactsUserSelector .mc-select-icon, #messagesView #messageContactsUserSelector .mc-select-chevron { color: #796c81; }
-#messagesView #messageContactsUserSelector select, #messagesView #messageContactsUserSelector select:hover { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
+#messagesView .muted, #messagesView #messageContactsStatus { color: #796c81 !important; }
+#messagesView #messageContactsCount {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%);
+  border: 0;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+#messagesView #messagesBackBtn {
+  color: #79258e !important;
+  background: #fbf6fd !important;
+  border: 1px solid #e2cce9 !important;
+}
+#messagesView #messagesBackBtn:hover { background: #f4e7f9 !important; }
+#messagesView #messageContactsUserSelector.mc-user-selector {
+  background: linear-gradient(135deg, #fbf6fd 0%, #fdf4fa 100%);
+  border-color: #e7d2ee;
+}
+#messagesView #messageContactsUserSelector label { color: #79258e !important; }
+#messagesView #messageContactsUserSelector .mc-user-selector-hint { color: #796c81 !important; }
+#messagesView #messageContactsUserSelector .mc-select-icon,
+#messagesView #messageContactsUserSelector .mc-select-chevron { color: #9c08d2; }
+#messagesView #messageContactsUserSelector select, #messagesView #messageContactsUserSelector select:hover { background: #fff !important; color: #35233f !important; border-color: #d9c3e2 !important; }
 #messagesView #messageContactsUserSelector select option { background: #fff; color: #35233f; }
-#messagesView .table-wrap { border: 1px solid #e8dfec; border-radius: 10px; }
+#messagesView .table-wrap { border: 1px solid #e5d2ec; border-radius: 10px; }
 #messagesView table { background: #fff; color: #35233f; }
-#messagesView th { background: #f8f5fa !important; color: #594660 !important; border-color: #e8dfec !important; }
-#messagesView td { color: #35233f !important; border-color: #eee7f0 !important; }
-#messagesView .add-manual-contact-btn { background: #79258e !important; border: 1px solid #79258e !important; color: #fff !important; border-radius: 9px; box-shadow: none !important; }
-#messagesView .delete-all-message-contacts-btn { background: #fff !important; border-color: #dcc9e2 !important; color: #79258e !important; }
+#messagesView thead tr {
+  background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important;
+}
+#messagesView th {
+  background: transparent !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+#messagesView td { color: #35233f !important; border-color: #f0e7f3 !important; transition: background-color .14s ease, color .14s ease; }
+#messagesView tbody tr:hover td { background: #e8c6f7 !important; color: #210830 !important; }
+#messagesView tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 #9c08d2; }
+#messagesView .send-status-chip.is-idle {
+  background: #ffffff !important;
+  color: #594660 !important;
+  border: 1px solid #d5bfe0 !important;
+  font-weight: 600;
+}
+#messagesView .message-contact-wa {
+  background: #16a34a !important;
+  border: 1.5px solid #15803d !important;
+  color: #ffffff !important;
+}
+#messagesView .message-contact-mail {
+  background: #ffffff !important;
+  border: 1.5px solid #2563eb !important;
+  color: #1d4ed8 !important;
+}
+#messagesView .message-contact-mail:hover {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+#messagesView .message-contact-delete {
+  background: #ffffff !important;
+  border: 1.5px solid #e11d48 !important;
+  color: #be123c !important;
+}
+#messagesView .message-contact-delete:not(:disabled):hover {
+  background: #e11d48 !important;
+  color: #ffffff !important;
+}
+#messagesView .add-manual-contact-btn {
+  background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%) !important;
+  border: 1px solid transparent !important;
+  color: #fff !important;
+  border-radius: 9px;
+  box-shadow: 0 4px 14px rgba(156, 8, 210, 0.18) !important;
+}
+#messagesView .add-manual-contact-btn:hover { filter: brightness(1.06); }
+#messagesView .delete-all-message-contacts-btn { background: #fff !important; border-color: #e2b8d8 !important; color: #b51b89 !important; }
 #messagesView :is(button, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }

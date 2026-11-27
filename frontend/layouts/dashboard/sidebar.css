@@ -14,7 +14,7 @@ html.has-viavox-sidebar body .panel > .apk-bar { display: none; }
 }
 .viavox-sidebar *, .viavox-menu-toggle { box-sizing: border-box; }
 /* The existing panel theme has global important rules for links and buttons. */
-.viavox-sidebar a { color: #e9c5f2 !important; }
+.viavox-sidebar a { color: #ffffff !important; }
 .viavox-sidebar .viavox-brand, .viavox-sidebar .viavox-brand * { color: #fff !important; }
 .viavox-sidebar .viavox-navigation > [aria-current="page"] { color: #fff !important; }
 .viavox-sidebar button, button.viavox-menu-toggle {
@@ -642,7 +642,7 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .viavox-sidebar {
   width: 248px;
   padding: 22px 14px 16px;
-  background: #a72a83;
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%);
   border-right: 1px solid rgba(245, 190, 255, .22);
   box-shadow: 10px 0 34px rgba(20, 0, 28, .12);
 }
@@ -654,7 +654,7 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   background: linear-gradient(90deg, #fb55c9, #a72bea 72%, #7130bd);
 }
 .viavox-sidebar button:hover { background: rgba(92, 12, 75, .25) !important; }
-button.viavox-menu-toggle { background: #922376 !important; }
+button.viavox-menu-toggle { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; }
 .viavox-sidebar .viavox-brand {
   gap: 11px;
   min-height: 72px;
@@ -664,7 +664,7 @@ button.viavox-menu-toggle { background: #922376 !important; }
 }
 .viavox-brand img { width: 46px; height: 42px; }
 .viavox-brand strong { font-size: 23px; letter-spacing: -.5px; }
-.viavox-brand small { color: #d9b8e4 !important; font-size: 9px; letter-spacing: .8px; }
+.viavox-brand small { color: #ffffff !important; opacity: .92; font-size: 9px; letter-spacing: .8px; }
 .viavox-navigation { gap: 5px; }
 .viavox-sidebar .viavox-navigation > a,
 .viavox-sidebar .viavox-navigation > button {
@@ -675,10 +675,11 @@ button.viavox-menu-toggle { background: #922376 !important; }
   border: 1px solid transparent;
   border-left: 3px solid transparent;
   border-radius: 9px;
-  color: #f0def7;
+  color: #ffffff !important;
   font-size: 14px;
-  font-weight: 600;
-  letter-spacing: .2px;
+  font-weight: 700;
+  letter-spacing: .25px;
+  text-shadow: 0 1px 2px rgba(24, 0, 36, .28);
   transition: background-color .16s ease, border-color .16s ease, color .16s ease;
 }
 .viavox-nav-icon {
@@ -690,7 +691,7 @@ button.viavox-menu-toggle { background: #922376 !important; }
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #f3b9fb;
+  color: #ffffff;
   transition: color .16s ease, transform .16s ease;
 }
 .viavox-nav-icon-art {
@@ -711,15 +712,15 @@ button.viavox-menu-toggle { background: #922376 !important; }
 }
 .viavox-sidebar .viavox-navigation > :hover {
   border-color: transparent;
-  background: rgba(255, 255, 255, .09);
+  background: rgba(24, 0, 36, .18);
   color: #fff;
 }
 .viavox-sidebar .viavox-navigation > [aria-current="page"] {
   border-color: transparent;
-  border-left-color: #ff63ce !important;
-  background: rgba(255, 255, 255, .13) !important;
+  border-left-color: #ffffff !important;
+  background: rgba(24, 0, 36, .28) !important;
   color: #fff !important;
-  box-shadow: inset 0 0 18px rgba(255, 105, 222, .055);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, .06);
 }
 .viavox-sidebar-footer {
   padding-top: 18px;
@@ -728,32 +729,34 @@ button.viavox-menu-toggle { background: #922376 !important; }
   gap: 4px;
   margin: 0 0 14px;
   padding: 0 5px 14px;
-  border-bottom: 1px solid rgba(244, 206, 255, .14);
+  border-bottom: 1px solid rgba(255, 255, 255, .24);
 }
 .viavox-sidebar .viavox-downloads a {
   width: 100%;
   padding: 7px 5px;
   border-radius: 6px;
-  color: #d2b8de;
-  font-size: 10px;
+  color: #ffffff !important;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: .45px;
   text-decoration: none;
+  text-shadow: 0 1px 2px rgba(24, 0, 36, .24);
 }
 .viavox-sidebar .viavox-downloads a:hover {
-  background: rgba(255, 255, 255, .055);
+  background: rgba(24, 0, 36, .18);
   color: #fff;
 }
 .viavox-account {
   padding: 12px 11px 10px;
-  border: 1px solid rgba(226, 171, 239, .18);
+  border: 1px solid rgba(255, 255, 255, .26);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .018));
+  background: rgba(24, 0, 36, .22);
 }
 .viavox-account #accountIdentity {
   margin-bottom: 12px;
 }
-.viavox-account #accountUsername { font-size: 12px; letter-spacing: .35px; }
-.viavox-account .account-role { color: #d9b9e5; font-size: 10px; }
+.viavox-account #accountUsername { font-size: 12px; letter-spacing: .35px; color: #fff; }
+.viavox-account .account-role { color: #ffffff; opacity: .92; font-size: 10px; font-weight: 600; }
 .viavox-sidebar #logoutButton {
   min-height: 38px;
   border-color: rgba(238, 180, 248, .3);
