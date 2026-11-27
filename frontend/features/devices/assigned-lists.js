@@ -7,7 +7,14 @@ export function createAssignedLists(state, actions) {
   const pageSize = 25;
   let currentRows = [];
   const esc = value => actions.escHtml(String(value ?? ""));
+  let _rafPending = false;
   function renderAssignedListsPanel() {
+    // Deduplicar renders en el mismo frame de animación
+    if (_rafPending) return;
+    _rafPending = true;
+    requestAnimationFrame(() => { _rafPending = false; _renderAssignedListsPanelSync(); });
+  }
+  function _renderAssignedListsPanelSync() {
     const container = refs.assignedListsPanelEl;
     if (!container) return;
     if (!container.querySelector('.calls-contact-workspace')) {

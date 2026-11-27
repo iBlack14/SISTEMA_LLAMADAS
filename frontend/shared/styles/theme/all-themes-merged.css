@@ -1,4 +1,4 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap");
 
 :root {
   --bg: #030014;
@@ -37,8 +37,8 @@ body {
   width: min(1600px, calc(100vw - 40px));
   margin: 32px auto;
   background: var(--card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--border);
   border-radius: 28px;
   padding: 40px;
@@ -350,7 +350,7 @@ button.icon-btn.active-mute {
   height: 3px;
   background: linear-gradient(90deg, #22d3ee, #8b5cf6, #ec4899, #f59e0b);
   background-size: 200% 100%;
-  animation: campaign-gradient 7s linear infinite;
+  animation: campaign-gradient 20s linear infinite;
 }
 
 .campaign-panel-head {
@@ -500,7 +500,7 @@ button.icon-btn.active-mute {
 .worker-chip.is-active {
   border-color: rgba(16, 185, 129, 0.45);
   background: rgba(16, 185, 129, 0.12);
-  animation: worker-active-glow 1.8s ease-in-out infinite;
+  animation: worker-active-glow 4s ease-in-out infinite;
 }
 
 .callback-card {
@@ -1540,7 +1540,7 @@ button,
   border-radius: 15px;
   pointer-events: none;
   box-shadow: 0 0 14px color-mix(in srgb, var(--call-state-border) 55%, transparent);
-  animation: call-state-border-motion 1.15s ease-in-out infinite;
+  animation: call-state-border-motion 2s ease-in-out infinite;
   transform-origin: center;
 }
 
@@ -1575,11 +1575,11 @@ button,
 }
 
 .pairing-call-status-icon.is-vibrating {
-  animation: phone-panel-vibration 0.34s linear infinite;
+  animation: phone-panel-vibration 0.5s linear infinite;
 }
 
 .pairing-call-status-icon.is-pulsing {
-  animation: call-icon-pulse 1.05s ease-in-out infinite;
+  animation: call-icon-pulse 2s ease-in-out infinite;
 }
 
 .pairing-call-status-icon.is-rejected {
@@ -1974,7 +1974,7 @@ button,
   border: 1px solid rgba(236, 0, 179, 0.38);
   border-radius: 22px;
   background: rgba(34, 2, 59, 0.58);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
 }
 
 .assigned-lists-empty {
@@ -2651,7 +2651,7 @@ button:disabled {
   position: fixed;
   inset: 0;
   background: rgba(3, 7, 18, 0.75);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -2888,8 +2888,8 @@ button:disabled {
   position: fixed;
   inset: 0;
   background: rgba(3, 0, 20, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2902,8 +2902,8 @@ button:disabled {
   border: 1px solid var(--border-bright);
   border-radius: 32px;
   background: rgba(20, 0, 35, 0.6);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 36px;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.05),
@@ -2922,7 +2922,7 @@ button:disabled {
   margin: 0 auto 20px;
   position: relative;
   box-shadow: 0 0 30px var(--accent-glow);
-  animation: pulse-ring 2.2s ease-in-out infinite;
+  animation: pulse-ring 4s ease-in-out infinite;
 }
 
 .call-pulse-ring img {
@@ -2976,12 +2976,12 @@ button:disabled {
 
 /* New Call Pulsing Behavior */
 .call-pulse-ring.is-calling {
-  animation: call-pulse-yellow 1.4s infinite;
+  animation: call-pulse-yellow 2.5s infinite;
   border-color: rgba(245, 158, 11, 0.4);
 }
 
 .call-pulse-ring.is-in-call {
-  animation: call-pulse-green 1.4s infinite;
+  animation: call-pulse-green 2.5s infinite;
   border-color: rgba(16, 185, 129, 0.5);
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
 }
@@ -3100,7 +3100,7 @@ button:disabled {
   color: var(--yellow);
   border-color: rgba(245, 158, 11, 0.4);
   background: rgba(245, 158, 11, 0.08);
-  animation: blink-badge 1.2s ease-in-out infinite;
+  animation: blink-badge 2.5s ease-in-out infinite;
 }
 
 .badge.state-in_call {
@@ -4654,8 +4654,8 @@ body {
   color: var(--text);
   background: linear-gradient(150deg, rgba(250, 244, 252, 0.88), rgba(229, 208, 239, 0.82));
   border-color: rgba(255,255,255,0.48);
-  backdrop-filter: blur(28px) saturate(115%);
-  -webkit-backdrop-filter: blur(28px) saturate(115%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: 0 24px 55px rgba(49, 15, 61, 0.25), inset 0 1px rgba(255,255,255,0.62);
 }
 
@@ -4677,8 +4677,8 @@ body .panel * { color: #211425 !important; }
   background: rgba(255, 251, 255, 0.58) !important;
   border-color: rgba(68, 28, 82, 0.16) !important;
   box-shadow: inset 0 1px rgba(255,255,255,0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .status-pill,
@@ -4819,8 +4819,8 @@ body {
   color: var(--text);
   background: linear-gradient(145deg, rgba(25, 2, 52, 0.48), rgba(53, 2, 65, 0.42));
   border: 1px solid rgba(236, 0, 179, 0.58);
-  backdrop-filter: blur(7px) saturate(112%);
-  -webkit-backdrop-filter: blur(7px) saturate(112%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: 0 28px 70px rgba(10, 0, 25, 0.52), inset 0 1px rgba(255,255,255,0.06);
 }
 
@@ -4848,8 +4848,8 @@ body .panel * { color: inherit !important; }
   background: linear-gradient(145deg, rgba(38, 3, 67, 0.39), rgba(65, 3, 73, 0.32)) !important;
   border-color: rgba(231, 0, 177, 0.38) !important;
   box-shadow: inset 0 1px rgba(255,255,255,0.045), 0 12px 30px rgba(8,0,24,0.16);
-  backdrop-filter: blur(5px) saturate(110%);
-  -webkit-backdrop-filter: blur(5px) saturate(110%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .status-pill,
@@ -6791,8 +6791,8 @@ body .panel .report-detailed-table tbody tr:nth-child(even) td {
   inset: 0;
   z-index: 1300;
   background: rgba(35, 3, 60, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7494,8 +7494,8 @@ body .panel .report-detailed-table tbody tr:nth-child(even) td {
   inset: 0;
   z-index: 1400 !important; /* Siempre por encima de sendMessageModal (1300) */
   background: rgba(35, 3, 60, 0.55); /* TraslÃºcido suave, deja ver el fondo magenta */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -8069,3 +8069,56 @@ body .panel .report-detailed-table tbody tr:nth-child(even) td {
 }
 
 
+
+
+/* =========================================================
+   OPTIMIZACIONES DE RENDIMIENTO - v20261127-perf
+   ========================================================= */
+
+/* contain: layout style → limita el repaint a cada tarjeta */
+.call-equipment-card {
+  contain: layout style;
+  will-change: transform;
+}
+
+/* Las tarjetas de campaña no necesitan repaints fuera de ellas */
+.pairing-slots-grid {
+  contain: layout;
+}
+
+/* Deshabilitar transform costoso en hover de cards cuando no es necesario */
+.call-equipment-card:hover {
+  transform: translateY(-1px);
+}
+
+/* Las filas de tabla no necesitan capas propias */
+#callsContent .calls-table-scroll tbody tr {
+  contain: layout style;
+}
+
+/* Modales: usar transform en lugar de opacity+display para evitar relayout */
+.edit-modal {
+  will-change: opacity, transform;
+}
+
+/* Sidebar: capas compositeadas para evitar repaint al abrir/cerrar */
+.viavox-sidebar {
+  will-change: transform;
+}
+
+/* Deshabilitar TODAS las animaciones si el usuario prefiere movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reducir box-shadow costosos en elementos no focalizados */
+#callsContent .call-equipment-card:not(:hover):not(:focus-within) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}

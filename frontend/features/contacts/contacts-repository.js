@@ -55,6 +55,8 @@ let persistTimer = null;
 function persist() {
   if (!ready || !transport) return;
   if (persistTimer) clearTimeout(persistTimer);
+  // Debounce ampliado a 1200ms: reduce la frecuencia de structuredClone
+  // con listas grandes (>1000 contactos) y evita saturar MySQL en ráfagas
   persistTimer = setTimeout(() => {
     persistTimer = null;
     const book = snapshot();

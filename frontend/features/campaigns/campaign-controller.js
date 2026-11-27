@@ -22,7 +22,17 @@ function campaignCounter(label, value, tone = "") {
   return `<div class="campaign-counter ${tone}"><span>${dashboardActions.escHtml(label)}</span><strong>${value}</strong></div>`;
 }
 
+let _renderCampaignPanelPending = false;
 function renderCampaignPanel() {
+  // requestAnimationFrame: evita múltiples re-renders en el mismo frame
+  if (_renderCampaignPanelPending) return;
+  _renderCampaignPanelPending = true;
+  requestAnimationFrame(() => {
+    _renderCampaignPanelPending = false;
+    _renderCampaignPanelSync();
+  });
+}
+function _renderCampaignPanelSync() {
   dashboardActions.syncTurnPendingContacts();
   dashboardActions.renderTurnPendingContacts();
   dashboardActions.renderShiftManagement();
