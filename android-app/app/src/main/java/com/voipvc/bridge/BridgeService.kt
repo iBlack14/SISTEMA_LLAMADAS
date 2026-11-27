@@ -186,6 +186,7 @@ class BridgeService : Service() {
     private var lastDialCommandId = ""
     private var lastDialAck = DialResult(false, "")
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -241,6 +242,22 @@ class BridgeService : Service() {
             }
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo obtener WakeLock: ${e.message}")
+        }
+
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            val lockMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                @Suppress("DEPRECATION")
+                android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            }
+            wifiLock = wifiManager?.createWifiLock(lockMode, "VoipVcBridge::WifiLock")?.apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo obtener WifiLock: ${e.message}")
         }
 
         try {
@@ -340,6 +357,10 @@ class BridgeService : Service() {
             if (wakeLock?.isHeld == true) wakeLock?.release()
         } catch (_: Exception) {}
         wakeLock = null
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (_: Exception) {}
+        wifiLock = null
         socket?.disconnect()
         socket?.off()
         socket = null

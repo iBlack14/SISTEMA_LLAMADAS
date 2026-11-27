@@ -362,7 +362,7 @@ export function registerCallEvents(runtime, services, socket) {
       }
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
-      setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 600);
+      setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 250);
     }
     });
     }).catch(error => {

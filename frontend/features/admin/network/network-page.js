@@ -735,6 +735,12 @@ try {
     document.querySelector('#stateFilters .filter-pill[data-filter="all"]').classList.add("active");
 
     socket = window.io(window.location.origin, { transports: ["websocket"], auth: { client: "dashboard", userId: user.id } });
+    let initialBootId = null;
+    socket.on("app:version", ({ bootId } = {}) => {
+      if (!bootId) return;
+      if (!initialBootId) { initialBootId = bootId; return; }
+      if (bootId !== initialBootId) window.location.reload();
+    });
     socket.on("connect", () => socket.emit("admin:subscribe", result => { if (!result?.ok) unavailable(); }));
     socket.on("admin:network", accept);
     socket.on("disconnect", unavailable);

@@ -152,6 +152,9 @@ function emitState(code) {
     shiftManagement: getShiftSnapshot(session),
     updatedAt: session.updatedAt
   });
+  // Cualquier cambio de estado en Llamadas, campañas, equipos o APK
+  // notifica también a Núcleo de Red en tiempo real (agrupado en 250 ms).
+  runtime.network?.notifyChanged?.();
 }
 
 function emitMessageContacts(code) {

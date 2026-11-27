@@ -23,6 +23,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.telecom.TelecomManager
 import android.view.View
@@ -222,8 +223,24 @@ class MainActivity : AppCompatActivity() {
             if (isDefaultDialer()) Tone.SUCCESS else Tone.WARNING
         )
         refreshReadinessChips()
-        if (isDefaultDialer()) autoReconnectIfSaved()
+        if (isDefaultDialer()) {
+            requestIgnoreBatteryOptimizationsIfNeeded()
+            autoReconnectIfSaved()
+        }
         continuePendingPairing()
+    }
+
+    private var batteryPromptedThisSession = false
+
+    private val batteryOptimizationLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        showTransientStatus(
+            if (isIgnoringBatteryOptimizations()) "Batería sin restricciones activa."
+            else "Batería aún con restricciones; puede cortar llamadas en segundo plano.",
+            if (isIgnoringBatteryOptimizations()) Tone.SUCCESS else Tone.WARNING
+        )
+        refreshReadinessChips()
     }
 
     private val statusReceiver = object : BroadcastReceiver() {
@@ -273,6 +290,7 @@ class MainActivity : AppCompatActivity() {
             pendingPairFromConnectedMode = savedInstanceState.getBoolean("pending_pair_mode")
         }
         if (bridgeMode == BridgeMode.CONNECTED) requestAllPermissions()
+        else requestIgnoreBatteryOptimizationsIfNeeded()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -486,6 +504,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestDialerRoleIfNeeded() {
         if (isDefaultDialer()) {
             refreshReadinessChips()
+            requestIgnoreBatteryOptimizationsIfNeeded()
             autoReconnectIfSaved()
             continuePendingPairing()
             return
@@ -502,6 +521,29 @@ class MainActivity : AppCompatActivity() {
                 putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
             }
         )
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun requestIgnoreBatteryOptimizationsIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (isIgnoringBatteryOptimizations() || batteryPromptedThisSession) return
+        batteryPromptedThisSession = true
+        try {
+            val intent = Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName")
+            )
+            batteryOptimizationLauncher.launch(intent)
+        } catch (_: Exception) {
+            try {
+                batteryOptimizationLauncher.launch(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {}
+        }
     }
 
     private fun hasCallingAccess(): Boolean =
