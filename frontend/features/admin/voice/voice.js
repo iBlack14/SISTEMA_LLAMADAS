@@ -86,6 +86,7 @@ function createPanel(panel) {
   const close = player.querySelector(".voice-player-close");
   const toast = panel.querySelector(".voice-toast");
   const userSelect = form.elements.namedItem("userId");
+  const workerSelect = form.elements.namedItem("worker");
   const confirmDialog = panel.querySelector(".voice-confirm-dialog");
   const confirmName = confirmDialog?.querySelector(".voice-confirm-name");
   const confirmMeta = confirmDialog?.querySelector(".voice-confirm-meta");
@@ -113,6 +114,21 @@ function createPanel(panel) {
         userSelect.value = selected;
       })
       .catch(error => console.warn("No se pudo cargar el filtro de usuarios del Panel de voz:", error));
+  }
+
+  if (workerSelect) {
+    apiFetch("/api/network", { cache: "no-store" })
+      .then(response => response.json().then(data => ({ response, data })))
+      .then(({ response, data }) => {
+        if (!response.ok || !data.ok || !Array.isArray(data.equipment)) throw new Error("No se pudieron cargar los equipos");
+        const selected = workerSelect.value;
+        workerSelect.replaceChildren(new Option("Todos los equipos", ""));
+        for (const equipment of data.equipment) {
+          if (equipment.deviceId) workerSelect.add(new Option(equipment.name || `Equipo ${equipment.number}`, equipment.deviceId));
+        }
+        workerSelect.value = selected;
+      })
+      .catch(() => { workerSelect.replaceChildren(new Option("No se pudieron cargar los equipos", "")); });
   }
 
   function showToast(message, isError = false) {

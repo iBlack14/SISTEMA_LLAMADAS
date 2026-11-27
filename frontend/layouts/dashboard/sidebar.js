@@ -128,10 +128,18 @@ async function loadAdminWorkspace() {
     stylesheet.href = networkCss?.getAttribute("href") || "/features/admin/network/network.css?v=20261119-users-ui3";
     stylesheet.dataset.adminStyles = "1";
     document.head.append(stylesheet);
+    const networkLightStylesheet = document.createElement("link");
+    networkLightStylesheet.rel = "stylesheet";
+    networkLightStylesheet.href = "/features/admin/network/network-light.css?v=20261127-cards2";
+    document.head.append(networkLightStylesheet);
     const voiceStylesheet = document.createElement("link");
     voiceStylesheet.rel = "stylesheet";
     voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261124-voice-ui3";
     document.head.append(voiceStylesheet);
+    const voiceLightStylesheet = document.createElement("link");
+    voiceLightStylesheet.rel = "stylesheet";
+    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-no-search";
+    document.head.append(voiceLightStylesheet);
   })().catch(error => {
     adminPromise = null;
     throw error;
@@ -214,7 +222,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
         await settings.initEmailSettingsPage?.();
       }
       if (view === "voice") {
-        const voice = await import("../../features/admin/voice/voice.js?v=20261124-voice-ui3");
+        const voice = await import("../../features/admin/voice/voice.js?v=20261127-equipment");
         if (request !== viewRequest) return;
         await voice.openVoicePanel(adminVoice);
       }

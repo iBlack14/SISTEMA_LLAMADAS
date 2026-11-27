@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/features/admin/network/network.css?v=20261127-network-two-rows">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261117-sidebar-flow">
+  <link rel="stylesheet" href="/features/admin/network/network-light.css?v=20261127-cards2">
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <script type="module" src="/layouts/dashboard/sidebar.js?v=20261124-voice-retention"></script>
   <script src="/socket.io/socket.io.js" defer></script>
@@ -170,13 +171,14 @@
         </div>
       </header>
       <form class="voice-filters" aria-label="Filtros de grabaciones">
-        <label class="voice-field voice-field--search">Buscar por nombre o teléfono<input name="search" type="search" maxlength="100" placeholder="Ej. Lysoft o 9721…" autocomplete="off"></label>
+        <label class="voice-field">Usuario<select name="userId"><option value="">Todos los usuarios</option></select></label>
+        <label class="voice-field">Equipo<select name="worker"><option value="">Todos los equipos</option></select></label>
         <label class="voice-field">Desde<input name="from" type="date"></label>
         <label class="voice-field">Hasta<input name="to" type="date"></label>
+        <details class="voice-more-filters"><summary>Más filtros</summary><div class="voice-more-fields">
         <label class="voice-field">Lista<input name="list" maxlength="255" placeholder="Nombre exacto"></label>
-        <label class="voice-field">Equipo<input name="worker" maxlength="255" placeholder="Nombre o ID"></label>
-        <label class="voice-field">Usuario<select name="userId"><option value="">Todos los usuarios</option></select></label>
         <label class="voice-field">Turno<select name="shift"><option value="">Todos los turnos</option><option value="morning">Mañana</option><option value="afternoon">Tarde</option><option value="outside">Fuera de turno</option></select></label>
+        </div></details>
         <div class="voice-filter-actions">
           <button type="reset" class="voice-secondary">Limpiar</button>
         </div>

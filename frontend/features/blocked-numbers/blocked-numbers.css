@@ -9,6 +9,7 @@
   border-radius: 18px;
   font-family: inherit;
 }
+
 #blockedNumbersView[hidden] { display: none !important; }
 #blockedNumbersView .blocked-view-nav { margin-bottom: 20px; }
 #blockedNumbersView [hidden] { display: none !important; }
@@ -51,3 +52,22 @@
   #blockedNumbersView th, #blockedNumbersView td { padding: 12px 6px; font-size: 12px; }
   #blockedNumbersView td button { min-width: 0; max-width: 100%; padding: 8px; font-size: 12px; }
 }
+
+/* Paleta de Reserva de contacto para el panel de bloqueos. */
+body:has(#blockedNumbersView:not([hidden])) { background: #f5f1f8 !important; }
+body:has(#blockedNumbersView:not([hidden])) .app-background-overlay { display: none; }
+body:has(#blockedNumbersView:not([hidden])) .panel { background: #fff !important; border: 1px solid #e8dfec !important; box-shadow: none; }
+body:has(#blockedNumbersView:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
+body:has(#blockedNumbersView:not([hidden])) #statusText { color: #796c81 !important; }
+#blockedNumbersView { color: #35233f; background: #fff; border-color: #e8dfec; font-family: 'Outfit', sans-serif; }
+#blockedNumbersView .blocked-window-header, #blockedNumbersView .blocked-list-toolbar { border-color: #e8dfec; }
+#blockedNumbersView h2 { color: #35233f !important; }
+#blockedNumbersView .blocked-window-header p, #blockedNumbersView label, #blockedNumbersCount, #blockedNumbersView .blocked-empty { color: #796c81 !important; }
+#blockedNumbersView #blockedNumbersBack { color: #796c81 !important; background: #f8f5fa !important; border-color: #e8dfec !important; }
+#blockedNumbersView input { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
+#blockedNumbersView input::placeholder { color: #8c8092 !important; }
+#blockedNumbersView .blocked-table-scroll { border-color: #e8dfec; }
+#blockedNumbersView th { background: #f8f5fa !important; color: #594660 !important; }
+#blockedNumbersView td { color: #35233f !important; border-color: #eee7f0; }
+#blockedNumbersView .blocked-feedback { background: #f8f5fa; color: #35233f !important; }
+#blockedNumbersView .blocked-feedback[data-error="true"] { background: #fff1f3; border-color: #e7b6bf; color: #852d41 !important; }

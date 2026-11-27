@@ -1,0 +1,51 @@
+/* Panel de voz: paleta de Reserva de contacto. */
+body:has(#voiceView:not([hidden])) { background: #f5f1f8 !important; }
+body:has(#voiceView:not([hidden])) .app-background-overlay { display: none; }
+body:has(#voiceView:not([hidden])) .panel { background: #fff !important; border: 1px solid #e8dfec !important; box-shadow: none; }
+body:has(#voiceView:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
+body:has(#voiceView:not([hidden])) #statusText { color: #796c81 !important; }
+#voiceView {
+  --voice-surface: #fff;
+  --voice-surface-2: #f8f5fa;
+  --voice-line: #e8dfec;
+  --voice-line-strong: #d6bfdf;
+  --voice-text: #35233f;
+  --voice-text-2: #594660;
+  --voice-muted: #796c81;
+  --voice-accent: #79258e;
+  --voice-accent-soft: #f1e9f5;
+  --voice-on-accent: #fff;
+  --voice-success: #167846;
+  --voice-warn: #986100;
+  --voice-shadow: 0 3px 14px rgba(53, 35, 63, .05);
+  color-scheme: light;
+  font-family: 'Outfit', sans-serif;
+}
+#voiceView .voice-intro, #voiceView .voice-player { background: #fff; border-color: #e8dfec; box-shadow: var(--voice-shadow); }
+#voiceView .voice-intro::after, #voiceView .voice-player::before { display: none; }
+#voiceView .voice-eyebrow, #voiceView .voice-player-eyebrow { color: #79258e; }
+#voiceView :is(h1, h2, h3) { color: #35233f !important; }
+#voiceView .voice-chip { background: #f8f5fa; color: #594660; }
+#voiceView .voice-chip--live { background: #f1e9f5; border-color: #d6bfdf; color: #79258e; }
+#voiceView .voice-field :is(input, select) { background: #fff !important; border-color: #ded3e3 !important; color: #35233f !important; }
+#voiceView .voice-field :is(input, select):focus { background: #fff !important; border-color: #a765b7 !important; }
+#voiceView .voice-field input::placeholder { color: #8c8092; }
+#voiceView .voice-secondary, #voiceView .voice-chip-button, #voiceView .voice-icon-button { background: #fff !important; border-color: #e8dfec !important; color: #594660 !important; box-shadow: none !important; }
+#voiceView .voice-secondary:hover:not(:disabled), #voiceView .voice-chip-button:hover:not(:disabled), #voiceView .voice-icon-button:hover:not(:disabled) { background: #f1e9f5 !important; border-color: #cbb3d3 !important; }
+#voiceView .voice-player-toggle { background: #79258e !important; color: #fff !important; }
+#voiceView .voice-player-seek { background: linear-gradient(90deg, #79258e var(--progress, 0%), #e8dfec var(--progress, 0%)); }
+#voiceView .voice-table-scroll th { background: #f8f5fa; color: #594660; }
+#voiceView .voice-table-scroll td { color: #35233f; border-color: #eee7f0; }
+#voiceView .voice-table-scroll tr:hover { background: #f8f5fa; }
+#voiceView .voice-table-scroll tr.is-playing { background: #f1e9f5; }
+#voiceView :is(button, input, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
+#voiceView .voice-filters { grid-template-columns: repeat(4, minmax(135px, 1fr)) auto auto; }
+#voiceView .voice-more-filters { align-self: end; }
+#voiceView .voice-filter-actions { grid-column: 6; grid-row: 1; }
+#voiceView .voice-more-filters summary { display: flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 14px; border: 1px solid #e8dfec; border-radius: 9px; background: #fff; color: #594660; font-size: 13px; cursor: pointer; white-space: nowrap; }
+#voiceView .voice-more-filters summary::after { content: ' ▾'; margin-left: 5px; }
+#voiceView .voice-more-filters[open] { grid-column: 1 / -1; grid-row: 2; }
+#voiceView .voice-more-filters[open] summary { justify-content: flex-start; border-color: #d6bfdf; color: #79258e; }
+#voiceView .voice-more-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 12px; }
+@media (max-width: 800px) { #voiceView .voice-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } #voiceView .voice-field--search, #voiceView .voice-more-filters[open] { grid-column: 1 / -1; } #voiceView .voice-more-filters[open], #voiceView .voice-filter-actions { grid-row: auto; } #voiceView .voice-filter-actions { grid-column: auto; } #voiceView .voice-more-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { #voiceView .voice-more-fields { grid-template-columns: 1fr; } }
