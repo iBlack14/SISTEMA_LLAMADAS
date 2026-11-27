@@ -530,11 +530,13 @@ class BridgeService : Service() {
                 if (client !== socket) return@post
                 val commandId = data.optString("commandId")
                 val contactId = data.optString("contactId")
+                val callId = data.optString("callId")
                 if (
                     data.optBoolean("accepted") &&
                     data.optBoolean("terminal") &&
                     commandId == activeCommandId &&
-                    contactId == activeContactId
+                    contactId == activeContactId &&
+                    callId == activeCallId
                 ) {
                     clearCampaignTracking()
                 }
@@ -578,6 +580,12 @@ class BridgeService : Service() {
               if (action == "dial") emitCallTrace("apk_received", commandId, callId, mainQueueMs = SystemClock.elapsedRealtime() - receivedAtElapsedMs)
               when (action) {
                 "dial"   -> {
+                    val expiresAt = data.optLong("expiresAt", 0L)
+                    if (expiresAt > 0L && System.currentTimeMillis() >= expiresAt) {
+                        Log.w(TAG, "[DIAL] expired command discarded command=${commandId.takeLast(8)} call=${callId.takeLast(8)}")
+                        emitCommandAck(commandId, "dial", false, "La orden venció antes de ser procesada", serverAck)
+                        return@post
+                    }
                     val phoneNumber = data.optString("phoneNumber")
                     val companyName = data.optString("companyName")
                     val contactName = data.optString("contactName")
@@ -680,16 +688,22 @@ class BridgeService : Service() {
         if (number.isBlank() || commandId.isBlank()) {
             Log.w(TAG, "[DIAL] rejected: number or command id is empty")
             emitCallTrace("dial_rejected", commandId, callId, "invalid_command")
+        emitPhoneStatus("failed", "dial_error", correlateCampaign = true, force = true)
+        mainHandler.postDelayed({ emitPhoneStatus("failed", "dial_error_retry", correlateCampaign = true, force = true) }, 1000)
             return DialResult(false, "Número o identificador de llamada inválido")
         }
         if (BlockedNumberStore.contains(this, number)) {
             Log.w(TAG, "[DIAL] rejected: number is blocked locally")
             emitCallTrace("dial_rejected", commandId, callId, "locally_blocked")
+        emitPhoneStatus("failed", "dial_error", correlateCampaign = true, force = true)
+        mainHandler.postDelayed({ emitPhoneStatus("failed", "dial_error_retry", correlateCampaign = true, force = true) }, 1000)
             return DialResult(false, "Número bloqueado. Quítalo de la lista de bloqueos antes de llamar.")
         }
         if (isActuallyInCall() || activeCommandId.isNotBlank()) {
             Log.w(TAG, "[DIAL] rejected: another call is active")
             emitCallTrace("dial_rejected", commandId, callId, "call_already_active")
+        emitPhoneStatus("failed", "dial_error", correlateCampaign = true, force = true)
+        mainHandler.postDelayed({ emitPhoneStatus("failed", "dial_error_retry", correlateCampaign = true, force = true) }, 1000)
             return DialResult(false, "El teléfono ya está atendiendo otra llamada")
         }
         dialAttemptToken += 1
@@ -1183,9 +1197,7 @@ class BridgeService : Service() {
                     currentContactName = ""
                     currentImageUrl = ""
                 }
-                if (hasCampaignCall && belongsToCampaign) {
-                    clearCampaignTracking()
-                }
+                // Keep correlation persisted until the server confirms its durable terminal receipt.
             }
         }
     }

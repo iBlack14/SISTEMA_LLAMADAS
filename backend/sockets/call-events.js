@@ -194,9 +194,9 @@ export function registerCallEvents(runtime, services, socket) {
     const worker = getPhoneWorkerBySocketId(session, socket.id);
     if (!worker) return;
     if (!["idle", "available", "dialing", "ringing", "in_call", "ended", "failed"].includes(callState)) return;
-    // Liveness for the watchdog: any phone:status (including the in_call heartbeat,
-    // even if deduplicated below) proves the device is alive and on the call.
-    if (worker) worker.lastStatusAt = Date.now();
+    // Only affirmative live-call reports refresh the in-call watchdog. An idle
+    // heartbeat means the handset is free, not that the previous call is alive.
+    if (worker && ["dialing", "ringing", "in_call"].includes(callState)) worker.lastStatusAt = Date.now();
     if (commandId && worker) acknowledgeDialDelivery?.(code, worker.id, commandId, callId);
 
     // Only a repeated packet is a duplicate. The same physical state can carry
@@ -222,7 +222,7 @@ export function registerCallEvents(runtime, services, socket) {
     }
     const assignedContact = getContactByWorker(session, worker.id);
     const transientIdle = !isExternalIncoming && callState === "idle" && !terminalConfirmed
-      && ["dialing", "ringing", "in_call"].includes(assignedContact?.status);
+      && ["dialing", "ringing"].includes(assignedContact?.status);
     const effectiveState = transientIdle ? assignedContact.status : callState;
     if (!transientIdle && (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId)) network.observe(code, worker, payload);
     if (worker) {
@@ -262,7 +262,7 @@ export function registerCallEvents(runtime, services, socket) {
         resumeHeldContact(session, worker.id);
       }
     } else {
-      const reconciledState = terminalConfirmed && callState === "idle" ? "ended" : callState;
+      const reconciledState = callState === "idle" && terminalConfirmed ? "ended" : callState;
       // An unrelated/late Telecom event must not finish the assigned attempt.
       if (contactId && callId) {
         updatedContact = updateActiveCallState(session, reconciledState, worker || {}, { lastError, contactId, callId, detectedVoicemail: detectedVoicemail === true, detectedAnnouncement });

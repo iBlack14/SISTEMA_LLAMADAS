@@ -42,6 +42,7 @@ const acknowledgedDialResults = new Set();
 // ACK) degrades to "one lost contact" instead of a permanently stuck device.
 const WATCHDOG_INTERVAL_MS = Number(process.env.CALL_WATCHDOG_INTERVAL_MS || 5000);
 const WATCHDOG_DIALING_MS = Number(process.env.CALL_WATCHDOG_DIALING_MS || 45000);
+const DIAL_COMMAND_TTL_MS = Number(process.env.CALL_DIAL_COMMAND_TTL_MS || 30000);
 // With the app heartbeat (phone:status every 10s while in_call) a live call keeps
 // refreshing worker.lastStatusAt, so 45s of silence means the device is frozen.
 // The ceiling only applies to old APKs that never send a heartbeat timestamp.
@@ -90,6 +91,12 @@ function scheduleDialDelivery(code, workerId, payload, retry = 0) {
     if (!assignment || assignment.attemptId !== payload.callId || assignment.contactId !== payload.contactId
       || runtime.persistence.hasFinishedAttempt(code, payload.callId, payload.contactId)) {
       stopDialDelivery(code, workerId, commandId);
+      return;
+    }
+    if (Date.now() >= Number(payload.expiresAt || 0)) {
+      stopDialDelivery(code, workerId, commandId);
+      const expiredContact = session.campaign.contacts.find(item => item.id === assignment.contactId);
+      if (expiredContact) finalizeStuckAssignment(code, workerId, expiredContact, assignment, "watchdog_dial_command_expired");
       return;
     }
     if (session.campaign.status !== "running") {
@@ -145,7 +152,7 @@ function resumeAssignedDial(code, workerId) {
   const payload = {
     action: "dial", phoneNumber: contact.phone || "", contactId: contact.id,
     contactName: contact.name || "", companyName: contact.name || "",
-    callId, commandId: `campaign-${callId}`
+    callId, commandId: `campaign-${callId}`, expiresAt: Date.now() + DIAL_COMMAND_TTL_MS
   };
   console.warn(`[CALL_DELIVERY] reanudando orden pendiente sesión=${String(code).slice(-2)} equipo=${String(workerId).slice(-8)} contacto=${String(contact.name || "sin nombre").slice(0, 40)} progreso=${contact.attempts || 1}`);
   receivedDialDeliveries.delete(dialDeliveryKey(code, workerId, payload.commandId));
@@ -171,6 +178,7 @@ async function sendPersistedDial(code, socketId, payload, retry = 0, startedAt =
       return;
     }
     const [workerId] = assignmentEntry;
+    if (payload.action === "dial" && !payload.expiresAt) payload.expiresAt = Date.now() + DIAL_COMMAND_TTL_MS;
     const worker = session.phoneWorkers?.find(item => String(item.id) === workerId);
     const targetSocketId = worker?.connected && worker.socketId ? worker.socketId : socketId;
     console.info(`[CALL_DISPATCH] persisted session=${sessionId} command=${commandId} call=${callId} persistMs=${persistedMs}`);
@@ -214,6 +222,10 @@ function emitDialWithAck(code, workerId, socketId, payload, retry, startedAt) {
   const deliveryKey = dialDeliveryKey(code, workerId, String(payload.commandId || ""));
   if (payload.action === "dial" && confirmedDialDeliveries.has(deliveryKey)) {
     console.info(`[CALL_DELIVERY] reenvío omitido: Android ya confirmó sesión=${sessionId} equipo=${String(workerId).slice(-8)} intento=${callId}`);
+    return;
+  }
+  if (payload.action === "dial" && Date.now() >= Number(payload.expiresAt || 0)) {
+    console.warn(`[CALL_DISPATCH] orden vencida descartada session=${sessionId} command=${commandId} call=${callId}`);
     return;
   }
   receivedDialDeliveries.delete(deliveryKey);
@@ -296,7 +308,8 @@ function dispatchNextCampaignCallLegacy(code) {
       companyName: next.name,
       contactName: next.name,
       callId: getActiveAttemptId(session, worker.id),
-      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`
+      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`,
+      expiresAt: Date.now() + DIAL_COMMAND_TTL_MS
     });
     services.saveSoon(code);
     services.emitState(code);
@@ -364,7 +377,8 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
       companyName: next.name,
       contactName: next.name,
       callId: getActiveAttemptId(session, worker.id),
-      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`
+      commandId: `campaign-${getActiveAttemptId(session, worker.id)}`,
+      expiresAt: Date.now() + DIAL_COMMAND_TTL_MS
     });
     logOperationalCall({ campaign, worker, contact: next, state: "dialing", event: "ASIGNACION", sessionCode: code, username: session.ownerUsername });
     dispatched.push({ workerId: worker.id, contactId: next.id });
@@ -431,6 +445,11 @@ function scanStuckCalls() {
       const worker = session.phoneWorkers?.find(item => String(item.id) === String(workerId));
       const status = String(contact.status || "");
       if (status === "in_call") {
+        const reportedIdle = ["idle", "available", "ended", "failed"].includes(String(worker?.callState || ""));
+        if (reportedIdle && Number(worker?.lastStatusAt || 0) > 0) {
+          finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_phone_reported_idle");
+          continue;
+        }
         const lastStatusAt = Number(worker?.lastStatusAt || 0);
         if (lastStatusAt) {
           // Heartbeat-aware: a live call refreshes lastStatusAt every ~10s.
@@ -446,7 +465,11 @@ function scanStuckCalls() {
         }
       } else if (status === "dialing" || status === "ringing") {
         const startedAt = Date.parse(attempt?.startedAt || contact.lastAttemptAt || 0);
-        if (startedAt && Date.now() - startedAt > WATCHDOG_DIALING_MS) {
+        const commandExpired = startedAt && Date.now() - startedAt > DIAL_COMMAND_TTL_MS;
+        const dialingTimedOut = startedAt && Date.now() - startedAt > WATCHDOG_DIALING_MS;
+        if (commandExpired && !worker?.lastStatusAt) {
+          finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_dial_command_expired");
+        } else if (dialingTimedOut) {
           finalizeStuckAssignment(code, workerId, contact, assignment, "watchdog_dialing_timeout");
         }
       }
