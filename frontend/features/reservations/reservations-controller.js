@@ -20,6 +20,62 @@ let reservationsState = {
 };
 let quoteReturnFocus = null;
 let activeReservationType = "quote";
+let editingReservationStatus = "scheduled";
+
+function to12HourParts(time24) {
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(time24 || "").trim());
+  const h24 = match ? Number(match[1]) : 9;
+  const minute = match ? match[2] : "00";
+  const period = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return {
+    hour: String(h12).padStart(2, "0"),
+    minute,
+    period
+  };
+}
+
+function to24HourTime(hour12, minute, period) {
+  const h = Number(hour12);
+  const m = String(minute || "00").padStart(2, "0");
+  const isPm = String(period || "AM").toUpperCase() === "PM";
+  const h24 = isPm ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+  return `${String(h24).padStart(2, "0")}:${m}`;
+}
+
+function formatTime12h(time24) {
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(time24 || "").trim());
+  if (!match) return time24 || "";
+  const { hour, minute, period } = to12HourParts(`${match[1].padStart(2, "0")}:${match[2]}`);
+  return `${Number(hour)}:${minute} ${period}`;
+}
+
+function ensureTimePickerOptions() {
+  const hourSelect = document.getElementById("quoteHourSelect");
+  const periodSelect = document.getElementById("quotePeriodSelect");
+  if (hourSelect && !hourSelect.options.length) {
+    for (let h = 1; h <= 12; h++) {
+      const val = String(h).padStart(2, "0");
+      hourSelect.add(new Option(val, val));
+    }
+  }
+  [hourSelect, periodSelect].forEach(el => {
+    if (el && !el.dataset.boundTimeSync) {
+      el.dataset.boundTimeSync = "1";
+      el.addEventListener("change", syncQuoteTimeInput);
+    }
+  });
+}
+
+function syncQuoteTimeInput() {
+  const timeInput = document.getElementById("quoteTimeInput");
+  const hourSelect = document.getElementById("quoteHourSelect");
+  const periodSelect = document.getElementById("quotePeriodSelect");
+  if (!timeInput || !hourSelect || !periodSelect) return "";
+  const val = to24HourTime(hourSelect.value, "00", periodSelect.value);
+  timeInput.value = val;
+  return val;
+}
 const reservationReminders = createReservationReminders({
   getIdentity: () => {
     const userId = (currentUser || window.VOIP_VC_AUTH_USER)?.id;
@@ -125,8 +181,8 @@ export function openQuoteModal(initialData = {}) {
   const descInput = document.getElementById("quoteDescInput");
   const priceInput = document.getElementById("quotePriceInput");
   const dateInput = document.getElementById("quoteDateInput");
-  const timeInput = document.getElementById("quoteTimeInput");
-  const statusSelect = document.getElementById("quoteStatusSelect");
+  const hourSelect = document.getElementById("quoteHourSelect");
+  const periodSelect = document.getElementById("quotePeriodSelect");
   const notesInput = document.getElementById("quoteNotesInput");
   const modalTitle = document.getElementById("quoteModalTitle");
   const modalDescription = document.getElementById("quoteModalDescription");
@@ -142,14 +198,19 @@ export function openQuoteModal(initialData = {}) {
     : inAgenda && reservationsState.month !== today.slice(0, 7) ? `${reservationsState.month}-01` : today;
   const nextHour = String((now.getHours() + 1) % 24).padStart(2, '0') + ":00";
 
+  ensureTimePickerOptions();
+  const timeParts = to12HourParts(initialData.time || nextHour);
+  editingReservationStatus = initialData.id ? (initialData.status || "scheduled") : "scheduled";
+
   if (quoteId) quoteId.value = initialData.id || "";
   if (phoneInput) phoneInput.value = initialData.phone || initialData.phoneNumber || "";
   if (nameInput) nameInput.value = initialData.name || initialData.company || initialData.contactName || "";
   if (descInput) descInput.value = initialData.quote || "";
   if (priceInput) priceInput.value = initialData.price || "";
   if (dateInput) dateInput.value = initialData.date || todayStr;
-  if (timeInput) timeInput.value = initialData.time || nextHour;
-  if (statusSelect) statusSelect.value = initialData.status || "scheduled";
+  if (hourSelect) hourSelect.value = timeParts.hour;
+  if (periodSelect) periodSelect.value = timeParts.period;
+  syncQuoteTimeInput();
   if (notesInput) notesInput.value = initialData.notes || "";
   if (modalTitle) modalTitle.textContent = initialData.id ? "Editar reserva" : activeReservationType === "appointment" ? "Agendar llamada" : "Nueva reserva";
   if (modalDescription) modalDescription.textContent = activeReservationType === "appointment"
@@ -184,8 +245,8 @@ async function handleSaveQuote(e) {
   const quote = document.getElementById("quoteDescInput")?.value.trim();
   const price = document.getElementById("quotePriceInput")?.value.trim();
   const date = document.getElementById("quoteDateInput")?.value.trim();
-  const time = document.getElementById("quoteTimeInput")?.value.trim();
-  const status = document.getElementById("quoteStatusSelect")?.value || "scheduled";
+  const time = syncQuoteTimeInput() || document.getElementById("quoteTimeInput")?.value.trim();
+  const status = id ? (editingReservationStatus || "scheduled") : "scheduled";
   const notes = document.getElementById("quoteNotesInput")?.value.trim();
 
   if (!phone) {
@@ -492,7 +553,7 @@ export function renderReservations() {
             </div>
             <div class="res-datetime-item">
               <span class="res-label">Hora</span>
-              <strong class="res-datetime-val">${esc(r.time || 'Sin hora')}</strong>
+              <strong class="res-datetime-val">${esc(r.time ? formatTime12h(r.time) : 'Sin hora')}</strong>
             </div>
           </div>
 

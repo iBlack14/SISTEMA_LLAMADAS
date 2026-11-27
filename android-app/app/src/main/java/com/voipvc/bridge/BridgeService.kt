@@ -27,6 +27,7 @@ import io.socket.client.Socket
 import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -134,6 +135,8 @@ class BridgeService : Service() {
     private var heartbeatJob: Job? = null
     private val HEARTBEAT_INTERVAL_MS = 10_000L
     private val HEARTBEAT_TIMEOUT_MS = 5_000L
+    private val heartbeatMissedAcks = AtomicInteger(0)
+    private val HEARTBEAT_RECONNECT_MISSES = 3
 
     // Buffer pool for audio chunks to reduce GC pressure
     private val audioBufferPool = Channel<ByteArray>(
@@ -1429,6 +1432,7 @@ class BridgeService : Service() {
                 client.emit("phone:detector_status", JSONObject().put("state", VoicemailDetector.dashboardState()))
                 client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { _ ->
                     ackReceived.set(true)
+                    heartbeatMissedAcks.set(0)
                     val latencyMs = System.currentTimeMillis() - sentAt
                     Log.d(TAG, "[HEARTBEAT] pong ok latency=${latencyMs}ms")
                 })
@@ -1436,15 +1440,18 @@ class BridgeService : Service() {
                 delay(HEARTBEAT_TIMEOUT_MS)
                 if (!isActive || client !== socket) break
                 if (!ackReceived.get()) {
-                    Log.w(TAG, "[HEARTBEAT] pong timeout (>${HEARTBEAT_TIMEOUT_MS}ms); forcing socket reconnect")
-                    mainHandler.post {
-                        if (client === socket && !logoutInProgress.get()) {
-                            setStatus("🔄 Reconectando…")
-                            client.disconnect()
-                            client.connect()
+                    val missedAcks = heartbeatMissedAcks.incrementAndGet()
+                    Log.w(TAG, "[HEARTBEAT] pong timeout (>${HEARTBEAT_TIMEOUT_MS}ms) misses=$missedAcks/$HEARTBEAT_RECONNECT_MISSES")
+                    if (missedAcks >= HEARTBEAT_RECONNECT_MISSES) {
+                        heartbeatMissedAcks.set(0)
+                        mainHandler.post {
+                            if (client === socket && !logoutInProgress.get()) {
+                                setStatus("🔄 Reconectando…")
+                                client.disconnect()
+                                client.connect()
+                            }
                         }
                     }
-                    break
                 }
             }
         }

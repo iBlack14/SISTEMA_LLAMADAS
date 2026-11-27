@@ -1291,19 +1291,9 @@
         <textarea id="quoteDescInput" rows="3" placeholder="Ej: Solicita cotización de 50 sacos de alimento y flete..."
           required></textarea>
 
-        <div class="form-row-dual">
-          <div id="quotePriceField">
-            <label for="quotePriceInput">Precio (S/)</label>
-            <input id="quotePriceInput" type="text" placeholder="Ej: 1500" autocomplete="off" />
-          </div>
-          <div>
-            <label for="quoteStatusSelect">Estado</label>
-            <select id="quoteStatusSelect">
-              <option value="scheduled">Programada</option>
-              <option value="paused">Pausada</option>
-              <option value="completed">Completada</option>
-            </select>
-          </div>
+        <div id="quotePriceField">
+          <label for="quotePriceInput">Precio (S/)</label>
+          <input id="quotePriceInput" type="text" placeholder="Ej: 1500" autocomplete="off" />
         </div>
 
         <div class="form-row-dual">
@@ -1312,8 +1302,15 @@
             <input id="quoteDateInput" type="date" required />
           </div>
           <div>
-            <label for="quoteTimeInput">Hora *</label>
-            <input id="quoteTimeInput" type="time" required />
+            <label for="quoteHourSelect">Hora *</label>
+            <div class="time-12h-group">
+              <select id="quoteHourSelect" aria-label="Hora (12 horas)" required></select>
+              <select id="quotePeriodSelect" aria-label="AM o PM" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+            <input id="quoteTimeInput" type="hidden" />
           </div>
         </div>
 
