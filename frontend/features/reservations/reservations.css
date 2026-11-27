@@ -1200,9 +1200,32 @@ body:has(#reservationsView:not([hidden])) #statusText {
   text-transform: none !important;
 }
 
-#reservationReminderDock [data-reminder-action="open"] {
-  background: #b5009e !important;
-  border-color: #ee77d9 !important;
+#reservationReminderDock [data-reminder-action="open"],
+#reservationReminderDock [data-reminder-action="edit"],
+#reservationReminderDock [data-reminder-action="save-time"] {
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+  border-color: transparent !important;
+  font-weight: 600;
+}
+
+#reservationReminderDock .reminder-time-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+#reservationReminderDock .reminder-time-editor select {
+  min-height: 32px;
+  padding: 4px 7px;
+  border: 1px solid #a275b5;
+  border-radius: 8px;
+  background: #1a0728;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  color-scheme: dark;
 }
 
 #reservationReminderDock button:focus-visible {

@@ -20,10 +20,28 @@ export function dueReservationReminders(reservations, now, preferences = {}) {
   }).sort((a, b) => reservationDueAt(a) - reservationDueAt(b));
 }
 
+function to12h(time24) {
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)/.exec(String(time24 || ''));
+  if (!m) return { hour: '09', minute: '00', period: 'AM' };
+  const h24 = Number(m[1]);
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return { hour: String(h12).padStart(2, '0'), minute: m[2], period };
+}
+
+function to24h(hour12, minute, period) {
+  const h = Number(hour12);
+  const m = String(minute || '00').padStart(2, '0');
+  const isPm = String(period || 'AM').toUpperCase() === 'PM';
+  const h24 = isPm ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+  return `${String(h24).padStart(2, '0')}:${m}`;
+}
+
 // The browser must remain open. Native notifications are opt-in and never place calls.
-export function createReservationReminders({ getIdentity, onOpen }) {
+export function createReservationReminders({ getIdentity, onOpen, onEditTime }) {
   let reservations = [], identity = '', timer = null, dock = null;
   let minimized = false;
+  let editingKey = '';
   const fallback = new Map();
   const storageKey = () => `viavox.reservation-reminders.${identity}`;
   function preferences() {
@@ -67,7 +85,7 @@ export function createReservationReminders({ getIdentity, onOpen }) {
     dock.setAttribute('aria-label', 'Recordatorios de reservas');
     dock.hidden = true;
     dock.innerHTML = '<header><strong>Reservas para llamar</strong><span class="reservation-reminder-count" role="status"></span><button type="button" class="reservation-reminder-toggle" aria-expanded="true" aria-controls="reservationReminderItems" aria-label="Minimizar recordatorios">−</button></header><div id="reservationReminderItems" class="reservation-reminder-items"></div>';
-    dock.addEventListener('click', event => {
+    dock.addEventListener('click', async event => {
       const toggle = event.target.closest('.reservation-reminder-toggle');
       if (toggle) {
         minimized = !minimized;
@@ -77,18 +95,42 @@ export function createReservationReminders({ getIdentity, onOpen }) {
         toggle.textContent = minimized ? '+' : '−';
         return;
       }
-      const button = event.target.closest('[data-reservation-reminder]');
-      if (!button) return;
-      const reservation = reservations.find(item => reservationReminderKey(item) === button.dataset.reservationReminder);
+      const button = event.target.closest('[data-reminder-action]');
+      if (!button || button.disabled) return;
+      const key = button.dataset.reservationReminder;
+      const reservation = reservations.find(item => reservationReminderKey(item) === key);
       if (!reservation) return;
       const action = button.dataset.reminderAction;
-      if (action === 'open') { onOpen(reservation); return; }
-      const saved = preferences();
-      saved[reservationReminderKey(reservation)] = action === 'snooze'
-        ? { snoozeUntil: Date.now() + 10 * 60 * 1000, notifiedAt: 0 }
-        : { dismissed: true };
-      save(saved);
-      check();
+      if (action === 'edit') {
+        editingKey = editingKey === key ? '' : key;
+        const list = dock.querySelector('.reservation-reminder-items');
+        if (list) list.dataset.signature = '';
+        check();
+        return;
+      }
+      if (action === 'cancel-edit') {
+        editingKey = '';
+        const list = dock.querySelector('.reservation-reminder-items');
+        if (list) list.dataset.signature = '';
+        check();
+        return;
+      }
+      if (action === 'save-time') {
+        const article = button.closest('article');
+        const hour = article?.querySelector('[data-reminder-hour]')?.value;
+        const minute = article?.querySelector('[data-reminder-minute]')?.value;
+        const period = article?.querySelector('[data-reminder-period]')?.value;
+        if (!hour || !minute || !period || typeof onEditTime !== 'function') return;
+        const newTime = to24h(hour, minute, period);
+        button.disabled = true;
+        try {
+          await onEditTime(reservation, newTime);
+          editingKey = '';
+        } finally {
+          button.disabled = false;
+        }
+        return;
+      }
     });
     document.body.append(dock);
     return dock;
@@ -103,11 +145,12 @@ export function createReservationReminders({ getIdentity, onOpen }) {
     root.hidden = !due.length;
     root.querySelector('.reservation-reminder-count').textContent = `${due.length} ${due.length === 1 ? 'pendiente' : 'pendientes'}`;
     const list = root.querySelector('.reservation-reminder-items');
-    const signature = JSON.stringify(due.map(r => [r.id, r.date, r.time, r.name, r.company, r.phone]));
+    const signature = JSON.stringify([editingKey, due.map(r => [r.id, r.date, r.time, r.name, r.company, r.phone])]);
     if (list.dataset.signature !== signature) {
       list.dataset.signature = signature;
       list.replaceChildren();
       for (const reservation of due.slice(0, 10)) {
+        const key = reservationReminderKey(reservation);
         const item = document.createElement('article');
         const name = document.createElement('strong');
         name.textContent = reservation.company || reservation.name || reservation.phone || 'Reserva';
@@ -115,15 +158,51 @@ export function createReservationReminders({ getIdentity, onOpen }) {
         const formatted = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(reservationDueAt(reservation)));
         time.textContent = `${formatted} · ${reservation.phone || ''}`;
         const actions = document.createElement('div');
-        for (const [action, label] of [['open', 'Ver reserva'], ['snooze', 'Posponer 10 min'], ['dismiss', 'Ya visto']]) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = label;
-          button.dataset.reminderAction = action;
-          button.dataset.reservationReminder = reservationReminderKey(reservation);
-          actions.append(button);
+        if (editingKey === key) {
+          const parts = to12h(reservation.time);
+          const editor = document.createElement('div');
+          editor.className = 'reminder-time-editor';
+          const hourSel = document.createElement('select');
+          hourSel.dataset.reminderHour = '1';
+          hourSel.setAttribute('aria-label', 'Hora');
+          for (let h = 1; h <= 12; h++) {
+            const v = String(h).padStart(2, '0');
+            hourSel.add(new Option(v, v, false, v === parts.hour));
+          }
+          const minSel = document.createElement('select');
+          minSel.dataset.reminderMinute = '1';
+          minSel.setAttribute('aria-label', 'Minuto');
+          for (let m = 0; m < 60; m++) {
+            const v = String(m).padStart(2, '0');
+            minSel.add(new Option(v, v, false, v === parts.minute));
+          }
+          const periodSel = document.createElement('select');
+          periodSel.dataset.reminderPeriod = '1';
+          periodSel.setAttribute('aria-label', 'AM o PM');
+          for (const p of ['AM', 'PM']) {
+            periodSel.add(new Option(p, p, false, p === parts.period));
+          }
+          const saveBtn = document.createElement('button');
+          saveBtn.type = 'button';
+          saveBtn.textContent = 'Guardar';
+          saveBtn.dataset.reminderAction = 'save-time';
+          saveBtn.dataset.reservationReminder = key;
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.textContent = 'Cancelar';
+          cancelBtn.dataset.reminderAction = 'cancel-edit';
+          cancelBtn.dataset.reservationReminder = key;
+          editor.append(hourSel, minSel, periodSel, saveBtn, cancelBtn);
+          item.append(name, time, editor);
+        } else {
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.textContent = 'Editar';
+          editBtn.dataset.reminderAction = 'edit';
+          editBtn.dataset.reservationReminder = key;
+          actions.append(editBtn);
+          item.append(name, time, actions);
         }
-        item.append(name, time, actions);
         list.append(item);
       }
     }
