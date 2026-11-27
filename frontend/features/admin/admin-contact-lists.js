@@ -293,11 +293,6 @@ function renderAdminListRows() {
     const sub = document.createElement("span");
     sub.textContent = "Lista de contactos";
     nameCell.append(name, sub);
-    const rubroCell = document.createElement("td");
-    const badge = document.createElement("span");
-    badge.className = "admin-lists-rubro-badge";
-    badge.textContent = item.rubro;
-    rubroCell.appendChild(badge);
     const countCell = document.createElement("td");
     countCell.className = "admin-lists-count-cell";
     countCell.textContent = item.count.toLocaleString("es-PE");
@@ -315,7 +310,7 @@ function renderAdminListRows() {
     open.dataset.count = String(item.count);
     open.textContent = "Ver →";
     actionCell.appendChild(open);
-    row.append(nameCell, rubroCell, countCell, dateCell, actionCell);
+    row.append(nameCell, countCell, dateCell, actionCell);
     body.appendChild(row);
   }
   $("adminListsBrowseMore").hidden = rows.length <= browseLimit;
