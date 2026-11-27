@@ -20,7 +20,10 @@ export function normalizeBook(input = {}) {
     let id = String(item.id || nanoid());
     if (ids.has(id)) id = nanoid();
     ids.add(id);
-    return [{ id, phone, list, name:String(item.name || "Contacto"), note:String(item.note || "") }];
+    const createdAt = item.createdAt || item.created_at;
+    const validCreatedAt = createdAt && Number.isFinite(new Date(createdAt).getTime());
+    return [{ id, phone, list, name:String(item.name || "Contacto"), note:String(item.note || ""),
+      ...(validCreatedAt ? { createdAt: new Date(createdAt).toISOString() } : {}) }];
   });
   const object = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
   return {contacts, lists, activeList:lists.includes(input.activeList) ? input.activeList : lists[0],
