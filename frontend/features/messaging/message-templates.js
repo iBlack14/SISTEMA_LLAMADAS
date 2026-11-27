@@ -1,10 +1,11 @@
-﻿/**
+/**
  * Sistema de plantillas de mensajes y mensajería
  * Gestiona plantillas con texto e imágenes, modales y envío a WhatsApp y Correo
  */
 
 import { apiFetch, requireLogin, currentUser } from '../auth/auth-session.js';
 import { recordSendStatus } from './message-send-status.js';
+import { playSystemSound } from '../../shared/ui/sounds.js';
 
 const STORAGE_KEY = 'voip_message_templates';
 const DB_MIGRATION_KEY = 'voip_message_templates_db_migrated';
@@ -1552,6 +1553,7 @@ async function sendWhatsApp() {
     showToast('El navegador bloqueó WhatsApp Web. Permite las ventanas emergentes y reintenta.', 'warning');
     return;
   }
+  playSystemSound('messageSent');
   closeSendModal();
 }
 
@@ -1682,6 +1684,7 @@ async function sendEmail() {
     }
 
     showToast('Correo enviado correctamente.', 'success');
+    playSystemSound('messageSent');
     recordSendStatus(currentSendContact?.phone || email, 'sent', 'email');
     contactSendResolved = true;
     emailAttachments = [];

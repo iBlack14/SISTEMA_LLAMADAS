@@ -1,5 +1,6 @@
 import { socket, API_BASE } from '../../../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../../../shared/ui/dom.js';
+import { playSystemSound } from '../../../shared/ui/sounds.js';
 import * as Contacts from '../contacts-repository.js';
 import { apiFetch as fetch, currentUser, bindAccountControls } from '../../auth/auth-session.js';
 import { loadBrowserLibrary } from '../../../shared/utils/browser-libraries.js';
@@ -66,6 +67,7 @@ async function addImportedContacts() {
     const successMessage = `${data.batches.length} lista(s) guardada(s): ${added} contacto(s) listo(s) para llamar${details.length ? `; ${details.join(", ")}` : ""}.`;
 
     setStatus(successMessage, true);
+    playSystemSound("dataUploaded");
     dashboardActions.resetImportPreview();
     dashboardActions.renderTabs();
     dashboardActions.renderContacts();

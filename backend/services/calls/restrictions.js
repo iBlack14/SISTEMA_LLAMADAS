@@ -163,11 +163,18 @@ function annualBlock(phone) {
   return allAnnualBlocks().get(phoneKey(phone));
 }
 
+const sessionRestrictionsCache = new WeakMap();
+
 function callRestrictions(session) {
+  const blockedList = globalBlockedNumbers();
+  const cacheKey = `${runtime.persistence.attemptsRevision || 0}:${session.contactBook?.revision || session.contactBook?.contacts?.length || 0}:${session.campaign?.updatedAt || 0}:${blockedList.length}:${durableExclusions.size}`;
+  const cached = sessionRestrictionsCache.get(session);
+  if (cached && cached.key === cacheKey) return cached.value;
+
   const blocks = allAnnualBlocks();
-  const manualBlocks = new Map(globalBlockedNumbers().map(entry => [phoneKey(entry.phone), entry]));
+  const manualBlocks = new Map(blockedList.map(entry => [phoneKey(entry.phone), entry]));
   const contacts = [...(session.contactBook?.contacts || []),...(session.campaign?.contacts || [])];
-  return Object.fromEntries(contacts.flatMap(contact => {
+  const value = Object.fromEntries(contacts.flatMap(contact => {
     const phone = phoneKey(contact.phone);
     const annual = blocks.get(phone);
     const manual = manualBlocks.get(phone);
@@ -176,6 +183,8 @@ function callRestrictions(session) {
       ...(manual ? { manualBlocked: true, blockName: manual.name, reason: "Número en la lista global de bloqueos." } : {})
     }]] : [];
   }));
+  sessionRestrictionsCache.set(session, { key: cacheKey, value });
+  return value;
 }
 
 function blockedCallMessage(block) {

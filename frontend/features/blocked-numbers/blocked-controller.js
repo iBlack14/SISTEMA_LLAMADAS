@@ -1,5 +1,6 @@
 import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../../shared/ui/dom.js';
+import { playSystemSound } from '../../shared/ui/sounds.js';
 import { currentUser } from '../auth/auth-session.js';
 
 /**
@@ -64,6 +65,7 @@ function changeBlockedNumber(action, name, phone) {
     name: String(name || "").trim() || normalizedPhone,
     phone: normalizedPhone
   });
+  if (action === "add") playSystemSound("blocked");
   return true;
 }
 return { setBlockedNumbersFeedback, renderBlockedNumbers, changeBlockedNumber };

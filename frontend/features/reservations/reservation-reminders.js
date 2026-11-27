@@ -1,4 +1,5 @@
 import { reservationDateKey } from './reservation-calendar.js';
+import { playSystemSound } from '../../shared/ui/sounds.js';
 
 export function reservationDueAt(reservation) {
   const day = reservationDateKey(reservation.date);
@@ -42,6 +43,7 @@ export function createReservationReminders({ getIdentity, onOpen, onEditTime }) 
   let reservations = [], identity = '', timer = null, dock = null;
   let minimized = false;
   let editingKey = '';
+  const soundedDueKeys = new Set();
   const fallback = new Map();
   const storageKey = () => `viavox.reservation-reminders.${identity}`;
   function preferences() {
@@ -143,6 +145,10 @@ export function createReservationReminders({ getIdentity, onOpen, onEditTime }) 
     const due = dueReservationReminders(reservations, now, saved);
     const root = ensureDock();
     root.hidden = !due.length;
+    if (due.some(r => !soundedDueKeys.has(reservationReminderKey(r)))) {
+      for (const r of due) soundedDueKeys.add(reservationReminderKey(r));
+      playSystemSound('reservationDue');
+    }
     root.querySelector('.reservation-reminder-count').textContent = `${due.length} ${due.length === 1 ? 'pendiente' : 'pendientes'}`;
     const list = root.querySelector('.reservation-reminder-items');
     const signature = JSON.stringify([editingKey, due.map(r => [r.id, r.date, r.time, r.name, r.company, r.phone])]);

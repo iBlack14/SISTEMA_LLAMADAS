@@ -3,6 +3,7 @@ import { refs, setStatus, setBadge, setAckBadge } from '../shared/ui/dom.js';
 import * as Contacts from '../features/contacts/contacts-repository.js';
 import * as WhatsApp from '../features/messaging/whatsapp.js';
 import { openQuoteModal } from '../features/reservations/reservations-controller.js';
+import { playSystemSound } from '../shared/ui/sounds.js';
 
 /**
  * bindDashboardEvents: conserva los contratos y reglas existentes.
@@ -13,13 +14,45 @@ export function bindDashboardEvents(dashboardState, dashboardActions) {
 let previousBlockedSignature = "";
 let previousContactSignature = "";
 let previousShiftSignature = "";
+const previousWorkerCallStates = new Map();
+const dirtyViews = new Set();
+const isViewVisible = (id) => {
+  const el = typeof document !== "undefined" ? document.getElementById(id) : null;
+  return Boolean(el && !el.hidden);
+};
+
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+  document.addEventListener("panel:view", ({ detail: view }) => {
+    if (!dirtyViews.has(view)) return;
+    dirtyViews.delete(view);
+    if (view === "calls") {
+      dashboardActions.renderAssignedListsPanel?.();
+      dashboardActions.renderShiftManagement?.();
+      dashboardActions.renderPairingSlotsOnly?.();
+    } else if (view === "contacts") {
+      dashboardActions.renderTabs?.();
+      dashboardActions.renderContacts?.();
+    } else if (view === "blocked") {
+      dashboardActions.renderBlockedNumbers?.();
+    }
+  });
+}
+
 window.addEventListener("contact-book:loaded", () => {
   WhatsApp.loadWhatsAppPresetMessages();
-  dashboardActions.renderTabs();
-  dashboardActions.renderContacts();
+  if (isViewVisible("contactsContent")) {
+    dashboardActions.renderTabs();
+    dashboardActions.renderContacts();
+  } else {
+    dirtyViews.add("contacts");
+  }
   dashboardActions.renderCampaignPanel();
-  if (dashboardActions.renderPairingSlotsOnly) dashboardActions.renderPairingSlotsOnly();
-  if (dashboardActions.renderAssignedListsPanel) dashboardActions.renderAssignedListsPanel();
+  if (isViewVisible("callsContent")) {
+    if (dashboardActions.renderPairingSlotsOnly) dashboardActions.renderPairingSlotsOnly();
+    if (dashboardActions.renderAssignedListsPanel) dashboardActions.renderAssignedListsPanel();
+  } else {
+    dirtyViews.add("calls");
+  }
 });
 
 window.addEventListener("contact-book:error", event => {
@@ -51,12 +84,22 @@ socket.on("contact-book:changed", async (payload) => {
 socket.on("call:error", ({message}) => setStatus(message || "No se permite llamar a este número.", true));
 
 socket.on("state:changed", st => {
+  for (const worker of st.phoneWorkers || []) {
+    const wid = String(worker.id || "");
+    const nextState = String(worker.callState || "idle");
+    const prevState = previousWorkerCallStates.get(wid);
+    previousWorkerCallStates.set(wid, nextState);
+    if (prevState && prevState !== nextState && (nextState === "in_call" || nextState === "ringing")) {
+      playSystemSound("call");
+    }
+  }
   dashboardActions.updateSessionUi(st);
   dashboardActions.applyState(st.callState, st.lastNumber, st);
   const blockedSignature = JSON.stringify(st.blockedNumbers || []);
   if (blockedSignature !== previousBlockedSignature) {
     previousBlockedSignature = blockedSignature;
-    dashboardActions.renderBlockedNumbers();
+    if (isViewVisible("blockedNumbersView")) dashboardActions.renderBlockedNumbers();
+    else dirtyViews.add("blocked");
   }
   const contactSignature = JSON.stringify([
     st.callRestrictions || {},
@@ -66,13 +109,16 @@ socket.on("state:changed", st => {
   ]);
   if (contactSignature !== previousContactSignature) {
     previousContactSignature = contactSignature;
-    dashboardActions.renderContacts();
-    dashboardActions.renderAssignedListsPanel();
+    if (isViewVisible("contactsContent")) dashboardActions.renderContacts();
+    else dirtyViews.add("contacts");
+    if (isViewVisible("callsContent")) dashboardActions.renderAssignedListsPanel();
+    else dirtyViews.add("calls");
   }
   const shiftSignature = JSON.stringify(st.shiftManagement || {});
   if (shiftSignature !== previousShiftSignature) {
     previousShiftSignature = shiftSignature;
-    dashboardActions.renderShiftManagement();
+    if (isViewVisible("callsContent")) dashboardActions.renderShiftManagement();
+    else dirtyViews.add("calls");
   }
   const nextDeviceSignature = JSON.stringify((st.phoneWorkers || []).map((worker) => [
     worker.id,

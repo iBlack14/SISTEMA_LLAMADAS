@@ -4,6 +4,7 @@ import { apiFetch, currentUser } from '../auth/auth-session.js';
 import { dashboardSessionKeys } from '../workspace/dashboard-session.js';
 import { limaToday, reservationMonth, reservationYear, reservationsInScope, shiftReservationMonth } from './reservation-calendar.js';
 import { createReservationReminders } from './reservation-reminders.js?v=20261127-edit';
+import { playSystemSound } from '../../shared/ui/sounds.js';
 
 let reservationsState = {
   reservations: [],
@@ -298,6 +299,7 @@ async function handleSaveQuote(e) {
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    playSystemSound('reservationSaved');
     closeQuoteModal();
     await loadReservations();
   } catch (err) {
