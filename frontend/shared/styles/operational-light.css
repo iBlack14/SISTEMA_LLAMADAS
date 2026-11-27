@@ -547,24 +547,29 @@ body:has(#contactsContent:not([hidden])) #status,
 }
 
 #contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month:not(.is-selected) {
-    background: #fff !important;
-    border-color: #dcc2e6 !important;
-    color: #594660 !important;
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+    box-shadow: 0 3px 10px rgba(156, 8, 210, 0.18) !important;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
 
 #contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month:not(.is-selected):hover {
-    background: #f1daf9 !important;
+    background: #ffffff !important;
+    background-image: none !important;
     border-color: #9c08d2 !important;
     color: #79159e !important;
+    box-shadow: 0 4px 14px rgba(156, 8, 210, 0.16) !important;
     transform: translateY(-1px);
 }
 
 #contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month.is-selected {
-    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
-    border-color: transparent !important;
-    color: #fff !important;
-    box-shadow: 0 5px 15px rgba(156, 8, 210, 0.28) !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    border: 2px solid #9c08d2 !important;
+    color: #79159e !important;
+    font-weight: 800;
+    box-shadow: 0 5px 15px rgba(156, 8, 210, 0.24) !important;
 }
 
 #contactsContent .admin-user-lists-view :is(.admin-lists-month-heading select, .admin-lists-category select) {
