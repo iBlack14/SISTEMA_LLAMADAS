@@ -136,7 +136,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
     }
     if (activeCodes.length) {
       const [assignments] = await runtime.auth.pool.query(
-        `SELECT session_code,list_name,year_month,undated_contact_count,assigned_at
+        `SELECT session_code,list_name,month_key,undated_contact_count,assigned_at
           FROM vc_contact_book_month_assignments
           WHERE session_code IN (${activeCodes.map(() => "?").join(",")})`, activeCodes);
       for (const row of assignments) {
@@ -149,7 +149,7 @@ runtime.app.get("/api/users/lists", runtime.auth.requireAdmin, async (_, res) =>
           user._listsBySession.set(row.list_name, list);
           user.lists.push(list);
         }
-        const month = String(row.year_month);
+        const month = String(row.month_key);
         list.monthlyCounts[month] = (list.monthlyCounts[month] || 0) + Number(row.undated_contact_count || 0);
         list.monthlyLastImportedAt[month] = row.assigned_at;
         list.monthlyEstimatedMonths ||= {};
@@ -197,7 +197,7 @@ runtime.app.get("/api/users/:id/contact-book", runtime.auth.requireAdmin, async 
     const [legacyAssignments] = filterMonth && sessionCodes.length
       ? await runtime.auth.pool.query(
         `SELECT session_code FROM vc_contact_book_month_assignments
-          WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=? AND year_month=?`,
+          WHERE session_code IN (${sessionCodes.map(() => "?").join(",")}) AND list_name=? AND month_key=?`,
         [...sessionCodes, listName, legacyMonth])
       : [[]];
     const legacySessions = new Set(legacyAssignments.map(row => row.session_code));

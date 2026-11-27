@@ -110,10 +110,10 @@ export const HISTORY_SCHEMA = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_contact_book_month_assignments (
     session_code VARCHAR(50) NOT NULL, list_name VARCHAR(255) NOT NULL,
-    year_month CHAR(7) NOT NULL, undated_contact_count INT UNSIGNED NOT NULL DEFAULT 0,
+    month_key CHAR(7) NOT NULL, undated_contact_count INT UNSIGNED NOT NULL DEFAULT 0,
     assigned_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    PRIMARY KEY(session_code,list_name,year_month),
-    INDEX vc_contact_book_month(year_month,session_code,list_name)
+    PRIMARY KEY(session_code,list_name,month_key),
+    INDEX vc_contact_book_month(month_key,session_code,list_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS vc_schema_migrations (
     migration_id VARCHAR(96) NOT NULL PRIMARY KEY, applied_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
