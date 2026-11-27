@@ -59,15 +59,31 @@ body:has(#blockedNumbersView:not([hidden])) .app-background-overlay { display: n
 body:has(#blockedNumbersView:not([hidden])) .panel { background: #fff !important; border: 1px solid #e8dfec !important; box-shadow: none; }
 body:has(#blockedNumbersView:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
 body:has(#blockedNumbersView:not([hidden])) #statusText { color: #796c81 !important; }
-#blockedNumbersView { color: #35233f; background: #fff; border-color: #e8dfec; font-family: 'Outfit', sans-serif; }
+#blockedNumbersView { color: #35233f; background: #fff; border-color: #e5d2ec; border-top: 3px solid #b51eb9; box-shadow: 0 8px 26px rgba(121, 37, 142, 0.06); font-family: 'Outfit', sans-serif; }
 #blockedNumbersView .blocked-window-header, #blockedNumbersView .blocked-list-toolbar { border-color: #e8dfec; }
 #blockedNumbersView h2 { color: #35233f !important; }
-#blockedNumbersView .blocked-window-header p, #blockedNumbersView label, #blockedNumbersCount, #blockedNumbersView .blocked-empty { color: #796c81 !important; }
-#blockedNumbersView #blockedNumbersBack { color: #796c81 !important; background: #f8f5fa !important; border-color: #e8dfec !important; }
-#blockedNumbersView input { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
+#blockedNumbersView .blocked-window-header p, #blockedNumbersView .blocked-empty { color: #796c81 !important; }
+#blockedNumbersView label { color: #79258e !important; font-weight: 600; }
+#blockedNumbersCount {
+  background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%);
+  color: #ffffff !important;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+#blockedNumbersView #blockedNumbersBack { color: #79258e !important; background: #fbf6fd !important; border-color: #d6b6e3 !important; transition: background-color .15s ease, border-color .15s ease; }
+#blockedNumbersView #blockedNumbersBack:hover { background: #eed5f7 !important; border-color: #9c08d2 !important; }
+#blockedNumbersView .blocked-number-form button { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border: 0 !important; color: #ffffff !important; box-shadow: 0 5px 15px rgba(156, 8, 210, 0.24) !important; transition: filter .15s ease, transform .15s ease; }
+#blockedNumbersView .blocked-number-form button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+#blockedNumbersView input { background: #fff !important; color: #35233f !important; border-color: #d9c3e2 !important; }
 #blockedNumbersView input::placeholder { color: #8c8092 !important; }
-#blockedNumbersView .blocked-table-scroll { border-color: #e8dfec; }
-#blockedNumbersView th { background: #f8f5fa !important; color: #594660 !important; }
-#blockedNumbersView td { color: #35233f !important; border-color: #eee7f0; }
+#blockedNumbersView .blocked-table-scroll { border-color: #e5d2ec; }
+#blockedNumbersView thead tr { background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important; }
+#blockedNumbersView th { background: transparent !important; color: #ffffff !important; }
+#blockedNumbersView td { color: #35233f !important; border-color: #f0e7f3; transition: background-color .14s ease, color .14s ease; }
+#blockedNumbersView tbody tr:hover td { background: #e8c6f7 !important; color: #210830 !important; }
+#blockedNumbersView tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 #9c08d2; }
+#blockedNumbersView td button { background: #ffffff !important; border: 1.5px solid #e11d48 !important; color: #be123c !important; transition: background-color .15s ease, color .15s ease; }
+#blockedNumbersView td button:not(:disabled):hover { background: #e11d48 !important; color: #ffffff !important; }
 #blockedNumbersView .blocked-feedback { background: #f8f5fa; color: #35233f !important; }
 #blockedNumbersView .blocked-feedback[data-error="true"] { background: #fff1f3; border-color: #e7b6bf; color: #852d41 !important; }

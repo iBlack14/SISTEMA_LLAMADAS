@@ -138,7 +138,7 @@ async function loadAdminWorkspace() {
     document.head.append(voiceStylesheet);
     const voiceLightStylesheet = document.createElement("link");
     voiceLightStylesheet.rel = "stylesheet";
-    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-contrast";
+    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-brand-color";
     document.head.append(voiceLightStylesheet);
   })().catch(error => {
     adminPromise = null;
