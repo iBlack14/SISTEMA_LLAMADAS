@@ -175,6 +175,12 @@ body:has(#contactsContent:not([hidden])) #statusText {
     box-shadow: none !important;
 }
 
+body:has(#contactsContent:not([hidden])) #status,
+#contactsContent .contacts-view-nav,
+#contactsContent .contacts-window-header {
+    display: none !important;
+}
+
 #contactsContent {
     color: #35233f;
     font-family: 'Outfit', sans-serif;
@@ -259,6 +265,7 @@ body:has(#contactsContent:not([hidden])) #statusText {
 
 #contactsContent #contactsTabs .tab-item>button {
     background: transparent !important;
+    background-image: none !important;
     box-shadow: none !important;
     color: #35233f !important;
 }
@@ -359,6 +366,67 @@ body:has(#contactsContent:not([hidden])) #statusText {
     background: #fff !important;
     border-color: #c98ee0 !important;
     color: #35233f !important;
+}
+
+#contactsContent #importFileName {
+    color: #594660 !important;
+    font-weight: 600;
+}
+
+#contactsContent .import-step-label {
+    color: #9c08d2 !important;
+    font-weight: 700;
+}
+
+#contactsContent #importPreview {
+    background: #ffffff !important;
+    border: 1.5px solid #d9c3e2 !important;
+    border-top: 3px solid #b51eb9 !important;
+    color: #35233f !important;
+    max-height: 48vh !important;
+}
+
+#contactsContent #importPreview strong {
+    color: #35233f !important;
+}
+
+#contactsContent #importPreview p {
+    color: #796c81 !important;
+}
+
+#contactsContent #importPreview .table-wrap {
+    border: 1px solid #e5d2ec !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+}
+
+#contactsContent #importPreview tbody td {
+    background: #ffffff !important;
+    color: #35233f !important;
+    border-color: #f0e7f3 !important;
+}
+
+#contactsContent #importPreview tbody tr:hover td {
+    background: #e8c6f7 !important;
+    color: #210830 !important;
+}
+
+#contactsContent #importCancelBtn {
+    background: #ffffff !important;
+    border: 1.5px solid #e11d48 !important;
+    color: #be123c !important;
+}
+
+#contactsContent #importCancelBtn:hover {
+    background: #e11d48 !important;
+    color: #ffffff !important;
+}
+
+#contactsContent #importConfirmBtn {
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border: 0 !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(156, 8, 210, 0.25) !important;
 }
 
 #contactsContent .contacts-table-scroll {
