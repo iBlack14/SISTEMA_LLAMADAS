@@ -73,6 +73,10 @@ const { saveSoon, getConnectedPhoneWorkers, removePhoneWorker, syncSessionPhoneS
 
     const data = payload && typeof payload === "object" ? payload : {};
     const action = String(data.action || "");
+    if (action === "remove" && (role !== "dashboard" || socket.data.authUser?.role !== "ADMINISTRADOR")) {
+      socket.emit("blocked-numbers:error", { message: "Solo el administrador puede quitar números bloqueados." });
+      return;
+    }
     const phone = String(data.phone || "").trim();
     const key = phoneKey(phone);
     const name = String(data.name || "").trim().slice(0, 120) || phone;

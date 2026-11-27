@@ -1,5 +1,6 @@
 import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { refs, setStatus, setBadge, setAckBadge } from '../../shared/ui/dom.js';
+import { currentUser } from '../auth/auth-session.js';
 
 /**
  * createBlockedController: conserva los contratos y reglas existentes.
@@ -19,6 +20,9 @@ function setBlockedNumbersFeedback(message, isError = false) {
 function renderBlockedNumbers() {
   const body = document.getElementById("blockedNumbersBody");
   if (!body) return;
+  const canRemove = currentUser?.role === "ADMINISTRADOR";
+  document.getElementById("blockedNumbersActionHeader")?.toggleAttribute("hidden", !canRemove);
+  document.querySelector("#blockedNumbersView .blocked-action-column")?.toggleAttribute("hidden", !canRemove);
   const entries = Array.isArray(dashboardState.latestSessionState.blockedNumbers) ? dashboardState.latestSessionState.blockedNumbers : [];
   const query = (document.getElementById("blockedNumbersSearch")?.value || "").trim().toLocaleLowerCase("es");
   const phoneQuery = query.replace(/\D/g, "");
@@ -32,12 +36,16 @@ function renderBlockedNumbers() {
     ? filtered.map(entry => `<tr>
         <td>${dashboardActions.escHtml(entry.name || entry.phone || "")}</td>
         <td>${dashboardActions.escHtml(entry.phone || "")}</td>
-        <td><button type="button" class="secondary" data-remove-blocked-number="${dashboardActions.escHtml(entry.phone || "")}">Quitar</button></td>
+        ${canRemove ? `<td><button type="button" class="secondary" data-remove-blocked-number="${dashboardActions.escHtml(entry.phone || "")}">Quitar</button></td>` : ""}
       </tr>`).join("")
-    : `<tr><td class="blocked-empty" colspan="3">${query ? "No hay coincidencias con esa búsqueda." : "No hay números bloqueados."}</td></tr>`;
+    : `<tr><td class="blocked-empty" colspan="${canRemove ? 3 : 2}">${query ? "No hay coincidencias con esa búsqueda." : "No hay números bloqueados."}</td></tr>`;
 }
 
 function changeBlockedNumber(action, name, phone) {
+  if (action === "remove" && currentUser?.role !== "ADMINISTRADOR") {
+    setBlockedNumbersFeedback("Solo el administrador puede quitar números bloqueados.", true);
+    return false;
+  }
   const normalizedPhone = String(phone || "").trim();
   if (!dashboardState.sessionCode || !socket.connected) {
     setStatus("Espera a que el panel esté conectado para actualizar los bloqueos.", true);
