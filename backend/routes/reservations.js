@@ -52,7 +52,7 @@ export function registerReservations(runtime, services) {
     session.contactReservations.unshift(newReservation);
     saveSoon(code);
 
-    io.to(`session:${code}`).emit("reservations:changed", {
+    io.to(code).emit("reservations:changed", {
       action: "create",
       reservation: newReservation,
       reservations: session.contactReservations
@@ -97,7 +97,7 @@ export function registerReservations(runtime, services) {
     session.contactReservations[index] = updated;
     saveSoon(code);
 
-    io.to(`session:${code}`).emit("reservations:changed", {
+    io.to(code).emit("reservations:changed", {
       action: "update",
       reservation: updated,
       reservations: session.contactReservations
@@ -122,7 +122,7 @@ export function registerReservations(runtime, services) {
 
     if (session.contactReservations.length !== initialLen) {
       saveSoon(code);
-      io.to(`session:${code}`).emit("reservations:changed", {
+      io.to(code).emit("reservations:changed", {
         action: "delete",
         id,
         reservations: session.contactReservations

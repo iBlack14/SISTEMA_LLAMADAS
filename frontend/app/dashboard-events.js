@@ -85,6 +85,8 @@ socket.on("state:changed", st => {
     worker.phoneNumber || "",
     Boolean(worker.speakerOn),
     worker.detectorState || "unknown",
+    Boolean(worker.detectedVoicemail),
+    worker.detectedAnnouncement || "",
     Boolean(worker.paused)
   ]));
 
@@ -119,7 +121,15 @@ socket.on("blocked-numbers:error", ({ message }) => {
   dashboardActions.setBlockedNumbersFeedback(text, true);
 });
 
-socket.on("campaign:state", st => {
+// Batching de renders por socket campaign:state
+// Si llegan múltiples eventos en ráfaga → solo se ejecuta el último al final del frame
+let _campaignStatePending = false;
+let _campaignStateLatest = null;
+function _flushCampaignState() {
+  if (!_campaignStatePending) return;
+  _campaignStatePending = false;
+  const st = _campaignStateLatest;
+  _campaignStateLatest = null;
   if (String(st?.listName || "") === "Pendientes del turno" && String(st?.status || "") === "running") {
     dashboardState.pendingRecoveryRunning = true;
   }
@@ -129,6 +139,7 @@ socket.on("campaign:state", st => {
   dashboardState.campaignState = st;
   dashboardActions.syncCampaignResultsToContacts();
   dashboardActions.syncTurnPendingContacts();
+  // renderCampaignPanel ya usa RAF internamente → no necesita otro wrapper
   dashboardActions.renderCampaignPanel();
   dashboardActions.renderPairingSlotsOnly();
   dashboardActions.renderContacts();
@@ -143,13 +154,34 @@ socket.on("campaign:state", st => {
       }
     }, 400);
   }
+}
+socket.on("campaign:state", st => {
+  // Acumular el estado más reciente y diferir al siguiente frame
+  _campaignStateLatest = st;
+  if (!_campaignStatePending) {
+    _campaignStatePending = true;
+    requestAnimationFrame(_flushCampaignState);
+  }
 });
 
+// setInterval optimizado: solo actualiza timers (texto), nunca re-renderiza
+// el panel completo (eso lo hace el socket). renderWorkersPanel solo si hay
+// llamada activa Y el panel de llamadas está visible.
+const _callsSection = document.getElementById("callsContent");
 setInterval(() => {
-  if ((dashboardState.latestSessionState?.phoneWorkers || []).some((worker) => worker.callState === "in_call")) dashboardActions.renderWorkersPanel();
-  for (const timer of document.querySelectorAll('#callsContent:not([hidden]) .call-equipment-duration[data-started-at]')) {
+  const timers = (_callsSection && !_callsSection.hidden)
+    ? _callsSection.querySelectorAll('.call-equipment-duration[data-started-at]')
+    : [];
+  const now = Date.now();
+  for (const timer of timers) {
     const started = Date.parse(timer.dataset.startedAt);
-    if (Number.isFinite(started)) timer.textContent = dashboardActions.formatSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)));
+    if (Number.isFinite(started)) {
+      timer.textContent = dashboardActions.formatSeconds(Math.max(0, Math.floor((now - started) / 1000)));
+    }
+  }
+  // renderWorkersPanel solo si hay llamada activa y algo que mostrar
+  if (timers.length > 0 && (dashboardState.latestSessionState?.phoneWorkers || []).some(w => w.callState === "in_call")) {
+    dashboardActions.renderWorkersPanel();
   }
 }, 1000);
 

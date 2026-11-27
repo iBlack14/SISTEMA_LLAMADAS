@@ -1,3 +1,3 @@
 /* CSS unificado para alto rendimiento: elimina 24 solicitudes HTTP en cascada */
-@import url("./theme/all-themes-merged.css");
+@import url("./theme/all-themes-merged.css?v=20261127-perf");
 

@@ -282,7 +282,26 @@ class BridgeService : Service() {
             ACTION_UI_QUOTE_REQUEST -> sendQuoteRequestToWeb(intent)
             ACTION_UI_SYNC -> {
                 emitCallUiState()
-                emitPhoneStatus(lastCallState, "ui_sync", correlateCampaign = activeCommandId.isNotBlank())
+                val isSocketConnected = socket?.connected() == true
+                if (!isSocketConnected && !logoutInProgress.get()) {
+                    setStatus("🔄 Reconectando…")
+                    if (socket != null) {
+                        socket?.connect()
+                    } else {
+                        buildRestartIntentFromPrefs()?.let { restart ->
+                            tryConnect(
+                                restart.getStringExtra(EXTRA_SOCKET_URL).orEmpty(),
+                                restart.getStringExtra(EXTRA_CODE).orEmpty(),
+                                restart.getStringExtra(EXTRA_TOKEN).orEmpty(),
+                                restart.getStringExtra(EXTRA_DEVICE_ID).orEmpty(),
+                                restart.getStringExtra(EXTRA_DEVICE_NAME).orEmpty()
+                            )
+                        }
+                    }
+                } else if (isSocketConnected) {
+                    setStatus("✅ Activo — esperando llamadas")
+                    emitPhoneStatus(lastCallState, "ui_sync", correlateCampaign = activeCommandId.isNotBlank())
+                }
             }
             null -> buildRestartIntentFromPrefs()?.let { restart ->
                 tryConnect(
@@ -401,6 +420,7 @@ class BridgeService : Service() {
                 // Re-announce the actual local call after a network micro-cut so
                 // the server can resume the same command during its grace window.
                 emitPhoneStatus(lastCallState, "reconnect", correlateCampaign = activeCommandId.isNotBlank())
+                startHeartbeat(client)
                 if (campaignTrackingRestored) {
                     campaignTrackingRestored = false
                     mainHandler.postDelayed({
@@ -1367,17 +1387,24 @@ class BridgeService : Service() {
         Log.i(TAG, "[HEARTBEAT] starting clientConnected=${client.connected()}")
         heartbeatJob = serviceScope.launch {
             Log.i(TAG, "[HEARTBEAT] coroutine running")
-            while (isActive) {
+            while (isActive && client === socket) {
                 delay(HEARTBEAT_INTERVAL_MS)
-                if (!isActive) break
+                if (!isActive || client !== socket) break
                 // Wait for socket to be connected (handles brief disconnects during calls)
                 var waitCount = 0
-                while (isActive && !client.connected() && waitCount < 30) { // wait up to 30s
+                while (isActive && client === socket && !client.connected() && waitCount < 15) {
                     delay(1000)
                     waitCount++
                 }
-                if (!isActive || !client.connected()) {
-                    Log.w(TAG, "[HEARTBEAT] socket not connected after wait, will retry next interval")
+                if (!isActive || client !== socket) break
+                if (!client.connected()) {
+                    Log.w(TAG, "[HEARTBEAT] socket not connected after wait, nudging reconnect")
+                    mainHandler.post {
+                        if (client === socket && !logoutInProgress.get()) {
+                            setStatus("🔄 Reconectando…")
+                            client.connect()
+                        }
+                    }
                     continue
                 }
                 // While in a campaign call, also report "still on the call" so the
@@ -1386,18 +1413,27 @@ class BridgeService : Service() {
                     emitPhoneStatus(lastCallState, source = "heartbeat", correlateCampaign = activeCommandId.isNotBlank(), force = true)
                 }
                 val sentAt = System.currentTimeMillis()
+                val ackReceived = AtomicBoolean(false)
                 client.emit("phone:detector_status", JSONObject().put("state", VoicemailDetector.dashboardState()))
-                client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { ackArgs ->
+                client.emit("app:heartbeat_ping", JSONObject().put("t", sentAt), Ack { _ ->
+                    ackReceived.set(true)
                     val latencyMs = System.currentTimeMillis() - sentAt
-                    if (latencyMs > HEARTBEAT_TIMEOUT_MS) {
-                        Log.w(TAG, "[HEARTBEAT] pong timeout latency=${latencyMs}ms")
-                        if (client === socket) {
-                            mainHandler.post { client.disconnect() }
-                        }
-                    } else {
-                        Log.d(TAG, "[HEARTBEAT] pong ok latency=${latencyMs}ms")
-                    }
+                    Log.d(TAG, "[HEARTBEAT] pong ok latency=${latencyMs}ms")
                 })
+                // Wait for pong timeout even if the TCP socket is half-open and Ack never fires
+                delay(HEARTBEAT_TIMEOUT_MS)
+                if (!isActive || client !== socket) break
+                if (!ackReceived.get()) {
+                    Log.w(TAG, "[HEARTBEAT] pong timeout (>${HEARTBEAT_TIMEOUT_MS}ms); forcing socket reconnect")
+                    mainHandler.post {
+                        if (client === socket && !logoutInProgress.get()) {
+                            setStatus("🔄 Reconectando…")
+                            client.disconnect()
+                            client.connect()
+                        }
+                    }
+                    break
+                }
             }
         }
     }

@@ -39,6 +39,14 @@
 #callsContent .call-equipment-duration { font-variant-numeric: tabular-nums; }
 #callsContent .call-equipment-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 #callsContent .call-equipment-actions button { padding: 7px 8px; border-radius: 9px; }
+#callsContent .call-equipment-detector { display: grid; gap: 5px; padding: 10px 12px; border: 1px solid #ffffff22; border-radius: 10px; background: #ffffff06; }
+#callsContent .call-equipment-detector > span { font-size: 11px; color: var(--calls-muted); }
+#callsContent .call-equipment-detector > strong { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+#callsContent .call-equipment-detector > strong::before { content: ''; width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #a893b6; }
+#callsContent .call-equipment-detector[data-detector="ready"] > strong::before { background: #66df94; }
+#callsContent .call-equipment-detector[data-detector="preparing"] > strong::before { background: #ffc64b; }
+#callsContent .call-equipment-detector[data-detector="detected"] { border-color: #f369d6; background: #d100b11a; }
+#callsContent .call-equipment-detector[data-detector="detected"] > strong::before { background: #ff85de; }
 #callsContent .call-equipment-more { border-top: 1px solid var(--calls-border); }
 #callsContent .call-equipment-more summary { padding: 8px 0 0; font-size: 12px; }
 #callsContent .call-equipment-more p { font-size: 12px; color: var(--calls-muted); }

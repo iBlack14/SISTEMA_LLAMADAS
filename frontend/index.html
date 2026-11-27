@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/shared/styles/base.css?v=20261119-merged-optimized" />
+  <link rel="stylesheet" href="/shared/styles/base.css?v=20261127-perf" />
   <link rel="stylesheet" href="/features/contacts/contact-tabs.css?v=20261111-compact-lists" />
   <link rel="stylesheet" href="/features/calls/call-outcomes.css?v=20261111-voicemail" />
   <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261116-3cols" />
@@ -23,10 +23,10 @@
   <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
   <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261127-lists-clear-bg" />
-  <link rel="stylesheet" href="/features/calls/calls-workspace.css?v=20261127-qr180" />
+  <link rel="stylesheet" href="/features/calls/calls-workspace.css?v=20261127-visible-voicemail" />
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
-  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
+  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261127-reminders" />
   <style>
     html.auth-pending main,
     html.auth-pending #viavoxSidebar,
@@ -120,23 +120,33 @@
       </div>
       <p id="storageStatus" class="storage-status" role="status" hidden></p>
 
-      <div hidden><button id="reportNavBtn" type="button">Calendario</button><button id="blockedNumbersOpen" type="button">Bloqueos</button></div>
+      <div hidden><button id="reportNavBtn" type="button">Calendario</button><button id="blockedNumbersOpen"
+          type="button">Bloqueos</button></div>
 
       <div id="callsContent">
-        <section id="shiftManagement" class="general-call-module calls-main-toolbar" aria-label="Controles generales de llamadas">
+        <section id="shiftManagement" class="general-call-module calls-main-toolbar"
+          aria-label="Controles generales de llamadas">
           <div class="general-call-controls">
-            <div class="general-call-heading"><div class="calls-title-line"><h2>Llamadas</h2><strong id="currentShiftLabel" class="calls-shift-label">Detectando turno…</strong></div><span id="currentShiftSchedule">Horario de Lima</span><span id="campaignStartHint" role="status" hidden></span></div>
+            <div class="general-call-heading">
+              <div class="calls-title-line">
+                <h2>Llamadas</h2><strong id="currentShiftLabel" class="calls-shift-label">Detectando turno…</strong>
+              </div><span id="currentShiftSchedule">Horario de Lima</span><span id="campaignStartHint" role="status"
+                hidden></span>
+            </div>
             <div class="campaign-actions">
               <button id="campaignStartBtn" aria-describedby="campaignStartHint">Iniciar todos</button>
               <button id="campaignStopBtn" class="secondary">Detener todos</button>
-              <details class="calls-global-more"><summary>Más acciones</summary><div>
-                <button id="pendingTurnCallBtn" class="secondary">Llamar pendientes del turno</button>
-                <button id="campaignPauseBtn" class="secondary">Pausar todos</button>
-                <button id="campaignResumeBtn" class="secondary">Continuar</button>
-                <button id="campaignSkipBtn" class="secondary">Saltar contacto</button>
-                <button id="finalizeTurnBtn" class="secondary">Finalizar turno</button>
-                <button id="finalizeSessionBtn" class="secondary">Desvincular equipos</button>
-              </div></details>
+              <details class="calls-global-more">
+                <summary>Más acciones</summary>
+                <div>
+                  <button id="pendingTurnCallBtn" class="secondary">Llamar pendientes del turno</button>
+                  <button id="campaignPauseBtn" class="secondary">Pausar todos</button>
+                  <button id="campaignResumeBtn" class="secondary">Continuar</button>
+                  <button id="campaignSkipBtn" class="secondary">Saltar contacto</button>
+                  <button id="finalizeTurnBtn" class="secondary">Finalizar turno</button>
+                  <button id="finalizeSessionBtn" class="secondary">Desvincular equipos</button>
+                </div>
+              </details>
             </div>
           </div>
         </section>
@@ -661,46 +671,87 @@
           </div>
         </header>
 
-        <div class="reservations-toolbar">
-          <div class="reservations-search-wrap">
-            <label for="reservationsSearchInput">Buscar reserva</label>
-            <div class="res-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-                aria-hidden="true">
-                <circle cx="10.5" cy="10.5" r="6.5" />
-                <path d="m16 16 4 4" />
-              </svg><input id="reservationsSearchInput" type="search" placeholder="Número, empresa o cotización…"
-                autocomplete="off" /></div>
+        <div class="res-reminder-settings">
+          <div><strong>Recordatorios de llamada</strong><p id="reservationNotificationStatus" role="status">Avisos a la fecha y hora de Lima mientras el panel esté abierto.</p></div>
+          <button id="enableReservationNotifications" type="button">Activar notificaciones</button>
+        </div>
+        <section id="reservationsYearCalendar" class="res-calendar" aria-labelledby="reservationsYearTitle">
+          <div class="res-calendar-header">
+            <div><h3 id="reservationsYearTitle">Reservas del año</h3><p>Doble clic en un día para abrir sus reservas. También puedes seleccionarlo y pulsar Enter.</p></div>
+            <div class="res-calendar-navigation"><button id="reservationsPrevYear" type="button" aria-label="Año anterior">←</button><button id="reservationsCurrentYear" type="button">Este año</button><button id="reservationsNextYear" type="button" aria-label="Año siguiente">→</button></div>
           </div>
-          <div class="reservations-filters-wrap">
-            <button type="button" class="res-filter-btn active" data-status="all" aria-pressed="true">Todas <span
-                id="resCountAll">0</span></button>
-            <button type="button" class="res-filter-btn" data-status="scheduled" aria-pressed="false">Programadas <span
-                id="resCountScheduled">0</span></button>
-            <button type="button" class="res-filter-btn" data-status="paused" aria-pressed="false">Pausadas <span
-                id="resCountPaused">0</span></button>
-            <button type="button" class="res-filter-btn" data-status="completed" aria-pressed="false">Completadas <span
-                id="resCountCompleted">0</span></button>
+          <p id="reservationsYearStatus" class="res-calendar-status" role="status">Cargando reservas…</p>
+          <div id="reservationsYearMonths" class="res-year-months" role="group" aria-label="Meses del año"></div>
+          <div class="res-calendar-footer"><span id="reservationsYearCount"></span><div><button id="reservationsYearUndated" type="button" hidden>Sin fecha</button><button id="reservationsYearRefresh" type="button">Actualizar</button></div></div>
+        </section>
+        <section id="reservationsCalendar" class="res-calendar" aria-labelledby="reservationsMonthTitle" hidden>
+          <button id="reservationsYearBack" class="res-year-back" type="button">← Ver todos los meses</button>
+          <div class="res-calendar-header">
+            <div>
+              <h3 id="reservationsMonthTitle" tabindex="-1">Calendario de reservas</h3>
+              <p>Selecciona un día para ver tus reservas. Horario de Lima.</p>
+            </div>
+            <div class="res-calendar-navigation"><button id="reservationsPrevMonth" type="button"
+                aria-label="Mes anterior">←</button><button id="reservationsToday" type="button">Hoy</button><button
+                id="reservationsNextMonth" type="button" aria-label="Mes siguiente">→</button></div>
           </div>
-        </div>
+          <p id="reservationsCalendarStatus" class="res-calendar-status" role="status">Cargando reservas…</p>
+          <div class="res-calendar-weekdays" aria-hidden="true">
+            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+          </div>
+          <div id="reservationsCalendarDays" class="res-calendar-days" role="group" aria-label="Días del mes"></div>
+          <div class="res-calendar-footer"><span id="reservationsMonthCount"></span>
+            <div><button id="reservationsUndated" type="button" hidden>Sin fecha</button><button
+                id="reservationsViewMonth" type="button">Ver reservas del mes</button><button id="reservationsRefresh"
+                type="button">Actualizar</button></div>
+          </div>
+        </section>
+        <section id="reservationsListView" hidden aria-labelledby="reservationsScopeTitle">
+          <div class="res-scope-heading"><button id="reservationsCalendarBack" type="button">← Volver al
+              calendario</button>
+            <h3 id="reservationsScopeTitle" tabindex="-1">Reservas del día</h3>
+          </div>
+          <div class="reservations-toolbar">
+            <div class="reservations-search-wrap">
+              <label for="reservationsSearchInput">Buscar reserva</label>
+              <div class="res-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.7" aria-hidden="true">
+                  <circle cx="10.5" cy="10.5" r="6.5" />
+                  <path d="m16 16 4 4" />
+                </svg><input id="reservationsSearchInput" type="search" placeholder="Número, empresa o cotización…"
+                  autocomplete="off" /></div>
+            </div>
+            <div class="reservations-filters-wrap">
+              <button type="button" class="res-filter-btn active" data-status="all" aria-pressed="true">Todas <span
+                  id="resCountAll">0</span></button>
+              <button type="button" class="res-filter-btn" data-status="scheduled" aria-pressed="false">Programadas
+                <span id="resCountScheduled">0</span></button>
+              <button type="button" class="res-filter-btn" data-status="paused" aria-pressed="false">Pausadas <span
+                  id="resCountPaused">0</span></button>
+              <button type="button" class="res-filter-btn" data-status="completed" aria-pressed="false">Completadas
+                <span id="resCountCompleted">0</span></button>
+            </div>
+          </div>
 
-        <div class="res-results-heading">
-          <h3>Agenda de seguimiento</h3><span id="reservationsResultCount" role="status" aria-live="polite">Cargando
-            reservas…</span>
-        </div>
-        <div id="reservationsEmptyState" class="reservations-empty" style="display:none;">
-          <div class="res-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor"
-              stroke-width="1.7">
-              <rect x="9" y="12" width="30" height="29" rx="5" />
-              <path d="M9 22h30M17 7v10M31 7v10M18 30h5M27 30h4M18 35h5" />
-            </svg></div>
-          <h3 id="reservationsEmptyTitle">Tu próxima llamada empieza aquí</h3>
-          <p id="reservationsEmptyDescription">Crea una reserva para dar seguimiento a una cotización. También puedes
-            agendarla desde tu celular durante una llamada.</p>
-          <button id="reservationsEmptyAction" type="button" class="secondary">＋ Crear mi primera reserva</button>
-        </div>
+          <div class="res-results-heading">
+            <h3>Agenda de seguimiento</h3><span id="reservationsResultCount" role="status" aria-live="polite">Cargando
+              reservas…</span>
+          </div>
+          <div id="reservationsEmptyState" class="reservations-empty" style="display:none;">
+            <div class="res-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor"
+                stroke-width="1.7">
+                <rect x="9" y="12" width="30" height="29" rx="5" />
+                <path d="M9 22h30M17 7v10M31 7v10M18 30h5M27 30h4M18 35h5" />
+              </svg></div>
+            <h3 id="reservationsEmptyTitle">Tu próxima llamada empieza aquí</h3>
+            <p id="reservationsEmptyDescription">Crea una reserva para dar seguimiento a una cotización. También puedes
+              agendarla desde tu celular durante una llamada.</p>
+            <button id="reservationsEmptyAction" type="button" class="secondary">＋ Crear mi primera reserva</button>
+          </div>
 
-        <!-- Contenedor de tarjetas (Formato según boceto: Nº, EMPRESA, COTIZACIÓN, PRECIO, FECHA DE LLAMADA, HORARIO, [PAUSAR/DETENER], [LLAMAR]) -->
-        <div id="reservationsCardsGrid" class="reservations-cards-grid"></div>
+          <!-- Contenedor de tarjetas (Formato según boceto: Nº, EMPRESA, COTIZACIÓN, PRECIO, FECHA DE LLAMADA, HORARIO, [PAUSAR/DETENER], [LLAMAR]) -->
+          <div id="reservationsCardsGrid" class="reservations-cards-grid"></div>
+        </section>
       </section>
 
     </section>
@@ -1266,6 +1317,7 @@
           </div>
         </div>
 
+        <p class="quote-reminder-hint">La reserva programada tendrá un recordatorio en esta fecha y hora de Lima. Mantén el panel abierto para recibirlo.</p>
         <label for="quoteNotesInput">Notas adicionales (opcional)</label>
         <input id="quoteNotesInput" type="text" placeholder="Ej: Preguntar por el encargado de compras" />
 

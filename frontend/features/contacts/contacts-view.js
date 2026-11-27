@@ -57,7 +57,24 @@ function saveModalContact() {
   setStatus("Contacto agregado.", true);
 }
 
+let _contactsRenderDirty = false;
+let _contactsPanelListenerBound = false;
 function renderContacts() {
+  const contactsView = document.getElementById("contactsContent");
+  if (!_contactsPanelListenerBound) {
+    _contactsPanelListenerBound = true;
+    document.addEventListener("panel:view", (e) => {
+      if (e.detail === "contacts" && _contactsRenderDirty) {
+        _contactsRenderDirty = false;
+        renderContacts();
+      }
+    });
+  }
+  if (contactsView && contactsView.hidden) {
+    _contactsRenderDirty = true;
+    return;
+  }
+  _contactsRenderDirty = false;
   updateCalledContactsCounter();
   const cBodyEl = refs.cBodyEl;
   cBodyEl.innerHTML = "";

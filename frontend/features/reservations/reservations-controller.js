@@ -2,15 +2,40 @@ import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { showPanelView } from '../../app/navigation/panel-navigation.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 import { dashboardSessionKeys } from '../workspace/dashboard-session.js';
+import { limaToday, reservationMonth, reservationYear, reservationsInScope, shiftReservationMonth } from './reservation-calendar.js';
+import { createReservationReminders } from './reservation-reminders.js';
 
 let reservationsState = {
   reservations: [],
   activeFilter: 'all',
   searchQuery: '',
-  initialized: false
+  initialized: false,
+  month: limaToday().slice(0, 7),
+  year: Number(limaToday().slice(0, 4)),
+  yearVisible: true,
+  returnToYear: true,
+  selectedDay: '',
+  listVisible: false,
+  calendarMessage: 'Cargando reservas…'
 };
 let quoteReturnFocus = null;
 let activeReservationType = "quote";
+const reservationReminders = createReservationReminders({
+  getIdentity: () => {
+    const userId = (currentUser || window.VOIP_VC_AUTH_USER)?.id;
+    const code = getSessionCode();
+    return userId && code ? `${userId}.${code}` : '';
+  },
+  onOpen: async reservation => {
+    if (window.navigatePanel) await window.navigatePanel('reservations');
+    else { showPanelView('reservations'); initReservationsView(); }
+    reservationsState.year = Number(reservation.date.slice(0, 4));
+    reservationsState.month = reservation.date.slice(0, 7);
+    reservationsState.yearVisible = true;
+    openReservationScope(reservation.date);
+    [...document.querySelectorAll('.reservation-card')].find(card => card.dataset.id === String(reservation.id))?.scrollIntoView({ block: 'center' });
+  }
+});
 
 function getSessionCode() {
   const input = document.getElementById("sessionCode");
@@ -53,20 +78,28 @@ function reservationFetch(code, suffix = "", options = {}) {
 export async function loadReservations() {
   const code = getSessionCode();
   if (!code || !getDashboardToken(code)) {
+    reservationsState.calendarMessage = 'Conectando con tu espacio de trabajo…';
+    renderReservationCalendar();
     const count = document.getElementById('reservationsResultCount');
     if (count) count.textContent = 'Conectando con tu espacio de trabajo…';
     return;
   }
 
+  reservationsState.calendarMessage = 'Cargando reservas…';
+  renderReservationCalendar();
   try {
     const res = await reservationFetch(code, "", {
       headers: { "Accept": "application/json" }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (code !== getSessionCode()) return;
     reservationsState.reservations = Array.isArray(data.reservations) ? data.reservations : [];
+    reservationsState.calendarMessage = '';
     renderReservations();
   } catch (err) {
+    reservationsState.calendarMessage = 'No pudimos actualizar las reservas. Pulsa «Actualizar» para volver a intentarlo.';
+    renderReservationCalendar();
     console.warn("[RESERVATIONS] Error al cargar reservas:", err);
     const count = document.getElementById('reservationsResultCount');
     if (count) count.textContent = 'No se pudieron cargar las reservas';
@@ -103,7 +136,10 @@ export function openQuoteModal(initialData = {}) {
   activeReservationType = initialData.reservationType === "appointment" ? "appointment" : "quote";
 
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = limaToday(now);
+  const inAgenda = document.getElementById('reservationsView')?.hidden === false;
+  const todayStr = inAgenda && /^\d{4}-\d{2}-\d{2}$/.test(reservationsState.selectedDay) ? reservationsState.selectedDay
+    : inAgenda && reservationsState.month !== today.slice(0, 7) ? `${reservationsState.month}-01` : today;
   const nextHour = String((now.getHours() + 1) % 24).padStart(2, '0') + ":00";
 
   if (quoteId) quoteId.value = initialData.id || "";
@@ -284,12 +320,86 @@ async function handleDeleteReservation(id) {
   }
 }
 
+function renderReservationCalendar() {
+  const calendar = document.getElementById('reservationsCalendar');
+  if (!calendar) return;
+  const month = reservationMonth(reservationsState.month, reservationsState.reservations);
+  calendar.hidden = reservationsState.yearVisible || reservationsState.listVisible;
+  const yearView = document.getElementById('reservationsYearCalendar');
+  if (yearView) {
+    yearView.hidden = !reservationsState.yearVisible || reservationsState.listVisible;
+    const year = reservationYear(reservationsState.year, reservationsState.reservations);
+    const thisMonth = limaToday().slice(0, 7);
+    document.getElementById('reservationsYearTitle').textContent = `Reservas de ${reservationsState.year}`;
+    const today = limaToday();
+    document.getElementById('reservationsYearMonths').innerHTML = year.months.map(month => {
+      const calendar = reservationMonth(month.key, reservationsState.reservations, { weekStartsOn: 0 });
+      return `<article class="res-year-month${month.key === thisMonth ? ' is-current-month' : ''}" data-calendar-month="${month.key}" aria-label="${esc(month.label)} de ${reservationsState.year}">
+        <header class="res-mini-header"><span class="res-mini-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v5M16 3v5M4 11h16"/></svg></span><strong>${esc(month.label)}</strong><span class="res-mini-total" aria-label="${month.count} reservas en el mes">${month.count}</span></header>
+        <div class="res-mini-weekdays" aria-hidden="true"><span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span></div>
+        <div class="res-mini-days" role="group" aria-label="Días de ${esc(month.label)}">${calendar.cells.map(day => {
+          if (!day) return '<span aria-hidden="true"></span>';
+          const label = new Intl.DateTimeFormat('es-PE', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
+          return `<button type="button" class="res-mini-day${day.count ? ' has-reservations' : ''}${day.date === today ? ' is-today' : ''}" data-reservation-year-day="${day.date}" aria-pressed="${day.date === reservationsState.selectedDay}" aria-label="${esc(label)}, ${day.count} reservas. Doble clic para abrir"${day.date === today ? ' aria-current="date"' : ''}><span>${day.number}</span>${day.count ? `<small class="res-mini-count" aria-hidden="true">${day.count}</small>` : ''}</button>`;
+        }).join('')}</div>
+      </article>`;
+    }).join('');
+    document.getElementById('reservationsYearCount').textContent = `${year.total} ${year.total === 1 ? 'reserva' : 'reservas'} en ${reservationsState.year}`;
+    const yearMessage = document.getElementById('reservationsYearStatus');
+    yearMessage.textContent = reservationsState.calendarMessage;
+    yearMessage.hidden = !reservationsState.calendarMessage;
+    const undatedButton = document.getElementById('reservationsYearUndated');
+    undatedButton.hidden = !year.undated;
+    undatedButton.textContent = `Sin fecha (${year.undated})`;
+  }
+  const list = document.getElementById('reservationsListView');
+  if (list) list.hidden = !reservationsState.listVisible;
+  document.getElementById('reservationsMonthTitle').textContent = month.label;
+  const message = document.getElementById('reservationsCalendarStatus');
+  message.textContent = reservationsState.calendarMessage;
+  message.hidden = !reservationsState.calendarMessage;
+  document.getElementById('reservationsMonthCount').textContent = `${month.total} ${month.total === 1 ? 'reserva en este mes' : 'reservas en este mes'}`;
+  const undated = document.getElementById('reservationsUndated');
+  undated.hidden = !month.undated;
+  undated.textContent = `Sin fecha (${month.undated})`;
+  const today = limaToday();
+  document.getElementById('reservationsCalendarDays').innerHTML = month.cells.map(day => {
+    if (!day) return '<span class="res-calendar-blank" aria-hidden="true"></span>';
+    const label = new Intl.DateTimeFormat('es-PE', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
+    return `<button type="button" class="res-calendar-day${day.count ? ' has-reservations' : ''}${day.date === today ? ' is-today' : ''}" data-reservation-day="${day.date}" aria-label="${esc(label)}, ${day.count} reservas" aria-pressed="${day.date === reservationsState.selectedDay}"${day.date === today ? ' aria-current="date"' : ''}><span class="res-calendar-number">${day.number}</span>${day.count ? `<span class="res-calendar-count">${day.count}<span class="res-calendar-count-word"> ${day.count === 1 ? 'reserva' : 'reservas'}</span></span>` : '<span class="res-calendar-no-events" aria-hidden="true">—</span>'}</button>`;
+  }).join('');
+  const title = document.getElementById('reservationsScopeTitle');
+  title.textContent = reservationsState.selectedDay === 'undated' ? 'Reservas sin fecha'
+    : reservationsState.selectedDay ? new Intl.DateTimeFormat('es-PE', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${reservationsState.selectedDay}T12:00:00Z`))
+    : `Reservas de ${month.label}`;
+}
+
+function openReservationScope(day = '') {
+  reservationsState.returnToYear = reservationsState.yearVisible;
+  reservationsState.yearVisible = false;
+  reservationsState.selectedDay = day;
+  reservationsState.listVisible = true;
+  reservationsState.activeFilter = 'all';
+  reservationsState.searchQuery = '';
+  const search = document.getElementById('reservationsSearchInput');
+  if (search) search.value = '';
+  document.querySelectorAll('.res-filter-btn').forEach(button => {
+    const active = button.dataset.status === 'all';
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  renderReservations();
+  document.getElementById('reservationsScopeTitle')?.focus({ preventScroll: true });
+}
+
 export function renderReservations() {
+  reservationReminders.update(reservationsState.reservations);
+  renderReservationCalendar();
   const container = document.getElementById("reservationsCardsGrid");
   const emptyState = document.getElementById("reservationsEmptyState");
   if (!container) return;
 
-  const all = reservationsState.reservations;
+  const all = reservationsInScope(reservationsState.reservations, reservationsState.month, reservationsState.selectedDay);
   const countScheduled = all.filter(r => r.status === "scheduled").length;
   const countPaused = all.filter(r => r.status === "paused").length;
   const countCompleted = all.filter(r => r.status === "completed").length;
@@ -318,6 +428,7 @@ export function renderReservations() {
       (r.notes || "").toLowerCase().includes(query)
     );
   }
+  filtered = [...filtered].sort((a, b) => `${a.date || ''} ${a.time || ''}`.localeCompare(`${b.date || ''} ${b.time || ''}`));
 
   const resultCount = document.getElementById('reservationsResultCount');
   if (resultCount) resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'reserva' : 'reservas'}${filtered.length !== all.length ? ` de ${all.length}` : ''}`;
@@ -325,8 +436,8 @@ export function renderReservations() {
   const emptyDescription = document.getElementById('reservationsEmptyDescription');
   const emptyAction = document.getElementById('reservationsEmptyAction');
   const hasFilters = Boolean(query || reservationsState.activeFilter !== 'all');
-  if (emptyTitle) emptyTitle.textContent = hasFilters ? 'No encontramos reservas' : 'Tu próxima llamada empieza aquí';
-  if (emptyDescription) emptyDescription.textContent = hasFilters ? 'Prueba con otro término o restablece los filtros para ver tu agenda.' : 'Crea una reserva para dar seguimiento a una cotización. También puedes agendarla desde tu celular durante una llamada.';
+  if (emptyTitle) emptyTitle.textContent = hasFilters ? 'No encontramos reservas' : 'No tienes reservas en esta fecha';
+  if (emptyDescription) emptyDescription.textContent = hasFilters ? 'Prueba con otro término o restablece los filtros para ver tu agenda.' : 'Puedes crear una reserva aquí o volver al calendario para elegir otra fecha.';
   if (emptyAction) {
     emptyAction.textContent = hasFilters ? 'Restablecer filtros' : '＋ Crear mi primera reserva';
     emptyAction.dataset.mode = hasFilters ? 'reset' : 'create';
@@ -414,11 +525,93 @@ export function renderReservations() {
 }
 
 export function initReservationsView() {
+  reservationReminders.notificationStatus();
+  reservationsState.yearVisible = true;
+  reservationsState.listVisible = false;
+  renderReservations();
   if (reservationsState.initialized) {
     loadReservations();
     return;
   }
   reservationsState.initialized = true;
+  const yearMonths = document.getElementById('reservationsYearMonths');
+  let lastTouchDay = '', lastTouchAt = 0;
+  const openYearDay = button => {
+    if (!button || reservationsState.listVisible) return;
+    const day = button.dataset.reservationYearDay;
+    reservationsState.month = day.slice(0, 7);
+    openReservationScope(day);
+  };
+  yearMonths?.addEventListener('click', event => {
+    const button = event.target.closest('[data-reservation-year-day]');
+    if (!button) return;
+    reservationsState.selectedDay = button.dataset.reservationYearDay;
+    reservationsState.month = reservationsState.selectedDay.slice(0, 7);
+    yearMonths.querySelectorAll('[aria-pressed="true"]').forEach(day => day.setAttribute('aria-pressed', 'false'));
+    button.setAttribute('aria-pressed', 'true');
+    if (event.detail === 0) return openYearDay(button); // Activación por teclado o lector de pantalla.
+    if (event.pointerType === 'touch') {
+      const now = Date.now();
+      if (lastTouchDay === reservationsState.selectedDay && now - lastTouchAt < 500) {
+        lastTouchDay = '';
+        return openYearDay(button);
+      }
+      lastTouchDay = reservationsState.selectedDay;
+      lastTouchAt = now;
+    }
+  });
+  yearMonths?.addEventListener('dblclick', event => openYearDay(event.target.closest('[data-reservation-year-day]')));
+  const moveYear = offset => {
+    reservationsState.year += offset;
+    reservationsState.month = `${reservationsState.year}-${reservationsState.month.slice(5)}`;
+    reservationsState.selectedDay = '';
+    renderReservationCalendar();
+  };
+  document.getElementById('reservationsPrevYear')?.addEventListener('click', () => moveYear(-1));
+  document.getElementById('reservationsNextYear')?.addEventListener('click', () => moveYear(1));
+  document.getElementById('reservationsCurrentYear')?.addEventListener('click', () => {
+    reservationsState.year = Number(limaToday().slice(0, 4));
+    reservationsState.month = limaToday().slice(0, 7);
+    reservationsState.selectedDay = '';
+    renderReservationCalendar();
+  });
+  document.getElementById('reservationsYearRefresh')?.addEventListener('click', loadReservations);
+  document.getElementById('reservationsYearUndated')?.addEventListener('click', () => openReservationScope('undated'));
+  document.getElementById('reservationsYearBack')?.addEventListener('click', () => {
+    reservationsState.yearVisible = true;
+    renderReservationCalendar();
+    document.getElementById('reservationsCurrentYear')?.focus();
+  });
+  document.getElementById('reservationsCalendarDays')?.addEventListener('click', event => {
+    const button = event.target.closest('[data-reservation-day]');
+    if (button) openReservationScope(button.dataset.reservationDay);
+  });
+  const moveMonth = offset => {
+    reservationsState.month = shiftReservationMonth(reservationsState.month, offset);
+    reservationsState.year = Number(reservationsState.month.slice(0, 4));
+    reservationsState.selectedDay = '';
+    renderReservationCalendar();
+  };
+  document.getElementById('reservationsPrevMonth')?.addEventListener('click', () => moveMonth(-1));
+  document.getElementById('reservationsNextMonth')?.addEventListener('click', () => moveMonth(1));
+  document.getElementById('reservationsToday')?.addEventListener('click', () => {
+    reservationsState.month = limaToday().slice(0, 7);
+    reservationsState.year = Number(limaToday().slice(0, 4));
+    reservationsState.selectedDay = limaToday();
+    renderReservationCalendar();
+    document.querySelector('[data-reservation-day][aria-current="date"]')?.focus();
+  });
+  document.getElementById('reservationsViewMonth')?.addEventListener('click', () => openReservationScope());
+  document.getElementById('reservationsUndated')?.addEventListener('click', () => openReservationScope('undated'));
+  document.getElementById('reservationsRefresh')?.addEventListener('click', loadReservations);
+  document.getElementById('reservationsCalendarBack')?.addEventListener('click', () => {
+    reservationsState.listVisible = false;
+    reservationsState.yearVisible = reservationsState.returnToYear;
+    renderReservationCalendar();
+    if (reservationsState.yearVisible) {
+      [...yearMonths.querySelectorAll('[data-reservation-year-day]')].find(day => day.dataset.reservationYearDay === reservationsState.selectedDay)?.focus();
+    } else document.getElementById('reservationsViewMonth')?.focus();
+  });
 
   document.getElementById('reservationsEmptyAction')?.addEventListener('click', (event) => {
     const mode = event.currentTarget.dataset.mode;
@@ -527,26 +720,22 @@ export function initReservationsView() {
     });
   }
 
-  // Sockets en tiempo real
-  if (socket) {
-    socket.on("reservations:changed", (data) => {
-      if (Array.isArray(data?.reservations)) {
-        reservationsState.reservations = data.reservations;
-        renderReservations();
-      } else {
-        loadReservations();
-      }
-    });
-  }
-
   loadReservations();
 }
 
 // Auto-escuchar socket para abrir modal de cotización incluso si el usuario está en otra vista
 if (socket) {
+  // Los recordatorios funcionan también en Llamadas y en las demás secciones.
+  socket.on('reservations:changed', data => {
+    if (Array.isArray(data?.reservations)) {
+      reservationsState.reservations = data.reservations;
+      reservationsState.calendarMessage = '';
+      renderReservations();
+    } else loadReservations();
+  });
   // El dashboard guarda la sesión y su credencial en sus propios listeners.
   const refreshAfterJoin = () => {
-    if (reservationsState.initialized) setTimeout(() => loadReservations(), 0);
+    setTimeout(() => loadReservations(), 0);
   };
   socket.on("session:created", refreshAfterJoin);
   socket.on("session:joined", ({ role }) => {

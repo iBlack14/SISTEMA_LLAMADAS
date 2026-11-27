@@ -349,7 +349,7 @@ export function registerCallEvents(runtime, services, socket) {
       }
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
-      setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
+      setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 600);
     }
     });
     }).catch(error => {

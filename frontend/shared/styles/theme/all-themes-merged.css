@@ -30,7 +30,7 @@ body {
   background-image:
     radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 40%),
     radial-gradient(circle at 90% 80%, rgba(192, 38, 211, 0.12) 0%, transparent 40%);
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
 
 .panel {
@@ -4821,7 +4821,7 @@ body {
   border: 1px solid rgba(236, 0, 179, 0.58);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow: 0 28px 70px rgba(10, 0, 25, 0.52), inset 0 1px rgba(255,255,255,0.06);
+  box-shadow: 0 12px 28px rgba(10, 0, 25, 0.4);
 }
 
 body .panel * { color: inherit !important; }
@@ -4944,18 +4944,21 @@ a { color: #ff8dda !important; }
 /* Fondo estÃ¡tico violeta/fucsia. */
 body {
   background-color: #7900d4;
-  background-image:
+  background-image: none;
+  background-attachment: scroll;
+}
+
+.app-background-overlay {
+  transform: translateZ(0);
+  will-change: transform;
+  contain: strict;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
+    radial-gradient(circle at 50% 45%, rgba(209, 85, 255, 0.18), transparent 46%),
     radial-gradient(circle at 16% 12%, rgba(199, 75, 255, 0.82), transparent 30%),
     radial-gradient(circle at 82% 22%, rgba(247, 0, 202, 0.44), transparent 36%),
     radial-gradient(circle at 50% 100%, rgba(112, 0, 209, 0.72), transparent 48%),
     linear-gradient(135deg, #6b00d7 0%, #a000df 48%, #7a00cf 100%);
-  background-attachment: fixed;
-}
-
-.app-background-overlay {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
-    radial-gradient(circle at 50% 45%, rgba(209, 85, 255, 0.18), transparent 46%);
 }
 
 .pairing-slot-current-call {
