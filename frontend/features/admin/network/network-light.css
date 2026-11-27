@@ -24,17 +24,6 @@ body:has(#networkView:not([hidden])) { background: #f5f1f8 !important; color: va
 body:has(#networkView:not([hidden])) .app-background-overlay { display: none; }
 body:has(#networkView:not([hidden])) .panel { background: #fff !important; border-color: #e8dfec !important; box-shadow: none; }
 #networkView .connection, #networkView .summary > div, #networkView .net-card { background: #fff; border-color: #e8dfec; box-shadow: var(--shadow); }
-#networkView .equipment-position { background: #f8f5fa; border-color: #e8dfec; box-shadow: none; }
-#networkView .indicator { background: #fff; border-color: #e8dfec; color: #35233f; box-shadow: none; }
-#networkView .indicator:hover { background: #f8f5fa; border-color: #cbb3d3; }
-#networkView .indicator .orb-connection { background: #f8f5fa; border-color: #e8dfec; color: #796c81; }
-#networkView .indicator .orb-connection[data-connection=connected] { background: #e5f4ea; color: #12683e; }
-#networkView .indicator .orb-connection[data-connection=disconnected] { background: #fcecef; color: #9e263c; }
-#networkView .indicator[data-tone=offline] .orb-sub { color: #a62d43; }
-#networkView .equipment-position .button { background: #fff; border: 1px solid #ded3e3; color: #594660; box-shadow: none; }
-#networkView .equipment-position .equipment-number-btn { background: #79258e; border-color: #79258e; color: #fff; }
-#networkView .equipment-position .button:hover:not(:disabled) { background: #f1e9f5; color: #79258e; }
-#networkView .equipment-position .equipment-number-btn:hover:not(:disabled) { background: #611b73; color: #fff; }
 #networkView .primary, #networkView .filter-pill.active { background: #79258e; border-color: #79258e; color: #fff; }
 #networkView .secondary, #networkView .equipment-slider button { background: #fff; border-color: #e8dfec; color: #35233f; }
 #networkView .search input, #networkView .card-list-select { background: #fff; color: #35233f; border-color: #ded3e3; }

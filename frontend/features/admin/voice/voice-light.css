@@ -47,5 +47,5 @@ body:has(#voiceView:not([hidden])) #statusText { color: #796c81 !important; }
 #voiceView .voice-more-filters[open] { grid-column: 1 / -1; grid-row: 2; }
 #voiceView .voice-more-filters[open] summary { justify-content: flex-start; border-color: #d6bfdf; color: #79258e; }
 #voiceView .voice-more-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 12px; }
-@media (max-width: 800px) { #voiceView .voice-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } #voiceView .voice-field--search, #voiceView .voice-more-filters[open] { grid-column: 1 / -1; } #voiceView .voice-more-filters[open], #voiceView .voice-filter-actions { grid-row: auto; } #voiceView .voice-filter-actions { grid-column: auto; } #voiceView .voice-more-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 800px) { #voiceView .voice-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } #voiceView .voice-more-filters[open] { grid-column: 1 / -1; } #voiceView .voice-more-filters[open], #voiceView .voice-filter-actions { grid-row: auto; } #voiceView .voice-filter-actions { grid-column: auto; } #voiceView .voice-more-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { #voiceView .voice-more-fields { grid-template-columns: 1fr; } }

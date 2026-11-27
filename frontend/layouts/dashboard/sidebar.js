@@ -130,15 +130,15 @@ async function loadAdminWorkspace() {
     document.head.append(stylesheet);
     const networkLightStylesheet = document.createElement("link");
     networkLightStylesheet.rel = "stylesheet";
-    networkLightStylesheet.href = "/features/admin/network/network-light.css?v=20261127-cards2";
+    networkLightStylesheet.href = "/features/admin/network/network-light.css?v=20261127-clean";
     document.head.append(networkLightStylesheet);
     const voiceStylesheet = document.createElement("link");
     voiceStylesheet.rel = "stylesheet";
-    voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261124-voice-ui3";
+    voiceStylesheet.href = "/features/admin/voice/voice.css?v=20261127-clean";
     document.head.append(voiceStylesheet);
     const voiceLightStylesheet = document.createElement("link");
     voiceLightStylesheet.rel = "stylesheet";
-    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-no-search";
+    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-clean";
     document.head.append(voiceLightStylesheet);
   })().catch(error => {
     adminPromise = null;

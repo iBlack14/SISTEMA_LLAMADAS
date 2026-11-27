@@ -1,29 +1,15 @@
 /* ══════════════════════════════════════════════════════
    PANEL DE VOZ — grabaciones de llamadas
-   Usa la paleta del panel admin (morado + fucsia).
+   Estructura del panel; colores definidos en voice-light.css.
    ══════════════════════════════════════════════════════ */
 
 #voiceView {
-  --voice-surface: rgba(34, 8, 50, 0.94);
-  --voice-surface-2: rgba(62, 18, 84, 0.96);
-  --voice-line: rgba(222, 165, 240, 0.28);
-  --voice-line-strong: rgba(255, 156, 224, 0.6);
-  --voice-text: #fdf4ff;
-  --voice-text-2: #f3e4fb;
-  --voice-muted: #dcc2ea;
-  --voice-accent: #ff31c6;
-  --voice-accent-soft: rgba(255, 49, 198, 0.18);
-  --voice-on-accent: #2a0638;
-  --voice-success: #3ddc84;
-  --voice-warn: #ffc046;
-  --voice-shadow: 0 18px 44px rgba(18, 2, 32, 0.4);
   max-width: 1400px;
   margin: 0 auto;
   padding: clamp(16px, 2.4vw, 36px);
   display: grid;
   gap: 18px;
   color: var(--voice-text);
-  color-scheme: dark;
 }
 
 #voiceView[hidden],
@@ -1037,10 +1023,6 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
-      #voiceView .voice-field--search {
-        grid-column: span 3;
-      }
-
       #voiceView .voice-filter-actions {
         grid-column: span 3;
         justify-content: flex-end;
@@ -1130,7 +1112,6 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      #voiceView .voice-field--search,
       #voiceView .voice-filter-actions {
         grid-column: span 2;
       }

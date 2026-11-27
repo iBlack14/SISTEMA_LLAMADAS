@@ -2,17 +2,6 @@
    REPORTES — capa de UI limpia (se carga después de los temas)
    Solo estilos: no modifica ningún comportamiento del calendario.
    ══════════════════════════════════════════════════════════ */
-#annualReport {
-  --r-card: rgba(52, 13, 76, .96);
-  --r-card-hi: rgba(70, 24, 99, .98);
-  --r-line: rgba(236, 198, 250, .28);
-  --r-line-hi: rgba(255, 122, 216, .72);
-  --r-text: #fdf4ff;
-  --r-muted: #e7d4f1;
-  --r-accent: #ff5bc8;
-  --r-violet: #a855f7;
-}
-
 /* Contenedor principal */
 #annualReport .reports-workspace {
   border: 1px solid var(--r-line);
