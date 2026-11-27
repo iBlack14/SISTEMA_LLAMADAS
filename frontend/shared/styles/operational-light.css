@@ -1,72 +1,565 @@
 /* Paleta clara para Llamadas y Rubro y lista. */
-body:has(#callsContent:not([hidden])), body:has(#contactsContent:not([hidden])) { background: #f5f1f8 !important; }
-body:has(#callsContent:not([hidden])) .app-background-overlay, body:has(#contactsContent:not([hidden])) .app-background-overlay { display: none; }
-body:has(#callsContent:not([hidden])) .panel, body:has(#contactsContent:not([hidden])) .panel { background: #fff !important; border: 1px solid #e8dfec !important; border-radius: 18px; box-shadow: none; }
-body:has(#callsContent:not([hidden])) #status, body:has(#contactsContent:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
-body:has(#callsContent:not([hidden])) #statusText, body:has(#contactsContent:not([hidden])) #statusText { color: #796c81 !important; }
-#callsContent { --calls-surface: #f8f5fa; --calls-border: #e8dfec; --calls-muted: #796c81; color: #35233f; }
-#callsContent :is(.calls-main-toolbar, .call-equipment-card, .calls-global-more > div, .assigned-lists-panel) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none !important; }
-#callsContent :is(.general-call-heading h2, .qr-title, .call-equipment-heading strong, .call-equipment-current strong) { color: #35233f !important; }
-#callsContent :is(.calls-shift-label, .qr-description, .call-equipment-list, .call-equipment-current small, summary) { color: #796c81 !important; }
-#callsContent .general-call-heading > span { color: #796c81 !important; }
-#callsContent :is(.call-equipment-current, .call-equipment-detector) { background: #f8f5fa; border-color: #e8dfec; color: #35233f; }
-#callsContent .call-equipment-current span, #callsContent .call-equipment-detector strong { color: #35233f !important; }
-#callsContent .call-equipment-detector > span { color: #796c81 !important; }
-#callsContent .call-equipment-list select { background: #fff; border-color: #ded3e3; color: #35233f; }
-#callsContent .call-connection { background: #e5f4ea; border-color: #b8dfc5; color: #167846; }
-#callsContent [data-tone="offline"] .call-connection { background: #f8f5fa; border-color: #e8dfec; color: #796c81; }
-#callsContent :is(.call-equipment-actions .secondary, .campaign-actions > .secondary) { background: #fff !important; border-color: #ded3e3 !important; color: #594660 !important; }
-#callsContent :is(.calls-contact-workspace, .calls-table-scroll) { background: #f8f5fa !important; border-color: #e8dfec !important; }
-#callsContent :is(.calls-table-heading h3, .calls-table-total, .calls-table-search, .calls-table-pagination, .calls-table-scroll td) { color: #35233f !important; }
-#callsContent .calls-table-scroll td { background: #fff !important; border-color: #eee7f0 !important; transition: background-color .14s ease, color .14s ease; }
-#callsContent .calls-table-scroll tbody tr:hover td { background: #e8c6f7 !important; color: #210830 !important; }
-#callsContent .calls-table-scroll tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 #9c08d2; }
-#callsContent .calls-table-scroll thead tr { background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important; }
-#callsContent .calls-table-scroll th { background: transparent !important; color: #ffffff !important; border-color: transparent !important; }
-#callsContent .calls-table-search input { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
-#callsContent :is(.calls-team-tabs, .calls-state-tabs) button { background: #fff !important; border: 1px solid #d4b9df !important; color: #594660 !important; box-shadow: none !important; transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease; }
-#callsContent :is(.calls-team-tabs, .calls-state-tabs) button:not(.is-active):hover { background: #f1daf9 !important; border-color: #b832cf !important; color: #79159e !important; transform: translateY(-1px); }
-#callsContent :is(.calls-team-tabs, .calls-state-tabs) button.is-active { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 4px 14px rgba(156, 8, 210, 0.28) !important; }
-#callsContent .call-equipment-heading .call-connection { color: #167846 !important; background: #e5f4ea !important; border-color: #b8dfc5 !important; }
-#callsContent [data-tone="offline"] .call-equipment-heading .call-connection { color: #796c81 !important; background: #f1e9f5 !important; border-color: #e8dfec !important; }
-#callsContent .call-equipment-card [data-delete-pairing-slot] { background: #fff !important; border: 1px solid #ded3e3 !important; color: #79258e !important; box-shadow: none !important; }
-#contactsContent { color: #35233f; font-family: 'Outfit', sans-serif; }
-#contactsContent :is(.contacts-window-header, #contactsSection, .admin-user-lists-view) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none !important; }
-#contactsContent :is(h2, h3, h4, label) { color: #35233f !important; }
-#contactsContent :is(p, .muted) { color: #796c81 !important; }
-#contactsContent :is(input, select, textarea) { background: #fff !important; border-color: #ded3e3 !important; color: #35233f !important; }
-#contactsContent #contactsTabs .tab-item { background: #f8f5fa !important; border-color: #dcc2e6 !important; transition: background-color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
-#contactsContent #contactsTabs .tab-item:hover { background: #eed5f7 !important; border-color: #b832cf !important; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(156, 8, 210, 0.14); }
-#contactsContent #contactsTabs .tab-item.active { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border-color: transparent !important; box-shadow: 0 5px 16px rgba(156, 8, 210, 0.28) !important; }
-#contactsContent #contactsTabs .tab-item > button { color: #594660 !important; }
-#contactsContent #contactsTabs .tab-item.active > button { color: #ffffff !important; font-weight: 700; }
-#contactsContent :is(th, td) { color: #35233f; border-color: #eee7f0; transition: background-color .14s ease, color .14s ease; }
-#contactsContent tbody tr:hover td { background: #e8c6f7 !important; color: #210830 !important; }
-#contactsContent tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 #9c08d2; }
-#contactsContent thead tr { background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important; }
-#contactsContent th { background: transparent !important; color: #ffffff !important; border-color: transparent !important; }
-#contactsContent #adminUserListsView { background: transparent !important; }
-#contactsContent .admin-lists-role { background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%); border-color: transparent; color: #ffffff; }
-#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-detail-view, .admin-lists-card, .admin-lists-table-wrap, .admin-lists-import-details, .admin-lists-importer, .admin-lists-preview) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none; }
-#contactsContent .admin-lists-card { border-left: 4px solid #9c08d2 !important; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background .16s ease; }
-#contactsContent .admin-lists-card:hover { border-color: #d81b9c !important; background: #f9ecfd !important; box-shadow: 0 10px 24px rgba(156, 8, 210, 0.16) !important; transform: translateY(-2px); }
-#contactsContent .admin-lists-open-button { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border-color: transparent !important; color: #fff !important; transition: filter .15s ease, transform .15s ease, box-shadow .15s ease; }
-#contactsContent .admin-lists-open-button:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(240, 0, 169, 0.32) !important; }
-#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-import-details, .admin-lists-importer) { background: linear-gradient(135deg, #f8eefc 0%, #fcecf7 100%) !important; border-color: #dfc3ea !important; }
-#contactsContent :is(.admin-lists-step, .admin-lists-overview > div > span, .admin-lists-card-meta, .admin-lists-table-heading span, .admin-lists-browse-footer, .admin-lists-import-content > p, .admin-lists-month-heading label) { color: #796c81 !important; }
-#contactsContent .admin-user-lists-view .admin-lists-months > button.admin-lists-month:not(.is-selected) { background: #fff !important; border-color: #dcc2e6 !important; color: #594660 !important; transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease; }
-#contactsContent .admin-user-lists-view .admin-lists-months > button.admin-lists-month:not(.is-selected):hover { background: #f1daf9 !important; border-color: #9c08d2 !important; color: #79159e !important; transform: translateY(-1px); }
-#contactsContent .admin-user-lists-view .admin-lists-months > button.admin-lists-month.is-selected { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 5px 15px rgba(156, 8, 210, 0.28) !important; }
-#contactsContent .admin-user-lists-view :is(.admin-lists-month-heading select, .admin-lists-category select) { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; color-scheme: light; }
-#contactsContent .admin-lists-search { background: #fff !important; border-color: #ded3e3 !important; color: #796c81 !important; }
-#contactsContent .admin-lists-search input { background: transparent !important; }
-#contactsContent :is(.admin-lists-card-head strong, .admin-lists-name-cell strong, .admin-lists-detail-view .admin-lists-saved-heading h4) { color: #35233f !important; }
-#contactsContent :is(.admin-lists-card-count, .admin-lists-rubro-badge) { background: #f1e9f5; border-color: #e2d2e8; color: #79258e; }
-#contactsContent .admin-lists-import-details summary { color: #594660; }
-#contactsContent .admin-lists-import-details > summary { color: #35233f !important; }
-#contactsContent .admin-lists-import-copy strong { color: #35233f !important; }
-#contactsContent .admin-lists-import-copy span { color: #796c81 !important; }
-#contactsContent .admin-lists-import-file-row .file-upload-label, #contactsContent .admin-lists-import-file-row .file-upload-label span { color: #594660 !important; background: #fff !important; border-color: #ded3e3 !important; }
-#contactsContent .admin-lists-table-wrap thead th { background: #f8f5fa; color: #594660; }
-#contactsContent .admin-lists-table-wrap tbody td { color: #35233f; border-color: #eee7f0; }
-:is(#callsContent, #contactsContent) :is(button, input, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
+body:has(#callsContent:not([hidden])),
+body:has(#contactsContent:not([hidden])) {
+    background: #f5f1f8 !important;
+}
+
+body:has(#callsContent:not([hidden])) .app-background-overlay,
+body:has(#contactsContent:not([hidden])) .app-background-overlay {
+    display: none;
+}
+
+body:has(#callsContent:not([hidden])) .panel,
+body:has(#contactsContent:not([hidden])) .panel {
+    background: #fff !important;
+    border: 1px solid #e8dfec !important;
+    border-radius: 18px;
+    box-shadow: none;
+}
+
+body:has(#callsContent:not([hidden])) #status,
+body:has(#contactsContent:not([hidden])) #status {
+    background: #f8f5fa !important;
+    border: 1px solid #e8dfec !important;
+    box-shadow: none;
+}
+
+body:has(#callsContent:not([hidden])) #statusText,
+body:has(#contactsContent:not([hidden])) #statusText {
+    color: #796c81 !important;
+}
+
+#callsContent {
+    --calls-surface: #f8f5fa;
+    --calls-border: #e8dfec;
+    --calls-muted: #796c81;
+    color: #35233f;
+}
+
+#callsContent :is(.calls-main-toolbar, .call-equipment-card, .calls-global-more > div, .assigned-lists-panel) {
+    background: #fff !important;
+    border-color: #e8dfec !important;
+    color: #35233f;
+    box-shadow: none !important;
+}
+
+#callsContent :is(.general-call-heading h2, .qr-title, .call-equipment-heading strong, .call-equipment-current strong) {
+    color: #35233f !important;
+}
+
+#callsContent :is(.calls-shift-label, .qr-description, .call-equipment-list, .call-equipment-current small, summary) {
+    color: #796c81 !important;
+}
+
+#callsContent .general-call-heading>span {
+    color: #796c81 !important;
+}
+
+#callsContent :is(.call-equipment-current, .call-equipment-detector) {
+    background: #f8f5fa;
+    border-color: #e8dfec;
+    color: #35233f;
+}
+
+#callsContent .call-equipment-current span,
+#callsContent .call-equipment-detector strong {
+    color: #35233f !important;
+}
+
+#callsContent .call-equipment-detector>span {
+    color: #796c81 !important;
+}
+
+#callsContent .call-equipment-list select {
+    background: #fff;
+    border-color: #ded3e3;
+    color: #35233f;
+}
+
+#callsContent .call-connection {
+    background: #e5f4ea;
+    border-color: #b8dfc5;
+    color: #167846;
+}
+
+#callsContent [data-tone="offline"] .call-connection {
+    background: #f8f5fa;
+    border-color: #e8dfec;
+    color: #796c81;
+}
+
+#callsContent :is(.call-equipment-actions .secondary, .campaign-actions > .secondary) {
+    background: #fff !important;
+    border-color: #ded3e3 !important;
+    color: #594660 !important;
+}
+
+#callsContent :is(.calls-contact-workspace, .calls-table-scroll) {
+    background: #f8f5fa !important;
+    border-color: #e8dfec !important;
+}
+
+#callsContent :is(.calls-table-heading h3, .calls-table-total, .calls-table-search, .calls-table-pagination, .calls-table-scroll td) {
+    color: #35233f !important;
+}
+
+#callsContent .calls-table-scroll td {
+    background: #fff !important;
+    border-color: #eee7f0 !important;
+    transition: background-color .14s ease, color .14s ease;
+}
+
+#callsContent .calls-table-scroll tbody tr:hover td {
+    background: #e8c6f7 !important;
+    color: #210830 !important;
+}
+
+#callsContent .calls-table-scroll tbody tr:hover td:first-child {
+    box-shadow: inset 4px 0 0 #9c08d2;
+}
+
+#callsContent .calls-table-scroll thead tr {
+    background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important;
+}
+
+#callsContent .calls-table-scroll th {
+    background: transparent !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+#callsContent .calls-table-search input {
+    background: #fff !important;
+    color: #35233f !important;
+    border-color: #ded3e3 !important;
+}
+
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button {
+    background: #fff !important;
+    border: 1px solid #d4b9df !important;
+    color: #594660 !important;
+    box-shadow: none !important;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+}
+
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button:not(.is-active):hover {
+    background: #f1daf9 !important;
+    border-color: #b832cf !important;
+    color: #79159e !important;
+    transform: translateY(-1px);
+}
+
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button.is-active {
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(156, 8, 210, 0.28) !important;
+}
+
+#callsContent .call-equipment-heading .call-connection {
+    color: #167846 !important;
+    background: #e5f4ea !important;
+    border-color: #b8dfc5 !important;
+}
+
+#callsContent [data-tone="offline"] .call-equipment-heading .call-connection {
+    color: #796c81 !important;
+    background: #f1e9f5 !important;
+    border-color: #e8dfec !important;
+}
+
+#callsContent .call-equipment-card [data-delete-pairing-slot] {
+    background: #fff !important;
+    border: 1px solid #ded3e3 !important;
+    color: #79258e !important;
+    box-shadow: none !important;
+}
+
+#contactsContent {
+    color: #35233f;
+    font-family: 'Outfit', sans-serif;
+}
+
+#contactsContent :is(.contacts-window-header, #contactsSection, .admin-user-lists-view) {
+    background: #fff !important;
+    border-color: #e8dfec !important;
+    color: #35233f;
+    box-shadow: none !important;
+}
+
+#contactsContent :is(h2, h3, h4, label) {
+    color: #35233f !important;
+}
+
+#contactsContent :is(p, .muted) {
+    color: #796c81 !important;
+}
+
+#contactsContent :is(input, select, textarea) {
+    background: #fff !important;
+    border-color: #ded3e3 !important;
+    color: #35233f !important;
+}
+
+
+#contactsContent .contacts-list-panel,
+#contactsContent .contacts-main-panel {
+    background: #fff !important;
+    border: 1px solid #e5d2ec !important;
+    border-top: 3px solid #b51eb9 !important;
+    box-shadow: 0 8px 26px rgba(121, 37, 142, 0.06) !important;
+    color: #35233f !important;
+}
+
+#contactsContent .contacts-list-heading,
+#contactsContent .contacts-topbar {
+    border-color: #e8dfec !important;
+}
+
+#contactsContent .contacts-list-heading h3,
+#contactsContent .contacts-title {
+    color: #35233f !important;
+}
+
+#contactsContent .contacts-list-count,
+#contactsContent .contacts-active-count,
+#contactsContent .contacts-list-empty,
+#contactsContent .contacts-row-call-count,
+#contactsContent .contacts-empty-state,
+#contactsContent #contactsPagination {
+    color: #796c81 !important;
+}
+
+#contactsContent .contacts-list-search {
+    background: #fbf6fd !important;
+    border-color: #d9c3e2 !important;
+}
+
+#contactsContent .contacts-list-search svg,
+#contactsContent .contacts-selected-list>svg {
+    stroke: #9c08d2 !important;
+}
+
+#contactsContent .contacts-list-search input,
+#contactsContent #filterInput {
+    background: #fff !important;
+    color: #35233f !important;
+    border-color: #d9c3e2 !important;
+}
+
+#contactsContent .contacts-list-search input {
+    background: transparent !important;
+}
+
+#contactsContent #contactsTabs .tab-item {
+    background: #fbf6fd !important;
+    border: 1.5px solid #e2cce9 !important;
+    transition: background-color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+#contactsContent #contactsTabs .tab-item>button {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #35233f !important;
+}
+
+#contactsContent #contactsTabs .tab-item:hover {
+    background: #f1daf9 !important;
+    border-color: #9c08d2 !important;
+    transform: translateY(-1px);
+}
+
+#contactsContent #contactsTabs .tab-item.active {
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border-color: transparent !important;
+    box-shadow: 0 5px 16px rgba(156, 8, 210, 0.28) !important;
+}
+
+#contactsContent .contacts-folder-icon {
+    background: #f1daf9 !important;
+}
+
+#contactsContent .contacts-folder-icon svg {
+    stroke: #9c08d2 !important;
+}
+
+#contactsContent .contacts-list-label strong {
+    color: #35233f !important;
+}
+
+#contactsContent .contacts-list-label small {
+    color: #796c81 !important;
+}
+
+#contactsContent #contactsTabs .tab-item.active .contacts-folder-icon {
+    background: rgba(255, 255, 255, 0.22) !important;
+}
+
+#contactsContent #contactsTabs .tab-item.active .contacts-folder-icon svg {
+    stroke: #ffffff !important;
+}
+
+#contactsContent #contactsTabs .tab-item.active .contacts-list-label strong,
+#contactsContent #contactsTabs .tab-item.active .contacts-list-label small,
+#contactsContent #contactsTabs .tab-item.active>button,
+#contactsContent #contactsTabs .tab-item.active .delete-tab-btn {
+    color: #ffffff !important;
+}
+
+#contactsContent #contactsTabs .delete-tab-btn {
+    color: #9c58b3 !important;
+}
+
+#contactsContent #contactsTabs .delete-tab-btn:hover {
+    background: rgba(225, 29, 72, 0.14) !important;
+    color: #be123c !important;
+}
+
+#contactsContent #contactsTabs .tab-item.active .delete-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+#contactsContent .called-counter {
+    background: #fbf6fd !important;
+    border-color: #e2cce9 !important;
+    color: #594660 !important;
+}
+
+#contactsContent .called-counter strong {
+    background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%) !important;
+    color: #ffffff !important;
+}
+
+#contactsContent .contacts-import-toggle {
+    background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(156, 8, 210, 0.22) !important;
+}
+
+#contactsContent .contacts-export-button {
+    background: #fff !important;
+    border-color: #d9c3e2 !important;
+    color: #79258e !important;
+}
+
+#contactsContent .contacts-export-button:hover {
+    background: #f1daf9 !important;
+    border-color: #9c08d2 !important;
+}
+
+#contactsContent .contacts-import-panel {
+    background: #fbf6fd !important;
+    border-color: #e2cce9 !important;
+    color: #35233f !important;
+}
+
+#contactsContent .contacts-import-panel .file-label[for="importFile"] {
+    background: #fff !important;
+    border-color: #c98ee0 !important;
+    color: #35233f !important;
+}
+
+#contactsContent .contacts-table-scroll {
+    background: #fff !important;
+    border-color: #e5d2ec !important;
+    scrollbar-color: #b74aab #f8f5fa;
+}
+
+#contactsContent .contacts-table-wrap tbody tr:nth-child(even) {
+    background: #fcf9fe !important;
+}
+
+#contactsContent .contacts-table-wrap td {
+    background: transparent !important;
+    color: #35233f !important;
+    border-color: #f0e7f3 !important;
+}
+
+#contactsContent .contacts-table-wrap .contacts-phone-cell {
+    color: #35233f !important;
+    font-weight: 600;
+}
+
+#contactsContent .contacts-table-wrap .contacts-date-cell {
+    color: #796c81 !important;
+}
+
+#contactsContent .contacts-table-wrap tbody tr:hover td {
+    background: #e8c6f7 !important;
+    color: #210830 !important;
+}
+
+#contactsContent #contactsPagination button:not(:disabled) {
+    background: #fff !important;
+    border: 1px solid #d9c3e2 !important;
+    color: #79258e !important;
+}
+
+#contactsContent #contactsPagination button:not(:disabled):hover {
+    background: #f1daf9 !important;
+    border-color: #9c08d2 !important;
+}
+
+#contactsContent :is(th, td) {
+    color: #35233f;
+    border-color: #eee7f0;
+    transition: background-color .14s ease, color .14s ease;
+}
+
+#contactsContent tbody tr:hover td {
+    background: #e8c6f7 !important;
+    color: #210830 !important;
+}
+
+#contactsContent tbody tr:hover td:first-child {
+    box-shadow: inset 4px 0 0 #9c08d2;
+}
+
+#contactsContent thead tr {
+    background: linear-gradient(90deg, #9c08d2 0%, #d81b9c 100%) !important;
+}
+
+#contactsContent th {
+    background: transparent !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+#contactsContent #adminUserListsView {
+    background: transparent !important;
+}
+
+#contactsContent .admin-lists-role {
+    background: linear-gradient(135deg, #9c08d2 0%, #d81b9c 100%);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-detail-view, .admin-lists-card, .admin-lists-table-wrap, .admin-lists-import-details, .admin-lists-importer, .admin-lists-preview) {
+    background: #fff !important;
+    border-color: #e8dfec !important;
+    color: #35233f;
+    box-shadow: none;
+}
+
+#contactsContent .admin-lists-card {
+    border-left: 4px solid #9c08d2 !important;
+    transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background .16s ease;
+}
+
+#contactsContent .admin-lists-card:hover {
+    border-color: #d81b9c !important;
+    background: #f9ecfd !important;
+    box-shadow: 0 10px 24px rgba(156, 8, 210, 0.16) !important;
+    transform: translateY(-2px);
+}
+
+#contactsContent .admin-lists-open-button {
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+#contactsContent .admin-lists-open-button:hover {
+    filter: brightness(1.08);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(240, 0, 169, 0.32) !important;
+}
+
+#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-import-details, .admin-lists-importer) {
+    background: linear-gradient(135deg, #f8eefc 0%, #fcecf7 100%) !important;
+    border-color: #dfc3ea !important;
+}
+
+#contactsContent :is(.admin-lists-step, .admin-lists-overview > div > span, .admin-lists-card-meta, .admin-lists-table-heading span, .admin-lists-browse-footer, .admin-lists-import-content > p, .admin-lists-month-heading label) {
+    color: #796c81 !important;
+}
+
+#contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month:not(.is-selected) {
+    background: #fff !important;
+    border-color: #dcc2e6 !important;
+    color: #594660 !important;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+}
+
+#contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month:not(.is-selected):hover {
+    background: #f1daf9 !important;
+    border-color: #9c08d2 !important;
+    color: #79159e !important;
+    transform: translateY(-1px);
+}
+
+#contactsContent .admin-user-lists-view .admin-lists-months>button.admin-lists-month.is-selected {
+    background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    box-shadow: 0 5px 15px rgba(156, 8, 210, 0.28) !important;
+}
+
+#contactsContent .admin-user-lists-view :is(.admin-lists-month-heading select, .admin-lists-category select) {
+    background: #fff !important;
+    color: #35233f !important;
+    border-color: #ded3e3 !important;
+    color-scheme: light;
+}
+
+#contactsContent .admin-lists-search {
+    background: #fff !important;
+    border-color: #ded3e3 !important;
+    color: #796c81 !important;
+}
+
+#contactsContent .admin-lists-search input {
+    background: transparent !important;
+}
+
+#contactsContent :is(.admin-lists-card-head strong, .admin-lists-name-cell strong, .admin-lists-detail-view .admin-lists-saved-heading h4) {
+    color: #35233f !important;
+}
+
+#contactsContent :is(.admin-lists-card-count, .admin-lists-rubro-badge) {
+    background: #f1e9f5;
+    border-color: #e2d2e8;
+    color: #79258e;
+}
+
+#contactsContent .admin-lists-import-details summary {
+    color: #594660;
+}
+
+#contactsContent .admin-lists-import-details>summary {
+    color: #35233f !important;
+}
+
+#contactsContent .admin-lists-import-copy strong {
+    color: #35233f !important;
+}
+
+#contactsContent .admin-lists-import-copy span {
+    color: #796c81 !important;
+}
+
+#contactsContent .admin-lists-import-file-row .file-upload-label,
+#contactsContent .admin-lists-import-file-row .file-upload-label span {
+    color: #594660 !important;
+    background: #fff !important;
+    border-color: #ded3e3 !important;
+}
+
+#contactsContent .admin-lists-table-wrap thead th {
+    background: #f8f5fa;
+    color: #594660;
+}
+
+#contactsContent .admin-lists-table-wrap tbody td {
+    color: #35233f;
+    border-color: #eee7f0;
+}
+
+:is(#callsContent, #contactsContent) :is(button, input, select):focus-visible {
+    outline: 3px solid #c08ad1;
+    outline-offset: 3px;
+}
