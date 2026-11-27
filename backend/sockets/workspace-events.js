@@ -192,14 +192,26 @@ const { saveSoon, getPairingSlotByToken, upsertPhoneWorker, syncSessionPhoneStat
     if (role === "dashboard") emitMessageContacts(normalizedCode);
     if (role === "phone") network.notifyChanged();
 
-    // If a phone joined and a campaign is running but idle, kickstart it
+    // If a phone joined and a campaign is running but idle, kickstart it.
+    // We wait RECONNECT_SETTLE_MS before dispatching so the APK has time to
+    // report its real call state (e.g. it may still have a physical call active
+    // that it reported as "ended" on reconnect). Without this grace period the
+    // server sends a new dial order that Android rejects with call_already_active,
+    // which wastes 30 s waiting for the watchdog to free the assignment.
     if (role === "phone") {
         const campaign = ensureCampaign(session);
         if (campaign.status === "running") {
+            const RECONNECT_SETTLE_MS = Number(process.env.PHONE_RECONNECT_SETTLE_MS || 4000);
+            const reconnectedWorker = session.phoneWorkers?.find(w => w.id === joinedWorkerId);
+            if (reconnectedWorker) {
+              reconnectedWorker.blockDispatchUntil = Date.now() + RECONNECT_SETTLE_MS;
+              console.info(`[PHONE_RECONNECT] equipo reconectado; dispatch bloqueado ${RECONNECT_SETTLE_MS}ms sesión=${String(normalizedCode).slice(-2)} equipo=${String(joinedWorkerId).slice(-8)}`);
+            }
             setTimeout(() => {
+              if (reconnectedWorker) reconnectedWorker.blockDispatchUntil = 0;
               resumeAssignedDial?.(normalizedCode, joinedWorkerId);
               dispatchCampaignCalls(normalizedCode);
-            }, 1000);
+            }, RECONNECT_SETTLE_MS);
         }
     }
   });

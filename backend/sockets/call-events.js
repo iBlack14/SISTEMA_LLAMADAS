@@ -217,6 +217,15 @@ export function registerCallEvents(runtime, services, socket) {
     const currentAttemptId = worker ? getActiveAttemptId(session, worker.id) : "";
     if (!isExternalIncoming && callId && currentAttemptId && callId !== currentAttemptId) {
       console.warn(`[PHONE_SYNC] stale-call session=${String(code).slice(-2)} worker=${String(worker.id).slice(-8)} state=${callState}`);
+      // The phone has an active call the server doesn't recognise. Block dispatch
+      // on this worker until Android reports a terminal state for that unknown call.
+      if (["dialing", "ringing", "in_call"].includes(callState)) {
+        const STALE_BLOCK_MS = Number(process.env.CALL_STALE_BLOCK_MS || 8000);
+        if (!worker.blockDispatchUntil || Date.now() + STALE_BLOCK_MS > worker.blockDispatchUntil) {
+          worker.blockDispatchUntil = Date.now() + STALE_BLOCK_MS;
+          console.warn(`[PHONE_SYNC] stale-call activo: dispatch bloqueado ${STALE_BLOCK_MS}ms sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)}`);
+        }
+      }
       socket.emit("phone:status_ack", { persisted: false, accepted: false, terminal: false, reason: "stale_call", commandId: commandId || "", contactId: contactId || "", callId });
       return;
     }
@@ -227,6 +236,10 @@ export function registerCallEvents(runtime, services, socket) {
     if (!transientIdle && (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId)) network.observe(code, worker, payload);
     if (worker) {
       worker.callState = effectiveState || worker.callState || "idle";
+      if (["idle", "available", "ended", "failed"].includes(effectiveState)) {
+        worker.blockDispatchUntil = 0;
+        if (!isExternalIncoming) resumeHeldContact(session, worker.id);
+      }
       worker.speakerOn = Boolean(speakerOn);
       worker.connected = true;
       if (lineLabel) worker.lineLabel = String(lineLabel).trim();
@@ -397,6 +410,24 @@ export function registerCallEvents(runtime, services, socket) {
           const contact = session.campaign?.contacts?.find(item => item.id === assignment.contactId);
           const deliveryLog = `[CALL_DELIVERY] Android ${ok ? "confirmó" : "rechazó"} la orden sesión=${String(code).slice(-2)} equipo=${String(worker.id).slice(-8)} contacto=${String(contact?.name || "sin nombre").slice(0, 40)} intento=${String(assignment.attemptId).slice(-8)}${ok ? "" : ` motivo=${String(message || "sin detalle").replace(/[|\r\n]/g, " ").slice(0, 100)}`}`;
           (ok ? console.info : console.error)(deliveryLog);
+
+          // FIX: Si Android rechaza porque el teléfono ya tiene una llamada activa,
+          // liberar la asignación de inmediato sin consumir intento (holdActiveContact)
+          // en vez de esperar al watchdog (hasta 30 s).
+          // El worker queda bloqueado para dispatch durante SETTLE_MS para que
+          // Android pueda reportar el estado real de esa llamada desconocida.
+          const lowerMsg = String(message || "").toLowerCase();
+          if (!ok && (lowerMsg.includes("call_already_active") || lowerMsg.includes("ya está atendiendo otra llamada"))) {
+            const SETTLE_MS = Number(process.env.CALL_ALREADY_ACTIVE_SETTLE_MS || 6000);
+            console.warn(`[CALL_DELIVERY] call_already_active detectado: liberando asignación y esperando ${SETTLE_MS}ms antes de reasignar equipo=${String(worker.id).slice(-8)}`);
+            holdActiveContact(session, worker.id);
+            worker.activeContactId = null;
+            worker.callState = "in_call"; // Android tiene una llamada desconocida; marcar ocupado
+            worker.blockDispatchUntil = Date.now() + SETTLE_MS;
+            saveSoon(code);
+            emitState(code);
+            emitCampaignState(code);
+          }
         }
       }
     }

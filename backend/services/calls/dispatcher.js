@@ -358,6 +358,9 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
     // That phone is available for a new outbound call.
     && ["idle", "ended", "failed", "available"].includes(String(worker.callState || "idle"))
     && !campaign.assignments?.[worker.id]
+    // Respect the settle window after a call_already_active rejection or a reconnect.
+    // The phone may still be on an unknown call; wait for it to self-report.
+    && !(worker.blockDispatchUntil && Date.now() < worker.blockDispatchUntil)
   );
 
   for (const worker of workers) {
