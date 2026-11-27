@@ -636,3 +636,24 @@ body:has(#contactsContent:not([hidden])) #status,
     outline: 3px solid #c08ad1;
     outline-offset: 3px;
 }
+
+/* Listas de administrador con fondo corporativo y texto de alto contraste. */
+#contactsContent .admin-lists-grid .admin-lists-card,
+#contactsContent .admin-lists-grid .admin-lists-card:hover {
+    background: linear-gradient(110deg, #8e009f, #c00085) !important;
+    border-color: #a5009d !important;
+}
+#contactsContent .admin-lists-grid .admin-lists-card :is(.admin-lists-card-head strong, .admin-lists-card-meta) {
+    color: #fff !important;
+}
+#contactsContent .admin-lists-grid .admin-lists-card-count {
+    background: #681075 !important;
+    border-color: #e3a8e8 !important;
+    color: #fff !important;
+}
+#contactsContent .admin-lists-grid .admin-lists-open-button {
+    background: #fff !important;
+    border-color: #fff !important;
+    color: #79258e !important;
+    box-shadow: none !important;
+}

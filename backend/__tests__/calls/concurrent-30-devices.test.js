@@ -7,7 +7,6 @@ import { createSessionLifecycle } from "../../session/session-lifecycle.js";
 import { createSessionState } from "../../session/session-state.js";
 import { registerCallEvents } from "../../sockets/call-events.js";
 import { normalizeBook, withProgress } from "../../services/campaigns/contact-book.js";
-import { normalizeBook, withProgress } from "../../services/campaigns/contact-book.js";
 import {
   startCampaign,
   pauseCampaign,
