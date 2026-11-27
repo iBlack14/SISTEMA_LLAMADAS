@@ -642,7 +642,7 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .viavox-sidebar {
   width: 248px;
   padding: 22px 14px 16px;
-  background: linear-gradient(180deg, #541875 0%, #481363 58%, #3e0e58 100%);
+  background: #a72a83;
   border-right: 1px solid rgba(245, 190, 255, .22);
   box-shadow: 10px 0 34px rgba(20, 0, 28, .12);
 }
@@ -653,6 +653,8 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   height: 3px;
   background: linear-gradient(90deg, #fb55c9, #a72bea 72%, #7130bd);
 }
+.viavox-sidebar button:hover { background: rgba(92, 12, 75, .25) !important; }
+button.viavox-menu-toggle { background: #922376 !important; }
 .viavox-sidebar .viavox-brand {
   gap: 11px;
   min-height: 72px;

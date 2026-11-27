@@ -1,0 +1,56 @@
+/* Paleta clara para Llamadas y Rubro y lista. */
+body:has(#callsContent:not([hidden])), body:has(#contactsContent:not([hidden])) { background: #f5f1f8 !important; }
+body:has(#callsContent:not([hidden])) .app-background-overlay, body:has(#contactsContent:not([hidden])) .app-background-overlay { display: none; }
+body:has(#callsContent:not([hidden])) .panel, body:has(#contactsContent:not([hidden])) .panel { background: #fff !important; border: 1px solid #e8dfec !important; border-radius: 18px; box-shadow: none; }
+body:has(#callsContent:not([hidden])) #status, body:has(#contactsContent:not([hidden])) #status { background: #f8f5fa !important; border: 1px solid #e8dfec !important; box-shadow: none; }
+body:has(#callsContent:not([hidden])) #statusText, body:has(#contactsContent:not([hidden])) #statusText { color: #796c81 !important; }
+#callsContent { --calls-surface: #f8f5fa; --calls-border: #e8dfec; --calls-muted: #796c81; color: #35233f; }
+#callsContent :is(.calls-main-toolbar, .call-equipment-card, .calls-global-more > div, .assigned-lists-panel) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none !important; }
+#callsContent :is(.general-call-heading h2, .qr-title, .call-equipment-heading strong, .call-equipment-current strong) { color: #35233f !important; }
+#callsContent :is(.calls-shift-label, .qr-description, .call-equipment-list, .call-equipment-current small, summary) { color: #796c81 !important; }
+#callsContent .general-call-heading > span { color: #796c81 !important; }
+#callsContent :is(.call-equipment-current, .call-equipment-detector) { background: #f8f5fa; border-color: #e8dfec; color: #35233f; }
+#callsContent .call-equipment-list select { background: #fff; border-color: #ded3e3; color: #35233f; }
+#callsContent .call-connection { background: #e5f4ea; border-color: #b8dfc5; color: #167846; }
+#callsContent [data-tone="offline"] .call-connection { background: #f8f5fa; border-color: #e8dfec; color: #796c81; }
+#callsContent :is(.call-equipment-actions .secondary, .campaign-actions > .secondary) { background: #fff !important; border-color: #ded3e3 !important; color: #594660 !important; }
+#callsContent :is(.calls-contact-workspace, .calls-table-scroll) { background: #f8f5fa !important; border-color: #e8dfec !important; }
+#callsContent :is(.calls-table-heading h3, .calls-table-total, .calls-table-search, .calls-table-pagination, .calls-table-scroll td) { color: #35233f !important; }
+#callsContent .calls-table-scroll td { background: #fff !important; border-color: #eee7f0 !important; }
+#callsContent .calls-table-scroll th { background: #f1e9f5 !important; color: #594660 !important; border-color: #e8dfec !important; }
+#callsContent .calls-table-search input { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; }
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button { background: #fff !important; border: 1px solid #ded3e3 !important; color: #594660 !important; box-shadow: none !important; }
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button.is-active { background: #79258e !important; border-color: #79258e !important; color: #fff !important; }
+#callsContent .call-equipment-heading .call-connection { color: #594660 !important; background: #f1e9f5 !important; border-color: #e8dfec !important; }
+#callsContent .call-equipment-card [data-delete-pairing-slot] { background: #fff !important; border: 1px solid #ded3e3 !important; color: #79258e !important; box-shadow: none !important; }
+#contactsContent { color: #35233f; font-family: 'Outfit', sans-serif; }
+#contactsContent :is(.contacts-window-header, #contactsSection, .admin-user-lists-view) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none !important; }
+#contactsContent :is(h2, h3, h4, label) { color: #35233f !important; }
+#contactsContent :is(p, .muted) { color: #796c81 !important; }
+#contactsContent :is(input, select, textarea) { background: #fff !important; border-color: #ded3e3 !important; color: #35233f !important; }
+#contactsContent #contactsTabs .tab-item { background: #f8f5fa !important; border-color: #e8dfec !important; }
+#contactsContent #contactsTabs .tab-item.active { background: #f1e9f5 !important; border-color: #cbb3d3 !important; }
+#contactsContent #contactsTabs .tab-item > button { color: #594660 !important; }
+#contactsContent #contactsTabs .tab-item.active > button { color: #79258e !important; }
+#contactsContent :is(th, td) { color: #35233f; border-color: #eee7f0; }
+#contactsContent th { background: #f8f5fa !important; }
+#contactsContent #adminUserListsView { background: transparent !important; }
+#contactsContent .admin-lists-role { background: #f1e9f5; border-color: #e2d2e8; color: #79258e; }
+#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-detail-view, .admin-lists-card, .admin-lists-table-wrap, .admin-lists-import-details, .admin-lists-importer, .admin-lists-preview) { background: #fff !important; border-color: #e8dfec !important; color: #35233f; box-shadow: none; }
+#contactsContent :is(.admin-lists-month-panel, .admin-lists-overview, .admin-lists-import-details, .admin-lists-importer) { background: #f8f5fa !important; }
+#contactsContent :is(.admin-lists-step, .admin-lists-overview > div > span, .admin-lists-card-meta, .admin-lists-table-heading span, .admin-lists-browse-footer, .admin-lists-import-content > p, .admin-lists-month-heading label) { color: #796c81 !important; }
+#contactsContent .admin-user-lists-view .admin-lists-months > button.admin-lists-month:not(.is-selected) { background: #fff !important; border-color: #e8dfec !important; color: #594660 !important; }
+#contactsContent .admin-user-lists-view .admin-lists-months > button.admin-lists-month.is-selected { background: #79258e !important; border-color: #79258e !important; color: #fff !important; box-shadow: none !important; }
+#contactsContent .admin-user-lists-view :is(.admin-lists-month-heading select, .admin-lists-category select) { background: #fff !important; color: #35233f !important; border-color: #ded3e3 !important; color-scheme: light; }
+#contactsContent .admin-lists-search { background: #fff !important; border-color: #ded3e3 !important; color: #796c81 !important; }
+#contactsContent .admin-lists-search input { background: transparent !important; }
+#contactsContent :is(.admin-lists-card-head strong, .admin-lists-name-cell strong, .admin-lists-detail-view .admin-lists-saved-heading h4) { color: #35233f !important; }
+#contactsContent :is(.admin-lists-card-count, .admin-lists-rubro-badge) { background: #f1e9f5; border-color: #e2d2e8; color: #79258e; }
+#contactsContent .admin-lists-import-details summary { color: #594660; }
+#contactsContent .admin-lists-import-details > summary { color: #35233f !important; }
+#contactsContent .admin-lists-import-copy strong { color: #35233f !important; }
+#contactsContent .admin-lists-import-copy span { color: #796c81 !important; }
+#contactsContent .admin-lists-import-file-row .file-upload-label, #contactsContent .admin-lists-import-file-row .file-upload-label span { color: #594660 !important; background: #fff !important; border-color: #ded3e3 !important; }
+#contactsContent .admin-lists-table-wrap thead th { background: #f8f5fa; color: #594660; }
+#contactsContent .admin-lists-table-wrap tbody td { color: #35233f; border-color: #eee7f0; }
+:is(#callsContent, #contactsContent) :is(button, input, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
