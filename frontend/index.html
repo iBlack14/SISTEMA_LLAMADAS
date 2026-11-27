@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="/features/calls/calls-workspace.css?v=20261127-visible-voicemail" />
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
-  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261127-calendar-large" />
+  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261127-calendar-square" />
   <link rel="stylesheet" href="/features/messaging/messages-light.css?v=20261127-crisp-actions" />
   <link rel="stylesheet" href="/features/reports/reports-light.css?v=20261127-details" />
   <link rel="stylesheet" href="/shared/styles/operational-light.css?v=20261127-crisp-actions" />
@@ -675,17 +675,28 @@
         </header>
 
         <div class="res-reminder-settings">
-          <div><strong>Recordatorios de llamada</strong><p id="reservationNotificationStatus" role="status">Avisos a la fecha y hora de Lima mientras el panel esté abierto.</p></div>
+          <div><strong>Recordatorios de llamada</strong>
+            <p id="reservationNotificationStatus" role="status">Avisos a la fecha y hora de Lima mientras el panel esté
+              abierto.</p>
+          </div>
           <button id="enableReservationNotifications" type="button">Activar notificaciones</button>
         </div>
         <section id="reservationsYearCalendar" class="res-calendar" aria-labelledby="reservationsYearTitle">
           <div class="res-calendar-header">
-            <div><h3 id="reservationsYearTitle">Reservas del año</h3><p>Doble clic en un día para abrir sus reservas. También puedes seleccionarlo y pulsar Enter.</p></div>
-            <div class="res-calendar-navigation"><button id="reservationsPrevYear" type="button" aria-label="Año anterior">←</button><button id="reservationsCurrentYear" type="button">Este año</button><button id="reservationsNextYear" type="button" aria-label="Año siguiente">→</button></div>
+            <div>
+              <h3 id="reservationsYearTitle">Reservas del año</h3>
+              <p>Doble clic en un día para abrir sus reservas. También puedes seleccionarlo y pulsar Enter.</p>
+            </div>
+            <div class="res-calendar-navigation"><button id="reservationsPrevYear" type="button"
+                aria-label="Año anterior">←</button><button id="reservationsCurrentYear" type="button">Este
+                año</button><button id="reservationsNextYear" type="button" aria-label="Año siguiente">→</button></div>
           </div>
           <p id="reservationsYearStatus" class="res-calendar-status" role="status">Cargando reservas…</p>
           <div id="reservationsYearMonths" class="res-year-months" role="group" aria-label="Meses del año"></div>
-          <div class="res-calendar-footer"><span id="reservationsYearCount"></span><div><button id="reservationsYearUndated" type="button" hidden>Sin fecha</button><button id="reservationsYearRefresh" type="button">Actualizar</button></div></div>
+          <div class="res-calendar-footer"><span id="reservationsYearCount"></span>
+            <div><button id="reservationsYearUndated" type="button" hidden>Sin fecha</button><button
+                id="reservationsYearRefresh" type="button">Actualizar</button></div>
+          </div>
         </section>
         <section id="reservationsCalendar" class="res-calendar" aria-labelledby="reservationsMonthTitle" hidden>
           <button id="reservationsYearBack" class="res-year-back" type="button">← Ver todos los meses</button>
@@ -1317,7 +1328,8 @@
           </div>
         </div>
 
-        <p class="quote-reminder-hint">La reserva programada tendrá un recordatorio en esta fecha y hora de Lima. Mantén el panel abierto para recibirlo.</p>
+        <p class="quote-reminder-hint">La reserva programada tendrá un recordatorio en esta fecha y hora de Lima. Mantén
+          el panel abierto para recibirlo.</p>
         <label for="quoteNotesInput">Notas adicionales (opcional)</label>
         <input id="quoteNotesInput" type="text" placeholder="Ej: Preguntar por el encargado de compras" />
 
