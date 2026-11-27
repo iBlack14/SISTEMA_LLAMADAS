@@ -177,7 +177,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
     setActive(view);
     if (panelPaths[view]) showPanelView(view, { history });
     try {
-      const adminLists = await import("../../features/admin/admin-contact-lists.js?v=20261126-admin-monthly-lists");
+      const adminLists = await import("../../features/admin/admin-contact-lists.js?v=20261126-admin-lists-grid2");
       await adminLists.initAdminContactLists();
     } catch (error) {
       const status = document.getElementById("adminListsStatus");
