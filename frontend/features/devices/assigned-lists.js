@@ -69,9 +69,18 @@ export function createAssignedLists(state, actions) {
       const active = ["dialing", "ringing", "in_call"].includes(live?.status)
         || (worker?.activeContactId === contact.id && ["dialing", "ringing", "in_call"].includes(worker?.callState));
       const restriction = actions.contactAnnualBlock(contact);
-      const final = ["completed", "failed", "awaiting_callback"].includes(live?.status)
+      // «No volver a llamar» (permanent) y «Bloqueado» son restricciones definitivas:
+      // el número se mueve a «Finalizados» aunque esté en la lista de pendientes del turno
+      // o en una campaña pendiente. Así el contador de «Pendientes» sólo refleja números
+      // que el sistema puede efectivamente marcar.
+      const isPermanentlyRestricted = restriction === "permanent" || restriction === "blocked";
+      const final = isPermanentlyRestricted
+        || ["completed", "failed", "awaiting_callback"].includes(live?.status)
         || Number(contact.attempts || live?.attempts || 0) > 0 || Boolean(restriction);
-      const category = active ? "active" : pendingKeys.has(key(contact)) || ["pending", "retry_pending", "held"].includes(live?.status) ? "pending" : final ? "finished" : "pending";
+      const category = active ? "active"
+        : isPermanentlyRestricted ? "finished"
+        : pendingKeys.has(key(contact)) || ["pending", "retry_pending", "held"].includes(live?.status) ? "pending"
+        : final ? "finished" : "pending";
       const label = active ? (live?.status === "in_call" || worker?.callState === "in_call" ? "En llamada" : "Marcando")
         : restriction === "blocked" ? "Bloqueado" : restriction === "permanent" ? "No volver a llamar"
         : category === "finished" ? "Finalizado" : live?.status === "held" ? "Detenido" : "Pendiente";

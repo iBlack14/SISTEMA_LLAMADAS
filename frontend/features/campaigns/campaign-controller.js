@@ -60,7 +60,11 @@ function _renderCampaignPanelSync() {
   }
   if (refs.campaignStartBtn) refs.campaignStartBtn.textContent = "Iniciar todos";
   if (refs.pendingTurnCallBtn) {
-    const pendingCount = dashboardActions.loadTurnPendingContacts().length;
+    // Excluir números con restricción permanente: no son marcables y no deben habilitar el botón.
+    const pendingCount = dashboardActions.loadTurnPendingContacts().filter((contact) => {
+      const restriction = dashboardActions.contactAnnualBlock(contact);
+      return restriction !== "permanent" && restriction !== "blocked";
+    }).length;
     const campaignBusy = campaignStatus === "running" || assignmentsCount > 0;
     refs.pendingTurnCallBtn.disabled = !pendingCount || campaignBusy || !availableWorkers;
     refs.pendingTurnCallBtn.title = !pendingCount

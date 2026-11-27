@@ -36,7 +36,14 @@ function syncTurnPendingContacts() {
 }
 
 function renderTurnPendingContacts() {
-  const pending = loadTurnPendingContacts();
+  const allPending = loadTurnPendingContacts();
+  // Excluir los números con restricción permanente («No volver a llamar») del panel de pendientes
+  // del turno. Estos siguen apareciendo en la tabla pero etiquetados correctamente; no deben
+  // inflar el contador ni el botón «Llamar pendientes del turno».
+  const pending = allPending.filter((contact) => {
+    const restriction = dashboardActions.contactAnnualBlock(contact);
+    return restriction !== "permanent" && restriction !== "blocked";
+  });
   const assignments = dashboardActions.getPairingListAssignments();
   const workers = Array.isArray(dashboardState.latestSessionState?.phoneWorkers) ? dashboardState.latestSessionState.phoneWorkers : [];
   const teamSources = dashboardState.pairingSlotsSnapshot
