@@ -170,31 +170,47 @@ function bindEvents() {
     dashboardState.currentPage += 1;
     dashboardActions.renderContacts();
   };
-  if (refs.campaignStartBtn) refs.campaignStartBtn.onclick = dashboardActions.startCampaignRun;
-  if (refs.pendingTurnCallBtn) refs.pendingTurnCallBtn.onclick = dashboardActions.startPendingTurnRun;
+  const lockButton = (button, fn) => async (...args) => {
+    if (!button || button.disabled || button.dataset.busy === "1") return;
+    button.dataset.busy = "1";
+    button.disabled = true;
+    try {
+      return await fn(...args);
+    } finally {
+      delete button.dataset.busy;
+      button.disabled = false;
+      dashboardActions.renderCampaignPanel?.();
+    }
+  };
+  if (refs.campaignStartBtn) refs.campaignStartBtn.onclick = lockButton(refs.campaignStartBtn, dashboardActions.startCampaignRun);
+  if (refs.pendingTurnCallBtn) refs.pendingTurnCallBtn.onclick = lockButton(refs.pendingTurnCallBtn, dashboardActions.startPendingTurnRun);
   if (refs.pendingTurnBodyEl) refs.pendingTurnBodyEl.onclick = async (event) => {
     const button = event.target.closest("button[data-action]");
-    if (!button) return;
+    if (!button || button.disabled) return;
     const contact = Contacts.contacts.find((item) => item.id === button.dataset.id);
     if (!contact) return;
     if (button.dataset.action === "call-direct") {
-      await dashboardActions.callContactFromAssignedList(contact.id, contact.list || "Principal");
+      button.disabled = true;
+      try { await dashboardActions.callContactFromAssignedList(contact.id, contact.list || "Principal"); }
+      finally { button.disabled = false; }
     } else if (button.dataset.action === "whatsapp-direct") {
       const phone = dashboardActions.normalizeValidPeruPhone(contact.phone);
       if (phone) openContactSendModal(contact, "whatsapp");
       else setStatus("Este contacto no tiene un número peruano válido para WhatsApp.", true);
     }
   };
-  if (refs.finalizeTurnBtn) refs.finalizeTurnBtn.onclick = dashboardActions.finalizeWorkTurn;
-  if (refs.finalizeSessionBtn) refs.finalizeSessionBtn.onclick = dashboardActions.finalizeOperationalSession;
-  if (refs.addPairingQrBtn) refs.addPairingQrBtn.onclick = dashboardActions.createPairingQr;
+  if (refs.finalizeTurnBtn) refs.finalizeTurnBtn.onclick = lockButton(refs.finalizeTurnBtn, dashboardActions.finalizeWorkTurn);
+  if (refs.finalizeSessionBtn) refs.finalizeSessionBtn.onclick = lockButton(refs.finalizeSessionBtn, dashboardActions.finalizeOperationalSession);
+  if (refs.addPairingQrBtn) refs.addPairingQrBtn.onclick = lockButton(refs.addPairingQrBtn, dashboardActions.createPairingQr);
   if (refs.assignedListsPanelEl) refs.assignedListsPanelEl.onclick = async (event) => {
     const contactButton = event.target.closest("button[data-action]");
-    if (contactButton) {
+    if (contactButton && !contactButton.disabled) {
       const contact = Contacts.contacts.find((item) => item.id === contactButton.dataset.id);
       if (!contact) return;
       if (contactButton.dataset.action === "call-direct") {
-        await dashboardActions.callContactFromAssignedList(contact.id, contact.list || "Principal");
+        contactButton.disabled = true;
+        try { await dashboardActions.callContactFromAssignedList(contact.id, contact.list || "Principal"); }
+        finally { contactButton.disabled = false; }
       } else if (contactButton.dataset.action === "whatsapp-direct") {
         const phone = dashboardActions.normalizeValidPeruPhone(contact.phone);
         if (phone) openContactSendModal(contact, "whatsapp");
@@ -227,8 +243,10 @@ function bindEvents() {
   };
   if (refs.pairingSlotsEl) refs.pairingSlotsEl.onclick = async (event) => {
     const skipListButton = event.target.closest("button[data-skip-list-slot]");
-    if (skipListButton) {
-      await dashboardActions.skipWorkerList(skipListButton.dataset.skipListSlot, skipListButton.dataset.workerId, skipListButton.dataset.currentList);
+    if (skipListButton && !skipListButton.disabled) {
+      skipListButton.disabled = true;
+      try { await dashboardActions.skipWorkerList(skipListButton.dataset.skipListSlot, skipListButton.dataset.workerId, skipListButton.dataset.currentList); }
+      finally { skipListButton.disabled = false; }
       return;
     }
     const independentButton = event.target.closest("button[data-independent-pairing-slot]");
@@ -266,38 +284,49 @@ function bindEvents() {
       return;
     }
     const stopButton = event.target.closest("button[data-stop-pairing-slot]");
-    if (stopButton) {
-      await dashboardActions.stopIndependentWorker(stopButton.dataset.workerId);
+    if (stopButton && !stopButton.disabled) {
+      stopButton.disabled = true;
+      try { await dashboardActions.stopIndependentWorker(stopButton.dataset.workerId); }
+      finally { stopButton.disabled = false; }
       return;
     }
     const hangupButton = event.target.closest("button[data-hangup-pairing-slot]");
-    if (hangupButton) {
-      await dashboardActions.hangupWorkerWithResult(hangupButton.dataset.workerId);
+    if (hangupButton && !hangupButton.disabled) {
+      hangupButton.disabled = true;
+      try { await dashboardActions.hangupWorkerWithResult(hangupButton.dataset.workerId); }
+      finally { hangupButton.disabled = false; }
       return;
     }
     const disconnectButton = event.target.closest("button[data-disconnect-pairing-slot]");
-    if (disconnectButton) {
-      await dashboardActions.disconnectWorker(disconnectButton.dataset.workerId, disconnectButton.dataset.workerName || "este teléfono");
+    if (disconnectButton && !disconnectButton.disabled) {
+      disconnectButton.disabled = true;
+      try { await dashboardActions.disconnectWorker(disconnectButton.dataset.workerId, disconnectButton.dataset.workerName || "este teléfono"); }
+      finally { disconnectButton.disabled = false; }
       return;
     }
     const button = event.target.closest("button[data-delete-pairing-slot]");
-    if (!button) return;
-    const confirmed = await dashboardActions.requestConfirmation({
-      title: "Eliminar código QR",
-      message: `¿Eliminar ${button.dataset.slotLabel || "este QR"}?`,
-      confirmLabel: "Eliminar"
-    });
-    if (confirmed) await dashboardActions.deletePairingQr(button.dataset.deletePairingSlot);
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      const confirmed = await dashboardActions.requestConfirmation({
+        title: "Eliminar código QR",
+        message: `¿Eliminar ${button.dataset.slotLabel || "este QR"}?`,
+        confirmLabel: "Eliminar"
+      });
+      if (confirmed) await dashboardActions.deletePairingQr(button.dataset.deletePairingSlot);
+    } finally {
+      button.disabled = false;
+    }
   };
-  if (refs.campaignPauseBtn) refs.campaignPauseBtn.onclick = dashboardActions.pauseCampaignRun;
-  if (refs.campaignResumeBtn) refs.campaignResumeBtn.onclick = dashboardActions.resumeCampaignRun;
-  if (refs.campaignStopBtn) refs.campaignStopBtn.onclick = dashboardActions.stopCampaignRun;
+  if (refs.campaignPauseBtn) refs.campaignPauseBtn.onclick = lockButton(refs.campaignPauseBtn, dashboardActions.pauseCampaignRun);
+  if (refs.campaignResumeBtn) refs.campaignResumeBtn.onclick = lockButton(refs.campaignResumeBtn, dashboardActions.resumeCampaignRun);
+  if (refs.campaignStopBtn) refs.campaignStopBtn.onclick = lockButton(refs.campaignStopBtn, dashboardActions.stopCampaignRun);
   if (refs.campaignReportBtn) refs.campaignReportBtn.onclick = dashboardActions.downloadCampaignReport;
-  if (refs.campaignSkipBtn) refs.campaignSkipBtn.onclick = dashboardActions.skipCampaignContact;
-  if (refs.campaignResultAgendaBtn) refs.campaignResultAgendaBtn.onclick = () => dashboardActions.markCampaignResult("agendado");
-  if (refs.campaignResultNoBtn) refs.campaignResultNoBtn.onclick = () => dashboardActions.markCampaignResult("no_interesado");
-  if (refs.campaignResultAdvisorBtn) refs.campaignResultAdvisorBtn.onclick = () => dashboardActions.markCampaignResult("requiere_asesor");
-  if (refs.campaignResultRetryBtn) refs.campaignResultRetryBtn.onclick = () => dashboardActions.markCampaignResult("reintentar");
+  if (refs.campaignSkipBtn) refs.campaignSkipBtn.onclick = lockButton(refs.campaignSkipBtn, dashboardActions.skipCampaignContact);
+  if (refs.campaignResultAgendaBtn) refs.campaignResultAgendaBtn.onclick = lockButton(refs.campaignResultAgendaBtn, () => dashboardActions.markCampaignResult("agendado"));
+  if (refs.campaignResultNoBtn) refs.campaignResultNoBtn.onclick = lockButton(refs.campaignResultNoBtn, () => dashboardActions.markCampaignResult("no_interesado"));
+  if (refs.campaignResultAdvisorBtn) refs.campaignResultAdvisorBtn.onclick = lockButton(refs.campaignResultAdvisorBtn, () => dashboardActions.markCampaignResult("requiere_asesor"));
+  if (refs.campaignResultRetryBtn) refs.campaignResultRetryBtn.onclick = lockButton(refs.campaignResultRetryBtn, () => dashboardActions.markCampaignResult("reintentar"));
   if (refs.agentDisableBtn) {
     refs.agentDisableBtn.onclick = () => dashboardActions.saveVoiceAgentConfig(false);
     refs.agentDisableBtn.disabled = true;

@@ -158,11 +158,19 @@ async function fetchCampaignState(code = dashboardState.sessionCode) {
   }
 }
 
+const inFlightCampaignActions = new Set();
+
 async function postCampaignAction(path, body = {}) {
   if (!dashboardState.sessionCode) {
     setStatus("Espera a que cargue tu espacio de trabajo.", true);
     return null;
   }
+
+  const lockKey = `${path}:${body?.contactId || ""}`;
+  if (inFlightCampaignActions.has(lockKey)) {
+    return null;
+  }
+  inFlightCampaignActions.add(lockKey);
 
   try {
     if (/\/(start|resume|dispatch|start-independent|call-contact|continue|switch-list)$/.test(path)) {
@@ -195,6 +203,8 @@ async function postCampaignAction(path, body = {}) {
     console.error("Campaign action error:", error);
     setStatus(error.message || "No se pudo comunicar la acción de campaña.", true);
     return null;
+  } finally {
+    inFlightCampaignActions.delete(lockKey);
   }
 }
 
