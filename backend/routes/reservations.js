@@ -5,13 +5,13 @@ import { nanoid } from "nanoid";
  * Endpoints CRUD y emisión en tiempo real vía socket.
  */
 export function registerReservations(runtime, services) {
-  const { app, io, sessions } = runtime;
+  const { app, io } = runtime;
   const { saveSoon, getConnectedPhoneWorkers, sendPersistedDial, emitState } = services;
 
   // Obtener todas las reservas de una sesión
   app.get("/api/session/:code/reservations", (req, res) => {
     const code = String(req.params.code || "").toUpperCase().trim();
-    const session = sessions.get(code);
+    const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada" });
 
     const reservations = Array.isArray(session.contactReservations) ? session.contactReservations : [];
@@ -21,7 +21,7 @@ export function registerReservations(runtime, services) {
   // Crear una nueva reserva de cotización
   app.post("/api/session/:code/reservations", (req, res) => {
     const code = String(req.params.code || "").toUpperCase().trim();
-    const session = sessions.get(code);
+    const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada" });
 
     const { phone, name, company, quote, price, date, time, notes, status } = req.body || {};
@@ -65,7 +65,7 @@ export function registerReservations(runtime, services) {
   app.patch("/api/session/:code/reservations/:id", (req, res) => {
     const code = String(req.params.code || "").toUpperCase().trim();
     const id = String(req.params.id || "").trim();
-    const session = sessions.get(code);
+    const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada" });
 
     if (!Array.isArray(session.contactReservations)) {
@@ -110,7 +110,7 @@ export function registerReservations(runtime, services) {
   app.delete("/api/session/:code/reservations/:id", (req, res) => {
     const code = String(req.params.code || "").toUpperCase().trim();
     const id = String(req.params.id || "").trim();
-    const session = sessions.get(code);
+    const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada" });
 
     if (!Array.isArray(session.contactReservations)) {
@@ -136,7 +136,7 @@ export function registerReservations(runtime, services) {
   app.post("/api/session/:code/reservations/:id/call", async (req, res) => {
     const code = String(req.params.code || "").toUpperCase().trim();
     const id = String(req.params.id || "").trim();
-    const session = sessions.get(code);
+    const session = runtime.sessions.get(code);
     if (!session) return res.status(404).json({ ok: false, error: "Sesión no encontrada" });
 
     const reservation = (session.contactReservations || []).find(r => r.id === id);

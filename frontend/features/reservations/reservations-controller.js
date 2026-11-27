@@ -1,6 +1,6 @@
 import { socket, API_BASE } from '../../shared/realtime/socket.js';
 import { showPanelView } from '../../app/navigation/panel-navigation.js';
-import { apiFetch, currentUser } from '../auth/auth-session.js?v=20261119-users-ui3';
+import { apiFetch, currentUser } from '../auth/auth-session.js';
 import { dashboardSessionKeys } from '../workspace/dashboard-session.js';
 
 let reservationsState = {
@@ -15,9 +15,8 @@ let activeReservationType = "quote";
 function getSessionCode() {
   const input = document.getElementById("sessionCode");
   if (input && input.value) return input.value.trim().toUpperCase();
-  const match = location.search.match(/[?&]code=([A-Za-z0-9]+)/);
-  if (match) return match[1].toUpperCase();
-  return (window.currentSessionCode || "QQ9EKF").toUpperCase();
+  const keys = dashboardSessionKeys((currentUser || window.VOIP_VC_AUTH_USER)?.id);
+  return keys ? String(localStorage.getItem(keys.session) || "").trim().toUpperCase() : "";
 }
 
 function esc(str) {
@@ -35,7 +34,7 @@ function getDashboardToken(code) {
   const keys = dashboardSessionKeys(userId);
   if (!keys || !code) return "";
   try {
-    return String(sessionStorage.getItem(`${keys.tokenPrefix}${code}`) || "").trim();
+    return String(localStorage.getItem(`${keys.tokenPrefix}${code}`) || "").trim();
   } catch {
     return "";
   }
@@ -53,7 +52,11 @@ function reservationFetch(code, suffix = "", options = {}) {
 
 export async function loadReservations() {
   const code = getSessionCode();
-  if (!code) return;
+  if (!code || !getDashboardToken(code)) {
+    const count = document.getElementById('reservationsResultCount');
+    if (count) count.textContent = 'Conectando con tu espacio de trabajo…';
+    return;
+  }
 
   try {
     const res = await reservationFetch(code, "", {
@@ -526,11 +529,6 @@ export function initReservationsView() {
 
   // Sockets en tiempo real
   if (socket) {
-    socket.on("quote:open_modal", (data) => {
-      console.info("[SOCKET] quote:open_modal recibido:", data);
-      openQuoteModal(data);
-    });
-
     socket.on("reservations:changed", (data) => {
       if (Array.isArray(data?.reservations)) {
         reservationsState.reservations = data.reservations;
@@ -546,6 +544,14 @@ export function initReservationsView() {
 
 // Auto-escuchar socket para abrir modal de cotización incluso si el usuario está en otra vista
 if (socket) {
+  // El dashboard guarda la sesión y su credencial en sus propios listeners.
+  const refreshAfterJoin = () => {
+    if (reservationsState.initialized) setTimeout(() => loadReservations(), 0);
+  };
+  socket.on("session:created", refreshAfterJoin);
+  socket.on("session:joined", ({ role }) => {
+    if (role === "dashboard") refreshAfterJoin();
+  });
   socket.on("quote:open_modal", (data) => {
     console.info("[GLOBAL SOCKET] quote:open_modal recibido:", data);
     openQuoteModal(data);

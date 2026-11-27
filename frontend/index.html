@@ -14,29 +14,37 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
- <link rel="stylesheet" href="/shared/styles/base.css?v=20261119-merged-optimized" />
- <link rel="stylesheet" href="/features/contacts/contact-tabs.css?v=20261111-compact-lists" />
- <link rel="stylesheet" href="/features/calls/call-outcomes.css?v=20261111-voicemail" />
- <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261116-3cols" />
- <link rel="stylesheet" href="/features/reports/report-details.css?v=20261111-device-details" />
+  <link rel="stylesheet" href="/shared/styles/base.css?v=20261119-merged-optimized" />
+  <link rel="stylesheet" href="/features/contacts/contact-tabs.css?v=20261111-compact-lists" />
+  <link rel="stylesheet" href="/features/calls/call-outcomes.css?v=20261111-voicemail" />
+  <link rel="stylesheet" href="/features/reports/report-selection.css?v=20261116-3cols" />
+  <link rel="stylesheet" href="/features/reports/report-details.css?v=20261111-device-details" />
   <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261124-voice-ui5" />
- <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
- <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
- <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261126-admin-monthly-lists" />
- <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
+  <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
+  <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
+  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261126-admin-monthly-lists" />
+  <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
- <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
-  <style>html.auth-pending main,html.auth-pending #viavoxSidebar,html.auth-pending .viavox-menu-toggle{visibility:hidden}</style>
+  <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
+  <style>
+    html.auth-pending main,
+    html.auth-pending #viavoxSidebar,
+    html.auth-pending .viavox-menu-toggle {
+      visibility: hidden
+    }
+  </style>
 
   <script type="module" src="/layouts/dashboard/sidebar.js?v=20261126-admin-monthly-lists"></script>
- <script>document.documentElement.classList.add("auth-pending");</script>
+  <script>document.documentElement.classList.add("auth-pending");</script>
 
 </head>
 
 <body>
   <button type="button" class="viavox-menu-toggle" aria-controls="viavoxSidebar" aria-expanded="false">☰ MENÚ</button>
   <aside id="viavoxSidebar" class="viavox-sidebar" aria-label="Menú principal">
-    <a class="viavox-brand" href="/" aria-label="ViaVox, inicio"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo VIAVOX" width="52" height="36"><span><strong>VIAVOX</strong><small>GESTIÓN DE LLAMADAS</small></span></a>
+    <a class="viavox-brand" href="/" aria-label="ViaVox, inicio"><img src="/shared/assets/images/logo-vc-color.png"
+        alt="Logo VIAVOX" width="52" height="36"><span><strong>VIAVOX</strong><small>GESTIÓN DE
+          LLAMADAS</small></span></a>
     <nav class="viavox-navigation" aria-label="Navegación">
       <a class="viavox-nav-item" data-view="calls" href="/llamadas">LLAMADAS</a>
       <a class="viavox-nav-item" data-view="contacts" href="/contactos">RUBRO Y LISTA</a>
@@ -47,16 +55,21 @@
       <a id="adminLink" class="viavox-nav-item" data-view="network" href="/nucleo-red" hidden>NÚCLEO DE RED</a>
       <a id="sidebarVoice" class="viavox-nav-item" data-view="voice" href="/voz" hidden>PANEL DE VOZ</a>
       <a id="sidebarUsers" class="viavox-nav-item" data-view="users" href="/usuarios" hidden>USUARIOS</a>
-      <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion" hidden>CONFIGURACIÓN</a>
+      <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion"
+        hidden>CONFIGURACIÓN</a>
     </nav>
-    <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
+    <div class="viavox-sidebar-footer">
+      <div class="viavox-downloads"></div>
+      <div class="viavox-account"></div>
+    </div>
   </aside>
   <div class="app-background-overlay" aria-hidden="true"></div>
   <main class="layout">
     <section class="panel">
       <!-- HEADER -->
       <div class="app-header">
-        <div class="app-logo app-logo-wide"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo ViaVox VC" /></div>
+        <div class="app-logo app-logo-wide"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo ViaVox VC" />
+        </div>
         <div class="app-title">
           <h1> GESTION DE LLAMADAS VC </h1>
           <p>Campañas y llamadas desde dispositivos Android</p>
@@ -66,7 +79,8 @@
       <!-- APK MANAGEMENT BAR -->
       <div id="apkBar" class="apk-bar">
         <div class="apk-info">
-          <img class="apk-icon-img" src="/shared/assets/images/logotipo-VCMAS.ico" alt="VC icono" width="22" height="22" />
+          <img class="apk-icon-img" src="/shared/assets/images/logotipo-VCMAS.ico" alt="VC icono" width="22"
+            height="22" />
           <div>
             <strong id="apkName">VOIP VC Android</strong>
             <small id="apkMeta" class="muted">Cargando info del APK…</small>
@@ -76,7 +90,9 @@
           <a id="apkDownloadBtn" href="/api/apk/download" class="btn-apk-dl" download>
             Descargar VOIP VC
           </a>
-          <a id="shizukuDownloadBtn" href="https://github.com/RikkaApps/Shizuku/releases/download/v13.5.4/shizuku-v13.5.4.r1049.0e53409-release.apk" class="btn-apk-dl apk-shizuku-dl" target="_blank" rel="noopener noreferrer">
+          <a id="shizukuDownloadBtn"
+            href="https://github.com/RikkaApps/Shizuku/releases/download/v13.5.4/shizuku-v13.5.4.r1049.0e53409-release.apk"
+            class="btn-apk-dl apk-shizuku-dl" target="_blank" rel="noopener noreferrer">
             Descargar Shizuku
           </a>
         </div>
@@ -111,48 +127,49 @@
         </div>
         <div class="shift-management-actions">
           <button id="reportNavBtn" class="secondary" type="button">CALENDARIO</button>
-          <button id="blockedNumbersOpen" class="secondary" type="button" aria-controls="blockedNumbersView">PANEL DE BLOQUEOS</button>
+          <button id="blockedNumbersOpen" class="secondary" type="button" aria-controls="blockedNumbersView">PANEL DE
+            BLOQUEOS</button>
           <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
           <button id="finalizeSessionBtn" class="danger-soft">DESVINCULAR EQUIPOS</button>
         </div>
       </section>
 
       <div id="callsContent">
-      <!-- QR BLOCK -->
-      <div class="qr-block" id="qrBlock">
-        <div class="pairing-slots-head">
-          <div>
-            <p class="qr-eyebrow">Vinculación Android</p>
-            <h3 class="qr-title">Vincula tus teléfonos</h3>
-            <p class="muted qr-description">Cada dispositivo debe escanear un código QR diferente.</p>
+        <!-- QR BLOCK -->
+        <div class="qr-block" id="qrBlock">
+          <div class="pairing-slots-head">
+            <div>
+              <p class="qr-eyebrow">Vinculación Android</p>
+              <h3 class="qr-title">Vincula tus teléfonos</h3>
+              <p class="muted qr-description">Cada dispositivo debe escanear un código QR diferente.</p>
+            </div>
+            <button id="addPairingQrBtn" class="secondary">+ Crear QR</button>
           </div>
-          <button id="addPairingQrBtn" class="secondary">+ Crear QR</button>
+          <div id="pairingSlots" class="pairing-slots-grid">
+            <div class="campaign-list-empty">Generando códigos QR...</div>
+          </div>
         </div>
-        <div id="pairingSlots" class="pairing-slots-grid">
-          <div class="campaign-list-empty">Generando códigos QR...</div>
-        </div>
-      </div>
 
-      <!-- EQUIPOS Y LISTAS ASIGNADAS -->
-      <div id="assignedListsPanel" class="assigned-lists-panel" style="display: none;"></div>
+        <!-- EQUIPOS Y LISTAS ASIGNADAS -->
+        <div id="assignedListsPanel" class="assigned-lists-panel" style="display: none;"></div>
 
-      <section class="general-call-module" aria-label="Llamada general">
-        <div class="general-call-controls qr-general-call-controls">
-          <div class="general-call-heading">
-            <strong>Llamada general</strong>
-            <span>Inicia las llamadas en todos los teléfonos disponibles.</span>
-            <span id="campaignStartHint" role="status" hidden></span>
+        <section class="general-call-module" aria-label="Llamada general">
+          <div class="general-call-controls qr-general-call-controls">
+            <div class="general-call-heading">
+              <strong>Llamada general</strong>
+              <span>Inicia las llamadas en todos los teléfonos disponibles.</span>
+              <span id="campaignStartHint" role="status" hidden></span>
+            </div>
+            <div class="campaign-actions">
+              <button id="campaignStopBtn" class="danger-soft">■ Detener</button>
+              <button id="campaignStartBtn" aria-describedby="campaignStartHint">▶ Iniciar llamada general</button>
+              <button id="pendingTurnCallBtn" class="secondary">☎ Llamar números pendientes</button>
+              <button id="campaignPauseBtn" class="secondary">⏸ Pausar</button>
+              <button id="campaignResumeBtn" class="secondary">⏯ Continuar</button>
+              <button id="campaignSkipBtn" class="secondary">⏭ Saltar</button>
+            </div>
           </div>
-          <div class="campaign-actions">
-            <button id="campaignStopBtn" class="danger-soft">■ Detener</button>
-            <button id="campaignStartBtn" aria-describedby="campaignStartHint">▶ Iniciar llamada general</button>
-            <button id="pendingTurnCallBtn" class="secondary">☎ Llamar números pendientes</button>
-            <button id="campaignPauseBtn" class="secondary">⏸ Pausar</button>
-            <button id="campaignResumeBtn" class="secondary">⏯ Continuar</button>
-            <button id="campaignSkipBtn" class="secondary">⏭ Saltar</button>
-          </div>
-        </div>
-      </section>
+        </section>
 
         <!-- PENDING TURN PANEL -->
         <section id="pendingTurnPanel" class="pending-turn-panel" aria-live="polite">
@@ -163,11 +180,23 @@
             </div>
             <strong id="pendingTurnCount">0 pendientes</strong>
           </div>
-          <div id="pendingTurnTeamTabs" class="pending-turn-team-tabs" role="group" aria-label="Pendientes por equipo"></div>
+          <div id="pendingTurnTeamTabs" class="pending-turn-team-tabs" role="group" aria-label="Pendientes por equipo">
+          </div>
           <div class="pending-turn-table-wrap">
             <table>
-              <thead><tr><th>LISTA</th><th>EMPRESA</th><th>TELÉFONO</th><th>CONTACTO</th></tr></thead>
-              <tbody id="pendingTurnBody"><tr><td colspan="4">No hay números pendientes.</td></tr></tbody>
+              <thead>
+                <tr>
+                  <th>LISTA</th>
+                  <th>EMPRESA</th>
+                  <th>TELÉFONO</th>
+                  <th>CONTACTO</th>
+                </tr>
+              </thead>
+              <tbody id="pendingTurnBody">
+                <tr>
+                  <td colspan="4">No hay números pendientes.</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </section>
@@ -179,7 +208,10 @@
           <button id="contactsBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
         </div>
         <header class="contacts-window-header">
-          <div class="contacts-heading-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></div>
+          <div class="contacts-heading-mark" aria-hidden="true"><svg viewBox="0 0 24 24">
+              <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+              <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+            </svg></div>
           <div class="contacts-heading-copy">
             <h2>Rubro y Lista</h2>
             <p>Gestiona tus listas de contactos, rubros e importaciones de archivos.</p>
@@ -187,41 +219,62 @@
           <div class="contacts-import-notice" id="contactsImportNotice" role="status" aria-live="polite" hidden></div>
         </header>
 
-<section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de contactos por mes" hidden>
+        <section id="adminUserListsView" class="admin-user-lists-view" aria-label="Listas de contactos por mes" hidden>
           <div class="admin-lists-heading">
-            <div><span class="admin-lists-kicker">GESTIÓN DE CONTACTOS</span><h3>Rubro y lista</h3>
-              <p class="muted">Consulta en una sola vista todas las listas importadas en cada mes.</p></div>
+            <div><span class="admin-lists-kicker">GESTIÓN DE CONTACTOS</span>
+              <h3>Rubro y lista</h3>
+              <p class="muted">Consulta en una sola vista todas las listas importadas en cada mes.</p>
+            </div>
             <span class="admin-lists-role"><i aria-hidden="true"></i> Panel de administrador</span>
           </div>
 
           <section id="adminListsBrowseView" aria-label="Listas importadas por mes">
             <div class="admin-lists-month-panel">
-              <div class="admin-lists-month-heading"><span class="admin-lists-step">MES DE IMPORTACIÓN</span><label for="adminListsYear">Año</label><select id="adminListsYear" aria-label="Año de importación"></select></div>
+              <div class="admin-lists-month-heading"><span class="admin-lists-step">MES DE IMPORTACIÓN</span><label
+                  for="adminListsYear">Año</label><select id="adminListsYear" aria-label="Año de importación"></select>
+              </div>
               <div id="adminListsMonths" class="admin-lists-months" role="group" aria-label="Mes de importación"></div>
               <p>El mes filtra automáticamente las listas de todos los usuarios.</p>
             </div>
             <div class="admin-lists-overview">
-              <div><h4 id="adminListsMonthTitle">Listas del mes</h4><span id="adminListsMonthSummary">Cargando listas…</span></div>
-              <label class="admin-lists-search"><span aria-hidden="true">⌕</span><input id="adminListsSearch" type="search" placeholder="Buscar por rubro o nombre de lista…" autocomplete="off" aria-label="Buscar rubro o lista"></label>
-              <label class="admin-lists-category"><span class="admin-lists-step">RUBRO</span><select id="adminListsCategory" aria-label="Filtrar por rubro"><option value="">Todos los rubros</option></select></label>
+              <div>
+                <h4 id="adminListsMonthTitle">Listas del mes</h4><span id="adminListsMonthSummary">Cargando
+                  listas…</span>
+              </div>
+              <label class="admin-lists-search"><span aria-hidden="true">⌕</span><input id="adminListsSearch"
+                  type="search" placeholder="Buscar por rubro o nombre de lista…" autocomplete="off"
+                  aria-label="Buscar rubro o lista"></label>
+              <label class="admin-lists-category"><span class="admin-lists-step">RUBRO</span><select
+                  id="adminListsCategory" aria-label="Filtrar por rubro">
+                  <option value="">Todos los rubros</option>
+                </select></label>
             </div>
-            <div class="admin-lists-table-heading"><h4>Listas importadas en el mes</h4><span id="adminListsResultCount"></span></div>
-            <div class="table-wrap admin-lists-table-wrap">
-              <table><thead><tr><th>LISTA</th><th>CONTACTOS</th><th>FECHA DE IMPORTACIÓN</th><th>ACCIÓN</th></tr></thead><tbody id="adminListsRows"></tbody></table>
+            <div class="admin-lists-table-heading">
+              <h4>Listas importadas en el mes</h4><span id="adminListsResultCount"></span>
             </div>
-            <div class="admin-lists-browse-footer"><span id="adminListsBrowseStatus" role="status"></span><button id="adminListsBrowseMore" type="button" hidden>Ver más listas →</button></div>
+            <div id="adminListsRows" class="admin-lists-grid" role="list"></div>
+            <div class="admin-lists-browse-footer"><span id="adminListsBrowseStatus" role="status"></span><button
+                id="adminListsBrowseMore" type="button" hidden>Ver más listas →</button></div>
             <details class="admin-lists-import-details">
               <summary>Importar una lista</summary>
               <div class="admin-lists-import-content">
                 <p>Elige a qué cuenta asignar la nueva lista.</p>
                 <div class="row admin-lists-import-target">
-                  <label>Cuenta de destino<select id="adminListsUser"><option value="">Cargando…</option></select></label>
-                  <label>Lista de destino<select id="adminListsName" disabled><option value="">Primero elige una cuenta</option></select></label>
+                  <label>Cuenta de destino<select id="adminListsUser">
+                      <option value="">Cargando…</option>
+                    </select></label>
+                  <label>Lista de destino<select id="adminListsName" disabled>
+                      <option value="">Primero elige una cuenta</option>
+                    </select></label>
                 </div>
                 <div class="admin-lists-importer">
-                  <div class="admin-lists-import-copy"><strong>Seleccionar archivo</strong><span>CSV, Excel, HTML o TXT.</span></div>
+                  <div class="admin-lists-import-copy"><strong>Seleccionar archivo</strong><span>CSV, Excel, HTML o
+                      TXT.</span></div>
                   <div class="row admin-lists-import-file-row">
-                    <label class="file-upload-label"><input type="file" id="adminListsImportFile" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none" aria-label="Seleccionar archivo de contactos"><span id="adminListsFileLabel">📁 Elegir archivo</span></label>
+                    <label class="file-upload-label"><input type="file" id="adminListsImportFile"
+                        accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none"
+                        aria-label="Seleccionar archivo de contactos"><span id="adminListsFileLabel">📁 Elegir
+                        archivo</span></label>
                     <button id="adminListsImportBtn" type="button" disabled>Continuar</button>
                   </div>
                 </div>
@@ -229,91 +282,174 @@
             </details>
             <p id="adminListsStatus" class="muted" role="status" style="min-height:20px"></p>
             <div id="adminListsImportPreview" class="admin-lists-preview" style="display:none">
-              <div class="admin-lists-preview-heading"><div><span class="admin-lists-step">PASO 2 · REVISIÓN</span><h4>Revisa antes de importar</h4><p id="adminListsPreviewSummary">Contactos detectados en el archivo.</p></div><button id="adminListsImportCancel" class="secondary" type="button">Cancelar</button></div>
-              <div class="table-wrap admin-lists-preview-table" style="overflow:auto"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Fecha de creación</th><th>Lista de destino</th></tr></thead><tbody id="adminListsImportPreviewBody"></tbody></table></div>
-              <div class="admin-lists-preview-footer"><span>Se agregarán a la lista seleccionada.</span><button id="adminListsImportConfirm" type="button">Confirmar importación</button></div>
+              <div class="admin-lists-preview-heading">
+                <div><span class="admin-lists-step">PASO 2 · REVISIÓN</span>
+                  <h4>Revisa antes de importar</h4>
+                  <p id="adminListsPreviewSummary">Contactos detectados en el archivo.</p>
+                </div><button id="adminListsImportCancel" class="secondary" type="button">Cancelar</button>
+              </div>
+              <div class="table-wrap admin-lists-preview-table" style="overflow:auto">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Teléfono</th>
+                      <th>Fecha de creación</th>
+                      <th>Lista de destino</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminListsImportPreviewBody"></tbody>
+                </table>
+              </div>
+              <div class="admin-lists-preview-footer"><span>Se agregarán a la lista seleccionada.</span><button
+                  id="adminListsImportConfirm" type="button">Confirmar importación</button></div>
             </div>
           </section>
 
           <section id="adminListsDetailView" class="admin-lists-detail-view" aria-label="Contactos de la lista" hidden>
             <button id="adminListsBackToBrowse" class="secondary" type="button">← Volver a las listas</button>
-            <div class="admin-lists-saved-heading"><div><span class="admin-lists-step" id="adminListsDetailMonth"></span><h4 id="adminListsDetailTitle">Contactos de la lista</h4></div><span id="adminListsPage" class="muted"></span></div>
+            <div class="admin-lists-saved-heading">
+              <div><span class="admin-lists-step" id="adminListsDetailMonth"></span>
+                <h4 id="adminListsDetailTitle">Contactos de la lista</h4>
+              </div><span id="adminListsPage" class="muted"></span>
+            </div>
             <p id="adminListsDetailStatus" role="status"></p>
-            <div class="table-wrap admin-lists-table-wrap"><table><thead><tr><th>EMPRESA</th><th>TELÉFONO</th><th>FECHA DE CREACIÓN</th></tr></thead><tbody id="adminListsContacts"></tbody></table></div>
-            <div class="row admin-lists-pagination"><button id="adminListsPrev" class="secondary" type="button" disabled>← Anterior</button><span class="muted">Navega por los contactos de esta lista</span><button id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button></div>
+            <div class="table-wrap admin-lists-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>EMPRESA</th>
+                    <th>TELÉFONO</th>
+                    <th>FECHA DE CREACIÓN</th>
+                  </tr>
+                </thead>
+                <tbody id="adminListsContacts"></tbody>
+              </table>
+            </div>
+            <div class="row admin-lists-pagination"><button id="adminListsPrev" class="secondary" type="button"
+                disabled>← Anterior</button><span class="muted">Navega por los contactos de esta lista</span><button
+                id="adminListsNext" class="secondary" type="button" disabled>Siguiente →</button></div>
           </section>
         </section>
 
         <!-- CONTACTS SECTION -->
         <section id="contactsSection" class="contacts-workspace" style="display:none">
           <aside class="contacts-list-panel">
-            <div class="contacts-list-heading"><div><h3>Mis listas</h3><span class="contacts-list-count" id="contactsListCount">0 listas</span></div><button type="button" id="contactsListsToggle" class="contacts-list-toggle" aria-expanded="false" aria-controls="contactsTabs" aria-label="Mostrar listas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
-            <label class="contacts-list-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="contactsListSearch" type="search" placeholder="Buscar lista…" autocomplete="off" aria-label="Buscar lista" /></label>
+            <div class="contacts-list-heading">
+              <div>
+                <h3>Mis listas</h3><span class="contacts-list-count" id="contactsListCount">0 listas</span>
+              </div><button type="button" id="contactsListsToggle" class="contacts-list-toggle" aria-expanded="false"
+                aria-controls="contactsTabs" aria-label="Mostrar listas"><svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg></button>
+            </div>
+            <label class="contacts-list-search"><svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m16 16 4 4" />
+              </svg><input id="contactsListSearch" type="search" placeholder="Buscar lista…" autocomplete="off"
+                aria-label="Buscar lista" /></label>
             <div class="contacts-tabs" id="contactsTabs" role="group" aria-label="Listas de contactos"></div>
           </aside>
 
           <div class="contacts-main-panel">
-          <div class="contacts-topbar">
-            <div class="contacts-selected-list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h7l2 2H21v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 9h18"/></svg><div><p class="section-title contacts-title" id="contactsActiveListTitle">Mis contactos</p><span id="contactsActiveListCount" class="contacts-active-count">0 contactos</span></div></div>
-            <div class="called-counter"><span>Llamados</span><strong id="calledContactsValue">0</strong></div>
-          </div>
-          <div class="contacts-toolbar"><div class="contact-actions contacts-search">
-            <label for="filterInput" class="contacts-search-label">Buscar contacto</label>
-            <input id="filterInput" type="search" placeholder="Nombre o teléfono..." autocomplete="off" />
-          </div>
-          <div class="contacts-toolbar-actions"><button type="button" id="contactsImportToggle" class="contacts-import-toggle" aria-expanded="false" aria-controls="contactsImportPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span>Importar contactos</span></button></div></div>
-
-          <!-- IMPORT - SIMPLE -->
-          <div class="import-panel contacts-import-panel" id="contactsImportPanel" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);" hidden>
-            <div class="import-instructions"><span class="import-step-label">PASO 1</span><strong>Selecciona el archivo que contiene tus contactos</strong><span>Formatos aceptados: CSV, Excel (.xlsx, .xls) y Word (.docx). Luego podrás revisar los contactos antes de guardarlos.</span></div>
-            <div class="row import-file-row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-              <label class="file-label" for="importFile" style="flex:1;min-width:180px;text-align:center;background:rgba(255,91,200,.08);border:2px dashed rgba(236,198,250,.45);color:#f7d5ff;padding:18px;border-radius:10px;cursor:pointer;transition:all 0.2s;font-weight:600;">
-                <span class="import-file-icon">📁</span><span class="import-file-title">Seleccionar archivo</span><span class="import-file-subtitle">Haz clic aquí y busca el archivo en tu dispositivo</span>
-                <input id="importFile" type="file" accept=".csv,.txt,.xlsx,.xls,.docx" multiple hidden />
-              </label>
-              <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;min-width:150px;">Aún no has elegido un archivo</span>
+            <div class="contacts-topbar">
+              <div class="contacts-selected-list"><svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 6.5h7l2 2H21v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <path d="M3 9h18" />
+                </svg>
+                <div>
+                  <p class="section-title contacts-title" id="contactsActiveListTitle">Mis contactos</p><span
+                    id="contactsActiveListCount" class="contacts-active-count">0 contactos</span>
+                </div>
+              </div>
+              <div class="called-counter"><span>Llamados</span><strong id="calledContactsValue">0</strong></div>
+            </div>
+            <div class="contacts-toolbar">
+              <div class="contact-actions contacts-search">
+                <label for="filterInput" class="contacts-search-label">Buscar contacto</label>
+                <input id="filterInput" type="search" placeholder="Nombre o teléfono..." autocomplete="off" />
+              </div>
+              <div class="contacts-toolbar-actions"><button type="button" id="contactsImportToggle"
+                  class="contacts-import-toggle" aria-expanded="false" aria-controls="contactsImportPanel"><svg
+                    viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+                  </svg><span>Importar contactos</span></button></div>
             </div>
 
-            <!-- PREVIEW -->
-            <div id="importPreview" style="display:none;margin-top:12px;padding:14px;background:rgba(30,6,46,.97);border:1px solid rgba(236,198,250,.28);border-radius:12px;max-height:30vh;overflow:auto;color:#fdf4ff;">
-              <div class="row import-preview-heading" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div><span class="import-step-label">PASO 2</span><strong>Revisa los contactos</strong><p><span id="previewCount">0</span> contactos detectados. Todavía no se han guardado.</p></div>
-                <button id="importCancelBtn" class="secondary" aria-label="Cancelar importación" title="Cancelar importación" style="padding:6px 12px;">Cancelar</button>
+            <!-- IMPORT - SIMPLE -->
+            <div class="import-panel contacts-import-panel" id="contactsImportPanel"
+              style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--card);"
+              hidden>
+              <div class="import-instructions"><span class="import-step-label">PASO 1</span><strong>Selecciona el
+                  archivo que contiene tus contactos</strong><span>Formatos aceptados: CSV, Excel (.xlsx, .xls) y Word
+                  (.docx). Luego podrás revisar los contactos antes de guardarlos.</span></div>
+              <div class="row import-file-row" style="align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <label class="file-label" for="importFile"
+                  style="flex:1;min-width:180px;text-align:center;background:rgba(255,91,200,.08);border:2px dashed rgba(236,198,250,.45);color:#f7d5ff;padding:18px;border-radius:10px;cursor:pointer;transition:all 0.2s;font-weight:600;">
+                  <span class="import-file-icon">📁</span><span class="import-file-title">Seleccionar
+                    archivo</span><span class="import-file-subtitle">Haz clic aquí y busca el archivo en tu
+                    dispositivo</span>
+                  <input id="importFile" type="file" accept=".csv,.txt,.xlsx,.xls,.docx" multiple hidden />
+                </label>
+                <span id="importFileName" class="muted" style="font-size:13px;white-space:nowrap;min-width:150px;">Aún
+                  no has elegido un archivo</span>
               </div>
-              <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
-                <table class="import-preview-table" style="width:100%;font-size:13px;">
-                  <thead style="position:sticky;top:0;background:#43125f;">
+
+              <!-- PREVIEW -->
+              <div id="importPreview"
+                style="display:none;margin-top:12px;padding:14px;background:rgba(30,6,46,.97);border:1px solid rgba(236,198,250,.28);border-radius:12px;max-height:30vh;overflow:auto;color:#fdf4ff;">
+                <div class="row import-preview-heading"
+                  style="justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div><span class="import-step-label">PASO 2</span><strong>Revisa los contactos</strong>
+                    <p><span id="previewCount">0</span> contactos detectados. Todavía no se han guardado.</p>
+                  </div>
+                  <button id="importCancelBtn" class="secondary" aria-label="Cancelar importación"
+                    title="Cancelar importación" style="padding:6px 12px;">Cancelar</button>
+                </div>
+                <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+                  <table class="import-preview-table" style="width:100%;font-size:13px;">
+                    <thead style="position:sticky;top:0;background:#43125f;">
+                      <tr>
+                        <th style="text-align:left;padding:8px;">Empresa</th>
+                        <th style="text-align:left;padding:8px;">Teléfono</th>
+                      </tr>
+                    </thead>
+                    <tbody id="previewBody"></tbody>
+                  </table>
+                </div>
+                <div class="row" style="margin-top:12px;justify-content:flex-end;">
+                  <button id="importConfirmBtn"
+                    style="background:linear-gradient(120deg,#c81fa5,#8b2fd6);color:#fff;border:1px solid #ff7bd4;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">Guardar
+                    contactos</button>
+                </div>
+              </div>
+              <p id="importSaveFeedback" role="status" aria-live="polite" hidden style="margin-top:8px;font-size:13px;">
+              </p>
+            </div>
+
+            <!-- CONTACTS TABLE -->
+            <div class="contacts-table-scroll">
+              <div class="table-wrap contacts-table-wrap"
+                style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);">
+                <table style="width:100%;border-collapse:collapse;">
+                  <thead>
                     <tr>
-                      <th style="text-align:left;padding:8px;">Empresa</th>
-                      <th style="text-align:left;padding:8px;">Teléfono</th>
+                      <th>Empresa</th>
+                      <th>Teléfono</th>
+                      <th>Fecha</th>
+                      <th>Acción</th>
                     </tr>
                   </thead>
-                  <tbody id="previewBody"></tbody>
+                  <tbody id="contactsBody"></tbody>
                 </table>
               </div>
-              <div class="row" style="margin-top:12px;justify-content:flex-end;">
-                <button id="importConfirmBtn" style="background:linear-gradient(120deg,#c81fa5,#8b2fd6);color:#fff;border:1px solid #ff7bd4;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">Guardar contactos</button>
-              </div>
             </div>
-            <p id="importSaveFeedback" role="status" aria-live="polite" hidden style="margin-top:8px;font-size:13px;"></p>
-          </div>
-
-          <!-- CONTACTS TABLE -->
-          <div class="contacts-table-scroll"><div class="table-wrap contacts-table-wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr>
-                  <th>Empresa</th><th>Teléfono</th><th>Fecha</th><th>Acción</th>
-                </tr>
-              </thead>
-              <tbody id="contactsBody"></tbody>
-            </table>
-          </div></div>
-          <div id="contactsPagination" class="pagination" style="display:none;justify-content:center;gap:8px;margin-top:12px;">
-            <button id="prevPageBtn" class="secondary" style="padding:8px 16px;">← Ant</button>
-            <span id="pageInfo" class="muted" style="align-self:center;font-size:13px;">Página 1 de 1</span>
-            <button id="nextPageBtn" class="secondary" style="padding:8px 16px;">Sig →</button>
-          </div>
+            <div id="contactsPagination" class="pagination"
+              style="display:none;justify-content:center;gap:8px;margin-top:12px;">
+              <button id="prevPageBtn" class="secondary" style="padding:8px 16px;">← Ant</button>
+              <span id="pageInfo" class="muted" style="align-self:center;font-size:13px;">Página 1 de 1</span>
+              <button id="nextPageBtn" class="secondary" style="padding:8px 16px;">Sig →</button>
+            </div>
 
           </div>
         </section>
@@ -326,166 +462,287 @@
         </div>
         <div id="dailyReportMount"></div>
         <div class="reports-workspace" id="reportsWorkspace" hidden>
-        <div id="calendarUi"></div>
-      <section id="campaignReportPanel" class="campaign-report-panel" aria-labelledby="campaignReportTitle">
-        <div class="campaign-report-heading">
+          <div id="calendarUi"></div>
+          <section id="campaignReportPanel" class="campaign-report-panel" aria-labelledby="campaignReportTitle">
+            <div class="campaign-report-heading">
+              <div>
+                <h3 id="campaignReportTitle">Llamadas del período</h3>
+                <p class="muted">Resultados de cada intento y acceso a rellamadas.</p>
+              </div>
+              <div class="report-download-actions"><span id="campaignReportCount" class="campaign-report-count"
+                  aria-live="polite">0 registros</span><button id="campaignReportBtn" class="secondary"
+                  type="button">Descargar PDF</button></div>
+            </div>
+            <div class="report-filters">
+              <div class="report-shift-filter"><label for="reportShiftFilter">Turno</label><select
+                  id="reportShiftFilter">
+                  <option value="">Todos los turnos</option>
+                </select></div>
+              <div class="report-shift-filter"><label for="reportListFilter">Lista</label><select id="reportListFilter">
+                  <option value="">Todas las listas</option>
+                </select></div>
+              <div class="report-shift-filter"><label for="reportWorkerFilter">Equipo</label><select
+                  id="reportWorkerFilter">
+                  <option value="">Todos los equipos</option>
+                </select></div>
+              <div class="report-shift-filter"><label for="reportResultFilter">Resultado</label><select
+                  id="reportResultFilter">
+                  <option value="">Todos los resultados</option>
+                </select></div>
+              <div class="campaign-report-search">
+                <label for="campaignReportFilter">Buscar en el reporte</label>
+                <input id="campaignReportFilter" type="search" placeholder="Número, contacto, lista o resultado..." />
+              </div>
+            </div>
+            <p id="reportsLoadStatus" class="muted" role="status"></p>
+            <p id="campaignReportEmpty" class="campaign-report-empty" role="status">Todavía no hay llamadas registradas.
+            </p>
+            <div id="campaignReportTableWrap" class="table-wrap campaign-report-table-wrap" role="region"
+              aria-label="Historial de llamadas, desplaza horizontalmente para ver todas las columnas" tabindex="0"
+              hidden>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Lista</th>
+                    <th scope="col">Contacto</th>
+                    <th scope="col">Número</th>
+                    <th scope="col">Equipo</th>
+                    <th scope="col">Intento</th>
+                    <th scope="col">Inicio (Lima)</th>
+                    <th scope="col">Conectó (Lima)</th>
+                    <th scope="col">Fin (Lima)</th>
+                    <th scope="col">Espera</th>
+                    <th scope="col">Tiempo conectado</th>
+                    <th scope="col">Tiempo total</th>
+                    <th scope="col">Resultado técnico</th>
+                    <th scope="col">Resultado comercial</th>
+                    <th scope="col">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="campaignReportBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="blockedNumbersView" class="blocked-numbers-view" aria-labelledby="blockedNumbersTitle" hidden>
+        <div class="blocked-view-nav"><button id="blockedNumbersBack" class="secondary" type="button">← Volver a
+            llamadas</button></div>
+        <header class="blocked-window-header">
           <div>
-            <h3 id="campaignReportTitle">Llamadas del período</h3>
-            <p class="muted">Resultados de cada intento y acceso a rellamadas.</p>
+            <h2 id="blockedNumbersTitle">PANEL DE BLOQUEOS</h2>
+            <p>Estos números quedan bloqueados para todas las listas y cuentas.</p>
           </div>
-          <div class="report-download-actions"><span id="campaignReportCount" class="campaign-report-count" aria-live="polite">0 registros</span><button id="campaignReportBtn" class="secondary" type="button">Descargar PDF</button></div>
+        </header>
+        <p id="blockedNumbersFeedback" class="blocked-feedback" role="status" hidden></p>
+        <form id="blockedNumberForm" class="blocked-number-form">
+          <div><label for="blockedContactName">Nombre (opcional)</label><input id="blockedContactName"
+              placeholder="Nombre del contacto" maxlength="120" autocomplete="off" /></div>
+          <div><label for="blockedContactPhone">Número</label><input id="blockedContactPhone" type="tel"
+              placeholder="Ej. 900 000 000" inputmode="tel" maxlength="24" autocomplete="off" required /></div>
+          <button id="addBlockedContactBtn" type="submit">Agregar número</button>
+        </form>
+        <div class="blocked-list-toolbar">
+          <div><label for="blockedNumbersSearch">Buscar en la lista</label><input id="blockedNumbersSearch"
+              type="search" placeholder="Nombre o número…" autocomplete="off" /></div>
+          <span id="blockedNumbersCount" role="status">0 números</span>
         </div>
-        <div class="report-filters">
-          <div class="report-shift-filter"><label for="reportShiftFilter">Turno</label><select id="reportShiftFilter"><option value="">Todos los turnos</option></select></div>
-          <div class="report-shift-filter"><label for="reportListFilter">Lista</label><select id="reportListFilter"><option value="">Todas las listas</option></select></div>
-          <div class="report-shift-filter"><label for="reportWorkerFilter">Equipo</label><select id="reportWorkerFilter"><option value="">Todos los equipos</option></select></div>
-          <div class="report-shift-filter"><label for="reportResultFilter">Resultado</label><select id="reportResultFilter"><option value="">Todos los resultados</option></select></div>
-          <div class="campaign-report-search">
-            <label for="campaignReportFilter">Buscar en el reporte</label>
-            <input id="campaignReportFilter" type="search" placeholder="Número, contacto, lista o resultado..." />
-          </div>
-        </div>
-        <p id="reportsLoadStatus" class="muted" role="status"></p>
-        <p id="campaignReportEmpty" class="campaign-report-empty" role="status">Todavía no hay llamadas registradas.</p>
-        <div id="campaignReportTableWrap" class="table-wrap campaign-report-table-wrap" role="region" aria-label="Historial de llamadas, desplaza horizontalmente para ver todas las columnas" tabindex="0" hidden>
+        <div class="blocked-table-scroll" tabindex="0" role="region" aria-label="Números bloqueados">
           <table>
-            <thead><tr><th scope="col">Lista</th><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Equipo</th><th scope="col">Intento</th><th scope="col">Inicio (Lima)</th><th scope="col">Conectó (Lima)</th><th scope="col">Fin (Lima)</th><th scope="col">Espera</th><th scope="col">Tiempo conectado</th><th scope="col">Tiempo total</th><th scope="col">Resultado técnico</th><th scope="col">Resultado comercial</th><th scope="col">Acción</th></tr></thead>
-            <tbody id="campaignReportBody"></tbody>
+            <colgroup>
+              <col class="blocked-name-column">
+              <col class="blocked-phone-column">
+              <col class="blocked-action-column">
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Nombre</th>
+                <th scope="col">Número</th>
+                <th id="blockedNumbersActionHeader" scope="col" hidden>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="blockedNumbersBody">
+              <tr>
+                <td colspan="3">No hay números bloqueados.</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </section>
+
+      <!-- PANEL DE MENSAJES VIEW -->
+      <section id="messagesView" class="messages-view" hidden>
+        <div class="messages-view-nav">
+          <button id="messagesBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
+        </div>
+
+        <div class="messages-content-wrap">
+          <!-- Plantillas de mensajes (oculto según solicitud) -->
+          <section class="messages-section-card messages-templates-section" style="display: none;">
+            <div class="messages-card-header">
+              <div>
+                <span class="section-eyebrow">PLANTILLAS</span>
+                <h3>Mensajes guardados</h3>
+                <p class="muted">Guarda tus mensajes frecuentes y usa identidad para personalizarlos automáticamente.
+                </p>
+              </div>
+              <button id="createTemplateBtn" class="button primary">+ Crear nueva</button>
+            </div>
+
+            <div id="templatesListContainer" class="templates-list">
+              <div class="templates-empty">No hay plantillas guardadas. Crea tu primera plantilla.</div>
+            </div>
+          </section>
+
+          <!-- Contactos del celular -->
+          <section class="messages-section-card messages-contact-list" aria-labelledby="messageContactsTitle">
+            <div class="messages-card-header">
+              <h3 id="messageContactsTitle">Contactos para WhatsApp</h3>
+              <span id="messageContactsCount" class="muted">0 contactos</span>
+            </div>
+            <div id="messageContactsUserSelector" class="mc-user-selector">
+              <div class="mc-user-selector-field">
+                <label for="messageContactsUser">Ver contactos de</label>
+                <div class="mc-select-wrap">
+                  <svg class="mc-select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <select id="messageContactsUser">
+                    <option value="">Cargando…</option>
+                  </select>
+                  <svg class="mc-select-chevron" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                      stroke-linejoin="round" />
+                  </svg>
+                </div>
+              </div>
+              <div class="mc-user-selector-field">
+                <label for="messageContactsDay">Día de ingreso</label>
+                <div class="mc-select-wrap">
+                  <select id="messageContactsDay">
+                    <option value="">Todos los días</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mc-user-selector-field">
+                <label for="messageContactsShift">Turno de ingreso</label>
+                <div class="mc-select-wrap">
+                  <select id="messageContactsShift">
+                    <option value="">Todos los turnos</option>
+                  </select>
+                </div>
+              </div>
+              <p id="messageContactsHint" class="mc-user-selector-hint">Filtra por usuario, día y turno de ingreso.
+                Horario de Lima.</p>
+            </div>
+            <div class="message-contact-actions-row">
+              <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
+              <div class="message-contact-toolbar">
+                <button type="button" id="deleteAllMessageContactsBtn"
+                  class="add-manual-contact-btn delete-all-message-contacts-btn" disabled
+                  title="Se habilita cuando todos tus contactos estén enviados"><svg width="14" height="14"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18M8 6V4h8v2m2 0-1 14H7L6 6m4 4v6m4-6v6" />
+                  </svg><span>Eliminar todos</span></button>
+                <button type="button" id="sendDirectMessageBtn"
+                  class="add-manual-contact-btn send-direct-message-btn"><svg width="14" height="14" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M21 11.5a8.5 8.5 0 0 1-12.9 7.3L3 20l1.2-4.6A8.5 8.5 0 1 1 21 11.5Z" />
+                    <path d="M8.5 11.5h7" />
+                    <path d="M12 8v7" />
+                  </svg><span>Enviar a un número</span></button>
+                <button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14"
+                    height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg><span>Nuevo contacto</span></button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Contacto</th>
+                    <th scope="col">Número</th>
+                    <th scope="col">Ingreso</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="messageContactsBody">
+                  <tr>
+                    <td colspan="5" class="muted">Sin contactos</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
 
-  <section id="blockedNumbersView" class="blocked-numbers-view" aria-labelledby="blockedNumbersTitle" hidden>
-    <div class="blocked-view-nav"><button id="blockedNumbersBack" class="secondary" type="button">← Volver a llamadas</button></div>
-    <header class="blocked-window-header">
-      <div><h2 id="blockedNumbersTitle">PANEL DE BLOQUEOS</h2><p>Estos números quedan bloqueados para todas las listas y cuentas.</p></div>
-    </header>
-    <p id="blockedNumbersFeedback" class="blocked-feedback" role="status" hidden></p>
-    <form id="blockedNumberForm" class="blocked-number-form">
-      <div><label for="blockedContactName">Nombre (opcional)</label><input id="blockedContactName" placeholder="Nombre del contacto" maxlength="120" autocomplete="off" /></div>
-      <div><label for="blockedContactPhone">Número</label><input id="blockedContactPhone" type="tel" placeholder="Ej. 900 000 000" inputmode="tel" maxlength="24" autocomplete="off" required /></div>
-      <button id="addBlockedContactBtn" type="submit">Agregar número</button>
-    </form>
-    <div class="blocked-list-toolbar">
-      <div><label for="blockedNumbersSearch">Buscar en la lista</label><input id="blockedNumbersSearch" type="search" placeholder="Nombre o número…" autocomplete="off" /></div>
-      <span id="blockedNumbersCount" role="status">0 números</span>
-    </div>
-    <div class="blocked-table-scroll" tabindex="0" role="region" aria-label="Números bloqueados">
-      <table><colgroup><col class="blocked-name-column"><col class="blocked-phone-column"><col class="blocked-action-column"></colgroup><thead><tr><th scope="col">Nombre</th><th scope="col">Número</th><th id="blockedNumbersActionHeader" scope="col" hidden>Acción</th></tr></thead><tbody id="blockedNumbersBody"><tr><td colspan="3">No hay números bloqueados.</td></tr></tbody></table>
-    </div>
-  </section>
-
-  <!-- PANEL DE MENSAJES VIEW -->
-  <section id="messagesView" class="messages-view" hidden>
-    <div class="messages-view-nav">
-      <button id="messagesBackBtn" class="secondary" type="button">← VOLVER A LLAMADAS</button>
-    </div>
-    
-    <div class="messages-content-wrap">
-      <!-- Plantillas de mensajes (oculto según solicitud) -->
-      <section class="messages-section-card messages-templates-section" style="display: none;">
-        <div class="messages-card-header">
-          <div>
-            <span class="section-eyebrow">PLANTILLAS</span>
-            <h3>Mensajes guardados</h3>
-            <p class="muted">Guarda tus mensajes frecuentes y usa identidad para personalizarlos automáticamente.</p>
+      <!-- RESERVA DE CONTACTO VIEW (AGENDAS / COTIZACIONES) -->
+      <section id="reservationsView" class="reservations-view" aria-labelledby="reservationsTitle" hidden>
+        <div class="reservations-nav">
+          <button id="reservationsBackBtn" class="secondary" type="button">← Volver a llamadas</button>
+        </div>
+        <header class="reservations-window-header">
+          <div class="reservations-title-wrap">
+            <h2 id="reservationsTitle">Reservas de contacto</h2>
+            <p>Tus cotizaciones y próximas llamadas, en un solo lugar.</p>
           </div>
-          <button id="createTemplateBtn" class="button primary">+ Crear nueva</button>
+          <div class="reservations-header-actions">
+            <button id="newReservationBtn" class="primary" type="button"><span aria-hidden="true">＋</span> Nueva
+              reserva</button>
+          </div>
+        </header>
+
+        <div class="reservations-toolbar">
+          <div class="reservations-search-wrap">
+            <label for="reservationsSearchInput">Buscar reserva</label>
+            <div class="res-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="m16 16 4 4" />
+              </svg><input id="reservationsSearchInput" type="search" placeholder="Número, empresa o cotización…"
+                autocomplete="off" /></div>
+          </div>
+          <div class="reservations-filters-wrap">
+            <button type="button" class="res-filter-btn active" data-status="all" aria-pressed="true">Todas <span
+                id="resCountAll">0</span></button>
+            <button type="button" class="res-filter-btn" data-status="scheduled" aria-pressed="false">Programadas <span
+                id="resCountScheduled">0</span></button>
+            <button type="button" class="res-filter-btn" data-status="paused" aria-pressed="false">Pausadas <span
+                id="resCountPaused">0</span></button>
+            <button type="button" class="res-filter-btn" data-status="completed" aria-pressed="false">Completadas <span
+                id="resCountCompleted">0</span></button>
+          </div>
         </div>
-        
-        <div id="templatesListContainer" class="templates-list">
-          <div class="templates-empty">No hay plantillas guardadas. Crea tu primera plantilla.</div>
+
+        <div class="res-results-heading">
+          <h3>Agenda de seguimiento</h3><span id="reservationsResultCount" role="status" aria-live="polite">Cargando
+            reservas…</span>
         </div>
+        <div id="reservationsEmptyState" class="reservations-empty" style="display:none;">
+          <div class="res-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor"
+              stroke-width="1.7">
+              <rect x="9" y="12" width="30" height="29" rx="5" />
+              <path d="M9 22h30M17 7v10M31 7v10M18 30h5M27 30h4M18 35h5" />
+            </svg></div>
+          <h3 id="reservationsEmptyTitle">Tu próxima llamada empieza aquí</h3>
+          <p id="reservationsEmptyDescription">Crea una reserva para dar seguimiento a una cotización. También puedes
+            agendarla desde tu celular durante una llamada.</p>
+          <button id="reservationsEmptyAction" type="button" class="secondary">＋ Crear mi primera reserva</button>
+        </div>
+
+        <!-- Contenedor de tarjetas (Formato según boceto: Nº, EMPRESA, COTIZACIÓN, PRECIO, FECHA DE LLAMADA, HORARIO, [PAUSAR/DETENER], [LLAMAR]) -->
+        <div id="reservationsCardsGrid" class="reservations-cards-grid"></div>
       </section>
-
-      <!-- Contactos del celular -->
-      <section class="messages-section-card messages-contact-list" aria-labelledby="messageContactsTitle">
-        <div class="messages-card-header">
-          <h3 id="messageContactsTitle">Contactos para WhatsApp</h3>
-          <span id="messageContactsCount" class="muted">0 contactos</span>
-        </div>
-        <div id="messageContactsUserSelector" class="mc-user-selector">
-          <div class="mc-user-selector-field">
-            <label for="messageContactsUser">Ver contactos de</label>
-            <div class="mc-select-wrap">
-              <svg class="mc-select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <select id="messageContactsUser"><option value="">Cargando…</option></select>
-              <svg class="mc-select-chevron" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-          </div>
-          <div class="mc-user-selector-field">
-            <label for="messageContactsDay">Día de ingreso</label>
-            <div class="mc-select-wrap">
-              <select id="messageContactsDay"><option value="">Todos los días</option></select>
-            </div>
-          </div>
-          <div class="mc-user-selector-field">
-            <label for="messageContactsShift">Turno de ingreso</label>
-            <div class="mc-select-wrap">
-              <select id="messageContactsShift"><option value="">Todos los turnos</option></select>
-            </div>
-          </div>
-          <p id="messageContactsHint" class="mc-user-selector-hint">Filtra por usuario, día y turno de ingreso. Horario de Lima.</p>
-        </div>
-        <div class="message-contact-actions-row">
-          <p id="messageContactsStatus" class="muted" role="status">Cargando…</p>
-<div class="message-contact-toolbar">
-  <button type="button" id="deleteAllMessageContactsBtn" class="add-manual-contact-btn delete-all-message-contacts-btn" disabled title="Se habilita cuando todos tus contactos estén enviados"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m2 0-1 14H7L6 6m4 4v6m4-6v6"/></svg><span>Eliminar todos</span></button>
-  <button type="button" id="sendDirectMessageBtn" class="add-manual-contact-btn send-direct-message-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.9 7.3L3 20l1.2-4.6A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h7"/><path d="M12 8v7"/></svg><span>Enviar a un número</span></button>
-  <button type="button" id="addManualContactBtn" class="add-manual-contact-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Nuevo contacto</span></button>
-</div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th scope="col">Contacto</th><th scope="col">Número</th><th scope="col">Ingreso</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
-            <tbody id="messageContactsBody"><tr><td colspan="5" class="muted">Sin contactos</td></tr></tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  </section>
-
-  <!-- RESERVA DE CONTACTO VIEW (AGENDAS / COTIZACIONES) -->
-  <section id="reservationsView" class="reservations-view" aria-labelledby="reservationsTitle" hidden>
-    <div class="reservations-nav">
-      <button id="reservationsBackBtn" class="secondary" type="button">← Volver a llamadas</button>
-    </div>
-    <header class="reservations-window-header">
-      <div class="reservations-title-wrap">
-        <h2 id="reservationsTitle">Reservas de contacto</h2>
-        <p>Tus cotizaciones y próximas llamadas, en un solo lugar.</p>
-      </div>
-      <div class="reservations-header-actions">
-        <button id="newReservationBtn" class="primary" type="button"><span aria-hidden="true">＋</span> Nueva reserva</button>
-      </div>
-    </header>
-
-    <div class="reservations-toolbar">
-      <div class="reservations-search-wrap">
-        <label for="reservationsSearchInput">Buscar reserva</label>
-        <div class="res-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="reservationsSearchInput" type="search" placeholder="Número, empresa o cotización…" autocomplete="off" /></div>
-      </div>
-      <div class="reservations-filters-wrap">
-        <button type="button" class="res-filter-btn active" data-status="all" aria-pressed="true">Todas <span id="resCountAll">0</span></button>
-        <button type="button" class="res-filter-btn" data-status="scheduled" aria-pressed="false">Programadas <span id="resCountScheduled">0</span></button>
-        <button type="button" class="res-filter-btn" data-status="paused" aria-pressed="false">Pausadas <span id="resCountPaused">0</span></button>
-        <button type="button" class="res-filter-btn" data-status="completed" aria-pressed="false">Completadas <span id="resCountCompleted">0</span></button>
-      </div>
-    </div>
-
-    <div class="res-results-heading"><h3>Agenda de seguimiento</h3><span id="reservationsResultCount" role="status" aria-live="polite">Cargando reservas…</span></div>
-    <div id="reservationsEmptyState" class="reservations-empty" style="display:none;">
-      <div class="res-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="12" width="30" height="29" rx="5"/><path d="M9 22h30M17 7v10M31 7v10M18 30h5M27 30h4M18 35h5"/></svg></div>
-      <h3 id="reservationsEmptyTitle">Tu próxima llamada empieza aquí</h3>
-      <p id="reservationsEmptyDescription">Crea una reserva para dar seguimiento a una cotización. También puedes agendarla desde tu celular durante una llamada.</p>
-      <button id="reservationsEmptyAction" type="button" class="secondary">＋ Crear mi primera reserva</button>
-    </div>
-
-    <!-- Contenedor de tarjetas (Formato según boceto: Nº, EMPRESA, COTIZACIÓN, PRECIO, FECHA DE LLAMADA, HORARIO, [PAUSAR/DETENER], [LLAMAR]) -->
-    <div id="reservationsCardsGrid" class="reservations-cards-grid"></div>
-  </section>
 
     </section>
   </main>
@@ -579,11 +836,18 @@
 
   <!-- ADD MANUAL CONTACT MODAL -->
   <div id="addManualContactModal" class="edit-modal" style="display:none">
-    <div class="edit-card list-name-card add-contact-card" role="dialog" aria-modal="true" aria-labelledby="addManualContactTitle">
+    <div class="edit-card list-name-card add-contact-card" role="dialog" aria-modal="true"
+      aria-labelledby="addManualContactTitle">
       <button id="addManualContactCloseBtn" class="edit-close-btn" type="button" aria-label="Cerrar">✕</button>
       <div class="add-contact-header">
         <div class="add-contact-icon-badge">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="8.5" cy="7" r="4" />
+            <line x1="20" y1="8" x2="20" y2="14" />
+            <line x1="23" y1="11" x2="17" y2="11" />
+          </svg>
         </div>
         <div>
           <h3 id="addManualContactTitle" style="margin:0;font-size:1.15rem;font-weight:700">Agregar contacto</h3>
@@ -592,17 +856,23 @@
       </div>
       <form id="addManualContactForm" onsubmit="return false;" style="display:grid;gap:12px;margin-top:14px">
         <div class="edit-form" style="display:grid;gap:4px">
-          <label for="addManualContactName" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Empresa / Nombre del contacto</label>
-          <input id="addManualContactName" type="text" maxlength="100" autocomplete="off" placeholder="Ej. Corporación ABC / Juan Pérez" required />
+          <label for="addManualContactName" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Empresa / Nombre del
+            contacto</label>
+          <input id="addManualContactName" type="text" maxlength="100" autocomplete="off"
+            placeholder="Ej. Corporación ABC / Juan Pérez" required />
         </div>
         <div class="edit-form" style="display:grid;gap:4px">
-          <label for="addManualContactPhone" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Número (con código de país)</label>
-          <input id="addManualContactPhone" type="tel" maxlength="20" autocomplete="off" placeholder="Ej. 51987654321" required />
+          <label for="addManualContactPhone" style="font-size:0.8rem;font-weight:600;color:#3b1e54">Número (con código
+            de país)</label>
+          <input id="addManualContactPhone" type="tel" maxlength="20" autocomplete="off" placeholder="Ej. 51987654321"
+            required />
         </div>
-        <p id="addManualContactError" class="list-name-error" role="alert" style="margin:0;font-size:0.8rem;color:#d81482;min-height:16px"></p>
+        <p id="addManualContactError" class="list-name-error" role="alert"
+          style="margin:0;font-size:0.8rem;color:#d81482;min-height:16px"></p>
         <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px">
           <button id="addManualContactCancelBtn" type="button" class="secondary">Cancelar</button>
-          <button id="addManualContactSaveBtn" type="button" class="primary" style="background:linear-gradient(135deg,#d91483,#8e1ab2);color:#fff;border:none">Guardar contacto</button>
+          <button id="addManualContactSaveBtn" type="button" class="primary"
+            style="background:linear-gradient(135deg,#d91483,#8e1ab2);color:#fff;border:none">Guardar contacto</button>
         </div>
       </form>
     </div>
@@ -646,37 +916,45 @@
           <label for="templateMessageInput">Mensaje</label>
           <span class="template-char-count"><span id="templateCharCount">0</span> / 1000</span>
         </div>
-        <textarea id="templateMessageInput" rows="5" placeholder="Escribe tu mensaje aquí..." maxlength="1000" required></textarea>
+        <textarea id="templateMessageInput" rows="5" placeholder="Escribe tu mensaje aquí..." maxlength="1000"
+          required></textarea>
 
         <div id="templateFooterField">
           <div class="template-field-header">
             <label for="templateFooterInput">Pie de página del correo (opcional)</label>
             <span class="template-char-count"><span id="templateFooterCharCount">0</span> / 2000</span>
           </div>
-          <textarea id="templateFooterInput" rows="3" placeholder="Firma, datos de contacto, aviso legal…" maxlength="2000"></textarea>
-          <small class="muted template-footer-help">Se agregará al final del mensaje al usar la plantilla en Correo. Podrás editarlo aquí cuando quieras.</small>
+          <textarea id="templateFooterInput" rows="3" placeholder="Firma, datos de contacto, aviso legal…"
+            maxlength="2000"></textarea>
+          <small class="muted template-footer-help">Se agregará al final del mensaje al usar la plantilla en Correo.
+            Podrás editarlo aquí cuando quieras.</small>
         </div>
 
         <!-- Zona de imagen adjunta de la plantilla (solo WhatsApp) -->
         <div id="templateImageField">
-        <label>Imagen de la plantilla (opcional)</label>
-        <div id="templateImageDropZone" class="template-image-dropzone">
-          <input type="file" id="templateImageFileInput" accept="image/*" style="display:none" />
-          <div id="templateImageEmptyWrap" class="template-dropzone-empty">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <p>Arrastra una imagen aquí o <strong>haz clic para buscar</strong></p>
-            <small class="muted">PNG, JPG, WebP. También puedes pegar con <strong>Ctrl + V</strong></small>
-          </div>
-          <div id="templateImagePreviewWrap" class="template-dropzone-preview" style="display:none">
-            <div class="template-preview-img-box">
-              <img id="templateImagePreviewImg" src="" alt="Vista previa de plantilla" />
+          <label>Imagen de la plantilla (opcional)</label>
+          <div id="templateImageDropZone" class="template-image-dropzone">
+            <input type="file" id="templateImageFileInput" accept="image/*" style="display:none" />
+            <div id="templateImageEmptyWrap" class="template-dropzone-empty">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <p>Arrastra una imagen aquí o <strong>haz clic para buscar</strong></p>
+              <small class="muted">PNG, JPG, WebP. También puedes pegar con <strong>Ctrl + V</strong></small>
             </div>
-            <div class="template-preview-info">
-              <span class="template-preview-tag">✓ Imagen seleccionada</span>
-              <button type="button" id="templateImageRemoveBtn" class="template-remove-img-btn">✕ Quitar imagen</button>
+            <div id="templateImagePreviewWrap" class="template-dropzone-preview" style="display:none">
+              <div class="template-preview-img-box">
+                <img id="templateImagePreviewImg" src="" alt="Vista previa de plantilla" />
+              </div>
+              <div class="template-preview-info">
+                <span class="template-preview-tag">✓ Imagen seleccionada</span>
+                <button type="button" id="templateImageRemoveBtn" class="template-remove-img-btn">✕ Quitar
+                  imagen</button>
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
       <div class="modal-actions">
@@ -706,45 +984,67 @@
           </div>
           <div class="send-template-heading-controls">
             <span id="sendTemplateCount" class="send-template-count">0</span>
-            <button id="sendModalNewTemplateBtn" type="button" class="send-modal-new-template-btn" title="Crear nueva plantilla">+ Nueva</button>
+            <button id="sendModalNewTemplateBtn" type="button" class="send-modal-new-template-btn"
+              title="Crear nueva plantilla">+ Nueva</button>
           </div>
         </div>
         <p id="sendTemplateIntro">Elige un texto para cargarlo en el mensaje.</p>
         <div class="send-template-filter-tools" id="sendTemplateFilterTools">
-          <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search" placeholder="Nombre o contenido…" autocomplete="off" /></label>
+          <label for="sendTemplateSearch">Buscar plantilla<input id="sendTemplateSearch" type="search"
+              placeholder="Nombre o contenido…" autocomplete="off" /></label>
           <!-- Filtros de cuatro columnas: RUBRO · SPEECH · PRECIO · COMBO -->
           <div class="stf-dropdown-row" id="stfDropdownRow" role="tablist" aria-label="Secciones de plantillas">
             <!-- Rubro -->
             <div class="stf-dropdown" id="stfRubroDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-label="Filtrar por rubro" role="tab" aria-selected="false">
+              <button type="button" class="stf-dropdown-btn" id="stfRubroBtn" aria-label="Filtrar por rubro" role="tab"
+                aria-selected="false">
                 <span class="stf-btn-label" id="stfRubroLabel">R</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
               </button>
-              <button type="button" class="stf-add-btn" id="stfRubroAddBtn" data-kind="rubro" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
+              <button type="button" class="stf-add-btn" id="stfRubroAddBtn" data-kind="rubro"
+                title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
             </div>
             <!-- Speech -->
             <div class="stf-dropdown" id="stfSpeechDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-label="Filtrar por speech" role="tab" aria-selected="false">
+              <button type="button" class="stf-dropdown-btn" id="stfSpeechBtn" aria-label="Filtrar por speech"
+                role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfSpeechLabel">S</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
               </button>
-              <button type="button" class="stf-add-btn" id="stfSpeechAddBtn" data-kind="speech" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
+              <button type="button" class="stf-add-btn" id="stfSpeechAddBtn" data-kind="speech"
+                title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
             </div>
             <!-- Precio -->
             <div class="stf-dropdown" id="stfPrecioDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-label="Filtrar por precio" role="tab" aria-selected="false">
+              <button type="button" class="stf-dropdown-btn" id="stfPrecioBtn" aria-label="Filtrar por precio"
+                role="tab" aria-selected="false">
                 <span class="stf-btn-label" id="stfPrecioLabel">P</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
               </button>
-              <button type="button" class="stf-add-btn" id="stfPrecioAddBtn" data-kind="precio" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
+              <button type="button" class="stf-add-btn" id="stfPrecioAddBtn" data-kind="precio"
+                title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
             </div>
             <!-- Combo -->
             <div class="stf-dropdown" id="stfComboDropdown">
-              <button type="button" class="stf-dropdown-btn" id="stfComboBtn" aria-label="Filtrar por combo" role="tab" aria-selected="false">
+              <button type="button" class="stf-dropdown-btn" id="stfComboBtn" aria-label="Filtrar por combo" role="tab"
+                aria-selected="false">
                 <span class="stf-btn-label" id="stfComboLabel">C</span>
-                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="stf-btn-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
               </button>
-              <button type="button" class="stf-add-btn" id="stfComboAddBtn" data-kind="combo" title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
+              <button type="button" class="stf-add-btn" id="stfComboAddBtn" data-kind="combo"
+                title="Crear nueva categoría" aria-label="Crear nueva categoría">+</button>
             </div>
           </div>
           <div class="stf-tab-panels">
@@ -759,15 +1059,18 @@
             <button type="button" id="stfClearFiltersBtn" class="stf-clear-btn" hidden>✕ Limpiar filtros</button>
           </div>
 
-          <div class="stf-option-modal" id="stfOptionModal" role="dialog" aria-modal="true" aria-labelledby="stfOptionModalTitle">
+          <div class="stf-option-modal" id="stfOptionModal" role="dialog" aria-modal="true"
+            aria-labelledby="stfOptionModalTitle">
             <div class="stf-option-modal-card">
               <h4 id="stfOptionModalTitle">Nueva categoría</h4>
               <p id="stfOptionModalHint">Se agregará al filtro y quedará guardada.</p>
               <label for="stfOptionName">Nombre
-                <input id="stfOptionName" type="text" maxlength="60" placeholder="Ej. Servicios legales" autocomplete="off" />
+                <input id="stfOptionName" type="text" maxlength="60" placeholder="Ej. Servicios legales"
+                  autocomplete="off" />
               </label>
               <label for="stfOptionDescription">Descripción (opcional)
-                <input id="stfOptionDescription" type="text" maxlength="80" placeholder="Ej. Asesoría y gestiones" autocomplete="off" />
+                <input id="stfOptionDescription" type="text" maxlength="80" placeholder="Ej. Asesoría y gestiones"
+                  autocomplete="off" />
               </label>
               <div class="stf-option-modal-actions">
                 <button type="button" id="stfOptionCancelBtn" class="stf-option-cancel-btn">Cancelar</button>
@@ -776,7 +1079,9 @@
             </div>
           </div>
 
-          <select id="sendTemplateCategory" style="display:none"><option value="">Todas las categorías</option></select>
+          <select id="sendTemplateCategory" style="display:none">
+            <option value="">Todas las categorías</option>
+          </select>
         </div>
         <div id="sendMessageTemplates" class="send-template-list"></div>
       </aside>
@@ -784,11 +1089,17 @@
       <!-- Tabs WhatsApp / Correo -->
       <div class="message-tabs">
         <button id="tabWhatsAppBtn" class="message-tab active" data-tab="whatsapp">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+          </svg>
           WhatsApp
         </button>
         <button id="tabEmailBtn" class="message-tab" data-tab="email">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="m2 7 10 7 10-7" />
+          </svg>
           Correo
         </button>
       </div>
@@ -806,7 +1117,11 @@
         <div class="send-message-image-area">
           <div class="send-message-image-header">
             <span class="send-message-image-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
               Imagen adjunta (opcional)
             </span>
             <input type="file" id="sendWhatsAppImageInput" accept="image/*" style="display:none;" />
@@ -821,9 +1136,11 @@
             </div>
             <div class="sm-image-meta">
               <span class="sm-image-badge">✓ Imagen lista</span>
-              <span class="sm-image-tip">Al hacer clic en Enviar o en "Copiar", se copiará al portapapeles para pegarla en WhatsApp con <strong>Ctrl + V</strong>.</span>
+              <span class="sm-image-tip">Al hacer clic en Enviar o en "Copiar", se copiará al portapapeles para pegarla
+                en WhatsApp con <strong>Ctrl + V</strong>.</span>
               <div class="sm-image-controls">
-                <button type="button" id="sendWhatsAppCopyImageBtn" class="sm-btn-copy" title="Copiar imagen al portapapeles">
+                <button type="button" id="sendWhatsAppCopyImageBtn" class="sm-btn-copy"
+                  title="Copiar imagen al portapapeles">
                   📋 Copiar imagen
                 </button>
                 <button type="button" id="sendWhatsAppRemoveImageBtn" class="sm-btn-remove" title="Quitar imagen">
@@ -835,12 +1152,19 @@
         </div>
 
         <div class="message-note" id="whatsappMessageNote">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span id="whatsappNoteText">Edita el texto y confirma en WhatsApp. Guardará registrado en la base de datos.</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span id="whatsappNoteText">Edita el texto y confirma en WhatsApp. Guardará registrado en la base de
+            datos.</span>
         </div>
 
         <button id="continueWhatsAppBtn" type="button" class="button primary full-width">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+          </svg>
           Continuar en WhatsApp
         </button>
       </div>
@@ -861,10 +1185,14 @@
         <div class="send-message-image-area email-attachments-area">
           <div class="send-message-image-header">
             <span class="send-message-image-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
               Adjuntos PDF, Word o Excel (opcional)
             </span>
-            <input type="file" id="sendEmailFilesInput" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none;" />
+            <input type="file" id="sendEmailFilesInput" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple
+              style="display:none;" />
             <button type="button" id="sendEmailAttachBtn" class="sm-image-action-btn">
               📎 Adjuntar archivos
             </button>
@@ -874,7 +1202,10 @@
         </div>
 
         <button id="sendEmailBtn" type="button" class="button primary full-width">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="m2 7 10 7 10-7" />
+          </svg>
           Enviar Correo
         </button>
       </div>
@@ -911,7 +1242,8 @@
 
         <div class="call-controls">
           <button id="modalMuteBtn" class="secondary" title="Silenciar micrófono">🎙️ Micrófono</button>
-          <button id="modalQuoteBtn" class="secondary" title="Crear Cotización / Reserva de Contacto">📋 Cotización</button>
+          <button id="modalQuoteBtn" class="secondary" title="Crear Cotización / Reserva de Contacto">📋
+            Cotización</button>
         </div>
 
         <div class="call-controls call-controls-main">
@@ -946,7 +1278,8 @@
         </div>
 
         <label id="quoteDetailLabel" for="quoteDescInput">Detalle de la cotización *</label>
-        <textarea id="quoteDescInput" rows="3" placeholder="Ej: Solicita cotización de 50 sacos de alimento y flete..." required></textarea>
+        <textarea id="quoteDescInput" rows="3" placeholder="Ej: Solicita cotización de 50 sacos de alimento y flete..."
+          required></textarea>
 
         <div class="form-row-dual">
           <div id="quotePriceField">
@@ -1016,18 +1349,18 @@
     window.startOperationalDashboard = function startOperationalDashboard() {
       if (dashboardStart) return dashboardStart;
       dashboardStart = new Promise((resolve, reject) => {
-      // Isolated authentication uses one origin for pages, cookies and sockets.
-      const apiBase = window.location.origin;
-      window.VOIP_VC_API_BASE = apiBase;
+        // Isolated authentication uses one origin for pages, cookies and sockets.
+        const apiBase = window.location.origin;
+        window.VOIP_VC_API_BASE = apiBase;
 
-      window.loadSocketLibrary().then(() => import("/app/bootstrap.js?v=20261119-users-ui3")).then(resolve, error => {
-        console.error("No se pudo cargar Socket.IO desde", `${apiBase}/socket.io/socket.io.js`);
-        const statusText = document.getElementById("statusText");
-        if (statusText) {
-          statusText.textContent = `No se pudo conectar al backend en ${apiBase}.`;
-        }
-        reject(error || new Error("No se pudo conectar al servidor de llamadas."));
-      });
+        window.loadSocketLibrary().then(() => import("/app/bootstrap.js?v=20261119-users-ui3")).then(resolve, error => {
+          console.error("No se pudo cargar Socket.IO desde", `${apiBase}/socket.io/socket.io.js`);
+          const statusText = document.getElementById("statusText");
+          if (statusText) {
+            statusText.textContent = `No se pudo conectar al backend en ${apiBase}.`;
+          }
+          reject(error || new Error("No se pudo conectar al servidor de llamadas."));
+        });
       });
       return dashboardStart;
     };

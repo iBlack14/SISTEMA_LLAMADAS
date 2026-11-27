@@ -180,7 +180,7 @@ function onUserChange() {
   const user = users.find(item => String(item.id) === userId);
   const select = $("adminListsName");
   const status = $("adminListsStatus");
-  
+
   if (!userId) {
     status.textContent = "Selecciona una cuenta de destino para importar.";
     select.replaceChildren(new Option("Primero selecciona una cuenta", ""));
@@ -200,7 +200,7 @@ function onUserChange() {
     loadContacts();
     return;
   }
-  
+
   if (!user?.lists?.length) {
     // Auto-create "Principal" list via backend on first import
     select.replaceChildren(new Option("Principal (nueva)", "Principal"));
@@ -285,22 +285,30 @@ function renderAdminListRows() {
   $("adminListsResultCount").textContent = `${rows.length.toLocaleString("es-PE")} ${rows.length === 1 ? "lista" : "listas"}`;
   const pageRows = rows.slice(0, browseLimit);
   for (const item of pageRows) {
-    const row = document.createElement("tr");
-    const nameCell = document.createElement("td");
-    nameCell.className = "admin-lists-name-cell";
+    const card = document.createElement("article");
+    card.className = "admin-lists-card";
+    card.setAttribute("role", "listitem");
+
+    const main = document.createElement("div");
+    main.className = "admin-lists-card-main";
+
+    const head = document.createElement("div");
+    head.className = "admin-lists-card-head";
     const name = document.createElement("strong");
     name.textContent = item.name;
-    const sub = document.createElement("span");
-    sub.textContent = "Lista de contactos";
-    nameCell.append(name, sub);
-    const countCell = document.createElement("td");
-    countCell.className = "admin-lists-count-cell";
-    countCell.textContent = item.count.toLocaleString("es-PE");
-    const dateCell = document.createElement("td");
+    const countBadge = document.createElement("span");
+    countBadge.className = "admin-lists-card-count";
+    countBadge.textContent = `${item.count.toLocaleString("es-PE")} contactos`;
+    head.append(name, countBadge);
+
+    const meta = document.createElement("div");
+    meta.className = "admin-lists-card-meta";
     const formattedDate = item.createdAt ? new Intl.DateTimeFormat("es-PE", { timeZone: "America/Lima", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : "—";
-    dateCell.textContent = item.estimated ? `${formattedDate} · Registro inicial` : formattedDate;
-    if (item.estimated) dateCell.title = "Asignada a este mes para hacer visible una base antigua sin fecha de importación; no representa su fecha histórica.";
-    const actionCell = document.createElement("td");
+    meta.textContent = item.estimated ? `Lista de contactos · ${formattedDate} · Registro inicial` : `Lista de contactos · ${formattedDate}`;
+    if (item.estimated) meta.title = "Asignada a este mes para hacer visible una base antigua sin fecha de importación; no representa su fecha histórica.";
+
+    main.append(head, meta);
+
     const open = document.createElement("button");
     open.type = "button";
     open.className = "admin-lists-open-button";
@@ -309,9 +317,9 @@ function renderAdminListRows() {
     open.dataset.listName = item.name;
     open.dataset.count = String(item.count);
     open.textContent = "Ver →";
-    actionCell.appendChild(open);
-    row.append(nameCell, countCell, dateCell, actionCell);
-    body.appendChild(row);
+
+    card.append(main, open);
+    body.appendChild(card);
   }
   $("adminListsBrowseMore").hidden = rows.length <= browseLimit;
   $("adminListsBrowseStatus").textContent = rows.length

@@ -862,6 +862,15 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .admin-lists-category select { width: 100%; }
 .admin-lists-table-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 23px 4px 11px; }
 .admin-lists-table-heading span { color: #d5c0e1; font-size: 13px; }
+.admin-lists-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-lists-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 18px; border: 1px solid rgb(203 85 229 / 32%); border-radius: 14px; background: rgb(35 8 51 / 82%); transition: border-color .15s ease, background .15s ease; }
+.admin-lists-card:hover { border-color: rgb(222 113 244 / 58%); background: rgb(47 11 67 / 92%); }
+.admin-lists-card-main { min-width: 0; display: grid; gap: 6px; }
+.admin-lists-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.admin-lists-card-head strong { color: #fff; font-size: 14px; word-break: break-word; }
+.admin-lists-card-count { display: inline-flex; align-items: center; padding: 3px 10px; border: 1px solid #9251ae; border-radius: 99px; background: #47195f; color: #f4eafa; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.admin-lists-card-meta { color: #bfa9ce; font-size: 12px; line-height: 1.35; }
+.admin-lists-card .admin-lists-open-button { flex: 0 0 auto; }
 .admin-lists-table-wrap { margin: 0 !important; overflow: auto; border: 1px solid rgb(203 85 229 / 32%); border-radius: 14px; background: rgb(35 8 51 / 82%); }
 .admin-lists-table-wrap table { width: 100%; min-width: 790px; border-collapse: separate; border-spacing: 0; }
 .admin-lists-table-wrap thead th { padding: 14px 16px; color: #f7eaff; background: #681181; text-align: left; font-size: 11px; letter-spacing: .045em; white-space: nowrap; }
@@ -903,6 +912,7 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   .admin-lists-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .admin-lists-overview { grid-template-columns: 1fr 1fr; }
   .admin-lists-search { grid-column: 1 / -1; grid-row: 2; }
+  .admin-lists-grid { grid-template-columns: 1fr; }
 }
 @media (min-width: 901px) and (max-width: 1440px) {
   .admin-lists-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
