@@ -130,7 +130,7 @@ async function loadAdminWorkspace() {
     document.head.append(stylesheet);
     const networkLightStylesheet = document.createElement("link");
     networkLightStylesheet.rel = "stylesheet";
-    networkLightStylesheet.href = "/features/admin/network/network-light.css?v=20261127-clean";
+    networkLightStylesheet.href = "/features/admin/network/network-light.css?v=20261127-width";
     document.head.append(networkLightStylesheet);
     const voiceStylesheet = document.createElement("link");
     voiceStylesheet.rel = "stylesheet";
@@ -138,7 +138,7 @@ async function loadAdminWorkspace() {
     document.head.append(voiceStylesheet);
     const voiceLightStylesheet = document.createElement("link");
     voiceLightStylesheet.rel = "stylesheet";
-    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-clean";
+    voiceLightStylesheet.href = "/features/admin/voice/voice-light.css?v=20261127-contrast";
     document.head.append(voiceLightStylesheet);
   })().catch(error => {
     adminPromise = null;

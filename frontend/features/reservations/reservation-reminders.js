@@ -23,6 +23,7 @@ export function dueReservationReminders(reservations, now, preferences = {}) {
 // The browser must remain open. Native notifications are opt-in and never place calls.
 export function createReservationReminders({ getIdentity, onOpen }) {
   let reservations = [], identity = '', timer = null, dock = null;
+  let minimized = false;
   const fallback = new Map();
   const storageKey = () => `viavox.reservation-reminders.${identity}`;
   function preferences() {
@@ -65,8 +66,17 @@ export function createReservationReminders({ getIdentity, onOpen }) {
     dock.id = 'reservationReminderDock';
     dock.setAttribute('aria-label', 'Recordatorios de reservas');
     dock.hidden = true;
-    dock.innerHTML = '<header><strong>Reservas para llamar</strong><span class="reservation-reminder-count" role="status"></span></header><div class="reservation-reminder-items"></div>';
+    dock.innerHTML = '<header><strong>Reservas para llamar</strong><span class="reservation-reminder-count" role="status"></span><button type="button" class="reservation-reminder-toggle" aria-expanded="true" aria-controls="reservationReminderItems" aria-label="Minimizar recordatorios">−</button></header><div id="reservationReminderItems" class="reservation-reminder-items"></div>';
     dock.addEventListener('click', event => {
+      const toggle = event.target.closest('.reservation-reminder-toggle');
+      if (toggle) {
+        minimized = !minimized;
+        dock.querySelector('.reservation-reminder-items').hidden = minimized;
+        toggle.setAttribute('aria-expanded', String(!minimized));
+        toggle.setAttribute('aria-label', minimized ? 'Mostrar recordatorios' : 'Minimizar recordatorios');
+        toggle.textContent = minimized ? '+' : '−';
+        return;
+      }
       const button = event.target.closest('[data-reservation-reminder]');
       if (!button) return;
       const reservation = reservations.find(item => reservationReminderKey(item) === button.dataset.reservationReminder);

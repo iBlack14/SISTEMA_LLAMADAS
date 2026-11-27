@@ -38,6 +38,16 @@ body:has(#voiceView:not([hidden])) #statusText { color: #796c81 !important; }
 #voiceView .voice-table-scroll td { color: #35233f; border-color: #eee7f0; }
 #voiceView .voice-table-scroll tr:hover { background: #f8f5fa; }
 #voiceView .voice-table-scroll tr.is-playing { background: #f1e9f5; }
+#voiceView .voice-table-scroll :is(.voice-contact-copy strong, .voice-cell-stack, .voice-duration strong) { color: #35233f !important; }
+#voiceView .voice-table-scroll :is(.voice-contact-copy small, .voice-cell-stack small, .voice-duration span) { color: #796c81 !important; }
+#voiceView .voice-avatar { background: #f1e9f5; color: #79258e !important; }
+#voiceView .voice-badge.is-success { background: #e5f4ea; border-color: #b8dfc5; color: #167846 !important; }
+#voiceView .voice-badge.is-warn { background: #fff5df; border-color: #e8d2a1; color: #986100 !important; }
+#voiceView .voice-badge.is-neutral { background: #f8f5fa; border-color: #e8dfec; color: #594660 !important; }
+#voiceView .voice-action.voice-play { background: #f1e9f5 !important; border-color: #d6bfdf !important; color: #79258e !important; }
+#voiceView .voice-action.voice-play:hover:not(:disabled) { background: #e8daed !important; border-color: #b58ac1 !important; color: #611b73 !important; }
+#voiceView .voice-action.voice-delete { background: #fff1f3 !important; border-color: #eac6cd !important; color: #ad3045 !important; }
+#voiceView .voice-action.voice-delete:hover:not(:disabled) { background: #fce0e5 !important; border-color: #d68a99 !important; color: #852d41 !important; }
 #voiceView :is(button, input, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
 #voiceView .voice-filters { grid-template-columns: repeat(4, minmax(135px, 1fr)) auto auto; }
 #voiceView .voice-more-filters { align-self: end; }

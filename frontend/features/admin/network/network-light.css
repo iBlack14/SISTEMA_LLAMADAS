@@ -1,4 +1,6 @@
 /* Núcleo de red: misma paleta que Reserva de contacto. */
+#networkView { width: 100%; max-width: 1500px; margin: 0 auto; padding: 28px 24px 56px; box-sizing: border-box; }
+@media (max-width: 700px) { #networkView { padding: 20px 16px 40px; } }
 body:has(#networkView:not([hidden])) {
   color-scheme: light;
   --bg: #f5f1f8;

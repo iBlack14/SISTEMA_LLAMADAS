@@ -181,9 +181,13 @@ body:has(#reservationsView:not([hidden])) #statusText { color: #796c81 !importan
 #quoteModal .quote-reminder-hint { margin: 0 0 18px; padding: 10px 12px; background: var(--res-soft); border-radius: 9px; color: var(--res-muted) !important; font-size: 12px; line-height: 1.5; }
 #reservationReminderDock[hidden] { display: none !important; }
 #reservationReminderDock { position: fixed; z-index: 850; right: 20px; bottom: 20px; width: min(380px, calc(100vw - 32px)); max-height: 55dvh; overflow: auto; box-sizing: border-box; border: 1px solid #cb74df; border-radius: 15px; background: #2d103e; color: #fff; box-shadow: 0 12px 45px #16052470; font-family: 'Outfit', sans-serif; }
-#reservationReminderDock header { display: flex; justify-content: space-between; gap: 12px; padding: 15px; border-bottom: 1px solid #ffffff25; }
+#reservationReminderDock header { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 15px; border-bottom: 1px solid #ffffff25; }
 #reservationReminderDock header strong { color: #fff; font-size: 15px; }
 #reservationReminderDock header span { color: #dfc9e9; font-size: 12px; }
+#reservationReminderDock header strong { flex: 1; min-width: 0; }
+#reservationReminderDock .reservation-reminder-items[hidden] { display: none; }
+#reservationReminderDock header .reservation-reminder-toggle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; font-size: 20px; line-height: 1; }
+@media (max-width: 480px) { #reservationReminderDock { right: 12px; bottom: 12px; width: min(380px, calc(100% - 24px)); max-height: 45dvh; } }
 #reservationReminderDock article { padding: 14px 15px; border-bottom: 1px solid #ffffff16; }
 #reservationReminderDock article > strong { display: block; font-size: 14px; color: #fff; overflow-wrap: anywhere; }
 #reservationReminderDock article > p { font-size: 12px; color: #ddc4e8; margin: 6px 0 10px; }

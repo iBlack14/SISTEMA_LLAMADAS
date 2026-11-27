@@ -3,7 +3,7 @@ import { showPanelView } from '../../app/navigation/panel-navigation.js';
 import { apiFetch, currentUser } from '../auth/auth-session.js';
 import { dashboardSessionKeys } from '../workspace/dashboard-session.js';
 import { limaToday, reservationMonth, reservationYear, reservationsInScope, shiftReservationMonth } from './reservation-calendar.js';
-import { createReservationReminders } from './reservation-reminders.js';
+import { createReservationReminders } from './reservation-reminders.js?v=20261127-toggle';
 
 let reservationsState = {
   reservations: [],
