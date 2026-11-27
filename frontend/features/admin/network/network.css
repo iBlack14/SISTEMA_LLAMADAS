@@ -1059,7 +1059,8 @@ td small {
   transition: all 0.18s ease;
 }
 
-.equipment-position .button.equipment-number-btn {
+.equipment-position .button.equipment-number-btn,
+.equipment-position .button.equipment-list-btn {
   width: 100%;
   min-width: 0;
   min-height: 28px;
@@ -2680,3 +2681,23 @@ footer {
 .card-list-select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #9251ae; border-radius: 8px; background: #230833; color: #fff; }
 .card-list-form p, .card-list-feedback { font-size: 13px; line-height: 1.5; }
 .card-list-select:focus-visible { outline: 2px solid #ff87e3; outline-offset: 2px; }
+
+.equipment-action-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 26px; overflow: auto; color: #f9f0ff; background: #2b103c; border: 1px solid #a75bb8; border-radius: 20px; box-shadow: 0 24px 80px #10031ac0; }
+.equipment-action-dialog::backdrop { background: #10051cb8; backdrop-filter: blur(5px); }
+.equipment-action-dialog form { margin: 0; }
+.equipment-action-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.equipment-dialog-kicker { font-size: 12px; color: #cfaddf; }
+.equipment-action-dialog .equipment-dialog-close { display: grid; place-items: center; width: 34px; min-height: 34px; margin: 0; padding: 0; color: #e6ceed; background: #ffffff0d; border: 1px solid #ffffff20; border-radius: 10px; font: inherit; font-size: 24px; cursor: pointer; }
+.equipment-action-dialog h2 { margin: 18px 0 12px; color: #fff; font-size: 23px; line-height: 1.25; }
+.equipment-dialog-device { display: inline-block; margin: 0 0 8px; padding: 7px 11px; background: #ffffff09; border: 1px solid #9568a750; border-radius: 8px; color: #ecd5f4; font-size: 13px; }
+.equipment-action-dialog #equipmentActionDescription { color: #d3bddf; font-size: 14px; line-height: 1.65; margin: 8px 0 22px; }
+.equipment-dialog-field { display: grid; gap: 8px; margin: 0 0 22px; color: #eddef5; font-size: 13px; }
+.equipment-dialog-field[hidden] { display: none; }
+.equipment-dialog-field input { width: 100%; box-sizing: border-box; padding: 12px; color: #fff; background: #1e092d; border: 1px solid #9763af; border-radius: 10px; font: inherit; font-size: 17px; }
+.equipment-dialog-field small { color: #c4a8d3; }
+.equipment-action-dialog footer { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.equipment-action-dialog footer .button { min-height: 42px; padding: 10px 15px; margin: 0; font-size: 13px; border-radius: 10px; text-transform: none; }
+.equipment-action-dialog footer .equipment-dialog-cancel { color: #eadcf4; background: #ffffff0a !important; border: 1px solid #a87ab6; }
+.equipment-action-dialog footer .equipment-dialog-confirm { color: #fff; background: #d100b1; border: 1px solid #f369d6; }
+.equipment-action-dialog :is(button, input):focus-visible { outline: 2px solid #fface9; outline-offset: 3px; }
+@media (max-width: 480px) { .equipment-action-dialog { padding: 20px; } .equipment-action-dialog footer .button { flex: 1 1 100%; } }

@@ -473,7 +473,7 @@ class BridgeService : Service() {
             mainHandler.post {
                 if (client !== socket) return@post
                 if (currentPhoneNumber.isBlank() && !isActuallyInCall()) {
-                    currentPhoneNumber = workerState.optString("currentNumber")
+                    currentPhoneNumber = workerState.optString("phoneNumber")
                 }
             }
         }
@@ -540,6 +540,9 @@ class BridgeService : Service() {
             val receivedAtElapsedMs = SystemClock.elapsedRealtime()
             val receivedCommandId = data.optString("commandId")
             val receivedAction = data.optString("action")
+            if (receivedAction == "dial") {
+                emitCallTrace("apk_socket_received", receivedCommandId, data.optString("callId"))
+            }
             if (receivedAction == "dial" && receivedCommandId.startsWith("campaign-")) {
                 emitCommandReceived(receivedCommandId, receivedAction)
             }
@@ -552,7 +555,7 @@ class BridgeService : Service() {
               val action = data.optString("action")
               val callId = data.optString("callId")
               Log.i(TAG, "[CALL_ACTION] received action=$action command=${commandId.takeLast(8)} call=${callId.takeLast(8)} mainQueueMs=${SystemClock.elapsedRealtime() - receivedAtElapsedMs}")
-              if (action == "dial") emitCallTrace("apk_received", commandId, callId)
+              if (action == "dial") emitCallTrace("apk_received", commandId, callId, mainQueueMs = SystemClock.elapsedRealtime() - receivedAtElapsedMs)
               when (action) {
                 "dial"   -> {
                     val phoneNumber = data.optString("phoneNumber")
@@ -1379,8 +1382,8 @@ class BridgeService : Service() {
                 }
                 // While in a campaign call, also report "still on the call" so the
                 // server watchdog can tell a live call from a frozen one.
-                if (lastCallState == "in_call") {
-                    emitPhoneStatus("in_call", source = "heartbeat", correlateCampaign = true, force = true)
+                if (lastCallState == "in_call" || (activeCommandId.isNotBlank() && lastCallState in setOf("dialing", "ringing", "idle", "ended", "failed"))) {
+                    emitPhoneStatus(lastCallState, source = "heartbeat", correlateCampaign = activeCommandId.isNotBlank(), force = true)
                 }
                 val sentAt = System.currentTimeMillis()
                 client.emit("phone:detector_status", JSONObject().put("state", VoicemailDetector.dashboardState()))
@@ -1487,7 +1490,7 @@ class BridgeService : Service() {
         )
     }
 
-    private fun emitCallTrace(stage: String, commandId: String, callId: String, detail: String = "") {
+    private fun emitCallTrace(stage: String, commandId: String, callId: String, detail: String = "", mainQueueMs: Long? = null) {
         val currentSocket = socket ?: return
         if (!currentSocket.connected()) return
         val payload = JSONObject()
@@ -1495,6 +1498,7 @@ class BridgeService : Service() {
             .put("commandId", commandId.takeLast(96))
             .put("callId", callId.takeLast(96))
         if (detail.isNotBlank()) payload.put("detail", detail)
+        if (mainQueueMs != null) payload.put("mainQueueMs", mainQueueMs)
         currentSocket.emit("phone:call_trace", payload)
     }
 

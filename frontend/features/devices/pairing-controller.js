@@ -26,96 +26,20 @@ function preserveSlotToken(slot) {
 }
 
 function renderPairingSlotsUi(slots) {
-  const listAssignmentBySlotId = new Map(dashboardActions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
-  const workers = Array.isArray(dashboardState.latestSessionState?.phoneWorkers) ? dashboardState.latestSessionState.phoneWorkers : [];
-  const selectableListNames = (Contacts.lists || []).filter((name) =>
-    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
-  );
-
-  const renderedSlots = slots.map((slot, index) => {
-    const slotDisplayLabel = `EQUIPO ${index + 1}`;
-    const assigned = Boolean(slot.deviceId);
-    const qrUrl = assigned ? "" : (dashboardState.pairQrCache?.get(pairingQrCacheKey(slot)) || "");
-    const activeWorkerList = slot.deviceId
-      ? (dashboardState.campaignState?.contacts || []).find((contact) =>
-          contact.targetWorkerId === slot.deviceId && !["completed", "failed", "awaiting_callback"].includes(contact.status)
-        )?.list
-      : "";
-    const assignedList = activeWorkerList || listAssignmentBySlotId.get(slot.id)?.listName || "";
-    const optionList = Array.from(new Set([...selectableListNames, ...(assignedList ? [assignedList] : [])]));
-    const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
-    const connected = Boolean(worker?.connected);
-    const callState = String(worker?.callState || "idle");
-    const calling = Boolean(connected && ["dialing", "ringing", "in_call"].includes(callState));
-    const ringing = ["dialing", "ringing"].includes(callState);
-    const answered = callState === "in_call";
-    const ended = Boolean(worker && ["ended", "failed"].includes(callState));
-    const heldContact = (dashboardState.campaignState?.contacts || []).find((contact) =>
-      contact.targetWorkerId === slot.deviceId && contact.status === "held"
-    );
-    const statusIcon = ringing
-      ? { src: "/features/calls/assets/call-status/timbrando.png", label: "Timbrando", effect: "is-vibrating" }
-      : answered
-        ? { src: "/features/calls/assets/call-status/contesto.png", label: "Llamada contestada", effect: "is-pulsing" }
-        : ended || heldContact
-          ? { src: "/features/calls/assets/call-status/rechazado.png", label: "Llamada rechazada o finalizada", effect: "is-rejected" }
-          : null;
-
-    return `
-      <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}" data-slot-id="${dashboardActions.escHtml(slot.id)}">
-        <div class="pairing-slot-top">
-          <strong>${slotDisplayLabel}</strong>
-          <span class="pairing-slot-state">${assigned ? (connected ? "Conectado" : "Desconectado") : "Disponible"}</span>
-        </div>
-        ${assigned
-          ? `<div class="pairing-slot-linked-box">
-               <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
-               <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
-               <small class="pairing-slot-linked-sub">${dashboardActions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${dashboardActions.escHtml(shortDeviceId(slot.deviceId))}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
-             </div>`
-          : (qrUrl
-              ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
-              : `<div class="pairing-slot-qr-loading">Cargando código QR...</div>`
-            )
-        }
-        <div class="pairing-slot-details">
-          <span>Teléfono</span>
-          <strong>${assigned ? dashboardActions.escHtml(slot.deviceName || "Teléfono vinculado") : "Sin vincular"}</strong>
-        </div>
-        ${assigned
-          ? `<label class="pairing-slot-list-field">
-               <span>Lista asignada</span>
-               <select class="pairing-slot-list-select" data-slot-list-select="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" data-current-list="${dashboardActions.escHtml(assignedList)}" aria-label="Lista asignada a ${slotDisplayLabel}">
-                 <option value="">Sin lista</option>
-                 ${optionList.map((name) => `<option value="${dashboardActions.escHtml(name)}"${name === assignedList ? " selected" : ""}>${dashboardActions.escHtml(name)}</option>`).join("")}
-               </select>
-             </label>`
-          : `<div class="pairing-slot-list-field"><span>Lista asignada</span><strong class="pairing-slot-list-empty">Sin vincular</strong></div>`}
-        <div class="pairing-slot-current-call ${ringing ? "is-ringing" : answered ? "is-answered" : ended || heldContact ? "is-ended" : ""}">
-          <span>${ringing ? "Teléfono timbrando" : answered ? "Llamada contestada" : heldContact ? "Llamada detenida" : ended ? "Llamada finalizada" : "Estado de llamada"}</span>
-          <div class="pairing-call-number-row">
-            <strong class="pairing-call-number">${calling || ended ? dashboardActions.escHtml(worker.phoneNumber || "Sin número") : heldContact ? dashboardActions.escHtml(heldContact.phone || "") : "Esperando llamada"}</strong>
-            ${statusIcon ? `<img class="pairing-call-status-icon ${statusIcon.effect}" src="${statusIcon.src}" alt="${statusIcon.label}" />` : ""}
-          </div>
-          <small class="pairing-call-company">${calling || ended ? dashboardActions.escHtml(worker.companyName || "Empresa") : heldContact ? dashboardActions.escHtml(heldContact.name || "Empresa") : ""}</small>
-        </div>
-        <div class="pairing-slot-call-actions">
-          <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" ${connected && assignedList && !calling ? "" : "disabled"}>▶ Iniciar llamada</button>
-          <button type="button" class="pairing-slot-stop" data-stop-pairing-slot="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>■ Detener</button>
-          <button type="button" class="pairing-slot-hangup" data-hangup-pairing-slot="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>☎ Colgar</button>
-        </div>
-        <button type="button" class="pairing-slot-skip-list" data-skip-list-slot="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" data-current-list="${dashboardActions.escHtml(assignedList)}" ${connected && assignedList ? "" : "disabled"}>SALTAR LISTA</button>
-        ${assigned ? `<button type="button" class="pairing-slot-disconnect" data-disconnect-pairing-slot="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || "")}" data-worker-name="${dashboardActions.escHtml(slot.deviceName || "Teléfono vinculado")}">Desvincular teléfono</button>` : ""}
-        ${assigned ? "" : `<button type="button" class="pairing-slot-delete" data-delete-pairing-slot="${dashboardActions.escHtml(slot.id)}" data-slot-label="${slotDisplayLabel}">Eliminar QR</button>`}
-      </article>`;
-  });
-
-  if (refs.pairingSlotsEl) {
-    refs.pairingSlotsEl.innerHTML = renderedSlots.length
-      ? renderedSlots.join("")
-      : `<div class="campaign-list-empty">No hay códigos QR disponibles.</div>`;
-  }
+  if (!refs.pairingSlotsEl) return;
+  const focus = document.activeElement;
+  const focusedSlot = refs.pairingSlotsEl.contains(focus) ? focus?.dataset.slotListSelect : null;
+  const openMenus = new Set([...refs.pairingSlotsEl.querySelectorAll('.call-equipment-more[open]')].map(el => el.closest('[data-slot-id]').dataset.slotId));
+  refs.pairingSlotsEl.innerHTML = slots.map((slot, index) => renderSingleSlot(slot, index, dashboardState, dashboardActions)).join("")
+    || '<div class="campaign-list-empty">Pulsa «Vincular equipo» para crear un QR.</div>';
   dashboardState.pairingSlotsSnapshot = slots;
+  for (const card of refs.pairingSlotsEl.querySelectorAll('[data-slot-id]')) {
+    if (openMenus.has(card.dataset.slotId)) card.querySelector('.call-equipment-more')?.setAttribute('open', '');
+  }
+  if (focusedSlot) {
+    [...refs.pairingSlotsEl.querySelectorAll('[data-slot-list-select]')]
+      .find(select => select.dataset.slotListSelect === focusedSlot && !select.disabled)?.focus({ preventScroll: true });
+  }
   dashboardActions.renderAssignedListsPanel();
 }
 
@@ -165,154 +89,36 @@ function renderPairingSlotsOnly() {
 }
 
 function renderPairingSlotsGranular(newSlots) {
-  const container = refs.pairingSlotsEl;
-  if (!container) return;
-
-  // El placeholder inicial o un diff desincronizado deja tarjetas duplicadas.
-  // Si el DOM no coincide con los slots esperados, se regenera el contenedor completo.
-  const domIds = [...container.querySelectorAll("[data-slot-id]")].map((el) => el.dataset.slotId);
-  const expectedIds = newSlots.map((slot) => slot.id);
-  if (container.querySelector(".campaign-list-empty") ||
-      domIds.length !== expectedIds.length ||
-      domIds.some((id, index) => id !== expectedIds[index])) {
-    renderPairingSlotsUi(newSlots);
-    return;
-  }
-
-  const oldSlots = dashboardState.pairingSlotsSnapshot || [];
-  const oldSlotMap = new Map(oldSlots.map((slot, idx) => [slot.id, { slot, idx }]));
-  const newSlotMap = new Map(newSlots.map((slot, idx) => [slot.id, { slot, idx }]));
-
-  // Determine which slots need updates
-  const allSlotIds = new Set([...oldSlotMap.keys(), ...newSlotMap.keys()]);
-
-  for (const slotId of allSlotIds) {
-    const oldEntry = oldSlotMap.get(slotId);
-    const newEntry = newSlotMap.get(slotId);
-
-    if (!oldEntry) {
-      // New slot added - insert at correct position
-      const newSlotHtml = renderSingleSlot(newEntry.slot, newEntry.idx, dashboardState, dashboardActions);
-      if (newEntry.idx === 0) {
-        container.insertAdjacentHTML('afterbegin', newSlotHtml);
-      } else {
-        const prevSlot = newSlots[newEntry.idx - 1];
-        const prevEl = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(prevSlot.id)}"]`);
-        if (prevEl) {
-          prevEl.insertAdjacentHTML('afterend', newSlotHtml);
-        } else {
-          container.insertAdjacentHTML('beforeend', newSlotHtml);
-        }
-      }
-    } else if (!newEntry) {
-      // Slot removed
-      const el = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(slotId)}"]`);
-      if (el) el.remove();
-    } else {
-      // Slot exists - check if content changed
-      const oldSlot = oldEntry.slot;
-      const newSlot = newEntry.slot;
-      if (slotsChanged(oldSlot, newSlot)) {
-        const newSlotHtml = renderSingleSlot(newSlot, newEntry.idx, dashboardState, dashboardActions);
-        const el = container.querySelector(`[data-slot-id="${dashboardActions.escHtml(slotId)}"]`);
-        if (el) el.outerHTML = newSlotHtml;
-      }
-    }
-  }
-
-  dashboardState.pairingSlotsSnapshot = newSlots;
-  dashboardActions.renderAssignedListsPanel();
-}
-
-function slotsChanged(oldSlot, newSlot) {
-  return oldSlot.deviceId !== newSlot.deviceId ||
-    oldSlot.deviceName !== newSlot.deviceName ||
-    oldSlot.token !== newSlot.token ||
-    oldSlot.linkedAt !== newSlot.linkedAt;
+  renderPairingSlotsUi(newSlots);
 }
 
 function renderSingleSlot(slot, index, state, actions) {
-  const listAssignmentBySlotId = new Map(actions.getPairingListAssignments().map((assignment) => [assignment.slot.id, assignment]));
-  const workers = Array.isArray(state.latestSessionState?.phoneWorkers) ? state.latestSessionState.phoneWorkers : [];
-  const selectableListNames = (Contacts.lists || []).filter((name) =>
-    name && (name !== "Principal" || Contacts.contacts.some((contact) => (contact.list || "Principal") === "Principal"))
-  );
-
-  const slotDisplayLabel = `EQUIPO ${index + 1}`;
+  const esc = actions.escHtml;
+  const worker = (state.latestSessionState?.phoneWorkers || []).find(w => String(w.id) === String(slot.deviceId));
   const assigned = Boolean(slot.deviceId);
-  const qrUrl = assigned ? "" : (state.pairQrCache?.get(pairingQrCacheKey(slot)) || "");
-  const activeWorkerList = slot.deviceId
-    ? (state.campaignState?.contacts || []).find((contact) =>
-        contact.targetWorkerId === slot.deviceId && !["completed", "failed", "awaiting_callback"].includes(contact.status)
-      )?.list
-    : "";
-  const assignedList = activeWorkerList || listAssignmentBySlotId.get(slot.id)?.listName || "";
-  const optionList = Array.from(new Set([...selectableListNames, ...(assignedList ? [assignedList] : [])]));
-  const worker = workers.find((item) => String(item.id) === String(slot.deviceId));
   const connected = Boolean(worker?.connected);
-  const callState = String(worker?.callState || "idle");
-  const calling = Boolean(connected && ["dialing", "ringing", "in_call"].includes(callState));
-  const ringing = ["dialing", "ringing"].includes(callState);
-  const answered = callState === "in_call";
-  const ended = Boolean(worker && ["ended", "failed"].includes(callState));
-  const heldContact = (state.campaignState?.contacts || []).find((contact) =>
-    contact.targetWorkerId === slot.deviceId && contact.status === "held"
-  );
-  const statusIcon = ringing
-    ? { src: "/features/calls/assets/call-status/timbrando.png", label: "Timbrando", effect: "is-vibrating" }
-    : answered
-      ? { src: "/features/calls/assets/call-status/contesto.png", label: "Llamada contestada", effect: "is-pulsing" }
-      : ended || heldContact
-        ? { src: "/features/calls/assets/call-status/rechazado.png", label: "Llamada rechazada o finalizada", effect: "is-rejected" }
-        : null;
-
-  return `
-    <article class="pairing-slot-card ${assigned ? "is-assigned" : ""}" data-slot-id="${actions.escHtml(slot.id)}">
-      <div class="pairing-slot-top">
-        <strong>${slotDisplayLabel}</strong>
-        <span class="pairing-slot-state">${assigned ? (connected ? "Conectado" : "Desconectado") : "Disponible"}</span>
-      </div>
-      ${assigned
-        ? `<div class="pairing-slot-linked-box">
-             <span class="pairing-slot-linked-icon">${connected ? "📱" : "📵"}</span>
-             <strong class="pairing-slot-linked-title">${connected ? "Teléfono conectado" : "Teléfono desconectado"}</strong>
-             <small class="pairing-slot-linked-sub">${actions.escHtml(slot.deviceName || "Vinculado")}</small><small class="pairing-slot-linked-sub">ID: ${actions.escHtml(slot.deviceId || "—")}</small><small class="pairing-slot-linked-sub">${connected ? ({ready: "Detector de buzón listo", disabled: "Detector de buzón desactivado", preparing: "Preparando detector de buzón"}[worker?.detectorState] || "Detector sin información") : "Detector sin conexión"}</small>
-           </div>`
-        : (qrUrl
-            ? `<img class="pairing-slot-qr" src="${qrUrl}" alt="QR independiente para ${slotDisplayLabel}" />`
-            : `<div class="pairing-slot-qr-loading">Cargando código QR...</div>`
-          )
-      }
-      <div class="pairing-slot-details">
-        <span>Teléfono</span>
-        <strong>${assigned ? actions.escHtml(slot.deviceName || "Teléfono vinculado") : "Sin vincular"}</strong>
-      </div>
-      ${assigned
-        ? `<label class="pairing-slot-list-field">
-             <span>Lista asignada</span>
-             <select class="pairing-slot-list-select" data-slot-list-select="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-current-list="${actions.escHtml(assignedList)}" aria-label="Lista asignada a ${slotDisplayLabel}">
-               <option value="">Sin lista</option>
-               ${optionList.map((name) => `<option value="${actions.escHtml(name)}"${name === assignedList ? " selected" : ""}>${actions.escHtml(name)}</option>`).join("")}
-             </select>
-           </label>`
-        : `<div class="pairing-slot-list-field"><span>Lista asignada</span><strong class="pairing-slot-list-empty">Sin vincular</strong></div>`}
-      <div class="pairing-slot-current-call ${ringing ? "is-ringing" : answered ? "is-answered" : ended || heldContact ? "is-ended" : ""}">
-        <span>${ringing ? "Teléfono timbrando" : answered ? "Llamada contestada" : heldContact ? "Llamada detenida" : ended ? "Llamada finalizada" : "Estado de llamada"}</span>
-        <div class="pairing-call-number-row">
-          <strong class="pairing-call-number">${calling || ended ? actions.escHtml(worker.phoneNumber || "Sin número") : heldContact ? actions.escHtml(heldContact.phone || "") : "Esperando llamada"}</strong>
-          ${statusIcon ? `<img class="pairing-call-status-icon ${statusIcon.effect}" src="${statusIcon.src}" alt="${statusIcon.label}" />` : ""}
-        </div>
-        <small class="pairing-call-company">${calling || ended ? actions.escHtml(worker.companyName || "Empresa") : heldContact ? actions.escHtml(heldContact.name || "Empresa") : ""}</small>
-      </div>
-      <div class="pairing-slot-call-actions">
-        <button type="button" class="pairing-slot-independent" data-independent-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${connected && assignedList && !calling ? "" : "disabled"}>▶ Iniciar llamada</button>
-        <button type="button" class="pairing-slot-stop" data-stop-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>■ Detener</button>
-        <button type="button" class="pairing-slot-hangup" data-hangup-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" ${calling ? "" : "disabled"}>☎ Colgar</button>
-      </div>
-      <button type="button" class="pairing-slot-skip-list" data-skip-list-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-current-list="${actions.escHtml(assignedList)}" ${connected && assignedList ? "" : "disabled"}>SALTAR LISTA</button>
-      ${assigned ? `<button type="button" class="pairing-slot-disconnect" data-disconnect-pairing-slot="${actions.escHtml(slot.id)}" data-worker-id="${actions.escHtml(slot.deviceId || "")}" data-worker-name="${actions.escHtml(slot.deviceName || "Teléfono vinculado")}">Desvincular teléfono</button>` : ""}
-      ${assigned ? "" : `<button type="button" class="pairing-slot-delete" data-delete-pairing-slot="${actions.escHtml(slot.id)}" data-slot-label="${slotDisplayLabel}">Eliminar QR</button>`}
-    </article>`;
+  const busy = connected && ["dialing", "ringing", "in_call"].includes(worker?.callState);
+  const answered = worker?.callState === "in_call";
+  const paused = worker?.paused || state.campaignState?.pausedWorkerIds?.includes(slot.deviceId);
+  const assignment = actions.getPairingListAssignments().find(item => item.slot.id === slot.id);
+  const list = assignment?.listName || "";
+  const options = (Contacts.lists || []).filter(name => Contacts.contacts.some(c => (c.list || "Principal") === name));
+  if (list && !options.includes(list)) options.push(list);
+  const active = (state.campaignState?.contacts || []).find(c => c.assignedWorkerId === slot.deviceId && ["dialing", "ringing", "in_call"].includes(c.status));
+  const pending = Contacts.contacts.filter(c => (c.list || "Principal") === list && !c.attempts && !actions.contactAnnualBlock(c)).length;
+  const label = !assigned ? "Sin vincular" : !connected ? "Desconectado" : busy ? (answered ? "En llamada" : "Marcando") : paused ? "Detenido" : !list ? "Sin lista" : pending ? "Disponible" : "Sin contactos pendientes";
+  const tone = !connected ? "offline" : busy ? (answered ? "active" : "dialing") : "ready";
+  const qr = state.pairQrCache?.get(pairingQrCacheKey(slot));
+  const workerId = esc(slot.deviceId || "");
+  const slotId = esc(slot.id);
+  return `<article class="pairing-slot-card call-equipment-card ${assigned ? "is-assigned" : ""}" data-slot-id="${slotId}" data-tone="${tone}">
+    <div class="call-equipment-heading"><strong>Equipo ${index + 1}${assigned ? ` <small>· ID ${esc(shortDeviceId(slot.deviceId))}</small>` : ""}</strong><span class="call-connection">${connected ? "Conectado" : assigned ? "Desconectado" : "QR"}</span></div>
+    ${assigned ? `<label class="call-equipment-list">Lista<select data-slot-list-select="${slotId}" data-worker-id="${workerId}" data-current-list="${esc(list)}" aria-label="Lista del equipo ${index + 1}" ${busy ? "disabled" : ""}><option value="">Sin lista</option>${options.map(name => `<option value="${esc(name)}" ${name === list ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label>
+    <div class="call-equipment-current"><div><strong>${label}</strong><span>${busy ? esc(active?.name || worker.companyName || "Contacto") : list ? `${pending.toLocaleString("es-PE")} contactos sin llamar` : "Selecciona una lista"}</span><small>${busy ? esc(active?.phone || worker.phoneNumber || "") : esc(slot.deviceName || worker?.name || "")}</small></div>${busy ? `<strong class="call-equipment-duration" data-started-at="${esc(worker.answeredAt || active?.startedAt || "")}">${actions.formatSeconds(worker.answeredAt ? Math.max(0, Math.floor((Date.now() - Date.parse(worker.answeredAt)) / 1000)) : Number(worker.durationSeconds || 0))}</strong>` : ""}</div>
+    <div class="call-equipment-actions"><button data-independent-pairing-slot="${slotId}" data-worker-id="${workerId}" ${!connected || !list || busy ? "disabled" : ""}>Iniciar</button><button class="secondary" data-stop-pairing-slot="${slotId}" data-worker-id="${workerId}" ${!connected || paused ? "disabled" : ""}>Detener</button><button class="secondary" data-hangup-pairing-slot="${slotId}" data-worker-id="${workerId}" ${busy ? "" : "disabled"}>Colgar</button></div>
+    <details class="call-equipment-more"><summary>Opciones del equipo</summary><p>${esc(({ready:"Detector de buzón listo",disabled:"Detector de buzón desactivado",preparing:"Preparando detector de buzón"})[worker?.detectorState] || "Detector sin información")}</p><button class="secondary" data-skip-list-slot="${slotId}" data-worker-id="${workerId}" data-current-list="${esc(list)}" ${connected && list ? "" : "disabled"}>Saltar lista</button><button class="secondary" data-disconnect-pairing-slot="${slotId}" data-worker-id="${workerId}" data-worker-name="${esc(slot.deviceName || "Teléfono")}">Desvincular teléfono</button></details>`
+    : `<div class="call-equipment-qr">${qr ? `<img src="${qr}" alt="QR para vincular el equipo ${index + 1}">` : "Cargando código QR…"}<p>Escanea este QR desde la APK.</p></div><button class="secondary" data-delete-pairing-slot="${slotId}" data-slot-label="Equipo ${index + 1}">Eliminar QR</button>`}
+  </article>`;
 }
 
 async function loadPairingData(code) {

@@ -258,13 +258,13 @@ async function stopIndependentWorker(workerId) {
   if (data) setStatus(`Llamada detenida${data.heldContact?.phone ? `: ${data.heldContact.phone}` : ""}. No consumió un intento.`, true);
 }
 
-async function callContactFromAssignedList(contactId, listName) {
+async function callContactFromAssignedList(contactId, listName, sourceContact = null) {
   const slot = getPairingListAssignmentByName(listName)?.slot || null;
   if (!slot?.deviceId) {
     setStatus(`La lista "${listName || "Principal"}" no tiene un equipo vinculado.`, true);
     return;
   }
-  const contact = Contacts.contacts.find((item) => item.id === contactId);
+  const contact = Contacts.contacts.find((item) => item.id === contactId) || sourceContact;
   if (!contact) return;
   const restriction = dashboardActions.contactAnnualBlock(contact);
   const manualRetry = Boolean(restriction && restriction !== "blocked" && restriction !== "permanent");

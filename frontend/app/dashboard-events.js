@@ -67,6 +67,7 @@ socket.on("state:changed", st => {
   if (contactSignature !== previousContactSignature) {
     previousContactSignature = contactSignature;
     dashboardActions.renderContacts();
+    dashboardActions.renderAssignedListsPanel();
   }
   const shiftSignature = JSON.stringify(st.shiftManagement || {});
   if (shiftSignature !== previousShiftSignature) {
@@ -83,7 +84,8 @@ socket.on("state:changed", st => {
     worker.companyName || "",
     worker.phoneNumber || "",
     Boolean(worker.speakerOn),
-    worker.detectorState || "unknown"
+    worker.detectorState || "unknown",
+    Boolean(worker.paused)
   ]));
 
   if (nextDeviceSignature !== dashboardState.pairingDeviceSignature) {
@@ -128,6 +130,7 @@ socket.on("campaign:state", st => {
   dashboardActions.syncCampaignResultsToContacts();
   dashboardActions.syncTurnPendingContacts();
   dashboardActions.renderCampaignPanel();
+  dashboardActions.renderPairingSlotsOnly();
   dashboardActions.renderContacts();
   if (pendingCampaignFinished && !dashboardState.normalCampaignResumeRequested) {
     dashboardState.pendingRecoveryRunning = false;
@@ -144,6 +147,10 @@ socket.on("campaign:state", st => {
 
 setInterval(() => {
   if ((dashboardState.latestSessionState?.phoneWorkers || []).some((worker) => worker.callState === "in_call")) dashboardActions.renderWorkersPanel();
+  for (const timer of document.querySelectorAll('#callsContent:not([hidden]) .call-equipment-duration[data-started-at]')) {
+    const started = Date.parse(timer.dataset.startedAt);
+    if (Number.isFinite(started)) timer.textContent = dashboardActions.formatSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)));
+  }
 }, 1000);
 
 socket.on("session:created", ({ code, dashboardToken: createdToken }) => {

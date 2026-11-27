@@ -60,7 +60,7 @@ export function registerCallEvents(runtime, services, socket) {
   socket.on("phone:call_trace", (payload = {}) => {
     if (socket.data.role !== "phone") return;
     const allowedStages = new Set([
-      "apk_received", "dial_started", "dial_rejected", "place_call_accepted",
+      "apk_socket_received", "apk_received", "dial_started", "dial_rejected", "place_call_accepted",
       "place_call_failed", "dial_timeout", "fallback_call_accepted"
     ]);
     const stage = String(payload.stage || "");
@@ -71,7 +71,9 @@ export function registerCallEvents(runtime, services, socket) {
     const command = String(payload.commandId || "").slice(-8);
     const call = String(payload.callId || "").slice(-8);
     const detail = /^[a-z0-9_-]{1,64}$/i.test(String(payload.detail || "")) ? String(payload.detail) : "";
-    console.info(`[CALL_TRACE] stage=${stage} session=${String(code || "").slice(-2)} worker=${String(worker?.id || "").slice(-8)} command=${command} call=${call}${detail ? ` detail=${detail}` : ""}`);
+    const mainQueueMs = Number(payload.mainQueueMs);
+    const timing = Number.isFinite(mainQueueMs) && mainQueueMs >= 0 && mainQueueMs <= 600000 ? ` mainQueueMs=${Math.round(mainQueueMs)}` : "";
+    console.info(`[CALL_TRACE] stage=${stage} session=${String(code || "").slice(-2)} worker=${String(worker?.id || "").slice(-8)} command=${command} call=${call}${detail ? ` detail=${detail}` : ""}${timing}`);
   });
 
   socket.on("call:action", ({ action, phoneNumber, companyName, contactName, imageUrl, commandId, contactId, workerId }) => {
@@ -190,26 +192,41 @@ export function registerCallEvents(runtime, services, socket) {
     const session = sessions.get(code);
     if (!session) return;
     const worker = getPhoneWorkerBySocketId(session, socket.id);
+    if (!worker) return;
+    if (!["idle", "available", "dialing", "ringing", "in_call", "ended", "failed"].includes(callState)) return;
     // Liveness for the watchdog: any phone:status (including the in_call heartbeat,
     // even if deduplicated below) proves the device is alive and on the call.
     if (worker) worker.lastStatusAt = Date.now();
     if (commandId && worker) acknowledgeDialDelivery?.(code, worker.id, commandId, callId);
 
-    // Idempotency: track processed callId+state to avoid duplicate processing
-    if (!(session.processedCallIds instanceof Set)) session.processedCallIds = new Set();
-    const idempotencyKey = `${callId}:${callState}`;
-    if (session.processedCallIds.has(idempotencyKey)) {
-      console.info("[PHONE_STATUS] duplicate-ignored", { session: String(code).slice(-2), callId: String(callId || "").slice(-8), callState });
-      socket.emit("phone:status_ack", { persisted: true, accepted: false, duplicate: true, callId: callId || "" });
+    // Only a repeated packet is a duplicate. The same physical state can carry
+    // new speaker, voicemail or terminal-confirmation information.
+    const statusSessionId = typeof payload.statusSessionId === "string" ? payload.statusSessionId.slice(0, 128) : "";
+    const statusSequence = Number(payload.statusSequence);
+    const sequenced = Boolean(statusSessionId && Number.isSafeInteger(statusSequence) && statusSequence > 0);
+    const previous = socket.data.committedPhoneStatus;
+    if (sequenced && previous?.sessionId === statusSessionId && statusSequence <= previous.sequence) {
+      socket.emit("phone:status_ack", statusSequence === previous.sequence
+        ? { ...previous.receipt, duplicate: true }
+        : { persisted: false, accepted: false, terminal: false, reason: "stale_sequence", commandId: commandId || "", contactId: contactId || "", callId: callId || "" });
       return;
     }
 
     const isExternalIncoming = Boolean(externalIncoming);
     // Independent of commands/optimistic campaign state: only an Android event is evidence.
     const currentAttemptId = worker ? getActiveAttemptId(session, worker.id) : "";
-    if (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId) network.observe(code, worker, payload);
+    if (!isExternalIncoming && callId && currentAttemptId && callId !== currentAttemptId) {
+      console.warn(`[PHONE_SYNC] stale-call session=${String(code).slice(-2)} worker=${String(worker.id).slice(-8)} state=${callState}`);
+      socket.emit("phone:status_ack", { persisted: false, accepted: false, terminal: false, reason: "stale_call", commandId: commandId || "", contactId: contactId || "", callId });
+      return;
+    }
+    const assignedContact = getContactByWorker(session, worker.id);
+    const transientIdle = !isExternalIncoming && callState === "idle" && !terminalConfirmed
+      && ["dialing", "ringing", "in_call"].includes(assignedContact?.status);
+    const effectiveState = transientIdle ? assignedContact.status : callState;
+    if (!transientIdle && (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId)) network.observe(code, worker, payload);
     if (worker) {
-      worker.callState = callState || worker.callState || "idle";
+      worker.callState = effectiveState || worker.callState || "idle";
       worker.speakerOn = Boolean(speakerOn);
       worker.connected = true;
       if (lineLabel) worker.lineLabel = String(lineLabel).trim();
@@ -222,7 +239,7 @@ export function registerCallEvents(runtime, services, socket) {
       worker.terminalConfirmed = Boolean(terminalConfirmed);
       network.notifyChanged();
     }
-    session.callState = callState || session.callState;
+    session.callState = effectiveState || session.callState;
     if (typeof phoneNumber === "string" && phoneNumber.trim()) {
       session.lastNumber = phoneNumber.trim();
     }
@@ -277,20 +294,27 @@ export function registerCallEvents(runtime, services, socket) {
       campaignContacts: campaign.contacts?.length || 0,
       note: "phone status saves the full in-memory session to MySQL"
     });
+    // Publish Android's observed state immediately. Durable receipts and dispatch
+    // of the next call still wait for the transaction below.
+    emitState(code);
+    console.info(`[PHONE_SYNC] observed session=${String(code).slice(-2)} worker=${String(worker.id).slice(-8)} state=${effectiveState} reported=${callState} sequence=${sequenced ? statusSequence : "legacy"} queueMs=${statusStartedAt - statusReceivedAt}`);
     // No successful receipt or next call until the transaction/outbox is durable.
     await historyGate.commit(code, [callId, contactId, callState, terminal].join("|"), () => {
-    // Mark the event as processed only after the state snapshot is durable.
-    session.processedCallIds.add(idempotencyKey);
     emitState(code);
     emitCampaignState(code);
-    socket.emit("phone:status_ack", {
+    const receipt = {
       persisted: true,
       accepted: Boolean(updatedContact || alreadyFinalized),
       terminal: Boolean(terminal && (updatedContact || alreadyFinalized)),
       commandId: commandId || "",
       contactId: contactId || "",
       callId: callId || ""
-    });
+    };
+    if (sequenced) socket.data.committedPhoneStatus = { sessionId: statusSessionId, sequence: statusSequence, receipt };
+    socket.emit("phone:status_ack", receipt);
+    if (statusStartedAt - statusReceivedAt > 1000 || Date.now() - statusStartedAt > 1000) {
+      console.warn(`[PHONE_SYNC] delayed session=${String(code).slice(-2)} worker=${String(worker.id).slice(-8)} state=${callState} queueMs=${statusStartedAt - statusReceivedAt} persistMs=${Date.now() - statusStartedAt}`);
+    }
     console.info("[PHONE_STATUS] committed", {
       session: String(code).slice(-2),
       workerId: worker?.id,
@@ -326,13 +350,6 @@ export function registerCallEvents(runtime, services, socket) {
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
       setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 1200);
-    }
-    // Cleanup processedCallIds for finished calls to prevent memory leak
-    if (terminal && callId && session.processedCallIds) {
-      const prefix = `${callId}:`;
-      for (const key of session.processedCallIds) {
-        if (key.startsWith(prefix)) session.processedCallIds.delete(key);
-      }
     }
     });
     }).catch(error => {

@@ -1,188 +1,91 @@
-import { refs, setStatus, setBadge, setAckBadge } from '../../shared/ui/dom.js';
+import { refs } from '../../shared/ui/dom.js';
 import * as Contacts from '../contacts/contacts-repository.js';
 
-/**
- * createAssignedLists: conserva los contratos y reglas existentes.
- * Dependencias: dashboardActions.contactActionButtons, dashboardActions.escHtml, dashboardActions.getHiddenAssignedRecords, dashboardActions.getPairingListAssignments, dashboardActions.normalizeValidPeruPhone, dashboardState.campaignState, dashboardState.pairingSlotsSnapshot.
- * Se construye una vez por dashboard.
- */
-export function createAssignedLists(dashboardState, dashboardActions) {
-const ASSIGNED_LIST_PAGE_SIZE = 100;
-function renderAssignedListsPanel() {
-  const container = refs.assignedListsPanelEl;
-  if (!container) {
-    console.warn('assignedListsPanelEl no encontrado en el DOM');
-    return;
-  }
-
-  const hiddenRecords = dashboardActions.getHiddenAssignedRecords();
-  const listAssignments = dashboardActions.getPairingListAssignments()
-    .filter(({ listName }) => !hiddenRecords.has(String(listName)));
-
-  // Obtener todas las listas disponibles
-  const contactLists = new Set(Contacts.contacts.map(contact => contact.list || "Principal"));
-  const availableLists = (Contacts.lists || []).filter(name => name && contactLists.has(name));
-
-  const history = Array.isArray(dashboardState.campaignState?.history) ? dashboardState.campaignState.history : [];
-  const latestHistoryByContact = new Map();
-  for (const entry of history) {
-    const key = String(entry.contactId || "");
-    if (!key) continue;
-    const previous = latestHistoryByContact.get(key);
-    if (!previous || Date.parse(entry.startedAt || 0) >= Date.parse(previous.startedAt || 0)) {
-      latestHistoryByContact.set(key, entry);
+// Una tabla compartida para todos los teléfonos; los filtros no alteran la campaña.
+export function createAssignedLists(state, actions) {
+  let team = "all", filter = "pending", query = "", page = 1;
+  const pageSize = 25;
+  let currentRows = [];
+  const esc = value => actions.escHtml(String(value ?? ""));
+  function renderAssignedListsPanel() {
+    const container = refs.assignedListsPanelEl;
+    if (!container) return;
+    if (!container.querySelector('.calls-contact-workspace')) {
+      container.innerHTML = `<section class="calls-contact-workspace" aria-label="Contactos de llamadas">
+        <div class="calls-table-heading"><h3>Contactos</h3><span class="calls-table-total" role="status"></span></div>
+        <div class="calls-team-tabs" role="group" aria-label="Filtrar contactos por equipo"></div>
+        <div class="calls-table-toolbar"><div class="calls-state-tabs" role="group" aria-label="Filtrar por estado"></div><label class="calls-table-search"><span>Buscar</span><input type="search" placeholder="Empresa, teléfono o lista…" aria-label="Buscar contactos de llamadas"></label></div>
+        <div class="calls-table-scroll"><table><thead><tr><th scope="col">Empresa</th><th scope="col">Teléfono</th><th scope="col">Lista</th><th scope="col">Equipo</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead><tbody></tbody></table></div>
+        <div class="calls-table-pagination"><span role="status"></span><div><button class="secondary" data-calls-page="-1">Anterior</button><button class="secondary" data-calls-page="1">Siguiente</button></div></div>
+      </section>`;
+      container.querySelector('input').addEventListener('input', event => { query = event.target.value; page = 1; renderAssignedListsPanel(); });
+      container.addEventListener('click', async event => {
+        const tab = event.target.closest('[data-calls-team]');
+        if (tab) { team = tab.dataset.callsTeam; page = 1; renderAssignedListsPanel(); }
+        const status = event.target.closest('[data-calls-state]');
+        if (status) { filter = status.dataset.callsState; page = 1; renderAssignedListsPanel(); }
+        const pager = event.target.closest('[data-calls-page]');
+        if (pager && !pager.disabled) { page += Number(pager.dataset.callsPage); renderAssignedListsPanel(); }
+        const call = event.target.closest('[data-unified-call]');
+        if (call && !call.disabled) {
+          const row = currentRows[Number(call.dataset.unifiedCall)];
+          if (!row) return;
+          call.disabled = true;
+          try { await actions.callContactFromAssignedList(row.contact.id, row.contact.list || "Principal", row.contact); }
+          finally { renderAssignedListsPanel(); }
+        }
+      });
     }
-  }
-  const campaignContactById = new Map((dashboardState.campaignState?.contacts || [])
-    .map(contact => [String(contact.id), contact]));
-  const contactsByList = new Map();
-  for (const contact of Contacts.contacts) {
-    if (!dashboardActions.normalizeValidPeruPhone(contact.phone)) continue;
-    const name = contact.list || "Principal";
-    if (!contactsByList.has(name)) contactsByList.set(name, []);
-    contactsByList.get(name).push(contact);
-  }
-
-  // Si no hay asignaciones, mostrar los slots vinculados para permitir asignar listas
-  const linkedSlots = dashboardState.pairingSlotsSnapshot.map((slot, slotIndex) => ({ slot, slotIndex }))
-    .filter(({ slot }) => Boolean(slot?.deviceId));
-
-  if (!linkedSlots.length) {
-    container.innerHTML = `<div class="assigned-lists-empty">Vincula teléfonos usando los códigos QR de arriba para asignar listas.</div>`;
     container.style.display = 'block';
-    return;
+    const slots = (state.pairingSlotsSnapshot || []).map((slot, index) => ({slot, index})).filter(({slot}) => slot.deviceId);
+    const assignments = actions.getPairingListAssignments();
+    const byList = new Map(assignments.map(item => [item.listName, item.slot]));
+    const workers = new Map((state.latestSessionState?.phoneWorkers || []).map(w => [String(w.id), w]));
+    const campaign = new Map((state.campaignState?.contacts || []).map(c => [String(c.id), c]));
+    const key = c => `${c.list || "Principal"}|${actions.normalizeValidPeruPhone(c.phone)}`;
+    const pending = actions.loadTurnPendingContacts?.() || [];
+    const pendingKeys = new Set(pending.map(key));
+    const sources = new Map();
+    for (const c of [...Contacts.contacts, ...pending]) {
+      if (!actions.normalizeValidPeruPhone(c.phone)) continue;
+      if (!sources.has(key(c))) sources.set(key(c), {...c, id:c.id || `pending:${key(c)}`});
+    }
+    for (const c of state.campaignState?.contacts || []) {
+      if (actions.normalizeValidPeruPhone(c.phone) && !sources.has(key(c))) sources.set(key(c), c);
+    }
+    const rows = [...sources.values()].map(contact => {
+      const live = campaign.get(String(contact.id));
+      const slot = byList.get(contact.list || "Principal");
+      const workerId = live?.assignedWorkerId || slot?.deviceId || live?.targetWorkerId || "";
+      const worker = workers.get(String(workerId));
+      const slotIndex = (state.pairingSlotsSnapshot || []).findIndex(s => s.deviceId === workerId);
+      const active = ["dialing", "ringing", "in_call"].includes(live?.status)
+        || (worker?.activeContactId === contact.id && ["dialing", "ringing", "in_call"].includes(worker?.callState));
+      const restriction = actions.contactAnnualBlock(contact);
+      const final = ["completed", "failed", "awaiting_callback"].includes(live?.status)
+        || Number(contact.attempts || live?.attempts || 0) > 0 || Boolean(restriction);
+      const category = active ? "active" : pendingKeys.has(key(contact)) || ["pending", "retry_pending", "held"].includes(live?.status) ? "pending" : final ? "finished" : "pending";
+      const label = active ? (live?.status === "in_call" || worker?.callState === "in_call" ? "En llamada" : "Marcando")
+        : restriction === "blocked" ? "Bloqueado" : restriction === "permanent" ? "No volver a llamar"
+        : category === "finished" ? "Finalizado" : live?.status === "held" ? "Detenido" : "Pendiente";
+      const busy = ["dialing", "ringing", "in_call"].includes(worker?.callState);
+      const canCall = Boolean(slot?.deviceId && worker?.connected && !busy && !active && restriction !== "blocked" && restriction !== "permanent");
+      return {contact, workerId, label, category, canCall, retry:Boolean(restriction && restriction !== "blocked" && restriction !== "permanent"), equipment:slotIndex >= 0 ? `Equipo ${slotIndex + 1}` : "Sin equipo"};
+    });
+    if (team !== "all" && team !== "unassigned" && !slots.some(({slot}) => slot.deviceId === team)) team = "all";
+    const teamRows = rows.filter(r => team === "all" || (team === "unassigned" ? !r.workerId : r.workerId === team));
+    const tab = (label, attr, id, selected) => `<button type="button" ${attr}="${esc(id)}" aria-pressed="${selected}" class="${selected ? "is-active" : ""}">${esc(label)}</button>`;
+    container.querySelector('.calls-team-tabs').innerHTML = tab('Todos', 'data-calls-team', 'all', team === 'all') + slots.map(({slot,index}) => tab(`Equipo ${index + 1}`, 'data-calls-team', slot.deviceId, team === slot.deviceId)).join('') + (rows.some(r => !r.workerId) ? tab('Sin equipo','data-calls-team','unassigned',team==='unassigned') : '');
+    container.querySelector('.calls-state-tabs').innerHTML = [['pending','Pendientes'],['active','En curso'],['finished','Finalizados']].map(([id,label]) => tab(`${label} · ${teamRows.filter(r => r.category === id).length.toLocaleString('es-PE')}`, 'data-calls-state', id, filter === id)).join('');
+    const needle = query.trim().toLocaleLowerCase('es');
+    const filtered = teamRows.filter(r => r.category === filter && (!needle || `${r.contact.name || ''} ${r.contact.phone} ${r.contact.list || 'Principal'}`.toLocaleLowerCase('es').includes(needle)));
+    page = Math.max(1,Math.min(page,Math.ceil(filtered.length/pageSize) || 1));
+    currentRows = filtered.slice((page-1)*pageSize,page*pageSize);
+    container.querySelector('tbody').innerHTML = currentRows.map((r,index) => `<tr><td><strong>${esc(r.contact.name || 'Sin nombre')}</strong></td><td>${esc(r.contact.phone)}</td><td>${esc(r.contact.list || 'Principal')}</td><td>${esc(r.equipment)}</td><td><span class="calls-row-status" data-state="${r.category}">${esc(r.label)}</span></td><td>${r.category === 'active' ? '<span aria-label="Controla esta llamada desde la tarjeta del equipo">—</span>' : `<button class="calls-row-call" type="button" data-unified-call="${index}" ${r.canCall ? '' : 'disabled'} title="${r.canCall ? 'Llamar desde el equipo asignado' : 'Requiere un equipo conectado y libre, y un número permitido'}">${r.retry ? 'Reintentar' : 'Llamar'}</button>`}</td></tr>`).join('') || `<tr><td colspan="6" class="calls-table-empty">${needle ? 'No hay coincidencias con tu búsqueda.' : !Contacts.contacts.length && !rows.length ? 'Importa una lista desde Rubro y lista para comenzar.' : 'No hay contactos en este filtro.'}</td></tr>`;
+    container.querySelector('.calls-table-total').textContent = `${rows.length.toLocaleString('es-PE')} contactos`;
+    container.querySelector('.calls-table-pagination span').textContent = filtered.length ? `Mostrando ${(page-1)*pageSize+1}–${Math.min(page*pageSize,filtered.length)} de ${filtered.length.toLocaleString('es-PE')} · Página ${page}` : '0 contactos';
+    container.querySelector('[data-calls-page="-1"]').disabled = page <= 1;
+    container.querySelector('[data-calls-page="1"]').disabled = page*pageSize >= filtered.length;
   }
-
-  // Si no hay listas, mostrar mensaje pero mantener las tarjetas de equipos
-  if (!availableLists.length) {
-    container.innerHTML = linkedSlots.map(({ slot, slotIndex }) => {
-      const worker = (dashboardState.latestSessionState?.phoneWorkers || []).find(w => w.id === slot.deviceId);
-      const isConnected = worker?.connected || false;
-      
-      return `
-        <article class="assigned-list-card">
-          <div class="assigned-list-head">
-            <div>
-              <span>EQUIPO ${slotIndex + 1} · ${isConnected ? '🟢 Conectado' : '⚫ Desconectado'}</span>
-              <h3>${dashboardActions.escHtml(worker?.name || slot.deviceName || `Teléfono ${slotIndex + 1}`)}</h3>
-            </div>
-          </div>
-          <div class="assigned-list-empty-state" style="padding: 30px; text-align: center; color: rgba(255,255,255,0.6);">
-            <p style="margin-bottom: 10px;">📋 No hay listas disponibles</p>
-            <p style="font-size: 13px;">Ve a "RUBRO Y LISTA" para crear listas de contactos</p>
-          </div>
-        </article>`;
-    }).join("");
-    container.style.display = 'block';
-    return;
-  }
-
-  container.innerHTML = linkedSlots.map(({ slot, slotIndex }, listIndex) => {
-    const assignment = listAssignments.find(a => a.slotIndex === slotIndex);
-    const listName = assignment?.listName || "";
-    
-    const contacts = listName ? contactsByList.get(listName) || [] : [];
-    
-    const calledIds = new Set(listName ? contacts.filter((contact) => Number(contact.attempts || 0) > 0 || latestHistoryByContact.has(String(contact.id))
-      || Number(campaignContactById.get(String(contact.id))?.attempts || 0) > 0).map(contact => String(contact.id)) : []);
-    const contactIndexById = new Map(contacts.map((contact, index) => [String(contact.id), index + 1]));
-    const pending = listName ? contacts.filter((contact) => {
-      const status = campaignContactById.get(String(contact.id))?.status || contact.campaignStatus || "";
-      return !calledIds.has(String(contact.id)) || ["pending", "retry_pending", "held"].includes(status);
-    }) : [];
-    
-    const finished = contacts.length > 0 && pending.length === 0;
-    dashboardState.assignedListPages ||= {};
-    const totalPages = Math.max(1, Math.ceil(pending.length / ASSIGNED_LIST_PAGE_SIZE));
-    const page = Math.min(totalPages, Math.max(1, Number(dashboardState.assignedListPages[slot.id] || 1)));
-    dashboardState.assignedListPages[slot.id] = page;
-    const visiblePending = pending.slice((page - 1) * ASSIGNED_LIST_PAGE_SIZE, page * ASSIGNED_LIST_PAGE_SIZE);
-    const worker = (dashboardState.latestSessionState?.phoneWorkers || []).find(w => w.id === slot.deviceId);
-    const isConnected = worker?.connected || false;
-    const isBusy = ["dialing", "ringing", "in_call"].includes(worker?.callState);
-
-    // Crear el selector de listas
-    const listOptions = availableLists.map(name => 
-      `<option value="${dashboardActions.escHtml(name)}" ${name === listName ? 'selected' : ''}>${dashboardActions.escHtml(name)}</option>`
-    ).join("");
-
-    const pendingRows = visiblePending.map((contact) => `
-      <tr>
-        <td>${contactIndexById.get(String(contact.id)) || 0}</td>
-        <td>${dashboardActions.escHtml(contact.name || "Sin nombre")}</td>
-        <td><span class="pending-contact-phone"><span>${dashboardActions.escHtml(contact.phone || "-")}</span><img src="/features/calls/assets/call-status/contacto-pendiente.png" alt="Contacto pendiente" /></span></td>
-        <td>${dashboardActions.contactActionButtons(contact, "assigned-pending")}</td>
-      </tr>`).join("");
-
-    return `
-      <article class="assigned-list-card" data-slot-id="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || '')}">
-        <div class="assigned-list-head">
-          <div>
-            <span>EQUIPO ${slotIndex + 1} · ${isConnected ? '🟢 Conectado' : '⚫ Desconectado'}</span>
-            <h3>${dashboardActions.escHtml(worker?.name || slot.deviceName || `Teléfono ${slotIndex + 1}`)}</h3>
-          </div>
-          <div class="assigned-list-head-actions">
-            <div class="list-selector-group">
-              <label for="listSelect_${slotIndex}" style="font-size: 13px; margin-right: 8px; color: rgba(255,255,255,0.7);">Lista:</label>
-              <select id="listSelect_${slotIndex}" class="list-select" data-slot-id="${dashboardActions.escHtml(slot.id)}" data-slot-index="${slotIndex}" ${!isConnected || isBusy ? 'disabled' : ''}>
-                <option value="">Seleccionar lista...</option>
-                ${listOptions}
-              </select>
-              <button type="button" class="start-worker-btn" data-slot-id="${dashboardActions.escHtml(slot.id)}" data-worker-id="${dashboardActions.escHtml(slot.deviceId || '')}" ${!listName || !isConnected || isBusy ? 'disabled' : ''}>▶ Iniciar</button>
-            </div>
-            ${finished && listName !== "Principal" ? `<button type="button" class="assigned-list-delete" data-delete-assigned-list="${dashboardActions.escHtml(listName)}">Eliminar registro</button>` : ""}
-          </div>
-        </div>
-        ${listName ? `
-        <div class="assigned-list-group">
-          <h4>Pendientes por llamar <span>${pending.length} / ${contacts.length}</span></h4>
-          <div class="assigned-list-table-wrap">
-            <table><thead><tr><th>N.º</th><th>Empresa</th><th>Teléfono</th><th>Contacto</th></tr></thead>
-            <tbody>${pendingRows || `<tr><td colspan="4" class="assigned-list-none">No quedan contactos pendientes.</td></tr>`}</tbody></table>
-            ${totalPages > 1 ? `<div class="assigned-list-pagination"><button type="button" data-assigned-page="-1" data-slot-id="${dashboardActions.escHtml(slot.id)}" ${page <= 1 ? "disabled" : ""}>Anterior</button><span>Página ${page} de ${totalPages}</span><button type="button" data-assigned-page="1" data-slot-id="${dashboardActions.escHtml(slot.id)}" ${page >= totalPages ? "disabled" : ""}>Siguiente</button></div>` : ""}
-          </div>
-        </div>
-        ` : `<div class="assigned-list-empty-state">Selecciona una lista y pulsa Iniciar</div>`}
-      </article>`;
-  }).join("");
-
-  container.style.display = 'block';
-
-  // Agregar event listeners para los selectores y botones
-  container.querySelectorAll('.list-select').forEach(select => {
-    select.addEventListener('change', async (e) => {
-      const slotId = e.target.dataset.slotId;
-      const slotIndex = Number(e.target.dataset.slotIndex);
-      const newList = e.target.value;
-      const slot = dashboardState.pairingSlotsSnapshot[slotIndex];
-      const workerId = slot?.deviceId;
-      
-      if (workerId && slotId) {
-        const currentAssignment = listAssignments.find(a => a.slotIndex === slotIndex);
-        await dashboardActions.assignWorkerList(slotId, workerId, newList, currentAssignment?.listName || "");
-      }
-    });
-  });
-
-  container.querySelectorAll('[data-assigned-page]').forEach(button => {
-    button.addEventListener('click', () => {
-      const slotId = button.dataset.slotId;
-      const step = Number(button.dataset.assignedPage || 0);
-      if (!slotId || !step) return;
-      dashboardState.assignedListPages ||= {};
-      dashboardState.assignedListPages[slotId] = Math.max(1, Number(dashboardState.assignedListPages[slotId] || 1) + step);
-      renderAssignedListsPanel();
-    });
-  });
-
-  container.querySelectorAll('.start-worker-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const workerId = e.target.dataset.workerId;
-      if (workerId) {
-        await dashboardActions.startIndependentWorker(workerId);
-      }
-    });
-  });
-}
-return { renderAssignedListsPanel };
+  return {renderAssignedListsPanel};
 }

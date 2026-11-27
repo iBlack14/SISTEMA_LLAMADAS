@@ -104,7 +104,24 @@ function createOrb(number) {
   renumber.className = "button secondary equipment-number-btn";
   renumber.textContent = "Cambiar número";
   renumber.addEventListener("click", () => changeEquipmentNumber(number, renumber, message));
-  position.append(el, reconnect, renumber, message);
+  const changeList = document.createElement("button");
+  changeList.type = "button";
+  changeList.className = "button secondary equipment-list-btn";
+  changeList.textContent = "Cambiar lista";
+  changeList.disabled = true;
+  changeList.addEventListener("click", async () => {
+    selectFilter("all");
+    filterQuery = "";
+    $("searchInput").value = "";
+    const itemIndex = orderedEquipmentSnapshot.findIndex(item => item.number === number);
+    equipmentPage = Math.max(0, Math.floor(itemIndex / EQUIPMENT_PAGE_SIZE));
+    render();
+    const card = cards.get(number);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "auto", block: "center" });
+    await openEquipmentLists(number, card);
+  });
+  position.append(el, reconnect, renumber, changeList, message);
   $("equipmentIndicators").appendChild(position);
   orbs.set(number, el);
   return el;
@@ -136,6 +153,10 @@ function renderOrb(el, number, state, name, item, live) {
   reconnect.title = !item.deviceId ? "Sin dispositivo vinculado" : !live ? "Sin conexion con el servidor"
     : item.calling || ["En llamada", "Marcando"].includes(state) ? "No disponible durante una llamada"
     : "Solicitar reconexion de este equipo";
+  const changeList = el.parentElement.querySelector(".equipment-list-btn");
+  changeList.disabled = !live || !item.deviceId || !["Disponible", "En llamada", "Marcando"].includes(state);
+  changeList.setAttribute("aria-label", `Cambiar lista del equipo ${String(number).padStart(2, "0")}`);
+  changeList.title = !item.deviceId ? "Vincula un dispositivo antes" : changeList.disabled ? "El equipo debe estar conectado" : "Detener este equipo y cambiar su lista";
 }
 function statCell(label, n) {
   return `<div><span>${label}</span><strong>${value(n)}</strong></div>`;
@@ -182,13 +203,64 @@ function createCard(number) {
   });
   return card;
 }
+function equipmentDialog({ title, description, equipment, confirmLabel, number }) {
+  if (document.querySelector(".equipment-action-dialog[open]")) return Promise.resolve(null);
+  const opener = document.activeElement;
+  const dialog = document.createElement("dialog");
+  dialog.className = "equipment-action-dialog";
+  dialog.setAttribute("aria-labelledby", "equipmentActionTitle");
+  dialog.setAttribute("aria-describedby", "equipmentActionDescription");
+  dialog.innerHTML = `<form method="dialog">
+    <header><span class="equipment-dialog-kicker">Núcleo de red</span><button type="button" class="equipment-dialog-close" aria-label="Cerrar ventana">×</button></header>
+    <h2 id="equipmentActionTitle"></h2>
+    <p class="equipment-dialog-device"></p>
+    <p id="equipmentActionDescription"></p>
+    <label class="equipment-dialog-field" hidden>Número del equipo<input type="number" min="1" max="255" step="1" required><small>Elige un número del 1 al 255.</small></label>
+    <footer><button type="button" class="button secondary equipment-dialog-cancel">Cancelar</button><button type="submit" class="button equipment-dialog-confirm" value="confirm"></button></footer>
+  </form>`;
+  dialog.querySelector("h2").textContent = title;
+  dialog.querySelector(".equipment-dialog-device").textContent = equipment;
+  dialog.querySelector("#equipmentActionDescription").textContent = description;
+  dialog.querySelector(".equipment-dialog-confirm").textContent = confirmLabel;
+  const field = dialog.querySelector("input");
+  field.disabled = number === undefined;
+  if (number !== undefined) {
+    dialog.querySelector("label").hidden = false;
+    field.value = String(number);
+  }
+  dialog.querySelector(".equipment-dialog-close").onclick = dialog.querySelector(".equipment-dialog-cancel").onclick = () => dialog.close("cancel");
+  dialog.addEventListener("click", event => {
+    if (event.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close("cancel");
+  });
+  return new Promise(resolve => {
+    dialog.addEventListener("close", () => {
+      const result = dialog.returnValue === "confirm" ? (number === undefined ? true : field.value) : null;
+      dialog.remove();
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      resolve(result);
+    }, { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    if (number === undefined) dialog.querySelector(".equipment-dialog-cancel").focus();
+    else { field.focus(); field.select(); }
+  });
+}
+
 async function openEquipmentLists(number, card) {
   const button = card.querySelector(".card-change-list");
   if (button.dataset.loading === "true") return;
   const item = snapshot?.equipment.find(item => item.number === number);
   if (!item?.deviceId) return;
-  if (!window.confirm("Para cambiar la lista se detendrá este equipo y se colgará su llamada si tiene una en curso. ¿Continuar?")) return;
   button.dataset.loading = "true";
+  const accepted = await equipmentDialog({
+    title: "Cambiar lista del equipo",
+    equipment: `Equipo ${String(number).padStart(2, "0")} · ID ${shortDeviceId(item.deviceId)}`,
+    description: "Primero detendremos este equipo. Si tiene una llamada en curso, se colgará y esperaremos la confirmación del teléfono. Después podrás seleccionar otra lista.",
+    confirmLabel: "Detener y cambiar lista"
+  });
+  if (!accepted) { delete button.dataset.loading; return; }
   const feedback = card.querySelector(".card-list-feedback");
   const form = card.querySelector(".card-list-form");
   form.hidden = true;
@@ -502,7 +574,13 @@ async function changeEquipmentNumber(number, btn, msgEl) {
     if (msgEl) { msgEl.textContent = "Vincula un dispositivo antes de cambiar su número."; msgEl.hidden = false; }
     return;
   }
-  const answer = window.prompt(`Nuevo número para el equipo con ID ${shortDeviceId(current.deviceId)} (1–255):`, String(number));
+  const answer = await equipmentDialog({
+    title: "Cambiar número del equipo",
+    equipment: `Equipo ${String(number).padStart(2, "0")} · ID ${shortDeviceId(current.deviceId)}`,
+    description: "El equipo se ordenará según el número que elijas.",
+    confirmLabel: "Guardar número",
+    number
+  });
   if (answer === null) return;
   const newNumber = Number(answer.trim());
   if (!Number.isInteger(newNumber) || newNumber < 1 || newNumber > 255) {

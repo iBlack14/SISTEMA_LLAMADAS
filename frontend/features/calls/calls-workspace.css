@@ -1,0 +1,97 @@
+/* Espacio de llamadas: controles por equipo y una tabla compartida. */
+#callsContent { --calls-surface: #2d103e; --calls-border: #ffffff24; --calls-muted: #d2bbdf; }
+#callsContent button, #callsContent select, #callsContent input { font: inherit; }
+#callsContent button { min-height: 38px; margin: 0; font-size: 13px; text-transform: none; letter-spacing: 0; }
+#callsContent button:disabled { opacity: .4; cursor: not-allowed; }
+#callsContent :is(button, select, input, summary):focus-visible { outline: 2px solid #ff9cde; outline-offset: 3px; }
+#callsContent .calls-main-toolbar { padding: 18px 20px; margin: 0 0 18px; border: 1px solid var(--calls-border); border-radius: 16px; background: var(--calls-surface); }
+#callsContent .general-call-controls { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 0; min-height: 0; }
+#callsContent .general-call-heading { text-align: left; }
+#callsContent .general-call-heading h2 { margin: 0; font-size: 28px; line-height: 1.2; color: #fff; }
+#callsContent .calls-title-line { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#callsContent .calls-shift-label { padding-left: 16px; border-left: 1px solid #9264a9; font-size: 13px; color: #d8c4e5; }
+#callsContent .general-call-heading > span { display: block; font-size: 13px; color: var(--calls-muted); margin-top: 4px; }
+#callsContent .campaign-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#callsContent .calls-global-more { position: relative; }
+#callsContent summary { cursor: pointer; color: #eddbf5; font-size: 13px; padding: 10px; }
+#callsContent .calls-global-more > div { position: absolute; z-index: 20; top: 100%; right: 0; min-width: 230px; display: grid; gap: 8px; padding: 12px; background: #351247; border: 1px solid #a06ab9; border-radius: 12px; box-shadow: 0 12px 24px #0005; }
+#callsContent .qr-block { padding: 0; border: 0; box-shadow: none; background: transparent; margin: 0 0 20px; }
+#callsContent .pairing-slots-head { display: flex; justify-content: space-between; align-items: center; text-align: left; margin-bottom: 12px; padding-inline: 0; }
+#callsContent .pairing-slots-head #addPairingQrBtn { position: static; flex-shrink: 0; transform: none; }
+#callsContent .qr-title { font-size: 18px; margin: 0; color: #fff; text-align: left; }
+#callsContent .qr-description { font-size: 12px; margin: 4px 0 0; text-align: left; color: var(--calls-muted); }
+#callsContent .pairing-slots-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+#callsContent .call-equipment-card { display: grid; gap: 14px; min-width: 0; min-height: 0; align-items: stretch; justify-content: stretch; padding: 18px; border: 1px solid #a369bd66; border-radius: 15px; background: #351348; box-shadow: none; color: #fff; text-align: left; }
+#callsContent .call-equipment-heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+#callsContent .call-equipment-heading > strong { font-size: 17px; line-height: 1.4; }
+#callsContent .call-equipment-heading small { font-size: 12px; color: var(--calls-muted); font-weight: 500; white-space: nowrap; }
+#callsContent .call-connection { border: 1px solid #65cd8580; border-radius: 20px; background: #1b542d70; color: #b0edbf; padding: 4px 8px; font-size: 11px; white-space: nowrap; }
+#callsContent [data-tone="offline"] .call-connection { color: #d8c6e3; background: #ffffff0b; border-color: #ffffff30; }
+#callsContent .call-equipment-list { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 13px; color: var(--calls-muted); }
+#callsContent .call-equipment-list select { min-width: 0; width: 100%; height: 38px; margin: 0; padding: 6px 10px; color: #fff; background: #260b37; border: 1px solid #9966ae; border-radius: 8px; }
+#callsContent .call-equipment-current { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 85px; padding: 12px; border-radius: 10px; background: #ffffff08; border-left: 3px solid #66cf92; }
+#callsContent [data-tone="dialing"] .call-equipment-current { border-left-color: #ffc64b; }
+#callsContent [data-tone="offline"] .call-equipment-current { border-left-color: #9b83af; }
+#callsContent .call-equipment-current > div { display: grid; gap: 5px; min-width: 0; }
+#callsContent .call-equipment-current strong { font-size: 18px; color: #fff; }
+#callsContent .call-equipment-current span { font-size: 14px; overflow-wrap: anywhere; }
+#callsContent .call-equipment-current small { font-size: 12px; color: var(--calls-muted); overflow-wrap: anywhere; }
+#callsContent .call-equipment-duration { font-variant-numeric: tabular-nums; }
+#callsContent .call-equipment-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+#callsContent .call-equipment-actions button { padding: 7px 8px; border-radius: 9px; }
+#callsContent .call-equipment-more { border-top: 1px solid var(--calls-border); }
+#callsContent .call-equipment-more summary { padding: 8px 0 0; font-size: 12px; }
+#callsContent .call-equipment-more p { font-size: 12px; color: var(--calls-muted); }
+#callsContent .call-equipment-more button { margin: 4px 4px 0 0; }
+#callsContent .call-equipment-qr { text-align: center; padding: 8px; }
+#callsContent .call-equipment-qr img { display: block; width: 180px; max-width: 100%; height: auto; aspect-ratio: 1; margin: 0 auto; background: #fff; padding: 8px; border-radius: 8px; }
+#callsContent .call-equipment-qr p { font-size: 12px; color: var(--calls-muted); }
+#callsContent .assigned-lists-panel { margin: 0; padding: 0; }
+#callsContent .calls-contact-workspace { border: 1px solid var(--calls-border); border-radius: 16px; background: var(--calls-surface); padding: 18px; }
+#callsContent .calls-table-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+#callsContent .calls-table-heading h3 { margin: 0; font-size: 19px; color: #fff; }
+#callsContent .calls-table-total { font-size: 12px; color: var(--calls-muted); }
+#callsContent .calls-team-tabs, #callsContent .calls-state-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+#callsContent .calls-team-tabs { padding-bottom: 12px; border-bottom: 1px solid var(--calls-border); }
+#callsContent .calls-team-tabs button, #callsContent .calls-state-tabs button { padding: 8px 14px; border: 1px solid #9764ac66; border-radius: 9px; background: #ffffff07; box-shadow: none; color: #ead9f2; }
+#callsContent button.is-active { background: #c0009f; color: #fff; border-color: #ff77df; }
+#callsContent .calls-table-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 14px 0; }
+#callsContent .calls-table-search { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 13px; color: var(--calls-muted); }
+#callsContent .calls-table-search input { width: 260px; max-width: 100%; margin: 0; padding: 10px 12px; background: #200a30; border: 1px solid #9966ae; border-radius: 9px; color: #fff; }
+#callsContent .calls-table-scroll { overflow: auto; max-height: 390px; border: 1px solid var(--calls-border); border-radius: 12px; scrollbar-color: #bd33bb #210a30; }
+#callsContent .calls-table-scroll table { width: 100%; min-width: 740px; border-collapse: collapse; table-layout: auto; margin: 0; }
+#callsContent .calls-table-scroll :is(th, td) { text-align: left; padding: 13px 14px; font-size: 13px; border-bottom: 1px solid #ffffff14; color: #f4eaf9; }
+#callsContent .calls-table-scroll th { background: #4a1b60; font-weight: 600; text-transform: none; letter-spacing: 0; }
+#callsContent .calls-table-scroll thead { position: sticky; top: 0; z-index: 1; }
+#callsContent .calls-table-scroll td:nth-child(2) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#callsContent .calls-table-scroll tbody tr:last-child td { border-bottom: 0; }
+#callsContent .calls-row-status { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+#callsContent .calls-row-status::before { content: ''; width: 7px; height: 7px; background: #baa1cc; border-radius: 50%; }
+#callsContent .calls-row-status[data-state="active"]::before { background: #56df89; }
+#callsContent .calls-row-status[data-state="finished"]::before { background: #87adc2; }
+#callsContent .calls-row-call { padding: 6px 15px; border-radius: 9px; min-height: 32px; }
+#callsContent .calls-table-empty { text-align: center; padding: 35px 15px; color: var(--calls-muted); }
+#callsContent .calls-table-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; font-size: 12px; color: var(--calls-muted); }
+#callsContent .calls-table-pagination > div { display: flex; gap: 8px; }
+#callsContent .calls-table-pagination button { padding: 7px 14px; }
+.shift-management #reportNavBtn, .shift-management #blockedNumbersOpen { display: none; }
+/* Estos cuatro contenedores sustituyen estilos anteriores del tema con !important. */
+#callsContent .calls-main-toolbar { padding: 18px 20px !important; background: var(--calls-surface) !important; border: 1px solid var(--calls-border) !important; box-shadow: none !important; overflow: visible; }
+#callsContent .call-equipment-card { background: #351348 !important; border-color: #a369bd66 !important; box-shadow: none !important; }
+#callsContent .qr-block { background: transparent !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0 !important; min-height: 0; }
+#callsContent .pairing-slots-head :is(.qr-title, .qr-description) { text-transform: none; }
+#callsContent .pairing-slots-head .qr-description { text-align: left !important; margin-left: 0 !important; }
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button { background: #ffffff09 !important; border-color: #a679bc66 !important; }
+#callsContent :is(.calls-team-tabs, .calls-state-tabs) button.is-active { background: #c0009f !important; border-color: #ff77df !important; }
+#callsContent .call-equipment-actions .secondary, #callsContent .campaign-actions > .secondary { background: #ffffff0b !important; border: 1px solid #ad88bd !important; box-shadow: none !important; }
+@media (max-width: 1200px) { #callsContent .pairing-slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  #callsContent .pairing-slots-grid { grid-template-columns: 1fr; }
+  #callsContent .general-call-controls { align-items: flex-start; flex-direction: column; }
+  #callsContent .calls-table-toolbar { align-items: stretch; flex-direction: column; }
+  #callsContent .calls-table-search input { flex: 1; width: auto; min-width: 0; }
+  #callsContent .calls-contact-workspace { padding: 12px; }
+  #callsContent .call-equipment-card { padding: 15px; }
+  #callsContent .pairing-slots-head { flex-direction: row; padding-bottom: 0; align-items: center; gap: 8px; }
+  #callsContent .pairing-slots-head .qr-description { display: none; }
+}

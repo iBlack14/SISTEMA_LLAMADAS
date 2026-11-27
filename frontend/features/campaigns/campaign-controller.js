@@ -48,7 +48,7 @@ function renderCampaignPanel() {
       refs.campaignStartHint.hidden = !refs.campaignStartBtn.title;
     }
   }
-  if (refs.campaignStartBtn) refs.campaignStartBtn.textContent = "▶ Iniciar llamada general";
+  if (refs.campaignStartBtn) refs.campaignStartBtn.textContent = "Iniciar todos";
   if (refs.pendingTurnCallBtn) {
     const pendingCount = dashboardActions.loadTurnPendingContacts().length;
     const campaignBusy = campaignStatus === "running" || assignmentsCount > 0;

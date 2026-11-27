@@ -22,7 +22,8 @@
   <link rel="stylesheet" href="/features/reports/reports-ui.css?v=20261124-voice-ui5" />
   <link rel="stylesheet" href="/layouts/dashboard/account.css?v=20261111-account-bar" />
   <link rel="stylesheet" href="/features/blocked-numbers/blocked-numbers.css?v=20261111-internal" />
-  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261126-admin-lists-grid2" />
+  <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261127-lists-clear-bg" />
+  <link rel="stylesheet" href="/features/calls/calls-workspace.css?v=20261127-qr180" />
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <link rel="stylesheet" href="/features/messaging/message-composer.css?v=20261119-users-ui3" />
   <link rel="stylesheet" href="/features/reservations/reservations.css?v=20261116" />
@@ -119,31 +120,36 @@
       </div>
       <p id="storageStatus" class="storage-status" role="status" hidden></p>
 
-      <section class="shift-management" id="shiftManagement">
-        <div class="shift-management-info">
-          <span>GESTIÓN DEL TURNO</span>
-          <strong id="currentShiftLabel">Detectando turno...</strong>
-          <small id="currentShiftSchedule">Horario de Lima</small>
-        </div>
-        <div class="shift-management-actions">
-          <button id="reportNavBtn" class="secondary" type="button">CALENDARIO</button>
-          <button id="blockedNumbersOpen" class="secondary" type="button" aria-controls="blockedNumbersView">PANEL DE
-            BLOQUEOS</button>
-          <button id="finalizeTurnBtn" class="secondary">FINALIZAR TURNO</button>
-          <button id="finalizeSessionBtn" class="danger-soft">DESVINCULAR EQUIPOS</button>
-        </div>
-      </section>
+      <div hidden><button id="reportNavBtn" type="button">Calendario</button><button id="blockedNumbersOpen" type="button">Bloqueos</button></div>
 
       <div id="callsContent">
+        <section id="shiftManagement" class="general-call-module calls-main-toolbar" aria-label="Controles generales de llamadas">
+          <div class="general-call-controls">
+            <div class="general-call-heading"><div class="calls-title-line"><h2>Llamadas</h2><strong id="currentShiftLabel" class="calls-shift-label">Detectando turno…</strong></div><span id="currentShiftSchedule">Horario de Lima</span><span id="campaignStartHint" role="status" hidden></span></div>
+            <div class="campaign-actions">
+              <button id="campaignStartBtn" aria-describedby="campaignStartHint">Iniciar todos</button>
+              <button id="campaignStopBtn" class="secondary">Detener todos</button>
+              <details class="calls-global-more"><summary>Más acciones</summary><div>
+                <button id="pendingTurnCallBtn" class="secondary">Llamar pendientes del turno</button>
+                <button id="campaignPauseBtn" class="secondary">Pausar todos</button>
+                <button id="campaignResumeBtn" class="secondary">Continuar</button>
+                <button id="campaignSkipBtn" class="secondary">Saltar contacto</button>
+                <button id="finalizeTurnBtn" class="secondary">Finalizar turno</button>
+                <button id="finalizeSessionBtn" class="secondary">Desvincular equipos</button>
+              </div></details>
+            </div>
+          </div>
+        </section>
+
         <!-- QR BLOCK -->
         <div class="qr-block" id="qrBlock">
           <div class="pairing-slots-head">
             <div>
-              <p class="qr-eyebrow">Vinculación Android</p>
-              <h3 class="qr-title">Vincula tus teléfonos</h3>
-              <p class="muted qr-description">Cada dispositivo debe escanear un código QR diferente.</p>
+
+              <h3 class="qr-title">Equipos</h3>
+              <p class="muted qr-description">Conecta cada teléfono con su propio código QR.</p>
             </div>
-            <button id="addPairingQrBtn" class="secondary">+ Crear QR</button>
+            <button id="addPairingQrBtn" class="secondary">+ Vincular equipo</button>
           </div>
           <div id="pairingSlots" class="pairing-slots-grid">
             <div class="campaign-list-empty">Generando códigos QR...</div>
@@ -153,53 +159,6 @@
         <!-- EQUIPOS Y LISTAS ASIGNADAS -->
         <div id="assignedListsPanel" class="assigned-lists-panel" style="display: none;"></div>
 
-        <section class="general-call-module" aria-label="Llamada general">
-          <div class="general-call-controls qr-general-call-controls">
-            <div class="general-call-heading">
-              <strong>Llamada general</strong>
-              <span>Inicia las llamadas en todos los teléfonos disponibles.</span>
-              <span id="campaignStartHint" role="status" hidden></span>
-            </div>
-            <div class="campaign-actions">
-              <button id="campaignStopBtn" class="danger-soft">■ Detener</button>
-              <button id="campaignStartBtn" aria-describedby="campaignStartHint">▶ Iniciar llamada general</button>
-              <button id="pendingTurnCallBtn" class="secondary">☎ Llamar números pendientes</button>
-              <button id="campaignPauseBtn" class="secondary">⏸ Pausar</button>
-              <button id="campaignResumeBtn" class="secondary">⏯ Continuar</button>
-              <button id="campaignSkipBtn" class="secondary">⏭ Saltar</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- PENDING TURN PANEL -->
-        <section id="pendingTurnPanel" class="pending-turn-panel" aria-live="polite">
-          <div class="pending-turn-head">
-            <div>
-              <span>PENDIENTES DEL TURNO</span>
-              <h3>Números pendientes del turno</h3>
-            </div>
-            <strong id="pendingTurnCount">0 pendientes</strong>
-          </div>
-          <div id="pendingTurnTeamTabs" class="pending-turn-team-tabs" role="group" aria-label="Pendientes por equipo">
-          </div>
-          <div class="pending-turn-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>LISTA</th>
-                  <th>EMPRESA</th>
-                  <th>TELÉFONO</th>
-                  <th>CONTACTO</th>
-                </tr>
-              </thead>
-              <tbody id="pendingTurnBody">
-                <tr>
-                  <td colspan="4">No hay números pendientes.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
 
       <!-- RUBRO Y LISTA VIEW -->

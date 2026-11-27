@@ -245,7 +245,7 @@ function bindEvents() {
           feedback = document.createElement("p");
           feedback.className = "pairing-start-feedback";
           feedback.setAttribute("role", "status");
-          button.closest(".pairing-slot-call-actions").after(feedback);
+          button.closest(".call-equipment-actions, .pairing-slot-call-actions")?.after(feedback);
         }
         feedback.textContent = message;
       };

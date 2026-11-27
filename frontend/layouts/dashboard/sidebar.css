@@ -794,8 +794,16 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 .panel:has(#adminUserListsView:not([hidden])) .contacts-view-nav,
 .panel:has(#adminUserListsView:not([hidden])) .contacts-window-header { display: none !important; }
 .panel:has(#adminUserListsView:not([hidden])) #adminUserListsView { margin-top: 0; }
+.panel:has(#contactsContent:not([hidden]) #adminUserListsView:not([hidden])) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 .admin-user-lists-view {
   margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent;
+  box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .admin-user-lists-view .admin-lists-heading { margin-bottom: 18px; }
 .admin-lists-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
@@ -818,7 +826,7 @@ html.has-viavox-sidebar body { padding-left: 248px; }
   min-width: 86px; min-height: 38px; padding: 7px 12px; border: 1px solid #8c55a5; border-radius: 10px;
   color: #fbf6ff; background: #1c0829;
 }
-.admin-lists-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; }
+.admin-lists-months { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .admin-lists-months .admin-lists-month {
   min-height: 40px; padding: 8px 6px; border: 1px solid #734482; border-radius: 11px;
   color: #d7c1e0; background: #3b174e; font-weight: 650; cursor: pointer; transition: .16s ease;
