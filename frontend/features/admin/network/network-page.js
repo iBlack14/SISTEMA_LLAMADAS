@@ -156,6 +156,14 @@ function createCard(number) {
   </div>
   <div class="card-time-badge"></div>
   <div class="card-meta"></div>
+  <button type="button" class="button secondary card-change-list">Cambiar lista</button>
+  <form class="card-list-form" hidden>
+    <label>Lista del equipo<select class="card-list-select" required></select></label>
+    <p>El equipo quedará detenido. Inícialo desde Llamadas cuando estés listo.</p>
+    <button type="submit" class="button">Guardar lista</button>
+    <button type="button" class="button secondary card-list-cancel">Cancelar</button>
+  </form>
+  <p class="card-list-feedback" role="status" hidden></p>
   <div class="card-stats"></div>
   <div class="card-live" hidden></div>
   <details class="card-history"><summary>Actividad del turno <span class="card-activity"></span></summary>
@@ -166,11 +174,86 @@ function createCard(number) {
   <p class="card-scope"></p>`;
   $("equipmentGrid").appendChild(card);
   cards.set(number, card);
+  card.querySelector(".card-change-list").addEventListener("click", () => openEquipmentLists(number, card));
+  card.querySelector(".card-list-cancel").addEventListener("click", () => { card.querySelector(".card-list-form").hidden = true; });
+  card.querySelector(".card-list-form").addEventListener("submit", event => {
+    event.preventDefault();
+    saveEquipmentList(number, card);
+  });
   return card;
+}
+async function openEquipmentLists(number, card) {
+  const button = card.querySelector(".card-change-list");
+  if (button.dataset.loading === "true") return;
+  const item = snapshot?.equipment.find(item => item.number === number);
+  if (!item?.deviceId) return;
+  if (!window.confirm("Para cambiar la lista se detendrá este equipo y se colgará su llamada si tiene una en curso. ¿Continuar?")) return;
+  button.dataset.loading = "true";
+  const feedback = card.querySelector(".card-list-feedback");
+  const form = card.querySelector(".card-list-form");
+  form.hidden = true;
+  feedback.hidden = false;
+  feedback.textContent = "Deteniendo equipo y esperando el cierre de la llamada…";
+  try {
+    const stopResponse = await apiFetch(`/api/network/equipment/${number}/stop-for-list`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceId: item.deviceId })
+    });
+    const stop = await stopResponse.json();
+    if (!stopResponse.ok) throw new Error(stop.error || "No se pudo detener el equipo.");
+    let response, data;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      response = await apiFetch(`/api/network/equipment/${number}/lists`);
+      data = await response.json();
+      if (response.ok || data.reason !== "CALL_ACTIVE") break;
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    if (data.reason === "CALL_ACTIVE") throw new Error("El teléfono aún no confirma el cierre. El equipo quedó detenido. Revisa la llamada en el celular y vuelve a intentarlo.");
+    if (!response.ok) throw new Error(data.error || "No se pudieron cargar las listas.");
+    if (data.deviceId !== item.deviceId) throw new Error("El equipo cambió. Actualiza la página.");
+    form.dataset.deviceId = data.deviceId;
+    const select = card.querySelector(".card-list-select");
+    select.replaceChildren(new Option("Selecciona una lista", ""));
+    for (const list of data.lists) {
+      const option = new Option(`${list.name} · ${list.count.toLocaleString("es-PE")} contactos${list.occupied ? " · Asignada a otro equipo" : ""}`, list.name);
+      option.disabled = list.occupied;
+      select.append(option);
+    }
+    select.value = data.currentList;
+    form.hidden = false;
+    feedback.textContent = data.lists.length ? "" : "Esta cuenta no tiene listas con contactos.";
+    feedback.hidden = !feedback.textContent;
+    select.focus();
+  } catch (error) { feedback.textContent = error.message; }
+  finally { delete button.dataset.loading; }
+}
+async function saveEquipmentList(number, card) {
+  const form = card.querySelector(".card-list-form");
+  const feedback = card.querySelector(".card-list-feedback");
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  feedback.hidden = false;
+  feedback.textContent = "Guardando lista…";
+  try {
+    const response = await apiFetch(`/api/network/equipment/${number}/lists`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: form.dataset.deviceId, list: card.querySelector(".card-list-select").value })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "No se pudo guardar la lista.");
+    form.hidden = true;
+    feedback.textContent = "Lista guardada. El equipo está detenido; puedes iniciarlo desde Llamadas.";
+    if (data.snapshot?.equipment) accept(data.snapshot);
+  } catch (error) { feedback.textContent = error.message; }
+  finally { submit.disabled = false; }
 }
 function renderCard(card, item, state, live) {
   card.dataset.state = state;
   card.dataset.tone = tones[state];
+  const changeList = card.querySelector(".card-change-list");
+  changeList.hidden = !item.deviceId;
+  changeList.disabled = !live || !["Disponible", "En llamada", "Marcando"].includes(state);
+  changeList.title = changeList.disabled ? "Disponible cuando el teléfono esté conectado" : "Detener este equipo y asignarle otra lista";
   card.dataset.search = `${item.number} Equipo ${String(item.number).padStart(2, "0")} ${item.deviceId || ""} ${item.deviceId ? shortDeviceId(item.deviceId) : ""} ${item.name || ""} ${item.rubro || ""} ${item.call?.name || ""} ${item.call?.phone || ""}`.toLowerCase();
   card.querySelector(".card-title").textContent = `Equipo ${String(item.number).padStart(2, "0")}`;
   const model = (item.name || "").replace(/\bCelular\b/gi, "Equipo").replace(/^Equipo\s*\d*\s*/i, "").trim();

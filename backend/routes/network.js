@@ -1,6 +1,8 @@
 import path from "path";
+import { randomUUID } from "node:crypto";
 import { normalizeBook } from "../services/campaigns/contact-book.js";
 import { collectUsedBaseFingerprints, mergeImportedContactBatches } from "../services/contacts/import-contact-book.js";
+import { getContactByWorker, setWorkerPaused } from "../services/campaigns/campaign-manager.js";
 
 /**
  * registerNetwork: conserva los contratos y reglas existentes.
@@ -397,6 +399,123 @@ runtime.app.get("/api/network/equipment/:number", runtime.auth.requireAdmin, asy
     if (!equipment) return res.status(404).json({ ok: false, error: "Equipo no encontrado." });
     res.json({ ok: true, generatedAt: snapshot.generatedAt, equipment });
   } catch { res.status(503).json({ ok: false, error: "No se pudo consultar el equipo." }); }
+});
+
+function equipmentListTarget(deviceId) {
+  const candidate = runtime.network.candidates().get(deviceId);
+  if (!candidate) throw Object.assign(new Error("El teléfono ya no está vinculado."), { status: 409 });
+  const { code, session, slot, worker } = candidate;
+  if (!worker?.connected || !worker.socketId || !runtime.network.isSocketConnected(worker.socketId)) {
+    throw Object.assign(new Error("El teléfono no está conectado."), { status: 409 });
+  }
+  if (["dialing", "ringing", "in_call"].includes(worker.callState) || getContactByWorker(session, deviceId)) {
+    throw Object.assign(new Error("Espera a que el equipo termine su llamada antes de cambiar la lista."), { status: 409, reason: "CALL_ACTIVE" });
+  }
+  return { code, session, slot };
+}
+
+runtime.app.post("/api/network/equipment/:number/stop-for-list", runtime.auth.requireAdmin, async (req, res) => {
+  try {
+    const deviceId = String(req.body?.deviceId || "");
+    const snapshot = await runtime.network.snapshot();
+    const item = snapshot.equipment.find(item => item.number === Number(req.params.number));
+    if (!deviceId || item?.deviceId !== deviceId) return res.status(409).json({ ok: false, error: "El equipo cambió. Actualiza la página." });
+    const target = runtime.network.candidates().get(deviceId);
+    if (!target?.connected) return res.status(409).json({ ok: false, error: "El teléfono no está conectado." });
+    await runtime.historyGate.serialize(target.code, async () => {
+      const { code, session, worker } = runtime.network.candidates().get(deviceId) || {};
+      if (!worker?.connected || !runtime.network.isSocketConnected(worker.socketId)) {
+        throw Object.assign(new Error("El teléfono se desconectó."), { status: 409 });
+      }
+      const previousCampaign = structuredClone(session.campaign);
+      setWorkerPaused(session, deviceId, true);
+      try { await runtime.persistence.save(runtime.sessions, [code]); }
+      catch (error) { session.campaign = previousCampaign; throw error; }
+      const active = getContactByWorker(session, deviceId);
+      if (active || ["dialing", "ringing", "in_call"].includes(worker.callState)) {
+        runtime.io.to(worker.socketId).emit("call:action", {
+          action: "hangup", from: "dashboard", contactId: active?.id || "", commandId: randomUUID()
+        });
+      }
+      services.emitState(code);
+      services.emitCampaignState(code);
+    });
+    res.json({ ok: true });
+  } catch (error) { res.status(error.status || 503).json({ ok: false, error: error.message }); }
+});
+
+runtime.app.get("/api/network/equipment/:number/lists", runtime.auth.requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const snapshot = await runtime.network.snapshot();
+    const item = snapshot.equipment.find(item => item.number === Number(req.params.number));
+    if (!item?.deviceId) return res.status(404).json({ ok: false, error: "Equipo no vinculado." });
+    const { session, slot } = equipmentListTarget(item.deviceId);
+    const assignments = session.contactBook?.preferences?.pairingListAssignments || {};
+    const lists = (session.contactBook?.lists || []).map(name => ({
+      name,
+      count: (session.contactBook.contacts || []).filter(c => (c.list || "Principal") === name).length,
+      occupied: Object.entries(assignments).some(([id, list]) => id !== slot.id && list === name)
+    })).filter(list => list.count > 0);
+    res.json({ ok: true, deviceId: item.deviceId, currentList: assignments[slot.id] || "", lists });
+  } catch (error) { res.status(error.status || 503).json({ ok: false, error: error.message, reason: error.reason }); }
+});
+
+runtime.app.post("/api/network/equipment/:number/lists", runtime.auth.requireAdmin, async (req, res) => {
+  try {
+    const deviceId = String(req.body?.deviceId || "");
+    const nextList = String(req.body?.list || "").trim();
+    const snapshot = await runtime.network.snapshot();
+    const item = snapshot.equipment.find(item => item.number === Number(req.params.number));
+    if (!deviceId || item?.deviceId !== deviceId) return res.status(409).json({ ok: false, error: "El equipo cambió. Actualiza la página." });
+    const target = equipmentListTarget(deviceId);
+    await runtime.historyGate.serialize(target.code, async () => {
+      const { code, session, slot } = equipmentListTarget(deviceId);
+      const book = session.contactBook;
+      if (!nextList || !book?.contacts?.some(c => (c.list || "Principal") === nextList)) {
+        throw Object.assign(new Error("Selecciona una lista con contactos de esta cuenta."), { status: 400 });
+      }
+      const previousBook = structuredClone(book);
+      const previousCampaign = structuredClone(session.campaign);
+      const previousRevision = session.contactBookRevision;
+      book.preferences ||= {};
+      const assignments = { ...(book.preferences.pairingListAssignments || {}) };
+      if (Object.entries(assignments).some(([id, list]) => id !== slot.id && list === nextList)) {
+        throw Object.assign(new Error("Esa lista ya está asignada a otro equipo. Libérala primero desde Llamadas."), { status: 409 });
+      }
+      assignments[slot.id] = nextList;
+      book.preferences.pairingListAssignments = assignments;
+      setWorkerPaused(session, deviceId, true);
+      // Al iniciar la nueva lista no debe retomar la cola anterior del teléfono.
+      for (const contact of session.campaign.contacts) {
+        if (contact.targetWorkerId !== deviceId || contact.list === nextList
+            || ["completed", "failed", "awaiting_callback"].includes(contact.status)) continue;
+        contact.targetWorkerId = "";
+        if (contact.status === "held") contact.status = contact.attempts ? "retry_pending" : "pending";
+        if (contact.assignedWorkerId === deviceId) {
+          contact.assignedWorkerId = null;
+          contact.assignedWorkerName = "";
+          contact.currentAttemptId = "";
+        }
+      }
+      session.contactBookRevision = Number(previousRevision || 0) + 1;
+      runtime.persistence.markContactBookDirty(code);
+      try { await runtime.persistence.save(runtime.sessions, [code]); }
+      catch (error) {
+        session.contactBook = previousBook;
+        session.campaign = previousCampaign;
+        session.contactBookRevision = previousRevision;
+        runtime.persistence.markContactBookDirty(code);
+        throw error;
+      }
+      services.emitState(code);
+      services.emitCampaignState(code);
+      runtime.io.to(code).emit("contact-book:changed", { revision: session.contactBookRevision });
+    });
+    const updated = await runtime.network.snapshot();
+    runtime.network.broadcast(updated);
+    res.json({ ok: true, snapshot: updated });
+  } catch (error) { res.status(error.status || 503).json({ ok: false, error: error.message || "No se pudo cambiar la lista." }); }
 });
 
 runtime.app.post("/api/network/equipment/:number/position", runtime.auth.requireAdmin, async (req, res) => {

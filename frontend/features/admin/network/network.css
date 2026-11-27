@@ -2673,3 +2673,10 @@ footer {
   }
 }
 
+.card-list-form[hidden], .card-change-list[hidden], .card-list-feedback[hidden] { display: none !important; }
+.card-list-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 0; }
+.card-list-form label, .card-list-form p { grid-column: 1 / -1; margin: 0; }
+.card-list-form label { display: grid; gap: 8px; }
+.card-list-select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #9251ae; border-radius: 8px; background: #230833; color: #fff; }
+.card-list-form p, .card-list-feedback { font-size: 13px; line-height: 1.5; }
+.card-list-select:focus-visible { outline: 2px solid #ff87e3; outline-offset: 2px; }

@@ -202,7 +202,7 @@ async function navigate(view, { history = true, scroll = true } = {}) {
     try {
       if (view === "network") {
         await ensureSocketLibrary();
-        if (!initNetwork) initNetwork = (await import("../../features/admin/network/network-page.js")).initNetworkPage;
+        if (!initNetwork) initNetwork = (await import("../../features/admin/network/network-page.js?v=20261126-network-lists1")).initNetworkPage;
         await initNetwork?.();
       }
       if (view === "users") {
