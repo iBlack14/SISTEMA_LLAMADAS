@@ -95,7 +95,7 @@ export function ensureShiftManagement(session, date = new Date()) {
       date: detected.date,
       schedule: detected.schedule,
       status: "active",
-      startedAt: new Date().toISOString()
+      startedAt: date.toISOString()
     };
   }
   return session.shiftManagement;
@@ -112,6 +112,9 @@ export function syncPendingContacts(session, campaign, date = new Date()) {
     item
   ]));
   for (const [index, item] of (campaign?.history || []).entries()) {
+    const turnStart = Date.parse(management.current?.startedAt || "");
+    const attemptStart = Date.parse(item.startedAt || "");
+    if (Number.isFinite(turnStart) && Number.isFinite(attemptStart) && attemptStart < turnStart) continue;
     const key = String(item.attemptId || [item.list, item.phone, item.workerId, item.attemptNumber, item.startedAt, index].join("|"));
     report.set(key, { ...item });
   }
@@ -183,11 +186,10 @@ export function finalizeCurrentTurn(session, campaign, date = new Date()) {
   syncPendingContacts(session, campaign, date);
   const management = ensureShiftManagement(session, date);
   if (!management.current) return null;
-  const detected = detectWorkShift(date);
   const record = {
     ...management.current,
     status: "completed",
-    endedAt: new Date().toISOString(),
+    endedAt: date.toISOString(),
     summary: campaignCounts(campaign),
     report: management.currentReport.map((item) => ({ ...item })),
     unfinishedContacts: (campaign?.contacts || [])
@@ -198,7 +200,7 @@ export function finalizeCurrentTurn(session, campaign, date = new Date()) {
   management.history = management.history.slice(0, 60);
   management.currentReport = [];
   management.current = null;
-  management.lastFinalizedWindowKey = `${detected.date}|${management.current?.type || record.type}`;
+  management.lastFinalizedWindowKey = `${record.date}|${record.type}`;
   return record;
 }
 
@@ -238,8 +240,17 @@ export function markPendingCampaignStarted(session, contacts = []) {
 }
 
 export function getShiftSnapshot(session, date = new Date()) {
-  const management = ensureShiftManagement(session, date);
+  let management = ensureShiftManagement(session, date);
   const detected = detectWorkShift(date);
+  const current = management.current;
+  const changed = current && (current.date !== detected.date || current.type !== detected.type);
+  const activeCalls = Object.keys(session.campaign?.assignments || {}).length > 0
+    || (session.campaign?.contacts || []).some(contact => ["dialing", "ringing", "in_call", "held"].includes(contact.status));
+  if (changed && !activeCalls) {
+    session._syncPendingSkip = 0;
+    finalizeCurrentTurn(session, session.campaign || {}, date);
+    management = ensureShiftManagement(session, date);
+  }
   return {
     timezone: management.timezone,
     detected,

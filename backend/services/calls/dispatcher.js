@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { getShiftSnapshot } from "../campaigns/shift-manager.js";
 import { logCampaignWaiting, logOperationalCall } from "../campaigns/operational-log.js";
 import { normalizeBook, withProgress, uncalledContacts, excludeCalledPending, excludeCalledPendingFromBlocks, addAttemptPhoneBlock, excludeBlockedPending, annualPhoneBlocks, phoneKey } from "../campaigns/contact-book.js";
 import {
@@ -143,6 +144,9 @@ function acknowledgeDialDelivery(code, workerId, commandId, callId, accepted = t
 
 function resumeAssignedDial(code, workerId) {
   const session = runtime.sessions.get(code);
+  if (!session) return false;
+  const turn = getShiftSnapshot(session);
+  if (turn.detected.type === "outside" || !turn.current || turn.current.date !== turn.detected.date || turn.current.type !== turn.detected.type) return false;
   const assignment = session?.campaign?.assignments?.[workerId];
   const worker = session?.phoneWorkers?.find(item => String(item.id) === String(workerId));
   const contact = assignment && session?.campaign?.contacts?.find(item => item.id === assignment.contactId);
@@ -336,6 +340,8 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   if (!session) return [];
   const campaign = ensureCampaign(session);
   if (campaign.status !== "running") return [];
+  const turn = getShiftSnapshot(session);
+  if (turn.detected.type === "outside" || !turn.current || turn.current.date !== turn.detected.date || turn.current.type !== turn.detected.type) return [];
   const attempts = services.allCallAttempts();
   const calledBlocks = services.annualBlocks();
   const blockedNumbers = services.globalBlockedNumbers();
