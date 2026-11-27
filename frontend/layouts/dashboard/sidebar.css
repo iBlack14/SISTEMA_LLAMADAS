@@ -790,7 +790,18 @@ html.has-viavox-sidebar body { padding-left: 248px; }
 }
 
 /* Admin contact lists: browse every account's imports together by month. */
+.panel:has(#adminUserListsView:not([hidden])) #status,
+.panel:has(#adminUserListsView:not([hidden])) .contacts-view-nav,
+.panel:has(#adminUserListsView:not([hidden])) .contacts-window-header { display: none !important; }
+.panel:has(#adminUserListsView:not([hidden])) #adminUserListsView { margin-top: 0; }
+.admin-user-lists-view {
+  margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent;
+}
 .admin-user-lists-view .admin-lists-heading { margin-bottom: 18px; }
+.admin-lists-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.admin-lists-heading h3 { color: #fff; font-size: 25px; font-weight: 750; }
+.admin-lists-role { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; padding: 10px 15px; border: 1px solid rgb(235 75 223 / 75%); border-radius: 99px; color: #fbf6ff; background: #330b4c; font-size: 12px; font-weight: 700; }
+.admin-lists-role i { width: 9px; height: 9px; border-radius: 50%; background: #5de3ad; box-shadow: 0 0 0 4px rgb(93 227 173 / 12%); }
 .admin-lists-month-panel,
 .admin-lists-overview,
 .admin-lists-detail-view {
