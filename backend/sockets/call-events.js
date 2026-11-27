@@ -233,6 +233,36 @@ export function registerCallEvents(runtime, services, socket) {
     const transientIdle = !isExternalIncoming && callState === "idle" && !terminalConfirmed
       && ["dialing", "ringing"].includes(assignedContact?.status);
     const effectiveState = transientIdle ? assignedContact.status : callState;
+    const terminal = ["ended", "failed"].includes(String(callState || ""))
+      || (terminalConfirmed && callState === "idle");
+
+    // Fast-path for periodic heartbeat packets that only confirm the handset is
+    // still in the exact same state: refresh watchdog timestamp and ACK without
+    // triggering a full MySQL session snapshot every 10s per device.
+    if (
+      payload.source === "heartbeat"
+      && !terminal
+      && !isExternalIncoming
+      && worker.callState === effectiveState
+      && worker.speakerOn === Boolean(speakerOn)
+      && session.micMuted === Boolean(micMuted)
+      && !lastError
+      && !detectedVoicemail
+    ) {
+      network.observe(code, worker, payload);
+      const receipt = {
+        persisted: true,
+        accepted: Boolean(assignedContact),
+        terminal: false,
+        commandId: commandId || "",
+        contactId: contactId || "",
+        callId: callId || ""
+      };
+      if (sequenced) socket.data.committedPhoneStatus = { sessionId: statusSessionId, sequence: statusSequence, receipt };
+      socket.emit("phone:status_ack", receipt);
+      return;
+    }
+
     if (!transientIdle && (isExternalIncoming || !callId || !currentAttemptId || callId === currentAttemptId)) network.observe(code, worker, payload);
     if (worker) {
       worker.callState = effectiveState || worker.callState || "idle";
@@ -288,32 +318,28 @@ export function registerCallEvents(runtime, services, socket) {
     }
     syncSessionPhoneState(session);
 
-    const terminal = ["ended", "failed"].includes(String(callState || ""))
-      || (terminalConfirmed && callState === "idle");
     const campaign = ensureCampaign(session);
     const alreadyFinalized = terminal && contactId && callId
       && (persistence.hasFinishedAttempt(code, callId, contactId) || campaign.contacts.some((contact) => contact.id === contactId
         && contact.attemptHistory.some((attempt) => attempt.id === callId && attempt.endedAt)));
-    const contactBook = session.contactBook;
-    console.info("[PHONE_STATUS] persisting-session-snapshot", {
-      session: String(code).slice(-2),
-      callState: callState || "unknown",
-      command: String(commandId || "").slice(-8),
-      call: String(callId || "").slice(-8),
-      terminal: Boolean(terminal),
-      accepted: Boolean(updatedContact || alreadyFinalized),
-      contactLists: contactBook?.lists?.length || 0,
-      contactBookContacts: contactBook?.contacts?.length || 0,
-      campaignContacts: campaign.contacts?.length || 0,
-      note: "phone status saves the full in-memory session to MySQL"
-    });
-    // Publish Android's observed state immediately. Durable receipts and dispatch
-    // of the next call still wait for the transaction below.
-    emitState(code);
+    if (terminal || !["in_call", "dialing", "ringing"].includes(callState)) {
+      console.info("[PHONE_STATUS] persisting-session-snapshot", {
+        session: String(code).slice(-2),
+        callState: callState || "unknown",
+        command: String(commandId || "").slice(-8),
+        call: String(callId || "").slice(-8),
+        terminal: Boolean(terminal),
+        accepted: Boolean(updatedContact || alreadyFinalized),
+        campaignContacts: campaign.contacts?.length || 0
+      });
+    }
+    // Publish Android's observed state immediately only for active/live states.
+    // Terminal states wait for the durable commit below to avoid a double-emit.
+    if (!terminal) emitState(code);
     console.info(`[PHONE_SYNC] observed session=${String(code).slice(-2)} worker=${String(worker.id).slice(-8)} state=${effectiveState} reported=${callState} sequence=${sequenced ? statusSequence : "legacy"} queueMs=${statusStartedAt - statusReceivedAt}`);
     // No successful receipt or next call until the transaction/outbox is durable.
     await historyGate.commit(code, [callId, contactId, callState, terminal].join("|"), () => {
-    emitState(code);
+    if (terminal) emitState(code);
     emitCampaignState(code);
     const receipt = {
       persisted: true,
@@ -362,7 +388,11 @@ export function registerCallEvents(runtime, services, socket) {
       }
     }
     if (terminal && (updatedContact || alreadyFinalized) && campaign.status === "running") {
-      setTimeout(() => dispatchCampaignCalls(code, worker?.id || ""), 250);
+      // Use setImmediate (next I/O tick) for the same-worker dispatch to avoid holding
+      // the historyGate serialize queue while MySQL is committing for other workers.
+      // The 0ms timeout still defers to after this promise resolves, but signals Node
+      // it can process other socket messages (other workers' phone:status) in between.
+      setImmediate(() => dispatchCampaignCalls(code, worker?.id || ""));
     }
     });
     }).catch(error => {

@@ -85,8 +85,7 @@ export async function saveCallRecording(pool, {
 }
 
 export async function listAnsweredRecordings(pool, { from, to, list, worker, search, sessionCodes, shift, offset, limit }) {
-  const conditions = ["a.technical_result='contesto'", "a.connected_at IS NOT NULL", "a.ended_at IS NOT NULL",
-    "r.duration_seconds>=30", `r.created_at > ${expiration}`];
+  const conditions = ["a.ended_at IS NOT NULL"];
   const values = [];
   const add = (condition, ...args) => { conditions.push(condition); values.push(...args); };
   if (from) add("a.report_date>=?", from);
@@ -102,6 +101,16 @@ export async function listAnsweredRecordings(pool, { from, to, list, worker, sea
     const pattern = search.replace(/[!%_]/g, char => "!" + char) + "%";
     add("(a.phone LIKE ? ESCAPE '!' OR c.name LIKE ? ESCAPE '!')", pattern, pattern);
   }
+  const joins = `LEFT JOIN vc_call_contacts c ON c.session_code=a.session_code AND c.contact_id=a.contact_id
+       LEFT JOIN vc_call_devices d ON d.session_code=a.session_code AND d.device_id=a.worker_id
+       LEFT JOIN vc_call_turns t ON t.session_code=a.session_code AND t.turn_id=a.shift_id`;
+  const [summaryRows] = await pool.query(
+    `SELECT COUNT(CASE WHEN a.technical_result='buzon_de_voz' THEN 1 END) AS voicemail,
+            COUNT(CASE WHEN a.connected_at IS NOT NULL AND a.connected_seconds < 10 THEN 1 END) AS shortCalls,
+            COUNT(CASE WHEN a.connected_at IS NOT NULL AND a.connected_seconds >= 25 THEN 1 END) AS longCalls,
+            COALESCE(SUM(CASE WHEN a.connected_at IS NOT NULL AND a.connected_seconds >= 25 THEN a.connected_seconds ELSE 0 END),0) AS longSeconds
+       FROM vc_call_attempts a ${joins} WHERE ${conditions.join(" AND ")}`, values);
+  const recordingConditions = [...conditions, "a.technical_result='contesto'", "a.connected_at IS NOT NULL", "r.duration_seconds>=30", `r.created_at > ${expiration}`];
   const [rows] = await pool.query(
     `SELECT a.session_code AS sessionCode, a.attempt_id AS attemptId, a.phone,
             a.started_at AS startedAt, a.connected_at AS connectedAt, a.ended_at AS endedAt,
@@ -110,13 +119,11 @@ export async function listAnsweredRecordings(pool, { from, to, list, worker, sea
             r.duration_seconds AS durationSeconds, r.size_bytes AS sizeBytes
        FROM vc_call_recordings r
        JOIN vc_call_attempts a ON a.session_code=r.session_code AND a.attempt_id=r.attempt_id
-       LEFT JOIN vc_call_contacts c ON c.session_code=a.session_code AND c.contact_id=a.contact_id
-       LEFT JOIN vc_call_devices d ON d.session_code=a.session_code AND d.device_id=a.worker_id
-       LEFT JOIN vc_call_turns t ON t.session_code=a.session_code AND t.turn_id=a.shift_id
-      WHERE ${conditions.join(" AND ")}
+       ${joins}
+      WHERE ${recordingConditions.join(" AND ")}
       ORDER BY a.report_date DESC, a.started_at DESC, a.session_code DESC, a.attempt_id DESC
       LIMIT ? OFFSET ?`, [...values, limit + 1, offset]);
-  return { rows: rows.slice(0, limit), hasMore: rows.length > limit };
+  return { rows: rows.slice(0, limit), hasMore: rows.length > limit, summary: summaryRows[0] };
 }
 
 export async function getCallRecording(pool, sessionCode, attemptId) {

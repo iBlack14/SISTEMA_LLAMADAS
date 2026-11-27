@@ -52,6 +52,11 @@ body:has(#voiceView:not([hidden])) #statusText { color: #796c81 !important; }
 #voiceView .voice-action.voice-delete { background: #ffffff !important; border: 1.5px solid #e11d48 !important; color: #be123c !important; }
 #voiceView .voice-action.voice-delete:hover:not(:disabled) { background: #e11d48 !important; border-color: #e11d48 !important; color: #ffffff !important; }
 #voiceView :is(button, input, select):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
+#voiceView .voice-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+#voiceView .voice-summary > div { padding: 15px; background: #fff; border: 1px solid #e8dfec; border-radius: 12px; }
+#voiceView .voice-summary span { display: block; color: #796c81; font-size: 12px; }
+#voiceView .voice-summary strong { display: block; margin-top: 5px; color: #35233f !important; font-size: 21px; font-variant-numeric: tabular-nums; }
+@media (max-width: 800px) { #voiceView .voice-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 #voiceView .voice-filters { grid-template-columns: repeat(4, minmax(135px, 1fr)) auto auto; }
 #voiceView .voice-more-filters { align-self: end; }
 #voiceView .voice-filter-actions { grid-column: 6; grid-row: 1; }

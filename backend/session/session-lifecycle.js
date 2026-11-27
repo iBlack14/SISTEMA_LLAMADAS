@@ -37,12 +37,42 @@ import {
  * Se construye una vez por proceso.
  */
 export function createSessionLifecycle(runtime, services) {
-function emitCampaignState(code) {
+const campaignStateTimers = new Map();
+function flushCampaignState(code) {
   const session = runtime.sessions.get(code);
   if (!session) return;
   const campaign = ensureCampaign(session);
   syncPendingContacts(session, campaign);
-  runtime.io.to(code).emit("campaign:state", { ...getCampaignSnapshot(session), turn: getShiftSnapshot(session) });
+  const payload = { ...getCampaignSnapshot(session), turn: getShiftSnapshot(session) };
+  if (runtime.io.sockets?.sockets) {
+    if (session.dashboardSocketId) {
+      runtime.io.to(session.dashboardSocketId).emit("campaign:state", payload);
+    }
+  } else {
+    runtime.io.to(code).emit("campaign:state", payload);
+  }
+}
+
+function emitCampaignState(code) {
+  const session = runtime.sessions.get(code);
+  if (!session) return;
+  const contactCount = session.campaign?.contacts?.length || 0;
+  if (contactCount <= 200) {
+    const existing = campaignStateTimers.get(code);
+    if (existing) {
+      clearTimeout(existing);
+      campaignStateTimers.delete(code);
+    }
+    flushCampaignState(code);
+    return;
+  }
+  if (campaignStateTimers.has(code)) return;
+  const timer = setTimeout(() => {
+    campaignStateTimers.delete(code);
+    flushCampaignState(code);
+  }, 150);
+  timer.unref?.();
+  campaignStateTimers.set(code, timer);
 }
 
 function disconnectAllSessionPhones(session, reason = "turn_finished") {

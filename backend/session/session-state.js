@@ -101,9 +101,23 @@ function emitState(code) {
   services.syncSessionPhoneState(session);
   const campaign = ensureCampaign(session);
   syncPendingContacts(session, campaign);
+  const neededContactIds = new Set();
+  for (const worker of session.phoneWorkers || []) {
+    const assignment = campaign.assignments?.[worker.id];
+    if (assignment?.contactId) neededContactIds.add(assignment.contactId);
+  }
+  const assignedContactsById = new Map();
+  if (neededContactIds.size > 0) {
+    for (const item of campaign.contacts || []) {
+      if (neededContactIds.has(item.id)) {
+        assignedContactsById.set(item.id, item);
+        if (assignedContactsById.size === neededContactIds.size) break;
+      }
+    }
+  }
   const phoneWorkers = (session.phoneWorkers || []).map((worker) => {
     const assignment = campaign.assignments?.[worker.id] || null;
-    const contact = assignment ? campaign.contacts.find((item) => item.id === assignment.contactId) : null;
+    const contact = assignment ? (assignedContactsById.get(assignment.contactId) || null) : null;
     return {
       id: worker.id,
       name: worker.name,
@@ -128,7 +142,8 @@ function emitState(code) {
     };
   });
 
-  runtime.io.to(code).emit("state:changed", {
+  const blockedNumbers = services.globalBlockedNumbers();
+  const fullPayload = {
     localTestMode: false,
     storage: runtime.persistence.status(),
     callRestrictions: services.callRestrictions(session),
@@ -141,7 +156,7 @@ function emitState(code) {
     phoneDevice: session.phoneDevice,
     phoneWorkers,
     pairingSlots: session.pairingSlots || [],
-    blockedNumbers: services.globalBlockedNumbers(),
+    blockedNumbers,
     callState: session.callState,
     lastNumber: session.lastNumber,
     lastCompanyName: session.lastCompanyName,
@@ -151,7 +166,23 @@ function emitState(code) {
     isSpeakerOn: session.isSpeakerOn,
     shiftManagement: getShiftSnapshot(session),
     updatedAt: session.updatedAt
-  });
+  };
+
+  if (runtime.io.sockets?.sockets) {
+    // El dashboard necesita todo el estado; las APKs solo usan blockedNumbers y phoneWorkers.
+    // Con 5-10+ equipos evita enviar cientos de KB de callRestrictions/shiftManagement a cada celular.
+    if (session.dashboardSocketId) {
+      runtime.io.to(session.dashboardSocketId).emit("state:changed", fullPayload);
+    }
+    const phonePayload = { blockedNumbers, phoneWorkers };
+    for (const worker of session.phoneWorkers || []) {
+      if (worker.connected && worker.socketId) {
+        runtime.io.to(worker.socketId).emit("state:changed", phonePayload);
+      }
+    }
+  } else {
+    runtime.io.to(code).emit("state:changed", fullPayload);
+  }
   // Cualquier cambio de estado en Llamadas, campañas, equipos o APK
   // notifica también a Núcleo de Red en tiempo real (agrupado en 250 ms).
   runtime.network?.notifyChanged?.();

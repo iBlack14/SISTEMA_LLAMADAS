@@ -79,8 +79,20 @@ export function createRestrictions(runtime, services) {
     return cachedPersistedBlocks;
   }
 
+  let cachedAllAnnualKey = "";
+  let cachedAllAnnualAt = 0;
+  let cachedAllAnnualBlocks = new Map();
+
   function allAnnualBlocks() {
     const now = Date.now();
+    const sessionRevision = [...runtime.sessions].map(([code, session]) =>
+      `${code}:${session.campaign?.updatedAt || 0}:${session.reportArchive?.length || 0}`
+    ).join("|");
+    const cacheKey = `${runtime.persistence.attemptsRevision || 0}-${sessionRevision}-${durableExclusions.size}`;
+    if (cacheKey === cachedAllAnnualKey && now - cachedAllAnnualAt < 60000) {
+      return new Map(cachedAllAnnualBlocks);
+    }
+
     const blocks = new Map(persistedAnnualBlocks(now));
     const liveAttempts = [];
     for (const session of runtime.sessions.values()) liveAttempts.push(...collectCallAttempts(session));
@@ -99,7 +111,10 @@ export function createRestrictions(runtime, services) {
         reason: exclusion.invalid_number ? "NO VOLVER A LLAMAR: número inexistente o incorrecto" : "NO VOLVER A LLAMAR: número ya llamado"
       });
     }
-    return blocks;
+    cachedAllAnnualKey = cacheKey;
+    cachedAllAnnualAt = now;
+    cachedAllAnnualBlocks = blocks;
+    return new Map(blocks);
   }
 
   function globalBlockedNumbers() {
@@ -127,10 +142,20 @@ function synchronizeGlobalBlockedNumbers() {
   return blocked;
 }
 
+let refreshRestrictionsTimer = null;
+const pendingRestrictionSources = new Set();
 function refreshGlobalCallRestrictions(sourceCode = "") {
-  for (const code of runtime.sessions.keys()) {
-    if (code !== sourceCode) services.emitState(code);
-  }
+  if (sourceCode) pendingRestrictionSources.add(sourceCode);
+  if (refreshRestrictionsTimer) return;
+  refreshRestrictionsTimer = setTimeout(() => {
+    refreshRestrictionsTimer = null;
+    const onlyExcluded = pendingRestrictionSources.size === 1 ? [...pendingRestrictionSources][0] : "";
+    pendingRestrictionSources.clear();
+    for (const code of runtime.sessions.keys()) {
+      if (code !== onlyExcluded) services.emitState(code);
+    }
+  }, 1000);
+  refreshRestrictionsTimer.unref?.();
 }
 
 let blockedNumbersQueue = Promise.resolve();
@@ -167,22 +192,27 @@ const sessionRestrictionsCache = new WeakMap();
 
 function callRestrictions(session) {
   const blockedList = globalBlockedNumbers();
-  const cacheKey = `${runtime.persistence.attemptsRevision || 0}:${session.contactBook?.revision || session.contactBook?.contacts?.length || 0}:${session.campaign?.updatedAt || 0}:${blockedList.length}:${durableExclusions.size}`;
+  const cacheKey = `${runtime.persistence.attemptsRevision || 0}:${session.contactBook?.revision || session.contactBook?.contacts?.length || 0}:${session.campaign?.contacts?.length || 0}:${session.campaign?.startedAt || ""}:${blockedList.length}:${durableExclusions.size}`;
   const cached = sessionRestrictionsCache.get(session);
   if (cached && cached.key === cacheKey) return cached.value;
 
   const blocks = allAnnualBlocks();
   const manualBlocks = new Map(blockedList.map(entry => [phoneKey(entry.phone), entry]));
-  const contacts = [...(session.contactBook?.contacts || []),...(session.campaign?.contacts || [])];
-  const value = Object.fromEntries(contacts.flatMap(contact => {
+  const value = {};
+  const applyContact = (contact) => {
     const phone = phoneKey(contact.phone);
+    if (!phone || value[phone]) return;
     const annual = blocks.get(phone);
     const manual = manualBlocks.get(phone);
-    return annual || manual ? [[phone, {
-      ...(annual || {}),
-      ...(manual ? { manualBlocked: true, blockName: manual.name, reason: "Número en la lista global de bloqueos." } : {})
-    }]] : [];
-  }));
+    if (annual || manual) {
+      value[phone] = {
+        ...(annual || {}),
+        ...(manual ? { manualBlocked: true, blockName: manual.name, reason: "Número en la lista global de bloqueos." } : {})
+      };
+    }
+  };
+  for (const contact of session.contactBook?.contacts || []) applyContact(contact);
+  for (const contact of session.campaign?.contacts || []) applyContact(contact);
   sessionRestrictionsCache.set(session, { key: cacheKey, value });
   return value;
 }

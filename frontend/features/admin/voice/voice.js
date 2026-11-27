@@ -34,6 +34,11 @@ function formatDuration(value) {
     : `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatTotalHours(value) {
+  const total = Math.max(0, Math.floor(Number(value) || 0));
+  return `${Math.floor(total / 3600)} h ${String(Math.floor((total % 3600) / 60)).padStart(2, "0")} min ${String(total % 60).padStart(2, "0")} s`;
+}
+
 function formatBytes(value) {
   const bytes = Math.max(0, Number(value) || 0);
   if (bytes < 1024) return `${bytes} B`;
@@ -405,6 +410,7 @@ function createPanel(panel) {
     status.classList.remove("voice-status--date");
     status.textContent = "Cargando grabaciones…";
     body.replaceChildren();
+    panel.querySelectorAll('[data-voice-metric]').forEach(el => { el.textContent = '—'; });
     stopPlayer();
     try {
       const params = new URLSearchParams(filters);
@@ -413,6 +419,10 @@ function createPanel(panel) {
       const data = await response.json();
       if (current.signal.aborted) return;
       if (!response.ok || !data.ok) throw new Error(data.error || "No se pudieron cargar las grabaciones.");
+      for (const el of panel.querySelectorAll('[data-voice-metric]')) {
+        const value = Number(data.summary?.[el.dataset.voiceMetric] || 0);
+        el.textContent = el.dataset.voiceMetric === 'longSeconds' ? formatTotalHours(value) : value.toLocaleString('es-PE');
+      }
       offset = targetOffset;
       currentCount = data.rows.length;
       for (const entry of data.rows) buildRow(entry);

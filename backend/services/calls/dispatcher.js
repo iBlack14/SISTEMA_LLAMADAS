@@ -114,6 +114,7 @@ function scheduleDialDelivery(code, workerId, payload, retry = 0) {
     worker.socketId && runtime.io.to(worker.socketId).emit("call:action", payload);
     scheduleDialDelivery(code, workerId, payload, retry + 1);
   }, delay);
+  delivery.timer.unref?.();
   dialDeliveries.set(key, delivery);
 }
 
@@ -342,11 +343,14 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
   if (campaign.status !== "running") return [];
   const turn = getShiftSnapshot(session);
   if (turn.detected.type === "outside" || !turn.current || turn.current.date !== turn.detected.date || turn.current.type !== turn.detected.type) return [];
-  const attempts = services.allCallAttempts();
   const calledBlocks = services.annualBlocks();
   const blockedNumbers = services.globalBlockedNumbers();
-  excludeCalledPendingFromBlocks(campaign, calledBlocks);
-  excludeBlockedPending(campaign, blockedNumbers);
+  const exclusionKey = `${runtime.persistence.attemptsRevision || 0}:${calledBlocks.size}:${blockedNumbers.length}:${campaign.contacts.length}:${campaign.manualReportRetry?.contactIds?.length || 0}`;
+  if (campaign._lastExclusionKey !== exclusionKey) {
+    excludeCalledPendingFromBlocks(campaign, calledBlocks);
+    excludeBlockedPending(campaign, blockedNumbers);
+    campaign._lastExclusionKey = exclusionKey;
+  }
 
   const dispatched = [];
   const connectedWorkers = services.getConnectedPhoneWorkers(session);
@@ -363,14 +367,29 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
     && !(worker.blockDispatchUntil && Date.now() < worker.blockDispatchUntil)
   );
 
+  const manualRetryIds = new Set((campaign.manualReportRetry?.contactIds || []).map(String));
   for (const worker of workers) {
-    excludeCalledPendingFromBlocks(campaign, calledBlocks);
-    excludeBlockedPending(campaign, blockedNumbers);
     const next = assignNextContact(session, worker);
     if (!next) continue;
     // Preserve the old per-worker duplicate-phone guard without rescanning the
-    // full history after every assignment in this synchronous dispatch batch.
+    // full campaign contact list O(workers * contacts) times in a batch.
     addAttemptPhoneBlock(calledBlocks, next.phone, next.lastAttemptAt);
+    const nextPhoneKey = phoneKey(next.phone);
+    if (nextPhoneKey) {
+      const block = calledBlocks.get(nextPhoneKey);
+      if (block) {
+        for (const contact of campaign.contacts) {
+          if (contact.id === next.id || !["pending", "retry_pending", "held"].includes(contact.status)) continue;
+          if (!block.permanent && manualRetryIds.has(String(contact.id))) continue;
+          if (phoneKey(contact.phone) !== nextPhoneKey) continue;
+          contact.status = "failed";
+          contact.result = block.permanent ? "numero_inexistente" : "numero_llamado_anteriormente";
+          contact.doNotCall = Boolean(block.permanent);
+          contact.callBlockedUntil = block.nextAllowedAt;
+          contact.callBlockReason = block.reason || "Número llamado anteriormente";
+        }
+      }
+    }
     worker.callState = "dialing";
     worker.activeContactId = next.id;
     worker.lastCompanyName = next.name;
@@ -401,12 +420,17 @@ function dispatchCampaignCalls(code, onlyWorkerId = "") {
 
   session.updatedAt = Date.now();
   services.saveSoon(code);
-  services.emitState(code);
-  services.emitCampaignState(code);
-  if (dispatched.length) services.refreshGlobalCallRestrictions(code);
+  if (dispatched.length) {
+    services.emitState(code);
+    services.emitCampaignState(code);
+    services.refreshGlobalCallRestrictions(code);
+  } else {
+    // Only emit if something may have changed (workers checked but none dispatched).
+    services.emitCampaignState(code);
+  }
   const dispatchCycleMs = Date.now() - dispatchStartedAt;
   if (dispatchCycleMs >= 100) {
-    console.info(`[CALL_DISPATCH] cycle session=${String(code).slice(-2)} contacts=${campaign.contacts.length} workers=${workers.length} dispatched=${dispatched.length} attempts=${attempts.length} elapsedMs=${dispatchCycleMs}`);
+    console.info(`[CALL_DISPATCH] cycle session=${String(code).slice(-2)} contacts=${campaign.contacts.length} workers=${workers.length} dispatched=${dispatched.length} attempts=${runtime.persistence.records?.size || 0} elapsedMs=${dispatchCycleMs}`);
   }
   return dispatched;
 }

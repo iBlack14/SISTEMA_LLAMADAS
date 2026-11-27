@@ -25,7 +25,24 @@ function preserveSlotToken(slot) {
   return known?.token ? { ...slot, token: known.token } : slot;
 }
 
+let _pairingRafPending = false;
+let _pendingSlotsToRender = null;
+
 function renderPairingSlotsUi(slots) {
+  if (!refs.pairingSlotsEl) return;
+  _pendingSlotsToRender = slots;
+  if (_pairingRafPending || typeof requestAnimationFrame !== "function") {
+    if (typeof requestAnimationFrame !== "function") _renderPairingSlotsUiSync(slots);
+    return;
+  }
+  _pairingRafPending = true;
+  requestAnimationFrame(() => {
+    _pairingRafPending = false;
+    if (_pendingSlotsToRender) _renderPairingSlotsUiSync(_pendingSlotsToRender);
+  });
+}
+
+function _renderPairingSlotsUiSync(slots) {
   if (!refs.pairingSlotsEl) return;
   const focus = document.activeElement;
   const focusedSlot = refs.pairingSlotsEl.contains(focus) ? focus?.dataset.slotListSelect : null;

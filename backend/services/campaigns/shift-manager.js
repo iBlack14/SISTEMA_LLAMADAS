@@ -103,10 +103,10 @@ export function ensureShiftManagement(session, date = new Date()) {
 
 export function syncPendingContacts(session, campaign, date = new Date()) {
   const nowMs = date instanceof Date ? date.getTime() : (Number(date) || Date.now());
-  const campaignAt = Number(campaign?.updatedAt || 0);
-  if (session._syncPendingSkip && session._syncPendingCampaignAt === campaignAt && nowMs <= session._syncPendingSkip) return;
-  session._syncPendingSkip = nowMs + 60000; // Skip for 60 seconds unless campaign changes
-  session._syncPendingCampaignAt = campaignAt;
+  const syncKey = `${campaign?.history?.length || 0}:${campaign?.status || ""}:${campaign?.listName || ""}`;
+  if (session._syncPendingSkip && session._syncPendingKey === syncKey && nowMs <= session._syncPendingSkip) return;
+  session._syncPendingSkip = nowMs + 60000; // Skip for 60 seconds unless history/status/list changes
+  session._syncPendingKey = syncKey;
   
   const management = ensureShiftManagement(session, date);
   const report = new Map(management.currentReport.map((item, index) => [

@@ -398,24 +398,37 @@ export function getContactByWorker(session, workerId) {
 export function pickNextContact(session, workerId = "") {
   const campaign = ensureCampaign(session);
   const normalizedWorkerId = String(workerId || "").trim();
-  const targetedMode = campaign.contacts.some((contact) => Boolean(contact.targetWorkerId));
-  const eligible = (contact) => !normalizedWorkerId || !targetedMode || contact.targetWorkerId === normalizedWorkerId;
   // Aggregate campaign names do not correspond to a contact-book list.
   const aggregateCampaign = ["Asignación automática", "Pendientes del turno"].includes(campaign.listName);
   const listFilter = campaign.listName && !aggregateCampaign
     ? (contact) => (contact.list || "Principal") === campaign.listName
     : () => true;
-  // Complete the first round before retrying unanswered contacts.
-  const findPendingBeforeRetry = () => {
-    let firstRetry = null;
-    for (const contact of campaign.contacts) {
-      if (!eligible(contact) || !listFilter(contact)) continue;
-      if (contact.status === "pending") return contact;
-      if (!firstRetry && contact.status === "retry_pending") firstRetry = contact;
+
+  // Single-pass selection: detect whether any contact targets a worker while
+  // finding the first pending / retry_pending candidate for both modes.
+  let targetedMode = false;
+  let untargetedPending = null;
+  let untargetedRetry = null;
+  let targetedPending = null;
+  let targetedRetry = null;
+  for (const contact of campaign.contacts) {
+    if (contact.targetWorkerId) targetedMode = true;
+    if (!listFilter(contact)) continue;
+    if (contact.status === "pending") {
+      if (!untargetedPending) untargetedPending = contact;
+      if (!targetedPending && (!normalizedWorkerId || contact.targetWorkerId === normalizedWorkerId)) {
+        targetedPending = contact;
+      }
+    } else if (contact.status === "retry_pending") {
+      if (!untargetedRetry) untargetedRetry = contact;
+      if (!targetedRetry && (!normalizedWorkerId || contact.targetWorkerId === normalizedWorkerId)) {
+        targetedRetry = contact;
+      }
     }
-    return firstRetry;
-  };
-  let next = findPendingBeforeRetry();
+  }
+  let next = targetedMode
+    ? (targetedPending || targetedRetry)
+    : (untargetedPending || untargetedRetry);
   if (!next && normalizedWorkerId && targetedMode) {
     const unclaimed = campaign.contacts.find((contact) =>
       !contact.targetWorkerId && listFilter(contact) && ["pending", "retry_pending"].includes(contact.status)
@@ -425,7 +438,11 @@ export function pickNextContact(session, workerId = "") {
       campaign.contacts.forEach((contact) => {
         if (!contact.targetWorkerId && contact.list === nextList) contact.targetWorkerId = normalizedWorkerId;
       });
-      next = findPendingBeforeRetry();
+      next = campaign.contacts.find((contact) =>
+        contact.targetWorkerId === normalizedWorkerId && listFilter(contact) && contact.status === "pending"
+      ) || campaign.contacts.find((contact) =>
+        contact.targetWorkerId === normalizedWorkerId && listFilter(contact) && contact.status === "retry_pending"
+      ) || null;
     }
   }
   return next;
