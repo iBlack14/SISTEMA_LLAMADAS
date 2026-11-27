@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -8,20 +9,24 @@
   <link rel="icon" type="image/webp" href="/shared/assets/images/favicon.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/features/admin/network/network.css?v=20261127-main-width">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/layouts/dashboard/sidebar.css?v=20261127-white-text">
-  <link rel="stylesheet" href="/features/admin/network/network-light.css?v=20261127-kpi-gradient">
+  <link rel="stylesheet" href="/features/admin/network/network-light.css?v=20261127-indicator-gradient">
   <script>document.documentElement.classList.add("has-viavox-sidebar");</script>
   <script type="module" src="/layouts/dashboard/sidebar.js?v=20261124-voice-retention"></script>
   <script src="/socket.io/socket.io.js" defer></script>
   <script type="module" src="/features/admin/network/network-page.js?v=20261127-network-two-rows"></script>
 </head>
+
 <body>
   <button type="button" class="viavox-menu-toggle" aria-controls="viavoxSidebar" aria-expanded="false">☰ MENÚ</button>
   <aside id="viavoxSidebar" class="viavox-sidebar" aria-label="Menú principal">
-    <a class="viavox-brand" href="/" aria-label="ViaVox, inicio"><img src="/shared/assets/images/logo-vc-color.png" alt="Logo VIAVOX" width="52" height="36"><span><strong>VIAVOX</strong><small>GESTIÓN DE LLAMADAS</small></span></a>
+    <a class="viavox-brand" href="/" aria-label="ViaVox, inicio"><img src="/shared/assets/images/logo-vc-color.png"
+        alt="Logo VIAVOX" width="52" height="36"><span><strong>VIAVOX</strong><small>GESTIÓN DE
+          LLAMADAS</small></span></a>
     <nav class="viavox-navigation" aria-label="Navegación">
       <a class="viavox-nav-item" data-view="calls" href="/llamadas">LLAMADAS</a>
       <a class="viavox-nav-item" data-view="contacts" href="/contactos">RUBRO Y LISTA</a>
@@ -30,15 +35,24 @@
       <a class="viavox-nav-item" data-view="blocked" href="/bloqueos">PANEL DE BLOQUEOS</a>
       <a class="viavox-nav-item" data-view="messages" href="/mensajes">PANEL DE MENSAJES</a>
       <a id="sidebarVoice" class="viavox-nav-item" data-view="voice" href="/voz" hidden>PANEL DE VOZ</a>
-      <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion" hidden>CONFIGURACIÓN</a>
+      <a id="sidebarSettings" class="viavox-nav-item" data-view="settings" href="/configuracion"
+        hidden>CONFIGURACIÓN</a>
     </nav>
-    <div class="viavox-sidebar-footer"><div class="viavox-downloads"></div><div class="viavox-account"></div></div>
+    <div class="viavox-sidebar-footer">
+      <div class="viavox-downloads"></div>
+      <div class="viavox-account"></div>
+    </div>
   </aside>
   <header class="app-header">
     <div class="header-inner">
-      <a class="brand" href="/" aria-label="VOIP VC, ir al panel de llamadas"><img src="/shared/assets/images/logo-vc-color.png" alt="" width="44" height="44"><span>VOIP VC<small>Gestión de llamadas</small></span></a>
+      <a class="brand" href="/" aria-label="VOIP VC, ir al panel de llamadas"><img
+          src="/shared/assets/images/logo-vc-color.png" alt="" width="44" height="44"><span>VOIP VC<small>Gestión de
+            llamadas</small></span></a>
       <nav class="account" aria-label="Cuenta">
-        <div id="accountIdentity"><div class="account-details"><strong id="accountUsername">Cargando cuenta…</strong><span id="accountRole" class="account-role"></span></div></div>
+        <div id="accountIdentity">
+          <div class="account-details"><strong id="accountUsername">Cargando cuenta…</strong><span id="accountRole"
+              class="account-role"></span></div>
+        </div>
         <a class="button secondary" href="/">Panel de llamadas</a>
         <button id="logoutButton" class="button secondary" type="button">Cerrar sesión</button>
       </nav>
@@ -50,14 +64,18 @@
     <!-- NUCLEO DE RED VIEW -->
     <div id="networkView">
       <div class="page-heading">
-        <div><h1>Núcleo de Red</h1><p>Estado de los equipos y actividad del turno.</p></div>
+        <div>
+          <h1>Núcleo de Red</h1>
+          <p>Estado de los equipos y actividad del turno.</p>
+        </div>
         <div class="actions">
           <button id="refreshButton" class="button secondary" type="button">Actualizar</button>
           <button id="downloadLog" class="button primary" type="button" disabled>Descargar registro</button>
         </div>
       </div>
       <div class="connection" role="status">
-        <span class="connection-state"><span id="liveDot" class="status-dot"></span><span id="liveStatus">Conectando con el servidor…</span></span>
+        <span class="connection-state"><span id="liveDot" class="status-dot"></span><span id="liveStatus">Conectando con
+            el servidor…</span></span>
         <span id="updatedAt" class="connection-updated">Sin actualización</span>
       </div>
       <section class="summary" aria-label="Resumen del turno">
@@ -87,22 +105,26 @@
         </div>
         <div id="equipmentIndicators" class="indicators" aria-label="Ir a un equipo"></div>
         <div class="equipment-reconnect-actions">
-          <button id="reconnectAllAlertBtn" class="button secondary reconnect-all-btn" type="button" disabled>Reconectar bridges</button>
+          <button id="reconnectAllAlertBtn" class="button secondary reconnect-all-btn" type="button" disabled>Reconectar
+            bridges</button>
           <span id="reconnectFeedback" class="reconnect-feedback" role="status"></span>
         </div>
         <p id="overflowNotice" class="notice" hidden></p>
       </section>
       <section aria-label="Detalle de equipos">
         <div class="filters">
-          <label class="search" for="searchInput">Buscar equipo<input id="searchInput" type="search" placeholder="Equipo, ID, nombre o rubro…"></label>
+          <label class="search" for="searchInput">Buscar equipo<input id="searchInput" type="search"
+              placeholder="Equipo, ID, nombre o rubro…"></label>
           <div id="stateFilters" class="state-filters" role="group" aria-label="Filtrar por estado">
             <button class="filter-pill active" data-filter="all" type="button" aria-pressed="true">Todos</button>
             <button class="filter-pill" data-filter="En llamada" type="button" aria-pressed="false">En llamada</button>
             <button class="filter-pill" data-filter="Marcando" type="button" aria-pressed="false">Marcando</button>
             <button class="filter-pill" data-filter="Disponible" type="button" aria-pressed="false">Disponibles</button>
-            <button class="filter-pill" data-filter="Desconectado" type="button" aria-pressed="false">Desconectados</button>
+            <button class="filter-pill" data-filter="Desconectado" type="button"
+              aria-pressed="false">Desconectados</button>
             <button class="filter-pill" data-filter="Sin equipo" type="button" aria-pressed="false">Sin equipo</button>
-            <button class="filter-pill" data-filter="Sin señal de estado" type="button" aria-pressed="false">Sin señal de estado</button>
+            <button class="filter-pill" data-filter="Sin señal de estado" type="button" aria-pressed="false">Sin señal
+              de estado</button>
           </div>
         </div>
         <div id="equipmentGrid" class="equipment-grid"></div>
@@ -111,7 +133,7 @@
       <footer>Los estados dependen de la conexión de cada equipo. Horas de Lima.</footer>
     </div>
 
-<!-- USUARIOS VIEW (SECCIÓN INDEPENDIENTE) -->
+    <!-- USUARIOS VIEW (SECCIÓN INDEPENDIENTE) -->
     <section id="usersView" class="users-view-section" aria-labelledby="usersTitle" hidden>
       <div class="users-view-nav">
         <button id="usersBackBtn" class="button secondary" type="button">← VOLVER AL NÚCLEO DE RED</button>
@@ -120,7 +142,12 @@
         <div class="users-view-header">
           <div class="users-view-header-main">
             <span class="users-view-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5A3.5 3.5 0 0 0 12.5 15h-5A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10" cy="8" r="3.2"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 5.2a3.2 3.2 0 0 1 0 5.6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M16 20v-1.5A3.5 3.5 0 0 0 12.5 15h-5A3.5 3.5 0 0 0 4 18.5V20" />
+                <circle cx="10" cy="8" r="3.2" />
+                <path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 5.2a3.2 3.2 0 0 1 0 5.6" />
+              </svg>
             </span>
             <div>
               <span class="users-view-eyebrow">ADMINISTRACIÓN DE CUENTAS</span>
@@ -134,30 +161,93 @@
         <p id="usersError" class="notice error" role="alert" hidden></p>
         <form id="createUserForm" class="user-form">
           <h3><span class="users-section-step" aria-hidden="true">＋</span> Crear vendedor</h3>
-          <label for="newUsername">Usuario<input id="newUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="usernameHint"><small id="usernameHint">Letras, números, punto, guion o guion bajo.</small></label>
-          <label for="newUserRole">Acceso<select id="newUserRole" name="role"><option value="EMPLEADO">Vendedor · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Todo el sistema</option></select></label>
-          <label for="newUserPassword">Contraseña<span class="password-field"><input id="newUserPassword" name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="passwordHint"><button type="button" class="password-toggle" data-password-toggle="newUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span><small id="passwordHint">Mínimo 12 caracteres.</small></label>
-          <label for="newUserConfirmation">Confirmar contraseña<span class="password-field"><input id="newUserConfirmation" name="passwordConfirmation" type="password" required minlength="12" maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle" data-password-toggle="newUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span></label>
-          <div class="user-form-actions"><button id="createUserButton" class="button primary" type="submit">Crear vendedor</button></div>
+          <label for="newUsername">Usuario<input id="newUsername" name="username" required minlength="3" maxlength="80"
+              pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false"
+              aria-describedby="usernameHint"><small id="usernameHint">Letras, números, punto, guion o guion
+              bajo.</small></label>
+          <label for="newUserRole">Acceso<select id="newUserRole" name="role">
+              <option value="EMPLEADO">Vendedor · Solo llamadas</option>
+              <option value="ADMINISTRADOR">Administrador · Todo el sistema</option>
+            </select></label>
+          <label for="newUserPassword">Contraseña<span class="password-field"><input id="newUserPassword"
+                name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"
+                aria-describedby="passwordHint"><button type="button" class="password-toggle"
+                data-password-toggle="newUserPassword" aria-label="Mostrar contraseña" aria-pressed="false"
+                title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 3l18 18" />
+                  <path
+                    d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8" />
+                </svg></button></span><small id="passwordHint">Mínimo 12 caracteres.</small></label>
+          <label for="newUserConfirmation">Confirmar contraseña<span class="password-field"><input
+                id="newUserConfirmation" name="passwordConfirmation" type="password" required minlength="12"
+                maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle"
+                data-password-toggle="newUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false"
+                title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 3l18 18" />
+                  <path
+                    d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8" />
+                </svg></button></span></label>
+          <div class="user-form-actions"><button id="createUserButton" class="button primary" type="submit">Crear
+              vendedor</button></div>
         </form>
         <section class="users-list" aria-labelledby="usersListTitle">
-          <div class="section-heading"><h3 id="usersListTitle">Vendedores registrados</h3><button id="usersRefresh" class="button secondary" type="button">↻ Actualizar</button></div>
+          <div class="section-heading">
+            <h3 id="usersListTitle">Vendedores registrados</h3><button id="usersRefresh" class="button secondary"
+              type="button">↻ Actualizar</button>
+          </div>
           <p id="usersLoading" class="muted" role="status">Cargando…</p>
           <div class="users-table-scroll" tabindex="0" role="region" aria-label="Vendedores registrados">
-            <table><thead><tr><th scope="col">Vendedor</th><th scope="col">Acceso</th><th scope="col">Estado</th><th scope="col">Fecha creación</th><th scope="col">Acciones</th></tr></thead><tbody id="usersRows"></tbody></table>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Vendedor</th>
+                  <th scope="col">Acceso</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Fecha creación</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="usersRows"></tbody>
+            </table>
           </div>
         </section>
       </div>
     </section>
-        <section class="users-list" aria-labelledby="userListsTitle">
-          <div class="section-heading"><h3 id="userListsTitle">Listas por usuario</h3><button id="userListsRefresh" class="button secondary" type="button">Actualizar listas</button></div>
-          <p id="userListsLoading" class="muted" role="status" hidden>Abre esta sección para consultar las listas.</p>
-          <div class="users-table-scroll" tabindex="0" role="region" aria-label="Listas de contactos por usuario"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Acceso</th><th scope="col">Estado</th><th scope="col">Lista</th><th scope="col">Contactos</th></tr></thead><tbody id="userListsRows"></tbody></table></div>
-        </section>
+    <section class="users-list" aria-labelledby="userListsTitle">
+      <div class="section-heading">
+        <h3 id="userListsTitle">Listas por usuario</h3><button id="userListsRefresh" class="button secondary"
+          type="button">Actualizar listas</button>
+      </div>
+      <p id="userListsLoading" class="muted" role="status" hidden>Abre esta sección para consultar las listas.</p>
+      <div class="users-table-scroll" tabindex="0" role="region" aria-label="Listas de contactos por usuario">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Usuario</th>
+              <th scope="col">Acceso</th>
+              <th scope="col">Estado</th>
+              <th scope="col">Lista</th>
+              <th scope="col">Contactos</th>
+            </tr>
+          </thead>
+          <tbody id="userListsRows"></tbody>
+        </table>
       </div>
     </section>
+    </div>
+    </section>
 
-<!-- CONFIGURACIÓN SMTP (SOLO ADMIN) -->
+    <!-- CONFIGURACIÓN SMTP (SOLO ADMIN) -->
     <section id="voiceView" aria-labelledby="voiceTitle" hidden>
       <header class="voice-intro">
         <div class="voice-intro-copy">
@@ -171,14 +261,26 @@
         </div>
       </header>
       <form class="voice-filters" aria-label="Filtros de grabaciones">
-        <label class="voice-field">Usuario<select name="userId"><option value="">Todos los usuarios</option></select></label>
-        <label class="voice-field">Equipo<select name="worker"><option value="">Todos los equipos</option></select></label>
+        <label class="voice-field">Usuario<select name="userId">
+            <option value="">Todos los usuarios</option>
+          </select></label>
+        <label class="voice-field">Equipo<select name="worker">
+            <option value="">Todos los equipos</option>
+          </select></label>
         <label class="voice-field">Desde<input name="from" type="date"></label>
         <label class="voice-field">Hasta<input name="to" type="date"></label>
-        <details class="voice-more-filters"><summary>Más filtros</summary><div class="voice-more-fields">
-        <label class="voice-field">Lista<input name="list" maxlength="255" placeholder="Nombre exacto"></label>
-        <label class="voice-field">Turno<select name="shift"><option value="">Todos los turnos</option><option value="morning">Mañana</option><option value="afternoon">Tarde</option><option value="outside">Fuera de turno</option></select></label>
-        </div></details>
+        <details class="voice-more-filters">
+          <summary>Más filtros</summary>
+          <div class="voice-more-fields">
+            <label class="voice-field">Lista<input name="list" maxlength="255" placeholder="Nombre exacto"></label>
+            <label class="voice-field">Turno<select name="shift">
+                <option value="">Todos los turnos</option>
+                <option value="morning">Mañana</option>
+                <option value="afternoon">Tarde</option>
+                <option value="outside">Fuera de turno</option>
+              </select></label>
+          </div>
+        </details>
         <div class="voice-filter-actions">
           <button type="reset" class="voice-secondary">Limpiar</button>
         </div>
@@ -186,8 +288,13 @@
       <section class="voice-player" aria-labelledby="voicePlayerTitle" hidden>
         <div class="voice-player-head">
           <button type="button" class="voice-player-toggle" aria-label="Reproducir" aria-pressed="false">
-            <span class="voice-icon voice-icon-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z"/></svg></span>
-            <span class="voice-icon voice-icon-pause" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="4.5" height="16" rx="1.5"/></svg></span>
+            <span class="voice-icon voice-icon-play" aria-hidden="true"><svg viewBox="0 0 24 24">
+                <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z" />
+              </svg></span>
+            <span class="voice-icon voice-icon-pause" aria-hidden="true"><svg viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4.5" height="16" rx="1.5" />
+                <rect x="13.5" y="4" width="4.5" height="16" rx="1.5" />
+              </svg></span>
           </button>
           <div class="voice-player-meta">
             <span class="voice-player-eyebrow">
@@ -198,24 +305,43 @@
             <p class="voice-playing-detail"></p>
           </div>
           <div class="voice-player-tools">
-            <button type="button" class="voice-chip-button voice-player-back" aria-label="Retroceder 10 segundos" title="Retroceder 10 s">−10s</button>
-            <button type="button" class="voice-chip-button voice-player-forward" aria-label="Adelantar 10 segundos" title="Adelantar 10 s">+10s</button>
-            <button type="button" class="voice-chip-button voice-player-speed" aria-label="Cambiar velocidad de reproducción" title="Velocidad de reproducción">1×</button>
-            <a class="voice-icon-button voice-player-download" href="#" download aria-label="Descargar grabación" title="Descargar audio">
-              <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></span>
+            <button type="button" class="voice-chip-button voice-player-back" aria-label="Retroceder 10 segundos"
+              title="Retroceder 10 s">−10s</button>
+            <button type="button" class="voice-chip-button voice-player-forward" aria-label="Adelantar 10 segundos"
+              title="Adelantar 10 s">+10s</button>
+            <button type="button" class="voice-chip-button voice-player-speed"
+              aria-label="Cambiar velocidad de reproducción" title="Velocidad de reproducción">1×</button>
+            <a class="voice-icon-button voice-player-download" href="#" download aria-label="Descargar grabación"
+              title="Descargar audio">
+              <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />
+                </svg></span>
             </a>
-            <button type="button" class="voice-icon-button voice-player-mute" aria-label="Silenciar audio" aria-pressed="false" title="Silenciar / activar audio">
-              <span class="voice-icon voice-icon-volume" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Zm-2.5-7v2.1A7 7 0 0 1 14 19.9V22a9 9 0 0 0 0-18Z"/></svg></span>
-              <span class="voice-icon voice-icon-muted" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.7 1.3-1.4 1.4 1.3 1.3-1.3 1.3 1.4 1.4 1.3-1.3 1.3 1.3 1.4-1.4-1.3-1.3 1.3-1.3-1.4-1.4-1.3 1.3-1.3-1.3Z"/></svg></span>
+            <button type="button" class="voice-icon-button voice-player-mute" aria-label="Silenciar audio"
+              aria-pressed="false" title="Silenciar / activar audio">
+              <span class="voice-icon voice-icon-volume" aria-hidden="true"><svg viewBox="0 0 24 24">
+                  <path
+                    d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Zm-2.5-7v2.1A7 7 0 0 1 14 19.9V22a9 9 0 0 0 0-18Z" />
+                </svg></span>
+              <span class="voice-icon voice-icon-muted" aria-hidden="true"><svg viewBox="0 0 24 24">
+                  <path
+                    d="M4 9v6h4l5 4V5L8 9H4Zm12.7 1.3-1.4 1.4 1.3 1.3-1.3 1.3 1.4 1.4 1.3-1.3 1.3 1.3 1.4-1.4-1.3-1.3 1.3-1.3-1.4-1.4-1.3 1.3-1.3-1.3Z" />
+                </svg></span>
             </button>
-            <button type="button" class="voice-icon-button voice-player-close" aria-label="Cerrar reproductor" title="Cerrar reproductor">
-              <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4 6.4 5Z"/></svg></span>
+            <button type="button" class="voice-icon-button voice-player-close" aria-label="Cerrar reproductor"
+              title="Cerrar reproductor">
+              <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24">
+                  <path
+                    d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4 6.4 5Z" />
+                </svg></span>
             </button>
           </div>
         </div>
         <div class="voice-player-timeline">
           <span class="voice-player-current" aria-hidden="true">0:00</span>
-          <input class="voice-player-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición de la grabación">
+          <input class="voice-player-seek" type="range" min="0" max="1000" value="0" step="1"
+            aria-label="Posición de la grabación">
           <span class="voice-player-duration" aria-hidden="true">0:00</span>
         </div>
         <audio preload="metadata" aria-labelledby="voicePlayerTitle"></audio>
@@ -227,13 +353,24 @@
             <p class="voice-status" role="status" aria-live="polite"></p>
           </div>
           <button type="button" class="voice-secondary voice-refresh" aria-label="Actualizar grabaciones">
-            <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.32 4H3l3.5-3.5L10 9H7.9A5 5 0 1 0 12 7v2l4-3-4-3v2Z"/></svg></span>
+            <span class="voice-icon" aria-hidden="true"><svg viewBox="0 0 24 24">
+                <path d="M12 5a7 7 0 1 1-6.32 4H3l3.5-3.5L10 9H7.9A5 5 0 1 0 12 7v2l4-3-4-3v2Z" />
+              </svg></span>
             Actualizar
           </button>
         </header>
         <div class="voice-table-scroll" role="region" tabindex="0" aria-label="Resultados de grabaciones">
           <table>
-            <thead><tr><th scope="col">Contacto</th><th scope="col">Fecha en Lima</th><th scope="col">Lista y equipo</th><th scope="col">Duración</th><th scope="col">Resultado</th><th scope="col">Audio</th></tr></thead>
+            <thead>
+              <tr>
+                <th scope="col">Contacto</th>
+                <th scope="col">Fecha en Lima</th>
+                <th scope="col">Lista y equipo</th>
+                <th scope="col">Duración</th>
+                <th scope="col">Resultado</th>
+                <th scope="col">Audio</th>
+              </tr>
+            </thead>
             <tbody></tbody>
           </table>
         </div>
@@ -247,11 +384,14 @@
       <dialog class="voice-confirm-dialog" aria-labelledby="voiceConfirmTitle" aria-describedby="voiceConfirmDesc">
         <div class="voice-confirm-card">
           <div class="voice-confirm-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h1v-8H9Zm4 0v8h1v-8h-1Z"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h1v-8H9Zm4 0v8h1v-8h-1Z" />
+            </svg>
           </div>
           <div class="voice-confirm-copy">
             <h2 id="voiceConfirmTitle">Eliminar grabación</h2>
-            <p id="voiceConfirmDesc">Esta acción eliminará permanentemente el archivo de audio y no se puede deshacer.</p>
+            <p id="voiceConfirmDesc">Esta acción eliminará permanentemente el archivo de audio y no se puede deshacer.
+            </p>
             <div class="voice-confirm-target">
               <strong class="voice-confirm-name"></strong>
               <span class="voice-confirm-meta"></span>
@@ -269,7 +409,12 @@
         <header class="settings-header">
           <div class="settings-title-wrap">
             <span class="settings-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 7 9 6 9-6"/><path d="M2 19l6.5-6M22 19l-6.5-6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="3" />
+                <path d="m3 7 9 6 9-6" />
+                <path d="M2 19l6.5-6M22 19l-6.5-6" />
+              </svg>
             </span>
             <div>
               <span class="settings-eyebrow">CONFIGURACIÓN GENERAL</span>
@@ -293,7 +438,8 @@
             </div>
             <div class="settings-grid">
               <label class="settings-span-2" for="smtpHost">Servidor SMTP
-                <input id="smtpHost" name="host" type="text" maxlength="180" placeholder="smtp.gmail.com" required autocomplete="off">
+                <input id="smtpHost" name="host" type="text" maxlength="180" placeholder="smtp.gmail.com" required
+                  autocomplete="off">
               </label>
               <label for="smtpPort">Puerto
                 <input id="smtpPort" name="port" type="number" min="1" max="65535" value="587" required>
@@ -305,14 +451,28 @@
                 </select>
               </label>
               <label class="settings-span-2" for="smtpUsername">Usuario
-                <input id="smtpUsername" name="username" type="text" maxlength="180" placeholder="correo@empresa.com" autocomplete="username">
+                <input id="smtpUsername" name="username" type="text" maxlength="180" placeholder="correo@empresa.com"
+                  autocomplete="username">
               </label>
               <label class="settings-span-2" for="smtpPassword">Contraseña o app password
                 <span class="password-field">
-                  <input id="smtpPassword" name="password" type="password" maxlength="200" placeholder="Déjala vacía para mantener la actual" autocomplete="new-password" aria-describedby="smtpPasswordHint">
-                  <button type="button" class="password-toggle" data-password-toggle="smtpPassword" aria-label="Mostrar contraseña" aria-controls="smtpPassword" aria-pressed="false" title="Mostrar contraseña">
-                    <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg>
+                  <input id="smtpPassword" name="password" type="password" maxlength="200"
+                    placeholder="Déjala vacía para mantener la actual" autocomplete="new-password"
+                    aria-describedby="smtpPasswordHint">
+                  <button type="button" class="password-toggle" data-password-toggle="smtpPassword"
+                    aria-label="Mostrar contraseña" aria-controls="smtpPassword" aria-pressed="false"
+                    title="Mostrar contraseña">
+                    <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 3l18 18" />
+                      <path
+                        d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8" />
+                    </svg>
                   </button>
                 </span>
                 <small id="smtpPasswordHint">Se guarda cifrada. Solo el administrador puede verla o cambiarla.</small>
@@ -324,7 +484,8 @@
             <legend><span class="settings-step">2</span> Identidad del remitente</legend>
             <div class="settings-grid">
               <label for="smtpFrom">Dirección From
-                <input id="smtpFrom" name="fromAddress" type="email" maxlength="180" placeholder="ventas@empresa.com" required>
+                <input id="smtpFrom" name="fromAddress" type="email" maxlength="180" placeholder="ventas@empresa.com"
+                  required>
               </label>
               <label for="smtpFromName">Nombre visible
                 <input id="smtpFromName" name="fromName" type="text" maxlength="120" placeholder="VIAVOX Ventas">
@@ -334,7 +495,11 @@
 
           <div class="settings-footer">
             <p class="settings-footer-note">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <rect x="4" y="10" width="16" height="11" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
               La contraseña se guarda cifrada y no se muestra a los empleados.
             </p>
             <div class="settings-actions">
@@ -346,24 +511,64 @@
       </div>
     </section>
 
-<!-- EDITAR USUARIO -->
+    <!-- EDITAR USUARIO -->
     <dialog id="editUserDialog" class="users-dialog">
       <form id="editUserForm" class="user-form">
         <div class="users-dialog-header">
-          <div><h2>Editar vendedor</h2><p id="editUserSubtitle">Actualiza los datos de la cuenta.</p></div>
+          <div>
+            <h2>Editar vendedor</h2>
+            <p id="editUserSubtitle">Actualiza los datos de la cuenta.</p>
+          </div>
           <button id="editUserClose" class="button secondary" type="button">Cerrar</button>
         </div>
         <p id="editUserError" class="notice error" role="alert" hidden></p>
         <input id="editUserId" name="id" type="hidden">
-        <label for="editUsername">Usuario<input id="editUsername" name="username" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false"><small>Letras, números, punto, guion o guion bajo.</small></label>
-        <label for="editUserRole">Acceso<select id="editUserRole" name="role"><option value="EMPLEADO">Vendedor · Solo llamadas</option><option value="ADMINISTRADOR">Administrador · Todo el sistema</option></select></label>
-        <label for="editUserActive">Estado<select id="editUserActive" name="active"><option value="1">Activo</option><option value="0">Inactivo</option></select></label>
-        <label for="editUserPassword">Nueva contraseña<span class="password-field"><input id="editUserPassword" name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" aria-describedby="editPasswordHint"><button type="button" class="password-toggle" data-password-toggle="editUserPassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span><small id="editPasswordHint">Déjala vacía para mantener la actual. Mínimo 12 caracteres.</small></label>
-        <label for="editUserConfirmation">Confirmar contraseña<span class="password-field"><input id="editUserConfirmation" name="passwordConfirmation" type="password" minlength="12" maxlength="256" autocomplete="new-password"><button type="button" class="password-toggle" data-password-toggle="editUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8"/></svg></button></span></label>
-        <div class="user-form-actions"><button id="editUserSubmit" class="button primary" type="submit">Guardar cambios</button></div>
+        <label for="editUsername">Usuario<input id="editUsername" name="username" required minlength="3" maxlength="80"
+            pattern="[a-zA-Z0-9._-]{3,80}" autocomplete="off" autocapitalize="none" spellcheck="false"><small>Letras,
+            números, punto, guion o guion bajo.</small></label>
+        <label for="editUserRole">Acceso<select id="editUserRole" name="role">
+            <option value="EMPLEADO">Vendedor · Solo llamadas</option>
+            <option value="ADMINISTRADOR">Administrador · Todo el sistema</option>
+          </select></label>
+        <label for="editUserActive">Estado<select id="editUserActive" name="active">
+            <option value="1">Activo</option>
+            <option value="0">Inactivo</option>
+          </select></label>
+        <label for="editUserPassword">Nueva contraseña<span class="password-field"><input id="editUserPassword"
+              name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password"
+              aria-describedby="editPasswordHint"><button type="button" class="password-toggle"
+              data-password-toggle="editUserPassword" aria-label="Mostrar contraseña" aria-pressed="false"
+              title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path
+                  d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8" />
+              </svg></button></span><small id="editPasswordHint">Déjala vacía para mantener la actual. Mínimo 12
+            caracteres.</small></label>
+        <label for="editUserConfirmation">Confirmar contraseña<span class="password-field"><input
+              id="editUserConfirmation" name="passwordConfirmation" type="password" minlength="12" maxlength="256"
+              autocomplete="new-password"><button type="button" class="password-toggle"
+              data-password-toggle="editUserConfirmation" aria-label="Mostrar contraseña" aria-pressed="false"
+              title="Mostrar contraseña"><svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg><svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path
+                  d="M10.6 5.1A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17.4 17.4 0 0 1-3.3 4.2M6.7 6.7A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.2-.8" />
+              </svg></button></span></label>
+        <div class="user-form-actions"><button id="editUserSubmit" class="button primary" type="submit">Guardar
+            cambios</button></div>
       </form>
     </dialog>
   </main>
   <script type="module" src="/features/admin/users/users-page.js?v=20261119-users-ui3"></script>
 </body>
+
 </html>

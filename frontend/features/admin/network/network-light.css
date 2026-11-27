@@ -1,6 +1,18 @@
 /* Núcleo de red: misma paleta que Reserva de contacto. */
-#networkView { width: 100%; max-width: 1500px; margin: 0 auto; padding: 28px 24px 56px; box-sizing: border-box; }
-@media (max-width: 700px) { #networkView { padding: 20px 16px 40px; } }
+#networkView {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  #networkView {
+    padding: 20px 16px 40px;
+  }
+}
+
 body:has(#networkView:not([hidden])) {
   color-scheme: light;
   --bg: #f5f1f8;
@@ -22,31 +34,139 @@ body:has(#networkView:not([hidden])) {
   --tone-offline: #b73148;
   --tone-unknown: #796c81;
 }
-body:has(#networkView:not([hidden])) { background: #f5f1f8 !important; color: var(--text); font-family: 'Outfit', sans-serif; }
-body:has(#networkView:not([hidden])) .app-background-overlay { display: none; }
-body:has(#networkView:not([hidden])) .panel { background: #fff !important; border-color: #e8dfec !important; box-shadow: none; }
-#networkView .connection, #networkView .net-card { background: linear-gradient(155deg, #ffffff 0%, #fcf6fe 100%); border-color: #dec6e8; box-shadow: 0 6px 18px rgba(156, 8, 210, 0.08); }
-#networkView .net-card { border-top: 3px solid #b51eb9; }
-#networkView .summary > div { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border: 0 !important; box-shadow: 0 8px 22px rgba(156, 8, 210, 0.22) !important; color: #ffffff !important; }
-#networkView .summary > div :is(span, strong, small) { color: #ffffff !important; }
-#networkView .primary, #networkView .filter-pill.active { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%); border-color: transparent; color: #fff; }
-#networkView .secondary, #networkView .equipment-slider button { background: #fff; border-color: #e8dfec; color: #35233f; }
-#networkView .search input, #networkView .card-list-select { background: #fff; color: #35233f; border-color: #ded3e3; }
-#networkView .card-device-id, #networkView .card-history summary, #networkView th, #networkView td { color: #594660; }
-#networkView .card-live { background: #f8f5fa; box-shadow: none; }
-#networkView .card-time-badge .time-badge.connected { color: #12683e; }
-#networkView .card-time-badge .time-badge.disconnected { color: #9e263c; }
-.equipment-action-dialog { background: #fff; color: #35233f; border-color: #e8dfec; }
-.equipment-action-dialog h2, .equipment-action-dialog .equipment-dialog-close { color: #35233f; }
-.equipment-action-dialog #equipmentActionDescription, .equipment-dialog-kicker, .equipment-dialog-field, .equipment-dialog-field small { color: #796c81; }
-.equipment-dialog-device { background: #f8f5fa; border-color: #e8dfec; color: #594660; }
-.equipment-dialog-field input { background: #fff; border-color: #ded3e3; color: #35233f; }
-.equipment-action-dialog footer .equipment-dialog-cancel { color: #594660; background: #f8f5fa !important; border-color: #e8dfec; }
-.equipment-action-dialog footer .equipment-dialog-confirm { background: #79258e; border-color: #79258e; color: #fff; }
-#networkView :is(button, input, select):focus-visible, .equipment-action-dialog :is(button, input):focus-visible { outline: 3px solid #c08ad1; outline-offset: 3px; }
+
+body:has(#networkView:not([hidden])) {
+  background: #f5f1f8 !important;
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+}
+
+body:has(#networkView:not([hidden])) .app-background-overlay {
+  display: none;
+}
+
+body:has(#networkView:not([hidden])) .panel {
+  background: #fff !important;
+  border-color: #e8dfec !important;
+  box-shadow: none;
+}
+
+#networkView .connection,
+#networkView .net-card {
+  background: linear-gradient(155deg, #ffffff 0%, #fcf6fe 100%);
+  border-color: #dec6e8;
+  box-shadow: 0 6px 18px rgba(156, 8, 210, 0.08);
+}
+
+#networkView .net-card {
+  border-top: 3px solid #b51eb9;
+}
+
+#networkView .summary>div {
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(156, 8, 210, 0.22) !important;
+  color: #ffffff !important;
+}
+
+#networkView .summary>div :is(span, strong, small) {
+  color: #ffffff !important;
+}
+
+#networkView .primary,
+#networkView .filter-pill.active {
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+#networkView .secondary,
+#networkView .equipment-slider button {
+  background: #fff;
+  border-color: #e8dfec;
+  color: #35233f;
+}
+
+#networkView .search input,
+#networkView .card-list-select {
+  background: #fff;
+  color: #35233f;
+  border-color: #ded3e3;
+}
+
+#networkView .card-device-id,
+#networkView .card-history summary,
+#networkView th,
+#networkView td {
+  color: #594660;
+}
+
+#networkView .card-live {
+  background: #f8f5fa;
+  box-shadow: none;
+}
+
+#networkView .card-time-badge .time-badge.connected {
+  color: #12683e;
+}
+
+#networkView .card-time-badge .time-badge.disconnected {
+  color: #9e263c;
+}
+
+.equipment-action-dialog {
+  background: #fff;
+  color: #35233f;
+  border-color: #e8dfec;
+}
+
+.equipment-action-dialog h2,
+.equipment-action-dialog .equipment-dialog-close {
+  color: #35233f;
+}
+
+.equipment-action-dialog #equipmentActionDescription,
+.equipment-dialog-kicker,
+.equipment-dialog-field,
+.equipment-dialog-field small {
+  color: #796c81;
+}
+
+.equipment-dialog-device {
+  background: #f8f5fa;
+  border-color: #e8dfec;
+  color: #594660;
+}
+
+.equipment-dialog-field input {
+  background: #fff;
+  border-color: #ded3e3;
+  color: #35233f;
+}
+
+.equipment-action-dialog footer .equipment-dialog-cancel {
+  color: #594660;
+  background: #f8f5fa !important;
+  border-color: #e8dfec;
+}
+
+.equipment-action-dialog footer .equipment-dialog-confirm {
+  background: #79258e;
+  border-color: #79258e;
+  color: #fff;
+}
+
+#networkView :is(button, input, select):focus-visible,
+.equipment-action-dialog :is(button, input):focus-visible {
+  outline: 3px solid #c08ad1;
+  outline-offset: 3px;
+}
 
 /* Los estilos generales del dashboard usan !important en botones. */
-#networkView .indicators { gap: 18px; }
+#networkView .indicators {
+  gap: 18px;
+}
+
 #networkView .equipment-position {
   padding: 12px;
   gap: 7px;
@@ -56,25 +176,55 @@ body:has(#networkView:not([hidden])) .panel { background: #fff !important; borde
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(156, 8, 210, 0.08) !important;
 }
+
 #networkView .equipment-position .indicator {
   min-height: 200px;
   padding: 18px 10px 0;
-  background: linear-gradient(145deg, #f6e7fb 0%, #fce8f6 100%) !important;
-  border: 1.5px solid #d9b6e6 !important;
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+  border: 0 !important;
   border-radius: 11px;
-  color: #35233f !important;
+  color: #ffffff !important;
+  overflow: hidden;
   transform: none;
   filter: none;
-  box-shadow: none !important;
-  transition: background .16s ease, border-color .16s ease;
+  box-shadow: 0 6px 18px rgba(156, 8, 210, 0.24) !important;
+  transition: filter .16s ease;
 }
-#networkView .equipment-position .indicator:hover { background: linear-gradient(145deg, #eed5f8 0%, #fad8f1 100%) !important; border-color: #9c08d2 !important; }
-#networkView .indicator .orb-num, #networkView .indicator .orb-time, #networkView .indicator .orb-device-id { color: #35233f !important; }
-#networkView .indicator .orb-sub { color: var(--tone, #796c81) !important; }
-#networkView .indicator .orb-time-caption { color: #796c81 !important; }
-#networkView .indicator .orb-connection { margin-inline: -10px; background: #f0eaf3 !important; color: #67566e !important; }
-#networkView .indicator .orb-connection[data-connection=connected] { background: #e5f4ea !important; color: #12683e !important; }
-#networkView .indicator .orb-connection[data-connection=disconnected] { background: #fcecef !important; color: #9e263c !important; }
+
+#networkView .equipment-position .indicator:hover {
+  filter: brightness(1.06);
+}
+
+#networkView .indicator .orb-num,
+#networkView .indicator .orb-time,
+#networkView .indicator .orb-device-id,
+#networkView .indicator .orb-sub,
+#networkView .indicator .orb-time-caption {
+  color: #ffffff !important;
+}
+
+#networkView .indicator .orb-device-id,
+#networkView .indicator .orb-time-caption {
+  opacity: .9;
+}
+
+#networkView .indicator .orb-connection {
+  margin-inline: -10px;
+  background: rgba(24, 0, 36, .26) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+#networkView .indicator .orb-connection[data-connection=connected] {
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+#networkView .indicator .orb-connection[data-connection=disconnected] {
+  background: #e11d48 !important;
+  color: #ffffff !important;
+}
+
 #networkView .equipment-position .button {
   min-height: 34px;
   padding: 7px 8px;
@@ -88,8 +238,34 @@ body:has(#networkView:not([hidden])) .panel { background: #fff !important; borde
   box-shadow: none !important;
   filter: none;
 }
-#networkView .equipment-position .button:disabled { background: #f8f5fa !important; color: #8c8092 !important; opacity: .75; }
-#networkView .equipment-position .equipment-number-btn { background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 4px 12px rgba(156, 8, 210, 0.22) !important; }
-#networkView .equipment-position .equipment-number-btn:hover:not(:disabled) { filter: brightness(1.08); color: #fff !important; }
-#networkView .equipment-position .button:not(.equipment-number-btn):hover:not(:disabled) { background: #f1e9f5 !important; color: #79258e !important; }
-#networkView .reconnect-all-btn { background: #fff !important; border: 1px solid #ded3e3 !important; color: #594660 !important; box-shadow: none !important; text-transform: none !important; }
+
+#networkView .equipment-position .button:disabled {
+  background: #f8f5fa !important;
+  color: #8c8092 !important;
+  opacity: .75;
+}
+
+#networkView .equipment-position .equipment-number-btn {
+  background: linear-gradient(135deg, #9c08d2 0%, #f000a9 100%) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(156, 8, 210, 0.22) !important;
+}
+
+#networkView .equipment-position .equipment-number-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  color: #fff !important;
+}
+
+#networkView .equipment-position .button:not(.equipment-number-btn):hover:not(:disabled) {
+  background: #f1e9f5 !important;
+  color: #79258e !important;
+}
+
+#networkView .reconnect-all-btn {
+  background: #fff !important;
+  border: 1px solid #ded3e3 !important;
+  color: #594660 !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
